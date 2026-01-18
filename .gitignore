@@ -1,2 +1,30 @@
 # Beads local database (team mode)
 .beads/beads.db
+
+# bv (beads viewer) local config and caches
+.bv/
+
+# Go build artifacts
+ai-repo
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build output directories
+bin/
+dist/
+
+# GoReleaser
+.goreleaser.dist.yml
+
+# Go test artifacts
+*.test
+*.out
+
+# Go dependency management
+vendor/
+
+# IDE files
+.vscode/
+.DS_Store

@@ -1,0 +1,13 @@
+# AI Repository Configuration Example
+#
+# This file shows the available configuration options for ai-repo.
+# Copy this file to .ai-repo.yaml and customize as needed.
+
+# default-tool: Specifies which AI coding tool to use by default
+# Valid values: claude, opencode, copilot
+# Default: claude
+#
+# - claude: Claude Code (supports commands and skills)
+# - opencode: OpenCode (supports commands and skills, reads .claude/ too)
+# - copilot: GitHub Copilot (supports skills only, no commands)
+default-tool: claude
