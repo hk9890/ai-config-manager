@@ -17,7 +17,7 @@ var formatFlag string
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
-	Use:   "list [command|skill]",
+	Use:   "list [command|skill|agent]",
 	Short: "List resources in the repository",
 	Long: `List all resources in the ai-repo repository, optionally filtered by type.
 
@@ -25,6 +25,7 @@ Examples:
   ai-repo list                    # List all resources
   ai-repo list command            # List only commands
   ai-repo list skill              # List only skills
+  ai-repo list agent              # List only agents
   ai-repo list --format=json      # Output as JSON
   ai-repo list --format=yaml      # Output as YAML`,
 	Args: cobra.MaximumNArgs(1),
@@ -40,8 +41,11 @@ Examples:
 			case "skill":
 				t := resource.Skill
 				resourceType = &t
+			case "agent":
+				t := resource.Agent
+				resourceType = &t
 			default:
-				return fmt.Errorf("invalid resource type: %s (must be 'command' or 'skill')", typeStr)
+				return fmt.Errorf("invalid resource type: %s (must be 'command', 'skill', or 'agent')", typeStr)
 			}
 		}
 
@@ -63,7 +67,7 @@ Examples:
 			} else {
 				fmt.Println("No resources found in repository.")
 			}
-			fmt.Println("\nAdd resources with: ai-repo add command <file> or ai-repo add skill <folder>")
+			fmt.Println("\nAdd resources with: ai-repo add command <file>, ai-repo add skill <folder>, or ai-repo add agent <file>")
 			return nil
 		}
 
@@ -85,12 +89,15 @@ func outputTable(resources []resource.Resource) error {
 	// Group by type
 	commands := []resource.Resource{}
 	skills := []resource.Resource{}
+	agents := []resource.Resource{}
 
 	for _, res := range resources {
 		if res.Type == resource.Command {
 			commands = append(commands, res)
 		} else if res.Type == resource.Skill {
 			skills = append(skills, res)
+		} else if res.Type == resource.Agent {
+			agents = append(agents, res)
 		}
 	}
 
@@ -106,8 +113,8 @@ func outputTable(resources []resource.Resource) error {
 		}
 	}
 
-	// Add empty row between types if both exist
-	if len(commands) > 0 && len(skills) > 0 {
+	// Add empty row between types if commands exist and skills or agents exist
+	if len(commands) > 0 && (len(skills) > 0 || len(agents) > 0) {
 		if err := table.Append("", "", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
@@ -117,6 +124,21 @@ func outputTable(resources []resource.Resource) error {
 	for _, skill := range skills {
 		desc := truncateString(skill.Description, 60)
 		if err := table.Append("skill", skill.Name, desc); err != nil {
+			return fmt.Errorf("failed to add row: %w", err)
+		}
+	}
+
+	// Add empty row between types if skills exist and agents exist
+	if len(skills) > 0 && len(agents) > 0 {
+		if err := table.Append("", "", ""); err != nil {
+			return fmt.Errorf("failed to add separator: %w", err)
+		}
+	}
+
+	// Add agents
+	for _, agent := range agents {
+		desc := truncateString(agent.Description, 60)
+		if err := table.Append("agent", agent.Name, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
