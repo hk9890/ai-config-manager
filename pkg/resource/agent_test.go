@@ -351,10 +351,18 @@ func TestWriteAgent(t *testing.T) {
 				return agent
 			},
 			verifyAfterWrite: func(t *testing.T, res *Resource, original *AgentResource) {
-				// Note: metadata loading has a known issue (GetMap type assertion bug)
-				// Tracked separately - skipping metadata verification for now
 				if res.Name != "meta-agent" {
 					t.Errorf("Loaded agent name = %v, want meta-agent", res.Name)
+				}
+				// Verify metadata is loaded correctly
+				if len(res.Metadata) != 2 {
+					t.Errorf("Loaded metadata length = %v, want 2", len(res.Metadata))
+				}
+				if res.Metadata["category"] != "testing" {
+					t.Errorf("Loaded metadata[category] = %v, want testing", res.Metadata["category"])
+				}
+				if res.Metadata["priority"] != "high" {
+					t.Errorf("Loaded metadata[priority] = %v, want high", res.Metadata["priority"])
 				}
 			},
 		},
@@ -480,6 +488,13 @@ func TestWriteAgent_RoundTrip(t *testing.T) {
 	if loaded.License != original.License {
 		t.Errorf("License mismatch: got %v, want %v", loaded.License, original.License)
 	}
-	// Note: metadata loading has a known issue (GetMap type assertion bug)
-	// This is tracked separately - metadata round-trip is not verified here
+	// Verify metadata
+	if len(loaded.Metadata) != len(original.Metadata) {
+		t.Errorf("Metadata length mismatch: got %v, want %v", len(loaded.Metadata), len(original.Metadata))
+	}
+	for k, v := range original.Metadata {
+		if loaded.Metadata[k] != v {
+			t.Errorf("Metadata[%s] mismatch: got %v, want %v", k, loaded.Metadata[k], v)
+		}
+	}
 }

@@ -93,7 +93,15 @@ func (f Frontmatter) GetMap(key string) map[string]string {
 	result := make(map[string]string)
 
 	if val, ok := f[key]; ok {
+		// Try direct map[string]interface{} first (for manually constructed maps)
 		if m, ok := val.(map[string]interface{}); ok {
+			for k, v := range m {
+				if str, ok := v.(string); ok {
+					result[k] = str
+				}
+			}
+		} else if m, ok := val.(Frontmatter); ok {
+			// Also handle nested Frontmatter type (from YAML unmarshaling)
 			for k, v := range m {
 				if str, ok := v.(string); ok {
 					result[k] = str

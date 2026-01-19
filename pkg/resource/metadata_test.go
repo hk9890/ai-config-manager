@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestParseFrontmatter(t *testing.T) {
@@ -108,6 +110,7 @@ func TestWriteAndReadFrontmatter(t *testing.T) {
 }
 
 func TestFrontmatterGetMap(t *testing.T) {
+	// Test 1: Manually constructed map[string]interface{}
 	fm := Frontmatter{
 		"metadata": map[string]interface{}{
 			"author":  "test-author",
@@ -124,5 +127,30 @@ func TestFrontmatterGetMap(t *testing.T) {
 	}
 	if metadata["version"] != "1.0.0" {
 		t.Errorf("metadata[version] = %v, want '1.0.0'", metadata["version"])
+	}
+}
+
+func TestFrontmatterGetMap_YAMLUnmarshal(t *testing.T) {
+	// Test 2: From YAML unmarshaling (nested maps become Frontmatter type)
+	yamlData := `
+metadata:
+  category: testing
+  priority: high
+`
+	var fm Frontmatter
+	err := yaml.Unmarshal([]byte(yamlData), &fm)
+	if err != nil {
+		t.Fatalf("yaml.Unmarshal() error = %v", err)
+	}
+
+	metadata := fm.GetMap("metadata")
+	if len(metadata) != 2 {
+		t.Errorf("GetMap() after YAML unmarshal returned %d items, want 2", len(metadata))
+	}
+	if metadata["category"] != "testing" {
+		t.Errorf("metadata[category] = %v, want 'testing'", metadata["category"])
+	}
+	if metadata["priority"] != "high" {
+		t.Errorf("metadata[priority] = %v, want 'high'", metadata["priority"])
 	}
 }
