@@ -80,15 +80,15 @@ func LoadPluginMetadata(path string) (*PluginMetadata, error) {
 	return &metadata, nil
 }
 
-// ScanPluginResources scans a plugin directory for commands and skills
-func ScanPluginResources(path string) (commandPaths []string, skillPaths []string, err error) {
+// ScanPluginResources scans a plugin directory for commands, skills, and agents
+func ScanPluginResources(path string) (commandPaths []string, skillPaths []string, agentPaths []string, err error) {
 	// Validate it's a plugin
 	isPlugin, err := DetectPlugin(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if !isPlugin {
-		return nil, nil, fmt.Errorf("not a valid plugin directory")
+		return nil, nil, nil, fmt.Errorf("not a valid plugin directory")
 	}
 
 	// Scan commands/ directory
@@ -96,7 +96,7 @@ func ScanPluginResources(path string) (commandPaths []string, skillPaths []strin
 	if info, err := os.Stat(commandsDir); err == nil && info.IsDir() {
 		entries, err := os.ReadDir(commandsDir)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read commands directory: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to read commands directory: %w", err)
 		}
 
 		for _, entry := range entries {
@@ -114,7 +114,7 @@ func ScanPluginResources(path string) (commandPaths []string, skillPaths []strin
 	if info, err := os.Stat(skillsDir); err == nil && info.IsDir() {
 		entries, err := os.ReadDir(skillsDir)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read skills directory: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to read skills directory: %w", err)
 		}
 
 		for _, entry := range entries {
@@ -130,13 +130,32 @@ func ScanPluginResources(path string) (commandPaths []string, skillPaths []strin
 		}
 	}
 
-	return commandPaths, skillPaths, nil
+	// Scan agents/ directory
+	agentsDir := filepath.Join(path, "agents")
+	if info, err := os.Stat(agentsDir); err == nil && info.IsDir() {
+		entries, err := os.ReadDir(agentsDir)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to read agents directory: %w", err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			if filepath.Ext(entry.Name()) == ".md" {
+				agentPaths = append(agentPaths, filepath.Join(agentsDir, entry.Name()))
+			}
+		}
+	}
+
+	return commandPaths, skillPaths, agentPaths, nil
 }
 
 // ClaudeFolderContents represents the contents found in a Claude folder
 type ClaudeFolderContents struct {
 	CommandPaths []string
 	SkillPaths   []string
+	AgentPaths   []string
 }
 
 // DetectClaudeFolder checks if the given path is a Claude configuration folder
@@ -197,6 +216,7 @@ func ScanClaudeFolder(path string) (*ClaudeFolderContents, error) {
 	contents := &ClaudeFolderContents{
 		CommandPaths: []string{},
 		SkillPaths:   []string{},
+		AgentPaths:   []string{},
 	}
 
 	// Determine the actual Claude directory
@@ -245,6 +265,24 @@ func ScanClaudeFolder(path string) (*ClaudeFolderContents, error) {
 			skillMdPath := filepath.Join(skillPath, "SKILL.md")
 			if _, err := os.Stat(skillMdPath); err == nil {
 				contents.SkillPaths = append(contents.SkillPaths, skillPath)
+			}
+		}
+	}
+
+	// Scan agents/ directory
+	agentsDir := filepath.Join(claudePath, "agents")
+	if info, err := os.Stat(agentsDir); err == nil && info.IsDir() {
+		entries, err := os.ReadDir(agentsDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read agents directory: %w", err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			if filepath.Ext(entry.Name()) == ".md" {
+				contents.AgentPaths = append(contents.AgentPaths, filepath.Join(agentsDir, entry.Name()))
 			}
 		}
 	}

@@ -137,6 +137,47 @@ func (i *Installer) InstallSkill(name string, repoManager *repo.Manager) error {
 	return nil
 }
 
+// InstallAgent installs an agent resource by creating symlinks to target tools
+func (i *Installer) InstallAgent(name string, repoManager *repo.Manager) error {
+	// Get agent from repo
+	res, err := repoManager.Get(name, resource.Agent)
+	if err != nil {
+		return fmt.Errorf("agent not found in repository: %w", err)
+	}
+
+	// Install to each target tool
+	for _, tool := range i.targetTools {
+		toolInfo := tools.GetToolInfo(tool)
+
+		// Skip tools that don't support agents
+		if !toolInfo.SupportsAgents {
+			continue
+		}
+
+		// Create agents directory if needed
+		agentsDir := filepath.Join(i.projectPath, toolInfo.AgentsDir)
+		if err := os.MkdirAll(agentsDir, 0755); err != nil {
+			return fmt.Errorf("failed to create agents directory for %s: %w", tool, err)
+		}
+
+		// Symlink path
+		symlinkPath := filepath.Join(agentsDir, filepath.Base(res.Path))
+
+		// Check if already installed
+		if _, err := os.Lstat(symlinkPath); err == nil {
+			// Already exists, skip this tool
+			continue
+		}
+
+		// Create symlink
+		if err := os.Symlink(res.Path, symlinkPath); err != nil {
+			return fmt.Errorf("failed to create symlink for %s: %w", tool, err)
+		}
+	}
+
+	return nil
+}
+
 // Uninstall removes an installed resource by removing symlinks from all tool directories
 func (i *Installer) Uninstall(name string, resourceType resource.ResourceType) error {
 	removed := false
@@ -158,6 +199,11 @@ func (i *Installer) Uninstall(name string, resourceType resource.ResourceType) e
 				continue
 			}
 			symlinkPath = filepath.Join(i.projectPath, toolInfo.SkillsDir, name)
+		case resource.Agent:
+			if !toolInfo.SupportsAgents {
+				continue
+			}
+			symlinkPath = filepath.Join(i.projectPath, toolInfo.AgentsDir, name+".md")
 		default:
 			return fmt.Errorf("invalid resource type: %s", resourceType)
 		}
@@ -290,6 +336,49 @@ func (i *Installer) List() ([]resource.Resource, error) {
 				}
 			}
 		}
+
+		// List agents
+		if toolInfo.SupportsAgents {
+			agentsDir := filepath.Join(i.projectPath, toolInfo.AgentsDir)
+			if _, err := os.Stat(agentsDir); err == nil {
+				entries, err := os.ReadDir(agentsDir)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read agents directory for %s: %w", tool, err)
+				}
+
+				for _, entry := range entries {
+					if entry.IsDir() {
+						continue
+					}
+
+					symlinkPath := filepath.Join(agentsDir, entry.Name())
+					info, err := os.Lstat(symlinkPath)
+					if err != nil {
+						continue
+					}
+
+					// Only list symlinks
+					if info.Mode()&os.ModeSymlink == 0 {
+						continue
+					}
+
+					// Read the symlink target
+					target, err := os.Readlink(symlinkPath)
+					if err != nil {
+						continue
+					}
+
+					// Load the resource
+					res, err := resource.LoadAgent(target)
+					if err != nil {
+						continue
+					}
+
+					// Deduplicate by name
+					resourceMap[res.Name] = *res
+				}
+			}
+		}
 	}
 
 	// Convert map to slice
@@ -319,6 +408,11 @@ func (i *Installer) IsInstalled(name string, resourceType resource.ResourceType)
 				continue
 			}
 			symlinkPath = filepath.Join(i.projectPath, toolInfo.SkillsDir, name)
+		case resource.Agent:
+			if !toolInfo.SupportsAgents {
+				continue
+			}
+			symlinkPath = filepath.Join(i.projectPath, toolInfo.AgentsDir, name+".md")
 		default:
 			return false
 		}

@@ -14,9 +14,9 @@ import (
 var addClaudeCmd = &cobra.Command{
 	Use:   "claude <path>",
 	Short: "Add all resources from a Claude folder (.claude/)",
-	Long: `Add all resources (commands and skills) from a Claude configuration folder.
+	Long: `Add all resources (commands, skills, and agents) from a Claude configuration folder.
 
-A Claude folder contains .claude/commands/ and/or .claude/skills/ subdirectories.
+A Claude folder contains .claude/commands/, .claude/skills/, and/or .claude/agents/ subdirectories.
 You can specify either the .claude/ directory itself or its parent directory.
 
 Example:
@@ -39,7 +39,7 @@ Example:
 			return err
 		}
 		if !isClaudeFolder {
-			return fmt.Errorf("path is not a valid Claude folder: %s\nMust be a .claude/ directory or contain commands/ or skills/ subdirectories", claudePath)
+			return fmt.Errorf("path is not a valid Claude folder: %s\nMust be a .claude/ directory or contain commands/, skills/, or agents/ subdirectories", claudePath)
 		}
 
 		// Scan for resources
@@ -49,8 +49,8 @@ Example:
 		}
 
 		// Check if folder has any resources
-		if len(contents.CommandPaths) == 0 && len(contents.SkillPaths) == 0 {
-			fmt.Printf("⚠ Claude folder contains no commands or skills to import\n")
+		if len(contents.CommandPaths) == 0 && len(contents.SkillPaths) == 0 && len(contents.AgentPaths) == 0 {
+			fmt.Printf("⚠ Claude folder contains no commands, skills, or agents to import\n")
 			return nil
 		}
 
@@ -61,10 +61,11 @@ Example:
 			fmt.Println("  Mode: DRY RUN (preview only)")
 		}
 		fmt.Println()
-		fmt.Printf("Found: %d commands, %d skills\n\n", len(contents.CommandPaths), len(contents.SkillPaths))
+		fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(contents.CommandPaths), len(contents.SkillPaths), len(contents.AgentPaths))
 
 		// Combine all resource paths
 		allPaths := append(contents.CommandPaths, contents.SkillPaths...)
+		allPaths = append(allPaths, contents.AgentPaths...)
 
 		// Create manager and import
 		manager, err := repo.NewManager()

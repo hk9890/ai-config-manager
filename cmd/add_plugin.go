@@ -19,10 +19,10 @@ var (
 var addPluginCmd = &cobra.Command{
 	Use:   "plugin <path>",
 	Short: "Add all resources from a Claude plugin",
-	Long: `Add all resources (commands and skills) from a Claude plugin directory.
+	Long: `Add all resources (commands, skills, and agents) from a Claude plugin directory.
 
 A Claude plugin is a directory containing .claude-plugin/plugin.json with
-commands/ and/or skills/ subdirectories.
+commands/, skills/, and/or agents/ subdirectories.
 
 Example:
   ai-repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
@@ -53,14 +53,14 @@ Example:
 		}
 
 		// Scan for resources
-		commandPaths, skillPaths, err := resource.ScanPluginResources(pluginPath)
+		commandPaths, skillPaths, agentPaths, err := resource.ScanPluginResources(pluginPath)
 		if err != nil {
 			return fmt.Errorf("failed to scan plugin resources: %w", err)
 		}
 
 		// Check if plugin has any resources
-		if len(commandPaths) == 0 && len(skillPaths) == 0 {
-			fmt.Printf("⚠ Plugin '%s' contains no commands or skills to import\n", metadata.Name)
+		if len(commandPaths) == 0 && len(skillPaths) == 0 && len(agentPaths) == 0 {
+			fmt.Printf("⚠ Plugin '%s' contains no commands, skills, or agents to import\n", metadata.Name)
 			return nil
 		}
 
@@ -73,10 +73,11 @@ Example:
 			fmt.Println("  Mode: DRY RUN (preview only)")
 		}
 		fmt.Println()
-		fmt.Printf("Found: %d commands, %d skills\n\n", len(commandPaths), len(skillPaths))
+		fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commandPaths), len(skillPaths), len(agentPaths))
 
 		// Combine all resource paths
 		allPaths := append(commandPaths, skillPaths...)
+		allPaths = append(allPaths, agentPaths...)
 
 		// Create manager and import
 		manager, err := repo.NewManager()
@@ -119,15 +120,21 @@ func printImportResults(result *repo.BulkImportResult) {
 	for _, path := range result.Added {
 		resourceType := "resource"
 		name := filepath.Base(path)
-		
+
 		// Determine type
 		if filepath.Ext(path) == ".md" {
-			resourceType = "command"
+			// Could be command or agent - check parent directory
+			parentDir := filepath.Base(filepath.Dir(path))
+			if parentDir == "agents" {
+				resourceType = "agent"
+			} else {
+				resourceType = "command"
+			}
 			name = name[:len(name)-3] // Remove .md
 		} else {
 			resourceType = "skill"
 		}
-		
+
 		fmt.Printf("✓ Added %s '%s'\n", resourceType, name)
 	}
 
