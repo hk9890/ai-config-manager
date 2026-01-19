@@ -74,13 +74,12 @@ ai-repo is a CLI tool built with Go that manages AI resources (commands and skil
 ai-config-manager/
 ├── cmd/                    # CLI command definitions (Cobra)
 │   ├── root.go            # Root command and global flags
-│   ├── add.go             # Add command parent
-│   ├── add_command.go     # Add single command
-│   ├── add_skill.go       # Add single skill
+│   ├── add.go             # Add command (with command/skill/agent subcommands)
 │   ├── add_plugin.go      # Add from plugin (bulk)
 │   ├── add_claude.go      # Add from .claude/ (bulk)
+│   ├── add_opencode.go    # Add from .opencode/ (bulk)
 │   ├── config.go          # Configuration management
-│   ├── install.go         # Install resources to projects
+│   ├── install.go         # Install command (with command/skill/agent subcommands)
 │   ├── list.go            # List resources
 │   └── remove.go          # Remove resources
 │
@@ -95,15 +94,16 @@ ai-config-manager/
 │   │   ├── resource.go    # Base resource type
 │   │   ├── command.go     # Command resource logic
 │   │   ├── skill.go       # Skill resource logic
-│   │   ├── plugin.go      # Plugin and .claude/ detection
-│   │   ├── frontmatter.go # YAML frontmatter parsing
-│   │   └── validation.go  # Name and format validation
+│   │   ├── agent.go       # Agent resource logic
+│   │   ├── plugin.go      # Plugin and .claude/.opencode detection
+│   │   ├── metadata.go    # YAML frontmatter parsing
+│   │   └── types.go       # Resource types and validation
 │   │
 │   ├── install/           # Installation logic
 │   │   └── installer.go   # Symlink creation, tool detection
 │   │
 │   ├── tools/             # Tool-specific information
-│   │   └── tools.go       # Claude/OpenCode/Copilot definitions
+│   │   └── types.go       # Claude/OpenCode/Copilot definitions
 │   │
 │   └── version/           # Version information
 │       └── version.go     # Embedded at build time
@@ -114,6 +114,9 @@ ai-config-manager/
 │
 ├── examples/               # Example resources
 │   ├── sample-command.md
+│   ├── sample-agent.md
+│   ├── claude-style-agent.md
+│   ├── minimal-agent.md
 │   ├── sample-skill/
 │   └── README.md
 │
