@@ -8,6 +8,7 @@ import (
 	"github.com/hans-m-leitner/ai-config-manager/pkg/config"
 	"github.com/hans-m-leitner/ai-config-manager/pkg/tools"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
 
@@ -65,6 +66,8 @@ func init() {
 func configGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
+	fmt.Fprintf(os.Stderr, "Using config file: %s\n", viper.ConfigFileUsed())
+
 	if key != "default-tool" {
 		return fmt.Errorf("unknown config key: %s (available: default-tool)", key)
 	}
@@ -89,6 +92,8 @@ func configGet(cmd *cobra.Command, args []string) error {
 func configSet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 	value := args[1]
+
+	fmt.Fprintf(os.Stderr, "Using config file: %s\n", viper.ConfigFileUsed())
 
 	if key != "default-tool" {
 		return fmt.Errorf("unknown config key: %s (available: default-tool)", key)
