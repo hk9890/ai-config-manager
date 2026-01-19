@@ -51,6 +51,12 @@ func (m *Manager) Init() error {
 		return fmt.Errorf("failed to create skills directory: %w", err)
 	}
 
+	// Create agents subdirectory
+	agentsPath := filepath.Join(m.repoPath, "agents")
+	if err := os.MkdirAll(agentsPath, 0755); err != nil {
+		return fmt.Errorf("failed to create agents directory: %w", err)
+	}
+
 	return nil
 }
 
@@ -103,6 +109,33 @@ func (m *Manager) AddSkill(sourcePath string) error {
 	// Copy the directory
 	if err := copyDir(sourcePath, destPath); err != nil {
 		return fmt.Errorf("failed to copy skill: %w", err)
+	}
+
+	return nil
+}
+
+// AddAgent adds an agent resource to the repository
+func (m *Manager) AddAgent(sourcePath string) error {
+	// Ensure repo is initialized
+	if err := m.Init(); err != nil {
+		return err
+	}
+
+	// Validate and load the agent
+	res, err := resource.LoadAgent(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to load agent: %w", err)
+	}
+
+	// Check for conflicts
+	destPath := m.GetPath(res.Name, resource.Agent)
+	if _, err := os.Stat(destPath); err == nil {
+		return fmt.Errorf("agent '%s' already exists in repository", res.Name)
+	}
+
+	// Copy the file
+	if err := copyFile(sourcePath, destPath); err != nil {
+		return fmt.Errorf("failed to copy agent: %w", err)
 	}
 
 	return nil
@@ -162,6 +195,31 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 		}
 	}
 
+	// List agents if no filter or filter is Agent
+	if resourceType == nil || *resourceType == resource.Agent {
+		agentsPath := filepath.Join(m.repoPath, "agents")
+		if _, err := os.Stat(agentsPath); err == nil {
+			entries, err := os.ReadDir(agentsPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read agents directory: %w", err)
+			}
+
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+					continue
+				}
+
+				agentPath := filepath.Join(agentsPath, entry.Name())
+				res, err := resource.LoadAgent(agentPath)
+				if err != nil {
+					// Skip invalid agents
+					continue
+				}
+				resources = append(resources, *res)
+			}
+		}
+	}
+
 	return resources, nil
 }
 
@@ -180,6 +238,8 @@ func (m *Manager) Get(name string, resourceType resource.ResourceType) (*resourc
 		return resource.LoadCommand(path)
 	case resource.Skill:
 		return resource.LoadSkill(path)
+	case resource.Agent:
+		return resource.LoadAgent(path)
 	default:
 		return nil, fmt.Errorf("invalid resource type: %s", resourceType)
 	}
@@ -209,6 +269,8 @@ func (m *Manager) GetPath(name string, resourceType resource.ResourceType) strin
 		return filepath.Join(m.repoPath, "commands", name+".md")
 	case resource.Skill:
 		return filepath.Join(m.repoPath, "skills", name)
+	case resource.Agent:
+		return filepath.Join(m.repoPath, "agents", name+".md")
 	default:
 		return ""
 	}
@@ -347,6 +409,8 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 		res, err = resource.LoadCommand(sourcePath)
 	case resource.Skill:
 		res, err = resource.LoadSkill(sourcePath)
+	case resource.Agent:
+		res, err = resource.LoadAgent(sourcePath)
 	default:
 		err = fmt.Errorf("unknown resource type: %s", resourceType)
 	}
@@ -398,6 +462,8 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 			err = m.AddCommand(sourcePath)
 		case resource.Skill:
 			err = m.AddSkill(sourcePath)
+		case resource.Agent:
+			err = m.AddAgent(sourcePath)
 		}
 
 		if err != nil {

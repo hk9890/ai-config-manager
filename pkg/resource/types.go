@@ -14,6 +14,8 @@ const (
 	Command ResourceType = "command"
 	// Skill represents a skill resource (folder with SKILL.md)
 	Skill ResourceType = "skill"
+	// Agent represents an agent resource (folder with AGENT.md)
+	Agent ResourceType = "agent"
 )
 
 // Resource represents an AI resource (command or skill)
@@ -87,8 +89,8 @@ func (r *Resource) Validate() error {
 		return fmt.Errorf("invalid description: %w", err)
 	}
 
-	if r.Type != Command && r.Type != Skill {
-		return fmt.Errorf("invalid resource type: %s (must be 'command' or 'skill')", r.Type)
+	if r.Type != Command && r.Type != Skill && r.Type != Agent {
+		return fmt.Errorf("invalid resource type: %s (must be 'command', 'skill', or 'agent')", r.Type)
 	}
 
 	return nil

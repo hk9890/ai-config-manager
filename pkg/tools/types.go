@@ -55,10 +55,14 @@ type ToolInfo struct {
 	CommandsDir string
 	// SkillsDir is the project-level directory for skills
 	SkillsDir string
+	// AgentsDir is the project-level directory for agents (empty if not supported)
+	AgentsDir string
 	// SupportsCommands indicates whether this tool supports slash commands
 	SupportsCommands bool
 	// SupportsSkills indicates whether this tool supports agent skills
 	SupportsSkills bool
+	// SupportsAgents indicates whether this tool supports agents
+	SupportsAgents bool
 }
 
 // GetToolInfo returns the directory path information for a given tool
@@ -69,24 +73,30 @@ func GetToolInfo(tool Tool) ToolInfo {
 			Name:             "Claude Code",
 			CommandsDir:      ".claude/commands",
 			SkillsDir:        ".claude/skills",
+			AgentsDir:        ".claude/agents",
 			SupportsCommands: true,
 			SupportsSkills:   true,
+			SupportsAgents:   true,
 		}
 	case OpenCode:
 		return ToolInfo{
 			Name:             "OpenCode",
 			CommandsDir:      ".opencode/commands",
 			SkillsDir:        ".opencode/skills",
+			AgentsDir:        ".opencode/agents",
 			SupportsCommands: true,
 			SupportsSkills:   true,
+			SupportsAgents:   true,
 		}
 	case Copilot:
 		return ToolInfo{
 			Name:             "GitHub Copilot",
 			CommandsDir:      "", // Not supported
 			SkillsDir:        ".github/skills",
+			AgentsDir:        "", // Not supported
 			SupportsCommands: false,
 			SupportsSkills:   true,
+			SupportsAgents:   false,
 		}
 	default:
 		return ToolInfo{}

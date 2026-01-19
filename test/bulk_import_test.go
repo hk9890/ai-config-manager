@@ -16,7 +16,7 @@ func setupTestPlugin(t *testing.T, pluginDir string) {
 	if err := os.MkdirAll(pluginJsonDir, 0755); err != nil {
 		t.Fatalf("Failed to create plugin metadata dir: %v", err)
 	}
-	
+
 	pluginJson := []byte(`{
 		"name": "test-plugin",
 		"description": "A test plugin",
@@ -31,12 +31,12 @@ func setupTestPlugin(t *testing.T, pluginDir string) {
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands dir: %v", err)
 	}
-	
+
 	cmd1 := []byte("---\ndescription: Test command 1\n---\nTest content")
 	if err := os.WriteFile(filepath.Join(commandsDir, "test-cmd1.md"), cmd1, 0644); err != nil {
 		t.Fatalf("Failed to write command 1: %v", err)
 	}
-	
+
 	cmd2 := []byte("---\ndescription: Test command 2\n---\nTest content")
 	if err := os.WriteFile(filepath.Join(commandsDir, "test-cmd2.md"), cmd2, 0644); err != nil {
 		t.Fatalf("Failed to write command 2: %v", err)
@@ -48,7 +48,7 @@ func setupTestPlugin(t *testing.T, pluginDir string) {
 	if err := os.MkdirAll(skill1Dir, 0755); err != nil {
 		t.Fatalf("Failed to create skill1 dir: %v", err)
 	}
-	
+
 	skill1 := []byte("---\nname: test-skill1\ndescription: Test skill 1\n---\nTest content")
 	if err := os.WriteFile(filepath.Join(skill1Dir, "SKILL.md"), skill1, 0644); err != nil {
 		t.Fatalf("Failed to write skill 1: %v", err)
@@ -62,7 +62,7 @@ func setupTestClaudeFolder(t *testing.T, claudeDir string) {
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands dir: %v", err)
 	}
-	
+
 	cmd1 := []byte("---\ndescription: Claude command 1\n---\nTest content")
 	if err := os.WriteFile(filepath.Join(commandsDir, "claude-cmd1.md"), cmd1, 0644); err != nil {
 		t.Fatalf("Failed to write command 1: %v", err)
@@ -74,7 +74,7 @@ func setupTestClaudeFolder(t *testing.T, claudeDir string) {
 	if err := os.MkdirAll(skill1Dir, 0755); err != nil {
 		t.Fatalf("Failed to create skill1 dir: %v", err)
 	}
-	
+
 	skill1 := []byte("---\nname: claude-skill1\ndescription: Claude skill 1\n---\nTest content")
 	if err := os.WriteFile(filepath.Join(skill1Dir, "SKILL.md"), skill1, 0644); err != nil {
 		t.Fatalf("Failed to write skill 1: %v", err)
@@ -93,7 +93,7 @@ func TestPluginImport(t *testing.T) {
 	manager := repo.NewManagerWithPath(repoPath)
 
 	// Scan plugin resources
-	commandPaths, skillPaths, err := resource.ScanPluginResources(pluginDir)
+	commandPaths, skillPaths, _, err := resource.ScanPluginResources(pluginDir)
 	if err != nil {
 		t.Fatalf("Failed to scan plugin: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestInvalidPaths(t *testing.T) {
 	t.Run("non-existent path fails", func(t *testing.T) {
 		nonExistentPath := filepath.Join(tmpDir, "nonexistent.md")
 		result, _ := manager.AddBulk([]string{nonExistentPath}, repo.BulkImportOptions{SkipExisting: true})
-		
+
 		// Should fail but with result showing the failure
 		if len(result.Failed) != 1 {
 			t.Errorf("Expected 1 failed, got %d", len(result.Failed))
@@ -288,9 +288,9 @@ func TestInvalidPaths(t *testing.T) {
 	t.Run("invalid resource format fails", func(t *testing.T) {
 		invalidPath := filepath.Join(tmpDir, "invalid.txt")
 		os.WriteFile(invalidPath, []byte("not a resource"), 0644)
-		
+
 		result, _ := manager.AddBulk([]string{invalidPath}, repo.BulkImportOptions{SkipExisting: true})
-		
+
 		// Should fail but with result showing the failure
 		if len(result.Failed) != 1 {
 			t.Errorf("Expected 1 failed, got %d", len(result.Failed))

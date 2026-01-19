@@ -7,7 +7,7 @@ import (
 )
 
 // Load loads a resource from the filesystem
-// It detects whether the path is a command (file) or skill (directory)
+// It detects whether the path is a command, agent, or skill
 func Load(path string) (*Resource, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -19,8 +19,20 @@ func Load(path string) (*Resource, error) {
 		return LoadSkill(path)
 	}
 
-	// Load as command
-	return LoadCommand(path)
+	// For .md files, detect type and load appropriately
+	resourceType, err := DetectType(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect type: %w", err)
+	}
+
+	switch resourceType {
+	case Agent:
+		return LoadAgent(path)
+	case Command:
+		return LoadCommand(path)
+	default:
+		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
+	}
 }
 
 // DetectType detects the resource type from a filesystem path
@@ -41,6 +53,22 @@ func DetectType(path string) (ResourceType, error) {
 
 	// Check if it's a .md file
 	if filepath.Ext(path) == ".md" {
+		// Parse frontmatter to distinguish between agent and command
+		frontmatter, _, err := ParseFrontmatter(path)
+		if err != nil {
+			// If we can't parse frontmatter, fall back to Command
+			return Command, nil
+		}
+
+		// Check for agent-specific fields (type, instructions)
+		// If either exists, it's an agent
+		_, hasType := frontmatter["type"]
+		_, hasInstructions := frontmatter["instructions"]
+		if hasType || hasInstructions {
+			return Agent, nil
+		}
+
+		// Otherwise, it's a command
 		return Command, nil
 	}
 

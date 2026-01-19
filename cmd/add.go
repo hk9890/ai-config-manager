@@ -14,12 +14,13 @@ var forceFlag bool
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:   "add [command|skill]",
+	Use:   "add [command|skill|agent]",
 	Short: "Add a resource to the repository",
-	Long: `Add a command or skill resource to the ai-repo repository.
+	Long: `Add a command, skill, or agent resource to the ai-repo repository.
 
 Commands are single .md files with YAML frontmatter.
-Skills are directories containing a SKILL.md file.`,
+Skills are directories containing a SKILL.md file.
+Agents are single .md files with YAML frontmatter.`,
 }
 
 // addCommandCmd represents the add command subcommand
@@ -178,12 +179,87 @@ Example:
 	},
 }
 
+// addAgentCmd represents the add agent subcommand
+var addAgentCmd = &cobra.Command{
+	Use:   "agent <path>",
+	Short: "Add an agent resource",
+	Long: `Add an agent resource to the repository.
+
+An agent is a single .md file with YAML frontmatter containing at minimum
+a description field.
+
+Example:
+  ai-repo add agent ~/.opencode/agents/my-agent.md
+  ai-repo add agent ./my-agent.md --force`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		sourcePath := args[0]
+
+		// Validate path exists
+		if _, err := os.Stat(sourcePath); err != nil {
+			return fmt.Errorf("path does not exist: %s", sourcePath)
+		}
+
+		// Validate it's a file
+		info, err := os.Stat(sourcePath)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return fmt.Errorf("path is a directory, expected a .md file: %s", sourcePath)
+		}
+
+		// Validate it's a .md file
+		if filepath.Ext(sourcePath) != ".md" {
+			return fmt.Errorf("file must have .md extension: %s", sourcePath)
+		}
+
+		// Try to load and validate the agent
+		res, err := resource.LoadAgent(sourcePath)
+		if err != nil {
+			return fmt.Errorf("invalid agent resource: %w", err)
+		}
+
+		// Create manager and add agent
+		manager, err := repo.NewManager()
+		if err != nil {
+			return err
+		}
+
+		// Check if already exists (if not force mode)
+		if !forceFlag {
+			existing, _ := manager.Get(res.Name, resource.Agent)
+			if existing != nil {
+				return fmt.Errorf("agent '%s' already exists in repository (use --force to overwrite)", res.Name)
+			}
+		} else {
+			// Remove existing if force mode
+			_ = manager.Remove(res.Name, resource.Agent)
+		}
+
+		// Add the agent
+		if err := manager.AddAgent(sourcePath); err != nil {
+			return fmt.Errorf("failed to add agent: %w", err)
+		}
+
+		// Success message
+		fmt.Printf("✓ Added agent '%s' to repository\n", res.Name)
+		if res.Description != "" {
+			fmt.Printf("  Description: %s\n", res.Description)
+		}
+
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(addCmd)
 	addCmd.AddCommand(addCommandCmd)
 	addCmd.AddCommand(addSkillCmd)
+	addCmd.AddCommand(addAgentCmd)
 
-	// Add --force flag to both subcommands
+	// Add --force flag to all subcommands
 	addCommandCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resource")
 	addSkillCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resource")
+	addAgentCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resource")
 }

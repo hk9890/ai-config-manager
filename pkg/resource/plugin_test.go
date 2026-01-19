@@ -206,10 +206,11 @@ func TestScanPluginResources(t *testing.T) {
 		setup            func(tmpDir string) string
 		wantCommandCount int
 		wantSkillCount   int
+		wantAgentCount   int
 		wantError        bool
 	}{
 		{
-			name: "plugin with commands and skills",
+			name: "plugin with commands, skills, and agents",
 			setup: func(tmpDir string) string {
 				pluginDir := filepath.Join(tmpDir, "full-plugin")
 				os.MkdirAll(filepath.Join(pluginDir, ".claude-plugin"), 0755)
@@ -234,10 +235,18 @@ func TestScanPluginResources(t *testing.T) {
 				os.WriteFile(filepath.Join(skillsDir, "skill2", "SKILL.md"), []byte("---\nname: skill2\n---\n"), 0644)
 				os.MkdirAll(filepath.Join(skillsDir, "not-skill"), 0755) // no SKILL.md
 
+				// Create agents
+				agentsDir := filepath.Join(pluginDir, "agents")
+				os.MkdirAll(agentsDir, 0755)
+				os.WriteFile(filepath.Join(agentsDir, "agent1.md"), []byte("---\nname: agent1\n---\n"), 0644)
+				os.WriteFile(filepath.Join(agentsDir, "agent2.md"), []byte("---\nname: agent2\n---\n"), 0644)
+				os.WriteFile(filepath.Join(agentsDir, "readme.txt"), []byte("not an agent"), 0644)
+
 				return pluginDir
 			},
 			wantCommandCount: 2,
 			wantSkillCount:   2,
+			wantAgentCount:   2,
 			wantError:        false,
 		},
 		{
@@ -259,6 +268,7 @@ func TestScanPluginResources(t *testing.T) {
 			},
 			wantCommandCount: 1,
 			wantSkillCount:   0,
+			wantAgentCount:   0,
 			wantError:        false,
 		},
 		{
@@ -280,6 +290,29 @@ func TestScanPluginResources(t *testing.T) {
 			},
 			wantCommandCount: 0,
 			wantSkillCount:   1,
+			wantAgentCount:   0,
+			wantError:        false,
+		},
+		{
+			name: "plugin with only agents",
+			setup: func(tmpDir string) string {
+				pluginDir := filepath.Join(tmpDir, "agents-only")
+				os.MkdirAll(filepath.Join(pluginDir, ".claude-plugin"), 0755)
+				os.WriteFile(
+					filepath.Join(pluginDir, ".claude-plugin", "plugin.json"),
+					[]byte(`{"name":"agents-only","description":"Test"}`),
+					0644,
+				)
+
+				agentsDir := filepath.Join(pluginDir, "agents")
+				os.MkdirAll(agentsDir, 0755)
+				os.WriteFile(filepath.Join(agentsDir, "agent1.md"), []byte("---\nname: agent1\n---\n"), 0644)
+
+				return pluginDir
+			},
+			wantCommandCount: 0,
+			wantSkillCount:   0,
+			wantAgentCount:   1,
 			wantError:        false,
 		},
 		{
@@ -296,6 +329,7 @@ func TestScanPluginResources(t *testing.T) {
 			},
 			wantCommandCount: 0,
 			wantSkillCount:   0,
+			wantAgentCount:   0,
 			wantError:        false,
 		},
 		{
@@ -314,7 +348,7 @@ func TestScanPluginResources(t *testing.T) {
 			tmpDir := t.TempDir()
 			path := tt.setup(tmpDir)
 
-			commandPaths, skillPaths, err := ScanPluginResources(path)
+			commandPaths, skillPaths, agentPaths, err := ScanPluginResources(path)
 			if (err != nil) != tt.wantError {
 				t.Errorf("ScanPluginResources() error = %v, wantError %v", err, tt.wantError)
 				return
@@ -329,6 +363,9 @@ func TestScanPluginResources(t *testing.T) {
 			}
 			if len(skillPaths) != tt.wantSkillCount {
 				t.Errorf("ScanPluginResources() skillPaths count = %v, want %v", len(skillPaths), tt.wantSkillCount)
+			}
+			if len(agentPaths) != tt.wantAgentCount {
+				t.Errorf("ScanPluginResources() agentPaths count = %v, want %v", len(agentPaths), tt.wantAgentCount)
 			}
 		})
 	}

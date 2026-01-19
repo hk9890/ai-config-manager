@@ -554,3 +554,377 @@ func TestWithExampleResources(t *testing.T) {
 		}
 	})
 }
+
+// TestAgentWorkflow tests the complete agent workflow: add -> list -> install -> uninstall
+func TestAgentWorkflow(t *testing.T) {
+	// Create temporary directories for repo and project
+	repoDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	// Create sample agent .md file
+	testAgentPath := filepath.Join(repoDir, "test-agent.md")
+	agentContent := `---
+description: A test agent for integration testing
+type: helper
+instructions: This agent helps with testing
+capabilities:
+  - testing
+  - debugging
+version: "1.0.0"
+author: test
+license: MIT
+---
+
+# Test Agent
+
+This is a test agent for integration testing.
+
+## Instructions
+
+Follow these instructions to test the agent workflow.
+`
+	if err := os.WriteFile(testAgentPath, []byte(agentContent), 0644); err != nil {
+		t.Fatalf("Failed to create test agent: %v", err)
+	}
+
+	// Step 1: Create manager and add agent
+	t.Log("Step 1: Adding agent to repository")
+	manager := repo.NewManagerWithPath(repoDir)
+
+	if err := manager.AddAgent(testAgentPath); err != nil {
+		t.Fatalf("Failed to add agent: %v", err)
+	}
+
+	// Step 2: List resources and verify agent present
+	t.Log("Step 2: Listing resources and verifying agent")
+	resources, err := manager.List(nil)
+	if err != nil {
+		t.Fatalf("Failed to list resources: %v", err)
+	}
+
+	if len(resources) != 1 {
+		t.Errorf("Expected 1 resource, got %d", len(resources))
+	}
+
+	// Verify agent exists
+	agentRes, err := manager.Get("test-agent", resource.Agent)
+	if err != nil {
+		t.Errorf("Failed to get agent: %v", err)
+	}
+	if agentRes.Name != "test-agent" {
+		t.Errorf("Agent name = %v, want test-agent", agentRes.Name)
+	}
+	if agentRes.Type != resource.Agent {
+		t.Errorf("Agent type = %v, want Agent", agentRes.Type)
+	}
+	if agentRes.Description != "A test agent for integration testing" {
+		t.Errorf("Agent description = %v, want 'A test agent for integration testing'", agentRes.Description)
+	}
+
+	// Step 3: Install agent to Claude project
+	t.Log("Step 3: Installing agent to Claude project")
+	claudeInstaller, err := install.NewInstaller(projectDir, tools.Claude)
+	if err != nil {
+		t.Fatalf("Failed to create Claude installer: %v", err)
+	}
+
+	if err := claudeInstaller.InstallAgent("test-agent", manager); err != nil {
+		t.Fatalf("Failed to install agent to Claude: %v", err)
+	}
+
+	// Verify installation
+	if !claudeInstaller.IsInstalled("test-agent", resource.Agent) {
+		t.Error("Agent should be installed in Claude")
+	}
+
+	// Verify symlink was created correctly in .claude/agents
+	agentSymlink := filepath.Join(projectDir, ".claude", "agents", "test-agent.md")
+	if _, err := os.Lstat(agentSymlink); err != nil {
+		t.Errorf("Agent symlink not created in .claude/agents: %v", err)
+	}
+
+	// Step 4: Uninstall agent from Claude
+	t.Log("Step 4: Uninstalling agent from Claude")
+	if err := claudeInstaller.Uninstall("test-agent", resource.Agent); err != nil {
+		t.Errorf("Failed to uninstall agent from Claude: %v", err)
+	}
+
+	// Verify uninstallation
+	if claudeInstaller.IsInstalled("test-agent", resource.Agent) {
+		t.Error("Agent should be uninstalled from Claude")
+	}
+
+	// Verify symlink was removed
+	if _, err := os.Lstat(agentSymlink); err == nil {
+		t.Error("Agent symlink should be removed after uninstall")
+	}
+
+	// Step 5: Test with OpenCode
+	t.Log("Step 5: Installing agent to OpenCode project")
+	opencodeProjectDir := t.TempDir()
+
+	// Create .opencode directory to trigger OpenCode detection
+	if err := os.MkdirAll(filepath.Join(opencodeProjectDir, ".opencode"), 0755); err != nil {
+		t.Fatalf("Failed to create .opencode directory: %v", err)
+	}
+
+	opencodeInstaller, err := install.NewInstaller(opencodeProjectDir, tools.OpenCode)
+	if err != nil {
+		t.Fatalf("Failed to create OpenCode installer: %v", err)
+	}
+
+	if err := opencodeInstaller.InstallAgent("test-agent", manager); err != nil {
+		t.Fatalf("Failed to install agent to OpenCode: %v", err)
+	}
+
+	// Verify installation
+	if !opencodeInstaller.IsInstalled("test-agent", resource.Agent) {
+		t.Error("Agent should be installed in OpenCode")
+	}
+
+	// Verify symlink was created correctly in .opencode/agents
+	opencodeAgentSymlink := filepath.Join(opencodeProjectDir, ".opencode", "agents", "test-agent.md")
+	if _, err := os.Lstat(opencodeAgentSymlink); err != nil {
+		t.Errorf("Agent symlink not created in .opencode/agents: %v", err)
+	}
+
+	// Step 6: Uninstall agent from OpenCode
+	t.Log("Step 6: Uninstalling agent from OpenCode")
+	if err := opencodeInstaller.Uninstall("test-agent", resource.Agent); err != nil {
+		t.Errorf("Failed to uninstall agent from OpenCode: %v", err)
+	}
+
+	// Verify uninstallation
+	if opencodeInstaller.IsInstalled("test-agent", resource.Agent) {
+		t.Error("Agent should be uninstalled from OpenCode")
+	}
+
+	// Verify symlink was removed
+	if _, err := os.Lstat(opencodeAgentSymlink); err == nil {
+		t.Error("Agent symlink should be removed after uninstall")
+	}
+
+	t.Log("Agent workflow test passed!")
+}
+
+// TestOpenCodeImport tests importing resources from an OpenCode folder structure
+func TestOpenCodeImport(t *testing.T) {
+	// Create temporary directory for .opencode folder structure
+	opencodeDir := t.TempDir()
+	opencodePath := filepath.Join(opencodeDir, ".opencode")
+
+	// Create .opencode subdirectories
+	commandsDir := filepath.Join(opencodePath, "commands")
+	skillsDir := filepath.Join(opencodePath, "skills")
+	agentsDir := filepath.Join(opencodePath, "agents")
+
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands directory: %v", err)
+	}
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills directory: %v", err)
+	}
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		t.Fatalf("Failed to create agents directory: %v", err)
+	}
+
+	// Create test command
+	cmdPath := filepath.Join(commandsDir, "import-test-cmd.md")
+	cmdContent := `---
+description: A test command for import testing
+---
+
+# Import Test Command
+
+This command is used for testing OpenCode import functionality.
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	// Create test skill
+	skillPath := filepath.Join(skillsDir, "import-test-skill")
+	if err := os.MkdirAll(skillPath, 0755); err != nil {
+		t.Fatalf("Failed to create skill directory: %v", err)
+	}
+
+	skillMdPath := filepath.Join(skillPath, "SKILL.md")
+	skillContent := `---
+name: import-test-skill
+description: A test skill for import testing
+license: MIT
+metadata:
+  author: test
+  version: "1.0.0"
+---
+
+# Import Test Skill
+
+This skill is used for testing OpenCode import functionality.
+`
+	if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
+		t.Fatalf("Failed to create SKILL.md: %v", err)
+	}
+
+	// Create test agent
+	agentPath := filepath.Join(agentsDir, "import-test-agent.md")
+	agentContent := `---
+description: A test agent for import testing
+type: assistant
+instructions: Help with importing and testing
+---
+
+# Import Test Agent
+
+This agent is used for testing OpenCode import functionality.
+`
+	if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
+		t.Fatalf("Failed to create test agent: %v", err)
+	}
+
+	// Step 1: Scan OpenCode folder
+	t.Log("Step 1: Scanning OpenCode folder")
+	contents, err := resource.ScanOpenCodeFolder(opencodePath)
+	if err != nil {
+		t.Fatalf("Failed to scan OpenCode folder: %v", err)
+	}
+
+	// Verify correct counts
+	if len(contents.CommandPaths) != 1 {
+		t.Errorf("Expected 1 command, got %d", len(contents.CommandPaths))
+	}
+	if len(contents.SkillPaths) != 1 {
+		t.Errorf("Expected 1 skill, got %d", len(contents.SkillPaths))
+	}
+	if len(contents.AgentPaths) != 1 {
+		t.Errorf("Expected 1 agent, got %d", len(contents.AgentPaths))
+	}
+
+	// Step 2: Import all resources using Manager.AddBulk
+	t.Log("Step 2: Importing resources to repository")
+	repoDir := t.TempDir()
+	manager := repo.NewManagerWithPath(repoDir)
+
+	// Combine all paths
+	allPaths := append([]string{}, contents.CommandPaths...)
+	allPaths = append(allPaths, contents.SkillPaths...)
+	allPaths = append(allPaths, contents.AgentPaths...)
+
+	opts := repo.BulkImportOptions{
+		Force:        false,
+		SkipExisting: false,
+		DryRun:       false,
+	}
+
+	result, err := manager.AddBulk(allPaths, opts)
+	if err != nil {
+		t.Fatalf("Failed to import resources: %v", err)
+	}
+
+	// Verify import results
+	if len(result.Added) != 3 {
+		t.Errorf("Expected 3 resources added, got %d", len(result.Added))
+	}
+	if len(result.Failed) != 0 {
+		t.Errorf("Expected 0 failures, got %d", len(result.Failed))
+	}
+
+	// Step 3: Verify all resources are in repository
+	t.Log("Step 3: Verifying imported resources")
+	resources, err := manager.List(nil)
+	if err != nil {
+		t.Fatalf("Failed to list resources: %v", err)
+	}
+
+	if len(resources) != 3 {
+		t.Errorf("Expected 3 resources in repository, got %d", len(resources))
+	}
+
+	// Verify command was imported
+	cmdRes, err := manager.Get("import-test-cmd", resource.Command)
+	if err != nil {
+		t.Errorf("Failed to get imported command: %v", err)
+	}
+	if cmdRes.Name != "import-test-cmd" {
+		t.Errorf("Command name = %v, want import-test-cmd", cmdRes.Name)
+	}
+
+	// Verify skill was imported
+	skillRes, err := manager.Get("import-test-skill", resource.Skill)
+	if err != nil {
+		t.Errorf("Failed to get imported skill: %v", err)
+	}
+	if skillRes.Name != "import-test-skill" {
+		t.Errorf("Skill name = %v, want import-test-skill", skillRes.Name)
+	}
+
+	// Verify agent was imported
+	agentRes, err := manager.Get("import-test-agent", resource.Agent)
+	if err != nil {
+		t.Errorf("Failed to get imported agent: %v", err)
+	}
+	if agentRes.Name != "import-test-agent" {
+		t.Errorf("Agent name = %v, want import-test-agent", agentRes.Name)
+	}
+	if agentRes.Type != resource.Agent {
+		t.Errorf("Agent type = %v, want Agent", agentRes.Type)
+	}
+
+	// Step 4: Test installation of imported resources
+	t.Log("Step 4: Testing installation of imported resources")
+	projectDir := t.TempDir()
+
+	// Create .opencode directory to trigger OpenCode detection
+	if err := os.MkdirAll(filepath.Join(projectDir, ".opencode"), 0755); err != nil {
+		t.Fatalf("Failed to create .opencode directory: %v", err)
+	}
+
+	installer, err := install.NewInstaller(projectDir, tools.OpenCode)
+	if err != nil {
+		t.Fatalf("Failed to create installer: %v", err)
+	}
+
+	// Install command
+	if err := installer.InstallCommand("import-test-cmd", manager); err != nil {
+		t.Errorf("Failed to install command: %v", err)
+	}
+
+	// Install skill
+	if err := installer.InstallSkill("import-test-skill", manager); err != nil {
+		t.Errorf("Failed to install skill: %v", err)
+	}
+
+	// Install agent
+	if err := installer.InstallAgent("import-test-agent", manager); err != nil {
+		t.Errorf("Failed to install agent: %v", err)
+	}
+
+	// Verify all are installed
+	if !installer.IsInstalled("import-test-cmd", resource.Command) {
+		t.Error("Command should be installed")
+	}
+	if !installer.IsInstalled("import-test-skill", resource.Skill) {
+		t.Error("Skill should be installed")
+	}
+	if !installer.IsInstalled("import-test-agent", resource.Agent) {
+		t.Error("Agent should be installed")
+	}
+
+	// Verify symlinks exist
+	cmdSymlink := filepath.Join(projectDir, ".opencode", "commands", "import-test-cmd.md")
+	if _, err := os.Lstat(cmdSymlink); err != nil {
+		t.Errorf("Command symlink not created: %v", err)
+	}
+
+	skillSymlink := filepath.Join(projectDir, ".opencode", "skills", "import-test-skill")
+	if _, err := os.Lstat(skillSymlink); err != nil {
+		t.Errorf("Skill symlink not created: %v", err)
+	}
+
+	agentSymlink := filepath.Join(projectDir, ".opencode", "agents", "import-test-agent.md")
+	if _, err := os.Lstat(agentSymlink); err != nil {
+		t.Errorf("Agent symlink not created: %v", err)
+	}
+
+	t.Log("OpenCode import test passed!")
+}
