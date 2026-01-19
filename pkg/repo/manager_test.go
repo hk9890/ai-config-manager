@@ -388,3 +388,195 @@ func TestGetPath(t *testing.T) {
 		t.Errorf("GetPath(skill) = %v, want %v", skillPath, expectedSkillPath)
 	}
 }
+
+func TestAddBulk(t *testing.T) {
+	tests := []struct {
+		name            string
+		setup           func(tmpDir string, manager *Manager) []string
+		opts            BulkImportOptions
+		wantAddedCount  int
+		wantSkippedCount int
+		wantFailedCount int
+		wantError       bool
+	}{
+		{
+			name: "import multiple commands successfully",
+			setup: func(tmpDir string, manager *Manager) []string {
+				cmd1Path := filepath.Join(tmpDir, "cmd1.md")
+				cmd2Path := filepath.Join(tmpDir, "cmd2.md")
+				
+				os.WriteFile(cmd1Path, []byte("---\ndescription: Command 1\n---\n"), 0644)
+				os.WriteFile(cmd2Path, []byte("---\ndescription: Command 2\n---\n"), 0644)
+				
+				return []string{cmd1Path, cmd2Path}
+			},
+			opts:            BulkImportOptions{},
+			wantAddedCount:  2,
+			wantSkippedCount: 0,
+			wantFailedCount: 0,
+			wantError:       false,
+		},
+		{
+			name: "import multiple skills successfully",
+			setup: func(tmpDir string, manager *Manager) []string {
+				skill1Dir := filepath.Join(tmpDir, "skill1")
+				skill2Dir := filepath.Join(tmpDir, "skill2")
+				
+				os.MkdirAll(skill1Dir, 0755)
+				os.MkdirAll(skill2Dir, 0755)
+				
+				os.WriteFile(filepath.Join(skill1Dir, "SKILL.md"), 
+					[]byte("---\nname: skill1\ndescription: Skill 1\n---\n"), 0644)
+				os.WriteFile(filepath.Join(skill2Dir, "SKILL.md"), 
+					[]byte("---\nname: skill2\ndescription: Skill 2\n---\n"), 0644)
+				
+				return []string{skill1Dir, skill2Dir}
+			},
+			opts:            BulkImportOptions{},
+			wantAddedCount:  2,
+			wantSkippedCount: 0,
+			wantFailedCount: 0,
+			wantError:       false,
+		},
+		{
+			name: "import mixed commands and skills",
+			setup: func(tmpDir string, manager *Manager) []string {
+				cmdPath := filepath.Join(tmpDir, "cmd.md")
+				skillDir := filepath.Join(tmpDir, "skill")
+				
+				os.WriteFile(cmdPath, []byte("---\ndescription: Command\n---\n"), 0644)
+				os.MkdirAll(skillDir, 0755)
+				os.WriteFile(filepath.Join(skillDir, "SKILL.md"), 
+					[]byte("---\nname: skill\ndescription: Skill\n---\n"), 0644)
+				
+				return []string{cmdPath, skillDir}
+			},
+			opts:            BulkImportOptions{},
+			wantAddedCount:  2,
+			wantSkippedCount: 0,
+			wantFailedCount: 0,
+			wantError:       false,
+		},
+		{
+			name: "conflict with skip existing",
+			setup: func(tmpDir string, manager *Manager) []string {
+				// Add first command
+				cmd1Path := filepath.Join(tmpDir, "existing.md")
+				os.WriteFile(cmd1Path, []byte("---\ndescription: Existing\n---\n"), 0644)
+				manager.AddCommand(cmd1Path)
+				
+				// Try to add again
+				cmd2Path := filepath.Join(tmpDir, "existing.md")
+				os.WriteFile(cmd2Path, []byte("---\ndescription: Existing\n---\n"), 0644)
+				
+				return []string{cmd2Path}
+			},
+			opts:            BulkImportOptions{SkipExisting: true},
+			wantAddedCount:  0,
+			wantSkippedCount: 1,
+			wantFailedCount: 0,
+			wantError:       false,
+		},
+		{
+			name: "conflict with force",
+			setup: func(tmpDir string, manager *Manager) []string {
+				// Add first command
+				cmd1Path := filepath.Join(tmpDir, "forced.md")
+				os.WriteFile(cmd1Path, []byte("---\ndescription: Original\n---\n"), 0644)
+				manager.AddCommand(cmd1Path)
+				
+				// Force overwrite
+				cmd2Path := filepath.Join(tmpDir, "forced.md")
+				os.WriteFile(cmd2Path, []byte("---\ndescription: Updated\n---\n"), 0644)
+				
+				return []string{cmd2Path}
+			},
+			opts:            BulkImportOptions{Force: true},
+			wantAddedCount:  1,
+			wantSkippedCount: 0,
+			wantFailedCount: 0,
+			wantError:       false,
+		},
+		{
+			name: "conflict without flags fails",
+			setup: func(tmpDir string, manager *Manager) []string {
+				// Add first command
+				cmd1Path := filepath.Join(tmpDir, "conflict.md")
+				os.WriteFile(cmd1Path, []byte("---\ndescription: Conflict\n---\n"), 0644)
+				manager.AddCommand(cmd1Path)
+				
+				// Try to add again without flags
+				cmd2Path := filepath.Join(tmpDir, "conflict.md")
+				os.WriteFile(cmd2Path, []byte("---\ndescription: Conflict\n---\n"), 0644)
+				
+				return []string{cmd2Path}
+			},
+			opts:            BulkImportOptions{},
+			wantAddedCount:  0,
+			wantSkippedCount: 0,
+			wantFailedCount: 1,
+			wantError:       true,
+		},
+		{
+			name: "dry run doesn't actually import",
+			setup: func(tmpDir string, manager *Manager) []string {
+				cmdPath := filepath.Join(tmpDir, "dryrun.md")
+				os.WriteFile(cmdPath, []byte("---\ndescription: Dry run\n---\n"), 0644)
+				return []string{cmdPath}
+			},
+			opts:            BulkImportOptions{DryRun: true},
+			wantAddedCount:  1,
+			wantSkippedCount: 0,
+			wantFailedCount: 0,
+			wantError:       false,
+		},
+		{
+			name: "invalid resource fails",
+			setup: func(tmpDir string, manager *Manager) []string {
+				invalidPath := filepath.Join(tmpDir, "invalid.txt")
+				os.WriteFile(invalidPath, []byte("not a resource"), 0644)
+				return []string{invalidPath}
+			},
+			opts:            BulkImportOptions{},
+			wantAddedCount:  0,
+			wantSkippedCount: 0,
+			wantFailedCount: 1,
+			wantError:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			repoPath := filepath.Join(tmpDir, "repo")
+			manager := NewManagerWithPath(repoPath)
+			
+			sources := tt.setup(tmpDir, manager)
+			
+			result, err := manager.AddBulk(sources, tt.opts)
+			if (err != nil) != tt.wantError {
+				t.Errorf("AddBulk() error = %v, wantError %v", err, tt.wantError)
+				return
+			}
+			
+			if len(result.Added) != tt.wantAddedCount {
+				t.Errorf("AddBulk() added count = %v, want %v", len(result.Added), tt.wantAddedCount)
+			}
+			if len(result.Skipped) != tt.wantSkippedCount {
+				t.Errorf("AddBulk() skipped count = %v, want %v", len(result.Skipped), tt.wantSkippedCount)
+			}
+			if len(result.Failed) != tt.wantFailedCount {
+				t.Errorf("AddBulk() failed count = %v, want %v", len(result.Failed), tt.wantFailedCount)
+			}
+			
+			// Verify dry run doesn't actually import
+			if tt.opts.DryRun && tt.wantAddedCount > 0 {
+				// Check that repo is empty
+				resources, _ := manager.List(nil)
+				if len(resources) != 0 {
+					t.Errorf("DryRun should not import resources, but found %d resources", len(resources))
+				}
+			}
+		})
+	}
+}

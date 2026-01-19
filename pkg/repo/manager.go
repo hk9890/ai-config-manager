@@ -279,3 +279,136 @@ func copyDir(src, dst string) error {
 
 	return nil
 }
+
+// BulkImportOptions contains options for bulk import operations
+type BulkImportOptions struct {
+	Force        bool // Overwrite existing resources
+	SkipExisting bool // Skip conflicts silently
+	DryRun       bool // Preview only, don't actually import
+}
+
+// ImportError represents an error during resource import
+type ImportError struct {
+	Path    string
+	Message string
+}
+
+// BulkImportResult contains the results of a bulk import operation
+type BulkImportResult struct {
+	Added   []string      // Successfully added resources
+	Skipped []string      // Skipped due to conflicts
+	Failed  []ImportError // Failed imports with reasons
+}
+
+// AddBulk imports multiple resources at once
+func (m *Manager) AddBulk(sources []string, opts BulkImportOptions) (*BulkImportResult, error) {
+	result := &BulkImportResult{
+		Added:   []string{},
+		Skipped: []string{},
+		Failed:  []ImportError{},
+	}
+
+	// Ensure repo is initialized (even for dry run, to check paths)
+	if !opts.DryRun {
+		if err := m.Init(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Process each source
+	for _, sourcePath := range sources {
+		if err := m.importResource(sourcePath, opts, result); err != nil {
+			// If not skipping existing, fail on first error
+			if !opts.SkipExisting && !opts.Force {
+				return result, err
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// importResource imports a single resource (helper for AddBulk)
+func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, result *BulkImportResult) error {
+	// Detect resource type
+	resourceType, err := resource.DetectType(sourcePath)
+	if err != nil {
+		result.Failed = append(result.Failed, ImportError{
+			Path:    sourcePath,
+			Message: err.Error(),
+		})
+		return err
+	}
+
+	// Load the resource to get its name
+	var res *resource.Resource
+	switch resourceType {
+	case resource.Command:
+		res, err = resource.LoadCommand(sourcePath)
+	case resource.Skill:
+		res, err = resource.LoadSkill(sourcePath)
+	default:
+		err = fmt.Errorf("unknown resource type: %s", resourceType)
+	}
+
+	if err != nil {
+		result.Failed = append(result.Failed, ImportError{
+			Path:    sourcePath,
+			Message: fmt.Sprintf("failed to load resource: %v", err),
+		})
+		return err
+	}
+
+	// Check if resource already exists
+	destPath := m.GetPath(res.Name, resourceType)
+	_, statErr := os.Stat(destPath)
+	exists := statErr == nil
+
+	if exists {
+		if opts.Force {
+			// Force mode: remove existing and continue
+			if !opts.DryRun {
+				if err := m.Remove(res.Name, resourceType); err != nil {
+					result.Failed = append(result.Failed, ImportError{
+						Path:    sourcePath,
+						Message: fmt.Sprintf("failed to remove existing resource: %v", err),
+					})
+					return err
+				}
+			}
+		} else if opts.SkipExisting {
+			// Skip mode: skip this resource
+			result.Skipped = append(result.Skipped, sourcePath)
+			return nil
+		} else {
+			// Default mode: fail on conflict
+			err := fmt.Errorf("resource '%s' already exists in repository", res.Name)
+			result.Failed = append(result.Failed, ImportError{
+				Path:    sourcePath,
+				Message: err.Error(),
+			})
+			return err
+		}
+	}
+
+	// Import the resource (unless dry run)
+	if !opts.DryRun {
+		switch resourceType {
+		case resource.Command:
+			err = m.AddCommand(sourcePath)
+		case resource.Skill:
+			err = m.AddSkill(sourcePath)
+		}
+
+		if err != nil {
+			result.Failed = append(result.Failed, ImportError{
+				Path:    sourcePath,
+				Message: err.Error(),
+			})
+			return err
+		}
+	}
+
+	result.Added = append(result.Added, sourcePath)
+	return nil
+}
