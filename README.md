@@ -116,6 +116,107 @@ ai-repo add command ~/.claude/commands/my-command.md
 ai-repo add skill ~/my-skills/pdf-processing
 ```
 
+## Bulk Import
+
+Import multiple resources at once from Claude plugins or Claude configuration folders.
+
+### Import from Claude Plugin
+
+Import all commands and skills from a Claude plugin directory:
+
+```bash
+# Import from a Claude plugin
+ai-repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
+
+# Example output:
+# Importing from plugin: example-plugin
+#   Description: A comprehensive example plugin
+# 
+# Found: 1 commands, 1 skills
+# 
+# ✓ Added command 'example-command'
+# ✓ Added skill 'example-skill'
+# 
+# Summary: 2 added, 0 skipped, 0 failed
+```
+
+**Flags:**
+- `--force` / `-f`: Overwrite existing resources
+- `--skip-existing`: Skip conflicts silently
+- `--dry-run`: Preview without importing
+
+### Import from Claude Folder
+
+Import all commands and skills from a `.claude/` configuration folder:
+
+```bash
+# Import from .claude folder
+ai-repo add claude ~/.claude
+
+# Import from project's .claude folder
+ai-repo add claude ~/my-project/.claude
+
+# Example output:
+# Importing from Claude folder: /home/user/.claude
+# 
+# Found: 5 commands, 3 skills
+#
+# ✓ Added command 'test'
+# ✓ Added command 'review'
+# ✓ Added command 'deploy'
+# ✓ Added skill 'pdf-processor'
+# ✓ Added skill 'code-analyzer'
+# ⊘ Skipped 'git-release' (already exists)
+# 
+# Summary: 5 added, 1 skipped, 0 failed
+```
+
+**What gets imported:**
+- Commands from `.claude/commands/*.md`
+- Skills from `.claude/skills/*/SKILL.md`
+- Works with both `.claude` directory and parent directories containing `.claude/`
+
+### Handling Conflicts
+
+Control how conflicts are handled when importing:
+
+```bash
+# Force overwrite existing resources
+ai-repo add plugin ./my-plugin --force
+
+# Skip existing resources (no error)
+ai-repo add claude ~/.claude --skip-existing
+
+# Preview what would be imported (dry run)
+ai-repo add plugin ./plugin --dry-run
+
+# Default behavior: fail on first conflict
+ai-repo add plugin ./plugin  # Error if any resource already exists
+```
+
+### Bulk Import Use Cases
+
+**Scenario 1: Setting up your ai-repo from existing Claude setup**
+```bash
+# Import all your existing commands and skills at once
+ai-repo add claude ~/.claude
+```
+
+**Scenario 2: Installing a complete plugin**
+```bash
+# Import all resources from a plugin in one command
+ai-repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/pr-review-toolkit
+```
+
+**Scenario 3: Migrating resources between machines**
+```bash
+# On machine A: your resources are already in ai-repo
+# On machine B: import from a cloned .claude folder
+ai-repo add claude ~/cloned-config/.claude
+```
+
+
+
 ### 3. List Available Resources
 
 ```bash
@@ -266,14 +367,24 @@ ai-repo config set default-tool <tool>
 Add resources to the repository.
 
 ```bash
-# Add a command
+# Add a single command
 ai-repo add command <path-to-file.md>
 
-# Add a skill
+# Add a single skill
 ai-repo add skill <path-to-directory>
+
+# Add all resources from a Claude plugin
+ai-repo add plugin <path-to-plugin>
+
+# Add all resources from a Claude folder
+ai-repo add claude <path-to-.claude-folder>
 
 # Overwrite existing resource
 ai-repo add command my-command.md --force
+
+# Bulk import with conflict handling
+ai-repo add plugin ./plugin --skip-existing
+ai-repo add claude ~/.claude --dry-run
 ```
 
 ### `ai-repo list`
