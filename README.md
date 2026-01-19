@@ -614,73 +614,17 @@ See [examples/README.md](examples/README.md) for detailed instructions.
 
 ## Development
 
-### Prerequisites
-
-- Go 1.21 or higher
-- Make (optional)
-
-### Build
-
-```bash
-make build
-```
-
-### Run Tests
-
-```bash
-# All tests
-make test
-
-# Unit tests only
-make unit-test
-
-# Integration tests only
-make integration-test
-```
-
-### Code Quality
-
-```bash
-# Format code
-make fmt
-
-# Run linter
-make vet
-
-# All checks
-make all
-```
-
-## Project Structure
-
-```
-.
-├── cmd/               # CLI commands
-│   ├── root.go
-│   ├── add.go
-│   ├── list.go
-│   ├── install.go
-│   └── remove.go
-├── pkg/
-│   ├── config/        # Configuration
-│   ├── repo/          # Repository management
-│   ├── resource/      # Resource types and validation
-│   └── install/       # Installation logic
-├── test/              # Integration tests
-├── examples/          # Example resources
-├── main.go
-└── README.md
-```
+For information on building, testing, and contributing to ai-repo, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup and workflow
+- Code style guidelines
+- Testing requirements
+- Architecture overview
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass: `make test`
-5. Submit a pull request
+For quick questions or discussions, visit our [GitHub Discussions](https://github.com/hk9890/ai-config-manager/discussions).
 
 ## License
 
