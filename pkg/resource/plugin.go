@@ -251,3 +251,147 @@ func ScanClaudeFolder(path string) (*ClaudeFolderContents, error) {
 
 	return contents, nil
 }
+
+// OpenCodeFolderContents represents the contents found in an OpenCode folder
+type OpenCodeFolderContents struct {
+	CommandPaths []string
+	SkillPaths   []string
+	AgentPaths   []string
+}
+
+// DetectOpenCodeFolder checks if the given path is an OpenCode configuration folder
+// Returns true if the path is named .opencode or contains commands/, skills/, or agents/ subdirectories
+func DetectOpenCodeFolder(path string) (bool, error) {
+	// Check if path exists
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, fmt.Errorf("path does not exist: %w", err)
+	}
+
+	// Must be a directory
+	if !info.IsDir() {
+		return false, nil
+	}
+
+	// Check if directory is named .opencode
+	baseName := filepath.Base(path)
+	if baseName == ".opencode" {
+		return true, nil
+	}
+
+	// Check for .opencode subdirectory
+	opencodeSubDir := filepath.Join(path, ".opencode")
+	if info, err := os.Stat(opencodeSubDir); err == nil && info.IsDir() {
+		return true, nil
+	}
+
+	// Check if has commands/, skills/, or agents/ subdirectories (indicating it might be an OpenCode folder)
+	commandsDir := filepath.Join(path, "commands")
+	skillsDir := filepath.Join(path, "skills")
+	agentsDir := filepath.Join(path, "agents")
+
+	hasCommands := false
+	hasSkills := false
+	hasAgents := false
+
+	if info, err := os.Stat(commandsDir); err == nil && info.IsDir() {
+		hasCommands = true
+	}
+	if info, err := os.Stat(skillsDir); err == nil && info.IsDir() {
+		hasSkills = true
+	}
+	if info, err := os.Stat(agentsDir); err == nil && info.IsDir() {
+		hasAgents = true
+	}
+
+	// If it has any of commands, skills, or agents, it's likely an OpenCode folder
+	return hasCommands || hasSkills || hasAgents, nil
+}
+
+// ScanOpenCodeFolder scans an OpenCode folder for commands, skills, and agents
+func ScanOpenCodeFolder(path string) (*OpenCodeFolderContents, error) {
+	// Validate it's an OpenCode folder
+	isOpenCodeFolder, err := DetectOpenCodeFolder(path)
+	if err != nil {
+		return nil, err
+	}
+	if !isOpenCodeFolder {
+		return nil, fmt.Errorf("not a valid OpenCode folder")
+	}
+
+	contents := &OpenCodeFolderContents{
+		CommandPaths: []string{},
+		SkillPaths:   []string{},
+		AgentPaths:   []string{},
+	}
+
+	// Determine the actual OpenCode directory
+	opencodePath := path
+	baseName := filepath.Base(path)
+	if baseName != ".opencode" {
+		// Check if there's a .opencode subdirectory
+		opencodeSubDir := filepath.Join(path, ".opencode")
+		if info, err := os.Stat(opencodeSubDir); err == nil && info.IsDir() {
+			opencodePath = opencodeSubDir
+		}
+	}
+
+	// Scan commands/ directory
+	commandsDir := filepath.Join(opencodePath, "commands")
+	if info, err := os.Stat(commandsDir); err == nil && info.IsDir() {
+		entries, err := os.ReadDir(commandsDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read commands directory: %w", err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			if filepath.Ext(entry.Name()) == ".md" {
+				contents.CommandPaths = append(contents.CommandPaths, filepath.Join(commandsDir, entry.Name()))
+			}
+		}
+	}
+
+	// Scan skills/ directory
+	skillsDir := filepath.Join(opencodePath, "skills")
+	if info, err := os.Stat(skillsDir); err == nil && info.IsDir() {
+		entries, err := os.ReadDir(skillsDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read skills directory: %w", err)
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			// Check if directory contains SKILL.md
+			skillPath := filepath.Join(skillsDir, entry.Name())
+			skillMdPath := filepath.Join(skillPath, "SKILL.md")
+			if _, err := os.Stat(skillMdPath); err == nil {
+				contents.SkillPaths = append(contents.SkillPaths, skillPath)
+			}
+		}
+	}
+
+	// Scan agents/ directory
+	agentsDir := filepath.Join(opencodePath, "agents")
+	if info, err := os.Stat(agentsDir); err == nil && info.IsDir() {
+		entries, err := os.ReadDir(agentsDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read agents directory: %w", err)
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			if filepath.Ext(entry.Name()) == ".md" {
+				contents.AgentPaths = append(contents.AgentPaths, filepath.Join(agentsDir, entry.Name()))
+			}
+		}
+	}
+
+	return contents, nil
+}
