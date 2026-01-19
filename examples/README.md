@@ -1,20 +1,27 @@
 # AI Resources Examples
 
-This directory contains example command and skill resources that demonstrate the correct format and serve as templates for creating your own resources.
+This directory contains example command, skill, and agent resources that demonstrate the correct format and serve as templates for creating your own resources.
 
-## Commands vs Skills
+## Resource Types
 
 ### Commands
 - **Single .md file** with YAML frontmatter
 - Quick, focused tasks for AI agents
-- Stored in `~/.ai-config/repo/commands/`
+- Stored in `~/.local/share/ai-config/repo/commands/`
 - Example: `sample-command.md`
 
 ### Skills
 - **Directory** containing `SKILL.md` plus optional subdirectories
 - More complex capabilities with scripts, references, and assets
-- Stored in `~/.ai-config/repo/skills/`
+- Stored in `~/.local/share/ai-config/repo/skills/`
 - Example: `sample-skill/`
+
+### Agents
+- **Single .md file** with YAML frontmatter
+- AI agents with specialized roles and capabilities
+- Supports both OpenCode and Claude Code formats
+- Stored in `~/.local/share/ai-config/repo/agents/`
+- Examples: `sample-agent.md`, `minimal-agent.md`, `claude-style-agent.md`
 
 ## Command Format
 
@@ -99,9 +106,67 @@ Your skill documentation goes here.
 
 **Specification:** https://agentskills.io/specification
 
+## Agent Format
+
+Agents are single `.md` files with YAML frontmatter that define AI agents with specialized roles.
+
+**Minimum required frontmatter:**
+```yaml
+---
+description: What this agent does (required)
+---
+```
+
+**OpenCode format example:**
+```yaml
+---
+description: Code review agent that checks for best practices
+type: code-reviewer
+instructions: Review code for quality, security, and performance
+capabilities:
+  - static-analysis
+  - security-scan
+  - performance-review
+version: "1.0.0"
+author: your-name
+license: MIT
+---
+
+# Agent Documentation
+
+Your agent details go here.
+```
+
+**Claude Code format example:**
+```yaml
+---
+description: Test automation agent
+version: "2.0.0"
+author: team-name
+license: Apache-2.0
+metadata:
+  category: testing
+  tags: qa,automation
+---
+
+# Agent Documentation
+
+Instructions and guidelines go in the markdown body for Claude format.
+```
+
+**Key Differences:**
+- **OpenCode format**: Uses `type`, `instructions`, and `capabilities` in frontmatter
+- **Claude format**: Puts all instructions in the markdown body, uses standard metadata fields
+- Both formats require `description` field
+- Choose the format that fits your workflow
+
+**Specifications:**
+- OpenCode: https://opencode.ai/docs/agents
+- Claude Code: https://code.claude.com/docs/agents
+
 ## Name Validation Rules
 
-Both commands and skills must follow these naming rules:
+Commands, skills, and agents must follow these naming rules:
 - **Length:** 1-64 characters
 - **Characters:** Lowercase letters (a-z), numbers (0-9), hyphens (-)
 - **Start/End:** Must start and end with alphanumeric character
@@ -113,6 +178,8 @@ Both commands and skills must follow these naming rules:
 - `pdf-processing`
 - `test-e2e`
 - `skill123`
+- `code-reviewer`
+- `qa-tester`
 
 **Invalid examples:**
 - `Test` (uppercase)
@@ -137,6 +204,16 @@ Both commands and skills must follow these naming rules:
 2. Create `SKILL.md` with frontmatter (name must match directory)
 3. Add optional `scripts/`, `references/`, or `assets/` directories
 4. Test locally: `ai-repo add skill ./my-skill`
+
+### Agents
+
+1. Create a new `.md` file with a valid name (e.g., `my-agent.md`)
+2. Add YAML frontmatter with at least a `description`
+3. Choose format:
+   - **OpenCode**: Add `type`, `instructions`, `capabilities` to frontmatter
+   - **Claude**: Put instructions in markdown body
+4. Write agent documentation in markdown
+5. Test locally: `ai-repo add agent ./my-agent.md`
 
 ## Testing Before Adding
 
@@ -165,6 +242,11 @@ ai-repo add command examples/sample-command.md
 # Add the sample skill
 ai-repo add skill examples/sample-skill
 
+# Add sample agents
+ai-repo add agent examples/sample-agent.md
+ai-repo add agent examples/minimal-agent.md
+ai-repo add agent examples/claude-style-agent.md
+
 # List to verify
 ai-repo list
 ```
@@ -179,16 +261,22 @@ ai-repo install command sample-command
 # Install the skill
 ai-repo install skill sample-skill
 
+# Install an agent
+ai-repo install agent sample-agent
+
 # Verify installation
-ls -la .ai/commands/
-ls -la .ai/skills/
+ls -la .claude/commands/
+ls -la .claude/skills/
+ls -la .claude/agents/
 ```
 
 ## Resources
 
 - **Claude Code Commands:** https://code.claude.com/docs/en/slash-commands
+- **Claude Code Agents:** https://code.claude.com/docs/agents
+- **OpenCode Agents:** https://opencode.ai/docs/agents
 - **AgentSkills Specification:** https://agentskills.io/specification
-- **ai-repo Documentation:** (link to your main README)
+- **ai-repo Documentation:** ../README.md
 
 ## Contributing
 

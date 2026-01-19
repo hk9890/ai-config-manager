@@ -4,12 +4,13 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 
 ## Features
 
-- 📦 **Repository Management**: Centralized repository for AI commands and skills
+- 📦 **Repository Management**: Centralized repository for AI commands, skills, and agents
 - 🔗 **Symlink-based Installation**: Install resources in projects without duplication
 - 🤖 **Multi-Tool Support**: Works with Claude Code, OpenCode, and GitHub Copilot
-- ✅ **Format Validation**: Automatic validation of command and skill formats
+- 🤖 **Agent Support**: Manage AI agents with specialized roles and capabilities
+- ✅ **Format Validation**: Automatic validation of command, skill, and agent formats
 - 🎯 **Type Safety**: Strong validation following agentskills.io and Claude Code specifications
-- 🗂️ **Organized Storage**: Clean separation between commands and skills
+- 🗂️ **Organized Storage**: Clean separation between commands, skills, and agents
 - 🔧 **Smart Installation**: Automatically detects existing tool directories
 - 💻 **Cross-platform**: Works on Linux and macOS (Windows support planned)
 
@@ -17,13 +18,15 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 
 `ai-repo` supports three major AI coding tools:
 
-| Tool | Commands | Skills | Directory |
-|------|----------|--------|-----------|
-| **[Claude Code](https://code.claude.com/)** | ✅ | ✅ | `.claude/` |
-| **[OpenCode](https://opencode.ai/)** | ✅ | ✅ | `.opencode/` |
-| **[GitHub Copilot](https://github.com/features/copilot)** | ❌ | ✅ | `.github/skills/` |
+| Tool | Commands | Skills | Agents | Directory |
+|------|----------|--------|--------|-----------|
+| **[Claude Code](https://code.claude.com/)** | ✅ | ✅ | ✅ | `.claude/` |
+| **[OpenCode](https://opencode.ai/)** | ✅ | ✅ | ✅ | `.opencode/` |
+| **[GitHub Copilot](https://github.com/features/copilot)** | ❌ | ✅ | ❌ | `.github/skills/` |
 
-**Note:** GitHub Copilot only supports Agent Skills, not slash commands.
+**Notes:** 
+- GitHub Copilot only supports Agent Skills, not slash commands or agents.
+- Agents provide specialized roles with specific capabilities for different AI tools.
 
 ## Installation
 
@@ -114,6 +117,12 @@ ai-repo add command ~/.claude/commands/my-command.md
 
 # Add a skill (directory with SKILL.md)
 ai-repo add skill ~/my-skills/pdf-processing
+
+# Add an agent (single .md file)
+ai-repo add agent ~/.claude/agents/code-reviewer.md
+
+# Import from OpenCode directory
+ai-repo add opencode ~/.opencode
 ```
 
 ## Bulk Import
@@ -147,7 +156,7 @@ ai-repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugin
 
 ### Import from Claude Folder
 
-Import all commands and skills from a `.claude/` configuration folder:
+Import all commands, skills, and agents from a `.claude/` configuration folder:
 
 ```bash
 # Import from .claude folder
@@ -159,22 +168,53 @@ ai-repo add claude ~/my-project/.claude
 # Example output:
 # Importing from Claude folder: /home/user/.claude
 # 
-# Found: 5 commands, 3 skills
+# Found: 5 commands, 3 skills, 2 agents
 #
 # ✓ Added command 'test'
 # ✓ Added command 'review'
 # ✓ Added command 'deploy'
 # ✓ Added skill 'pdf-processor'
 # ✓ Added skill 'code-analyzer'
+# ✓ Added agent 'code-reviewer'
 # ⊘ Skipped 'git-release' (already exists)
 # 
-# Summary: 5 added, 1 skipped, 0 failed
+# Summary: 6 added, 1 skipped, 0 failed
 ```
 
 **What gets imported:**
 - Commands from `.claude/commands/*.md`
 - Skills from `.claude/skills/*/SKILL.md`
+- Agents from `.claude/agents/*.md`
 - Works with both `.claude` directory and parent directories containing `.claude/`
+
+### Import from OpenCode Folder
+
+Import all resources from an `.opencode/` configuration folder:
+
+```bash
+# Import from .opencode folder
+ai-repo add opencode ~/.opencode
+
+# Import from project's .opencode folder
+ai-repo add opencode ~/my-project/.opencode
+
+# Example output:
+# Importing from OpenCode folder: /home/user/.opencode
+# 
+# Found: 3 commands, 2 skills, 1 agents
+#
+# ✓ Added command 'build'
+# ✓ Added command 'test'
+# ✓ Added skill 'data-processor'
+# ✓ Added agent 'qa-reviewer'
+# 
+# Summary: 4 added, 0 skipped, 0 failed
+```
+
+**What gets imported:**
+- Commands from `.opencode/commands/*.md`
+- Skills from `.opencode/skills/*/SKILL.md`
+- Agents from `.opencode/agents/*.md`
 
 ### Handling Conflicts
 
@@ -229,6 +269,9 @@ ai-repo list command
 # List only skills
 ai-repo list skill
 
+# List only agents
+ai-repo list agent
+
 # JSON output
 ai-repo list --format=json
 ```
@@ -244,6 +287,9 @@ ai-repo install command my-command
 # Install a skill
 ai-repo install skill pdf-processing
 
+# Install an agent
+ai-repo install agent code-reviewer
+
 # Resources are symlinked to tool-specific directories
 # Example: .claude/commands/, .opencode/commands/, etc.
 ```
@@ -256,6 +302,9 @@ ai-repo remove command my-command
 
 # Force remove (skip confirmation)
 ai-repo remove skill old-skill --force
+
+# Remove an agent
+ai-repo remove agent old-agent
 ```
 
 ## Multi-Tool Support
@@ -373,11 +422,17 @@ ai-repo add command <path-to-file.md>
 # Add a single skill
 ai-repo add skill <path-to-directory>
 
+# Add a single agent
+ai-repo add agent <path-to-file.md>
+
 # Add all resources from a Claude plugin
 ai-repo add plugin <path-to-plugin>
 
 # Add all resources from a Claude folder
 ai-repo add claude <path-to-.claude-folder>
+
+# Add all resources from an OpenCode folder
+ai-repo add opencode <path-to-.opencode-folder>
 
 # Overwrite existing resource
 ai-repo add command my-command.md --force
@@ -385,6 +440,7 @@ ai-repo add command my-command.md --force
 # Bulk import with conflict handling
 ai-repo add plugin ./plugin --skip-existing
 ai-repo add claude ~/.claude --dry-run
+ai-repo add opencode ~/.opencode --skip-existing
 ```
 
 ### `ai-repo list`
@@ -398,6 +454,7 @@ ai-repo list
 # Filter by type
 ai-repo list command
 ai-repo list skill
+ai-repo list agent
 
 # Output formats
 ai-repo list --format=table  # Default
@@ -416,11 +473,15 @@ ai-repo install command <name>
 # Install skill
 ai-repo install skill <name>
 
+# Install agent
+ai-repo install agent <name>
+
 # Custom project path
 ai-repo install command test --project-path ~/my-project
 
 # Force reinstall
 ai-repo install skill utils --force
+ai-repo install agent code-reviewer --force
 ```
 
 ### `ai-repo remove`
@@ -431,12 +492,14 @@ Remove resources from the repository.
 # Remove with confirmation
 ai-repo remove command <name>
 ai-repo remove skill <name>
+ai-repo remove agent <name>
 
 # Skip confirmation
 ai-repo remove command test --force
 
 # Alias
 ai-repo rm command old-test
+ai-repo rm agent old-reviewer
 ```
 
 ## Resource Formats
@@ -516,9 +579,73 @@ See [examples/sample-skill/](examples/sample-skill/) for a complete example.
 
 **Specification:** https://agentskills.io/specification
 
+### Agents
+
+Agents are single `.md` files with YAML frontmatter that define AI agents with specialized roles and capabilities. They support both OpenCode and Claude Code formats.
+
+**Minimum format:**
+```yaml
+---
+description: What this agent does
+---
+
+# Agent documentation
+
+Your agent details here.
+```
+
+**OpenCode format (with type and instructions):**
+```yaml
+---
+description: Code review agent that checks for best practices
+type: code-reviewer
+instructions: Review code for quality, security, and performance
+capabilities:
+  - static-analysis
+  - security-scan
+  - performance-review
+version: "1.0.0"
+author: your-name
+license: MIT
+---
+
+# Code Reviewer Agent
+
+Detailed documentation about the agent's role and behavior.
+```
+
+**Claude format (instructions in body):**
+```yaml
+---
+description: Test automation agent
+version: "2.0.0"
+author: team-name
+license: Apache-2.0
+metadata:
+  category: testing
+  tags: qa,automation
+---
+
+# Test Automation Agent
+
+This agent specializes in creating and maintaining test suites.
+
+## Guidelines
+
+- Write comprehensive test cases
+- Follow testing best practices
+- Ensure good coverage
+```
+
+See [examples/sample-agent.md](examples/sample-agent.md) for a complete example.
+
+**Specifications:**
+- OpenCode: https://opencode.ai/docs/agents
+- Claude Code: https://code.claude.com/docs/agents
+
 ## Name Validation
 
-Both commands and skills must follow these naming rules:
+Commands, skills, and agents must follow these naming rules:
 
 - **Length:** 1-64 characters
 - **Characters:** Lowercase letters (a-z), numbers (0-9), hyphens (-)
@@ -537,12 +664,15 @@ Resources are stored in `~/.local/share/ai-config/repo/` (XDG data directory):
 ├── commands/
 │   ├── test.md
 │   └── review.md
-└── skills/
-    ├── pdf-processing/
-    │   ├── SKILL.md
-    │   └── scripts/
-    └── git-release/
-        └── SKILL.md
+├── skills/
+│   ├── pdf-processing/
+│   │   ├── SKILL.md
+│   │   └── scripts/
+│   └── git-release/
+│       └── SKILL.md
+└── agents/
+    ├── code-reviewer.md
+    └── qa-tester.md
 ```
 
 ## Project Installation
@@ -555,8 +685,10 @@ your-project/
 └── .claude/
     ├── commands/
     │   └── test.md -> ~/.local/share/ai-config/repo/commands/test.md
-    └── skills/
-        └── pdf-processing -> ~/.local/share/ai-config/repo/skills/pdf-processing/
+    ├── skills/
+    │   └── pdf-processing -> ~/.local/share/ai-config/repo/skills/pdf-processing/
+    └── agents/
+        └── code-reviewer.md -> ~/.local/share/ai-config/repo/agents/code-reviewer.md
 ```
 
 ### OpenCode Project
@@ -565,8 +697,10 @@ your-project/
 └── .opencode/
     ├── commands/
     │   └── test.md -> ~/.local/share/ai-config/repo/commands/test.md
-    └── skills/
-        └── pdf-processing -> ~/.local/share/ai-config/repo/skills/pdf-processing/
+    ├── skills/
+    │   └── pdf-processing -> ~/.local/share/ai-config/repo/skills/pdf-processing/
+    └── agents/
+        └── code-reviewer.md -> ~/.local/share/ai-config/repo/agents/code-reviewer.md
 ```
 
 ### GitHub Copilot Project (Skills Only)
@@ -583,13 +717,17 @@ your-project/
 ├── .claude/
 │   ├── commands/
 │   │   └── test.md -> ~/.local/share/ai-config/repo/commands/test.md
-│   └── skills/
-│       └── pdf-processing -> ~/.local/share/ai-config/repo/skills/pdf-processing/
+│   ├── skills/
+│   │   └── pdf-processing -> ~/.local/share/ai-config/repo/skills/pdf-processing/
+│   └── agents/
+│       └── code-reviewer.md -> ~/.local/share/ai-config/repo/agents/code-reviewer.md
 └── .opencode/
     ├── commands/
     │   └── test.md -> ~/.local/share/ai-config/repo/commands/test.md
-    └── skills/
-        └── pdf-processing -> ~/.local/share/ai-config/repo/skills/pdf-processing/
+    ├── skills/
+    │   └── pdf-processing -> ~/.local/share/ai-config/repo/skills/pdf-processing/
+    └── agents/
+        └── code-reviewer.md -> ~/.local/share/ai-config/repo/agents/code-reviewer.md
 ```
 
 The tool automatically detects existing tool directories and installs to all of them, ensuring resources are available in whichever tool you're using.
@@ -609,6 +747,14 @@ The tool automatically detects existing tool directories and installs to all of 
 2. Create `SKILL.md` with frontmatter (name must match directory)
 3. Optionally add `scripts/`, `references/`, `assets/`
 4. Test: `ai-repo add skill ./my-skill`
+
+### Create an Agent
+
+1. Create a `.md` file with valid name: `my-agent.md`
+2. Add YAML frontmatter with `description`
+3. Optionally add `type`, `instructions`, `capabilities` (OpenCode format)
+4. Write agent documentation in markdown body
+5. Test: `ai-repo add agent ./my-agent.md`
 
 See [examples/README.md](examples/README.md) for detailed instructions.
 
