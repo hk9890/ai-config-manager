@@ -420,3 +420,108 @@ func TestIsInstalled(t *testing.T) {
 		t.Error("IsInstalled() returned true for non-installed skill")
 	}
 }
+
+func TestNewInstallerWithTargets(t *testing.T) {
+	projectDir := t.TempDir()
+
+	tests := []struct {
+		name            string
+		targets         []tools.Tool
+		wantTargetCount int
+	}{
+		{
+			name:            "single target - claude",
+			targets:         []tools.Tool{tools.Claude},
+			wantTargetCount: 1,
+		},
+		{
+			name:            "multiple targets - claude and opencode",
+			targets:         []tools.Tool{tools.Claude, tools.OpenCode},
+			wantTargetCount: 2,
+		},
+		{
+			name:            "all three targets",
+			targets:         []tools.Tool{tools.Claude, tools.OpenCode, tools.Copilot},
+			wantTargetCount: 3,
+		},
+		{
+			name:            "empty targets",
+			targets:         []tools.Tool{},
+			wantTargetCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			installer, err := NewInstallerWithTargets(projectDir, tt.targets)
+			if err != nil {
+				t.Fatalf("NewInstallerWithTargets() error = %v", err)
+			}
+
+			if installer == nil {
+				t.Fatal("NewInstallerWithTargets() returned nil installer")
+			}
+
+			gotTargets := installer.GetTargetTools()
+			if len(gotTargets) != tt.wantTargetCount {
+				t.Errorf("NewInstallerWithTargets() got %d targets, want %d", len(gotTargets), tt.wantTargetCount)
+			}
+
+			// Verify targets match
+			for i, target := range tt.targets {
+				if i < len(gotTargets) && gotTargets[i] != target {
+					t.Errorf("Target[%d] = %v, want %v", i, gotTargets[i], target)
+				}
+			}
+		})
+	}
+}
+
+func TestExplicitTargetOverridesDetection(t *testing.T) {
+	manager, _ := setupTestRepo(t)
+	projectDir := t.TempDir()
+
+	// Create .claude directory (normally would be auto-detected)
+	claudeDir := filepath.Join(projectDir, ".claude", "commands")
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		t.Fatalf("Failed to create .claude directory: %v", err)
+	}
+
+	// Create .opencode directory (normally would be auto-detected)
+	opencodeDir := filepath.Join(projectDir, ".opencode", "commands")
+	if err := os.MkdirAll(opencodeDir, 0755); err != nil {
+		t.Fatalf("Failed to create .opencode directory: %v", err)
+	}
+
+	// Use explicit target (OpenCode only) - should override auto-detection
+	installer, err := NewInstallerWithTargets(projectDir, []tools.Tool{tools.OpenCode})
+	if err != nil {
+		t.Fatalf("NewInstallerWithTargets() error = %v", err)
+	}
+
+	targets := installer.GetTargetTools()
+	if len(targets) != 1 {
+		t.Fatalf("Expected 1 target, got %d", len(targets))
+	}
+
+	if targets[0] != tools.OpenCode {
+		t.Errorf("Expected target OpenCode, got %v", targets[0])
+	}
+
+	// Install command - should only go to OpenCode
+	if err := installer.InstallCommand("test-cmd", manager); err != nil {
+		t.Fatalf("InstallCommand() error = %v", err)
+	}
+
+	// Verify installed only in OpenCode
+	opencodeInstall := filepath.Join(projectDir, ".opencode", "commands", "test-cmd.md")
+	if _, err := os.Lstat(opencodeInstall); err != nil {
+		t.Errorf("Command not installed in OpenCode: %v", err)
+	}
+
+	// Verify NOT installed in Claude
+	claudeInstall := filepath.Join(projectDir, ".claude", "commands", "test-cmd.md")
+	if _, err := os.Lstat(claudeInstall); err == nil {
+		t.Error("Command should not be installed in Claude when using explicit target")
+	}
+}

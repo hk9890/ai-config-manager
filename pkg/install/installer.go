@@ -37,6 +37,22 @@ func NewInstaller(projectPath string, defaultTools []tools.Tool) (*Installer, er
 	return installer, nil
 }
 
+// NewInstallerWithTargets creates a new installer with explicit target tools
+// This bypasses tool detection and uses the specified targets directly
+func NewInstallerWithTargets(projectPath string, targets []tools.Tool) (*Installer, error) {
+	absPath, err := filepath.Abs(projectPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve project path: %w", err)
+	}
+
+	installer := &Installer{
+		projectPath: absPath,
+		targetTools: targets,
+	}
+
+	return installer, nil
+}
+
 // DetectInstallTargets determines which tools to install to
 // If tool directories exist, returns ALL of them
 // If no tool directories exist, returns the defaultTools

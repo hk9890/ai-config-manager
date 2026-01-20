@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hans-m-leitner/ai-config-manager/pkg/config"
 	"github.com/hans-m-leitner/ai-config-manager/pkg/install"
@@ -13,9 +14,31 @@ import (
 )
 
 var (
-	projectPathFlag  string
-	installForceFlag bool
+	projectPathFlag   string
+	installForceFlag  bool
+	installTargetFlag string
 )
+
+// parseTargetFlag parses the --target flag and returns a list of tools
+// If the flag is empty, returns nil (use defaults)
+// If the flag contains values, parses and validates them
+func parseTargetFlag(targetFlag string) ([]tools.Tool, error) {
+	if targetFlag == "" {
+		return nil, nil
+	}
+
+	var targets []tools.Tool
+	targetStrs := strings.Split(targetFlag, ",")
+	for _, t := range targetStrs {
+		tool, err := tools.ParseTool(strings.TrimSpace(t))
+		if err != nil {
+			return nil, fmt.Errorf("invalid target '%s': %w", t, err)
+		}
+		targets = append(targets, tool)
+	}
+
+	return targets, nil
+}
 
 // Completion functions for shell tab completion
 
@@ -130,6 +153,12 @@ Examples:
   # Install to specific project
   ai-repo install command test --project-path ~/my-project
   
+  # Install to specific target tool
+  ai-repo install command my-command --target claude
+  
+  # Install to multiple specific tools
+  ai-repo install command my-command --target claude,opencode
+  
   # Force reinstall
   ai-repo install command review --force
   
@@ -150,22 +179,35 @@ Examples:
 			}
 		}
 
-		// Load config to get default targets
-		home, err := os.UserHomeDir()
+		// Parse target flag (if provided)
+		explicitTargets, err := parseTargetFlag(installTargetFlag)
 		if err != nil {
-			return fmt.Errorf("failed to get home directory: %w", err)
-		}
-		cfg, err := config.Load(home)
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-		defaultTargets, err := cfg.GetDefaultTargets()
-		if err != nil {
-			return fmt.Errorf("invalid default targets in config: %w", err)
+			return err
 		}
 
-		// Create installer
-		installer, err := install.NewInstaller(projectPath, defaultTargets)
+		// Determine targets to use
+		var targets []tools.Tool
+		if explicitTargets != nil {
+			// Use explicit targets from --target flag
+			targets = explicitTargets
+		} else {
+			// Load config to get default targets
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get home directory: %w", err)
+			}
+			cfg, err := config.Load(home)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+			targets, err = cfg.GetDefaultTargets()
+			if err != nil {
+				return fmt.Errorf("invalid default targets in config: %w", err)
+			}
+		}
+
+		// Create installer with explicit targets
+		installer, err := install.NewInstallerWithTargets(projectPath, targets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
@@ -236,6 +278,12 @@ Examples:
   # Install to specific project
   ai-repo install skill my-skill --project-path ~/my-project
   
+  # Install to specific target tool
+  ai-repo install skill my-skill --target copilot
+  
+  # Install to multiple specific tools
+  ai-repo install skill my-skill --target claude,opencode,copilot
+  
   # Force reinstall
   ai-repo install skill utils --force
   
@@ -256,22 +304,35 @@ Examples:
 			}
 		}
 
-		// Load config to get default targets
-		home, err := os.UserHomeDir()
+		// Parse target flag (if provided)
+		explicitTargets, err := parseTargetFlag(installTargetFlag)
 		if err != nil {
-			return fmt.Errorf("failed to get home directory: %w", err)
-		}
-		cfg, err := config.Load(home)
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-		defaultTargets, err := cfg.GetDefaultTargets()
-		if err != nil {
-			return fmt.Errorf("invalid default targets in config: %w", err)
+			return err
 		}
 
-		// Create installer
-		installer, err := install.NewInstaller(projectPath, defaultTargets)
+		// Determine targets to use
+		var targets []tools.Tool
+		if explicitTargets != nil {
+			// Use explicit targets from --target flag
+			targets = explicitTargets
+		} else {
+			// Load config to get default targets
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get home directory: %w", err)
+			}
+			cfg, err := config.Load(home)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+			targets, err = cfg.GetDefaultTargets()
+			if err != nil {
+				return fmt.Errorf("invalid default targets in config: %w", err)
+			}
+		}
+
+		// Create installer with explicit targets
+		installer, err := install.NewInstallerWithTargets(projectPath, targets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
@@ -345,6 +406,12 @@ Examples:
   # Install to specific project
   ai-repo install agent my-agent --project-path ~/my-project
   
+  # Install to specific target tool
+  ai-repo install agent my-agent --target opencode
+  
+  # Install to multiple specific tools
+  ai-repo install agent my-agent --target claude,opencode
+  
   # Force reinstall
   ai-repo install agent beads-verify-agent --force
   
@@ -365,22 +432,35 @@ Examples:
 			}
 		}
 
-		// Load config to get default targets
-		home, err := os.UserHomeDir()
+		// Parse target flag (if provided)
+		explicitTargets, err := parseTargetFlag(installTargetFlag)
 		if err != nil {
-			return fmt.Errorf("failed to get home directory: %w", err)
-		}
-		cfg, err := config.Load(home)
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-		defaultTargets, err := cfg.GetDefaultTargets()
-		if err != nil {
-			return fmt.Errorf("invalid default targets in config: %w", err)
+			return err
 		}
 
-		// Create installer
-		installer, err := install.NewInstaller(projectPath, defaultTargets)
+		// Determine targets to use
+		var targets []tools.Tool
+		if explicitTargets != nil {
+			// Use explicit targets from --target flag
+			targets = explicitTargets
+		} else {
+			// Load config to get default targets
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get home directory: %w", err)
+			}
+			cfg, err := config.Load(home)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+			targets, err = cfg.GetDefaultTargets()
+			if err != nil {
+				return fmt.Errorf("invalid default targets in config: %w", err)
+			}
+		}
+
+		// Create installer with explicit targets
+		installer, err := install.NewInstallerWithTargets(projectPath, targets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
@@ -441,10 +521,13 @@ func init() {
 	// Add flags to all subcommands
 	installCommandCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
 	installCommandCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
+	installCommandCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
 
 	installSkillCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
 	installSkillCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
+	installSkillCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
 
 	installAgentCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
 	installAgentCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
+	installAgentCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
 }
