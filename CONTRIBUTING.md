@@ -85,7 +85,7 @@ ai-config-manager/
 │
 ├── pkg/                    # Core packages
 │   ├── config/            # Configuration management
-│   │   └── config.go      # Load/save ~/.ai-repo.yaml
+│   │   └── config.go      # Load/save ~/.config/ai-repo/ai-repo.yaml
 │   │
 │   ├── repo/              # Repository management
 │   │   └── manager.go     # Add/remove/list resources, bulk import
@@ -151,7 +151,7 @@ ai-config-manager/
 **Tool Detection:**
 - Smart detection of existing tool directories
 - Multi-tool installation support
-- Respects user's default-tool configuration
+- Respects user's install.targets configuration
 
 **Symlink-based Installation:**
 - No duplication of resources

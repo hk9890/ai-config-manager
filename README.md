@@ -196,14 +196,15 @@ ai-repo --version
 ai-repo -v
 ```
 
-### 1. Configure Your Default Tool
+### 1. Configure Your Default Installation Targets
 
 ```bash
-# Set your preferred AI tool (claude, opencode, or copilot)
-ai-repo config set default-tool claude
+# Set your preferred AI tools (claude, opencode, or copilot)
+ai-repo config set install.targets claude
+ai-repo config set install.targets claude,opencode  # Multiple tools
 
 # Check current setting
-ai-repo config get default-tool
+ai-repo config get install.targets
 ```
 
 ### 2. Add Resources to Repository
@@ -411,21 +412,26 @@ ai-repo remove agent old-agent
 `ai-repo` intelligently handles installation based on your project's existing tool directories:
 
 #### Scenario 1: Fresh Project (No Tool Directories)
-When installing to a project with no existing tool directories, `ai-repo` creates and uses your configured default tool directory:
+When installing to a project with no existing tool directories, `ai-repo` creates and uses your configured default installation targets:
 
 ```bash
-# Set default tool
-ai-repo config set default-tool claude
+# Set default targets
+ai-repo config set install.targets claude
 
 # Install in fresh project
 cd ~/my-new-project
 ai-repo install command test
 
 # Result: Creates .claude/commands/test.md
+
+# Or install to multiple tools by default
+ai-repo config set install.targets claude,opencode
+ai-repo install command test
+# Result: Creates both .claude/commands/test.md and .opencode/commands/test.md
 ```
 
 #### Scenario 2: Existing Tool Directory
-When a tool directory already exists (e.g., `.opencode/`), `ai-repo` installs to that directory, ignoring your default tool setting:
+When a tool directory already exists (e.g., `.opencode/`), `ai-repo` installs to that directory, ignoring your default installation targets:
 
 ```bash
 # Project already has .opencode directory
@@ -433,7 +439,7 @@ cd ~/existing-opencode-project
 ai-repo install command test
 
 # Result: Uses existing .opencode/commands/test.md
-# (Even if your default is set to 'claude')
+# (Even if your default targets are set to 'claude')
 ```
 
 #### Scenario 3: Multiple Tool Directories
@@ -451,21 +457,26 @@ ai-repo install skill pdf-processing
 
 This ensures resources are available regardless of which tool you're using.
 
-### Configuring Default Tool
+### Configuring Default Installation Targets
 
-Use the `config` command to set or view your default tool:
+Use the `config` command to set or view your default installation targets:
 
 ```bash
-# Set default tool
-ai-repo config set default-tool claude
-ai-repo config set default-tool opencode
-ai-repo config set default-tool copilot
+# Set default target (single tool)
+ai-repo config set install.targets claude
+ai-repo config set install.targets opencode
+ai-repo config set install.targets copilot
+
+# Set multiple default targets
+ai-repo config set install.targets claude,opencode
 
 # View current setting
-ai-repo config get default-tool
+ai-repo config get install.targets
 
-# Configuration is stored in ~/.ai-repo.yaml
+# Configuration is stored in ~/.config/ai-repo/ai-repo.yaml
 ```
+
+The `install.targets` setting controls which tool directories are created when installing to a fresh project (one without existing tool directories). You can specify multiple tools to install resources to all of them by default.
 
 ### Tool-Specific Behavior
 
@@ -500,12 +511,18 @@ View and manage configuration settings.
 
 ```bash
 # Get a setting
-ai-repo config get default-tool
+ai-repo config get install.targets
 
-# Set a setting
-ai-repo config set default-tool <tool>
+# Set a setting (single tool)
+ai-repo config set install.targets <tool>
+
+# Set multiple targets
+ai-repo config set install.targets <tool1>,<tool2>
 
 # Valid tools: claude, opencode, copilot
+# Examples:
+ai-repo config set install.targets claude
+ai-repo config set install.targets claude,opencode
 ```
 
 ### `ai-repo add`
@@ -579,7 +596,17 @@ ai-repo install command test --project-path ~/my-project
 # Force reinstall
 ai-repo install skill utils --force
 ai-repo install agent code-reviewer --force
+
+# Install to specific tool(s) - overrides defaults and existing directories
+ai-repo install command test --target claude
+ai-repo install skill utils --target opencode
+ai-repo install agent reviewer --target claude,opencode
 ```
+
+**Flags:**
+- `--project-path`: Specify project directory (defaults to current directory)
+- `--force`: Overwrite existing installations
+- `--target`: Specify which tool(s) to install to (accepts comma-separated values). Overrides both default targets and existing directory detection.
 
 ### `ai-repo remove`
 
@@ -828,6 +855,67 @@ your-project/
 ```
 
 The tool automatically detects existing tool directories and installs to all of them, ensuring resources are available in whichever tool you're using.
+
+## Migrating from v0.2.0
+
+If you're upgrading from v0.2.0 or earlier, there are two key changes:
+
+### Config Location Changed
+
+**Old location:** `~/.ai-repo.yaml`  
+**New location:** `~/.config/ai-repo/ai-repo.yaml`
+
+**Migration:** Automatic on first run. The tool will detect your old config file and copy it to the new location. Your old file is left intact for safety.
+
+### Config Format Changed
+
+The configuration format has changed to support multiple default installation targets:
+
+**Old format:**
+```yaml
+default-tool: claude
+```
+
+**New format:**
+```yaml
+install:
+  targets: [claude]
+```
+
+**Multiple targets:**
+```yaml
+install:
+  targets: [claude, opencode]
+```
+
+**Migration:** Automatic. When you run any `ai-repo` command, the tool will automatically convert `default-tool` to `install.targets` format. Your config file will be updated to the new format.
+
+### Command Changes
+
+**Old commands:**
+```bash
+ai-repo config set default-tool claude
+ai-repo config get default-tool
+```
+
+**New commands:**
+```bash
+ai-repo config set install.targets claude
+ai-repo config set install.targets claude,opencode  # Multiple tools
+ai-repo config get install.targets
+```
+
+### New Feature: --target Flag
+
+You can now override the installation target for individual operations:
+
+```bash
+# Install to specific tool(s), ignoring defaults
+ai-repo install command test --target claude
+ai-repo install skill utils --target claude,opencode
+```
+
+This is useful when you want to install a resource to a specific tool without changing your global configuration.
 
 ## Creating Resources
 
