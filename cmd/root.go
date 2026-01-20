@@ -49,7 +49,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ai-repo.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/ai-repo/ai-repo.yaml)")
 
 	// Version flag
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Show version information")
@@ -65,10 +65,15 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search config in home directory with name ".ai-repo" (without extension).
+		// Search config in XDG config directory first (~/.config/ai-repo/)
+		configDir := home + "/.config/ai-repo"
+		viper.AddConfigPath(configDir)
+
+		// Also search in home directory for backward compatibility
 		viper.AddConfigPath(home)
+
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".ai-repo")
+		viper.SetConfigName("ai-repo") // Will find both ai-repo.yaml and .ai-repo.yaml
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match

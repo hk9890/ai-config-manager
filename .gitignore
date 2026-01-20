@@ -3,6 +3,7 @@
 
 # bv (beads viewer) local config and caches
 .bv/
+.perles/
 
 # Go build artifacts
 ai-repo

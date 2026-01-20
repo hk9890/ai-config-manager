@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hans-m-leitner/ai-config-manager/pkg/config"
 	"github.com/hans-m-leitner/ai-config-manager/pkg/tools"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
 
@@ -18,8 +18,8 @@ var configCmd = &cobra.Command{
 	Short: "View and manage ai-repo configuration",
 	Long: `View and manage ai-repo configuration settings.
 
-Configuration is stored in ~/.ai-repo.yaml and controls default behavior
-for ai-repo commands.`,
+Configuration is stored in ~/.config/ai-repo/ai-repo.yaml and controls default
+behavior for ai-repo commands.`,
 }
 
 // configGetCmd represents the config get command
@@ -29,10 +29,10 @@ var configGetCmd = &cobra.Command{
 	Long: `Get a configuration value.
 
 Available keys:
-  default-tool - The default AI tool to use (claude, opencode, or copilot)
+  install.targets - The default AI tools to install to (comma-separated: claude, opencode, copilot)
 
 Example:
-  ai-repo config get default-tool`,
+  ai-repo config get install.targets`,
 	Args: cobra.ExactArgs(1),
 	RunE: configGet,
 }
@@ -44,15 +44,17 @@ var configSetCmd = &cobra.Command{
 	Long: `Set a configuration value.
 
 Available keys:
-  default-tool - The default AI tool to use
+  install.targets - The default AI tools to install to (comma-separated)
 
 Valid tools:
-  claude   - Claude Code (supports commands and skills)
-  opencode - OpenCode (supports commands and skills)
+  claude   - Claude Code (supports commands, skills, and agents)
+  opencode - OpenCode (supports commands, skills, and agents)
   copilot  - GitHub Copilot (supports skills only)
 
-Example:
-  ai-repo config set default-tool opencode`,
+Examples:
+  ai-repo config set install.targets claude
+  ai-repo config set install.targets claude,opencode
+  ai-repo config set install.targets claude,opencode,copilot`,
 	Args: cobra.ExactArgs(2),
 	RunE: configSet,
 }
@@ -66,26 +68,31 @@ func init() {
 func configGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	fmt.Fprintf(os.Stderr, "Using config file: %s\n", viper.ConfigFileUsed())
-
-	if key != "default-tool" {
-		return fmt.Errorf("unknown config key: %s (available: default-tool)", key)
+	if key != "install.targets" {
+		return fmt.Errorf("unknown config key: %s (available: install.targets)", key)
 	}
 
-	// Get home directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("getting home directory: %w", err)
-	}
-
-	// Load config
-	cfg, err := config.Load(home)
+	// Load global config
+	cfg, err := config.LoadGlobal()
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	// Get config path for display
+	configPath, _ := config.GetConfigPath()
+	fmt.Fprintf(os.Stderr, "Using config file: %s\n", configPath)
+
 	// Print value
-	fmt.Printf("default-tool: %s\n", cfg.DefaultTool)
+	if len(cfg.Install.Targets) == 0 {
+		fmt.Printf("install.targets: []\n")
+	} else if len(cfg.Install.Targets) == 1 {
+		fmt.Printf("install.targets: %s\n", cfg.Install.Targets[0])
+	} else {
+		fmt.Printf("install.targets:\n")
+		for _, target := range cfg.Install.Targets {
+			fmt.Printf("  - %s\n", target)
+		}
+	}
 	return nil
 }
 
@@ -93,40 +100,55 @@ func configSet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 	value := args[1]
 
-	fmt.Fprintf(os.Stderr, "Using config file: %s\n", viper.ConfigFileUsed())
-
-	if key != "default-tool" {
-		return fmt.Errorf("unknown config key: %s (available: default-tool)", key)
+	if key != "install.targets" {
+		return fmt.Errorf("unknown config key: %s (available: install.targets)", key)
 	}
 
-	// Validate tool name
-	if _, err := tools.ParseTool(value); err != nil {
-		return fmt.Errorf("invalid tool: %w\nValid tools: claude, opencode, copilot", err)
-	}
-
-	// Get home directory
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("getting home directory: %w", err)
+	// Parse comma-separated values
+	var targets []string
+	if value != "" {
+		for _, target := range splitAndTrim(value) {
+			// Validate tool name
+			if _, err := tools.ParseTool(target); err != nil {
+				return fmt.Errorf("invalid tool '%s': %w\nValid tools: claude, opencode, copilot", target, err)
+			}
+			targets = append(targets, target)
+		}
 	}
 
 	// Load existing config (or create new)
-	cfg, err := config.Load(home)
+	cfg, err := config.LoadGlobal()
 	if err != nil {
 		// If config doesn't exist or has issues, create a new one
 		cfg = &config.Config{}
 	}
 
 	// Update value
-	cfg.DefaultTool = value
+	cfg.Install.Targets = targets
+
+	// Get config path
+	configPath, err := config.GetConfigPath()
+	if err != nil {
+		return fmt.Errorf("getting config path: %w", err)
+	}
+
+	// Ensure config directory exists
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("creating config directory: %w", err)
+	}
 
 	// Save config
-	configPath := filepath.Join(home, config.DefaultConfigFileName)
 	if err := saveConfig(configPath, cfg); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
-	fmt.Printf("✓ Set default-tool to '%s'\n", value)
+	fmt.Fprintf(os.Stderr, "Using config file: %s\n", configPath)
+	if len(targets) == 1 {
+		fmt.Printf("✓ Set install.targets to '%s'\n", targets[0])
+	} else {
+		fmt.Printf("✓ Set install.targets to [%s]\n", value)
+	}
 	return nil
 }
 
@@ -143,4 +165,19 @@ func saveConfig(path string, cfg *config.Config) error {
 	}
 
 	return nil
+}
+
+// splitAndTrim splits a comma-separated string and trims whitespace from each part
+func splitAndTrim(s string) []string {
+	if s == "" {
+		return []string{}
+	}
+	parts := []string{}
+	for _, part := range strings.Split(s, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
 }

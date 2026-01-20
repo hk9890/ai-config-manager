@@ -23,41 +23,47 @@ func TestLoad_NoConfigFile(t *testing.T) {
 	}
 
 	// Should return default config
-	if config.DefaultTool != DefaultToolValue {
-		t.Errorf("Load().DefaultTool = %v, want %v", config.DefaultTool, DefaultToolValue)
+	if len(config.Install.Targets) != 1 || config.Install.Targets[0] != DefaultToolValue {
+		t.Errorf("Load().Install.Targets = %v, want [%v]", config.Install.Targets, DefaultToolValue)
 	}
 }
 
 func TestLoad_ValidConfig(t *testing.T) {
 	tests := []struct {
-		name         string
-		configYAML   string
-		wantTool     string
-		wantToolType tools.Tool
+		name          string
+		configYAML    string
+		wantTargets   []string
+		wantToolTypes []tools.Tool
 	}{
 		{
-			name:         "claude",
-			configYAML:   "default-tool: claude\n",
-			wantTool:     "claude",
-			wantToolType: tools.Claude,
+			name:          "new format: single target",
+			configYAML:    "install:\n  targets: [claude]\n",
+			wantTargets:   []string{"claude"},
+			wantToolTypes: []tools.Tool{tools.Claude},
 		},
 		{
-			name:         "opencode",
-			configYAML:   "default-tool: opencode\n",
-			wantTool:     "opencode",
-			wantToolType: tools.OpenCode,
+			name:          "new format: multiple targets",
+			configYAML:    "install:\n  targets: [claude, opencode]\n",
+			wantTargets:   []string{"claude", "opencode"},
+			wantToolTypes: []tools.Tool{tools.Claude, tools.OpenCode},
 		},
 		{
-			name:         "copilot",
-			configYAML:   "default-tool: copilot\n",
-			wantTool:     "copilot",
-			wantToolType: tools.Copilot,
+			name:          "old format: claude (migrated)",
+			configYAML:    "default-tool: claude\n",
+			wantTargets:   []string{"claude"},
+			wantToolTypes: []tools.Tool{tools.Claude},
 		},
 		{
-			name:         "empty defaults to claude",
-			configYAML:   "",
-			wantTool:     DefaultToolValue,
-			wantToolType: tools.Claude,
+			name:          "old format: opencode (migrated)",
+			configYAML:    "default-tool: opencode\n",
+			wantTargets:   []string{"opencode"},
+			wantToolTypes: []tools.Tool{tools.OpenCode},
+		},
+		{
+			name:          "empty defaults to claude",
+			configYAML:    "",
+			wantTargets:   []string{"claude"},
+			wantToolTypes: []tools.Tool{tools.Claude},
 		},
 	}
 
@@ -82,18 +88,29 @@ func TestLoad_ValidConfig(t *testing.T) {
 				t.Fatalf("Load() error = %v, want nil", err)
 			}
 
-			// Check default tool
-			if config.DefaultTool != tt.wantTool {
-				t.Errorf("Load().DefaultTool = %v, want %v", config.DefaultTool, tt.wantTool)
+			// Check install targets
+			if len(config.Install.Targets) != len(tt.wantTargets) {
+				t.Errorf("Load().Install.Targets length = %v, want %v", len(config.Install.Targets), len(tt.wantTargets))
+			}
+			for i, target := range tt.wantTargets {
+				if i >= len(config.Install.Targets) || config.Install.Targets[i] != target {
+					t.Errorf("Load().Install.Targets[%d] = %v, want %v", i, config.Install.Targets, tt.wantTargets)
+					break
+				}
 			}
 
-			// Check GetDefaultTool
-			tool, err := config.GetDefaultTool()
+			// Check GetDefaultTargets
+			toolTypes, err := config.GetDefaultTargets()
 			if err != nil {
-				t.Fatalf("GetDefaultTool() error = %v, want nil", err)
+				t.Fatalf("GetDefaultTargets() error = %v, want nil", err)
 			}
-			if tool != tt.wantToolType {
-				t.Errorf("GetDefaultTool() = %v, want %v", tool, tt.wantToolType)
+			if len(toolTypes) != len(tt.wantToolTypes) {
+				t.Errorf("GetDefaultTargets() length = %v, want %v", len(toolTypes), len(tt.wantToolTypes))
+			}
+			for i, wantType := range tt.wantToolTypes {
+				if i >= len(toolTypes) || toolTypes[i] != wantType {
+					t.Errorf("GetDefaultTargets()[%d] = %v, want %v", i, toolTypes[i], wantType)
+				}
 			}
 		})
 	}
@@ -105,11 +122,19 @@ func TestLoad_InvalidTool(t *testing.T) {
 		configYAML string
 	}{
 		{
-			name:       "invalid tool name",
+			name:       "invalid tool name in new format",
+			configYAML: "install:\n  targets: [invalid]\n",
+		},
+		{
+			name:       "unsupported tool in new format",
+			configYAML: "install:\n  targets: [cursor]\n",
+		},
+		{
+			name:       "invalid tool name in old format",
 			configYAML: "default-tool: invalid\n",
 		},
 		{
-			name:       "unsupported tool",
+			name:       "unsupported tool in old format",
 			configYAML: "default-tool: cursor\n",
 		},
 	}
@@ -167,37 +192,47 @@ func TestValidate(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name: "valid claude",
+			name: "valid single target",
 			config: Config{
-				DefaultTool: "claude",
+				Install: InstallConfig{
+					Targets: []string{"claude"},
+				},
 			},
 			wantError: false,
 		},
 		{
-			name: "valid opencode",
+			name: "valid multiple targets",
 			config: Config{
-				DefaultTool: "opencode",
-			},
-			wantError: false,
-		},
-		{
-			name: "valid copilot",
-			config: Config{
-				DefaultTool: "copilot",
+				Install: InstallConfig{
+					Targets: []string{"claude", "opencode", "copilot"},
+				},
 			},
 			wantError: false,
 		},
 		{
 			name: "empty is valid (uses default)",
 			config: Config{
-				DefaultTool: "",
+				Install: InstallConfig{
+					Targets: []string{},
+				},
 			},
 			wantError: false,
 		},
 		{
-			name: "invalid tool",
+			name: "invalid tool in targets",
 			config: Config{
-				DefaultTool: "invalid",
+				Install: InstallConfig{
+					Targets: []string{"invalid"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "mixed valid and invalid tools",
+			config: Config{
+				Install: InstallConfig{
+					Targets: []string{"claude", "invalid"},
+				},
 			},
 			wantError: true,
 		},
@@ -216,70 +251,158 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestGetDefaultTool(t *testing.T) {
+func TestGetDefaultTargets(t *testing.T) {
 	tests := []struct {
 		name      string
 		config    Config
-		wantTool  tools.Tool
+		wantTools []tools.Tool
 		wantError bool
 	}{
 		{
-			name: "claude",
+			name: "single target",
 			config: Config{
-				DefaultTool: "claude",
+				Install: InstallConfig{
+					Targets: []string{"claude"},
+				},
 			},
-			wantTool:  tools.Claude,
+			wantTools: []tools.Tool{tools.Claude},
 			wantError: false,
 		},
 		{
-			name: "opencode",
+			name: "multiple targets",
 			config: Config{
-				DefaultTool: "opencode",
+				Install: InstallConfig{
+					Targets: []string{"claude", "opencode"},
+				},
 			},
-			wantTool:  tools.OpenCode,
+			wantTools: []tools.Tool{tools.Claude, tools.OpenCode},
 			wantError: false,
 		},
 		{
-			name: "copilot",
+			name: "all three tools",
 			config: Config{
-				DefaultTool: "copilot",
+				Install: InstallConfig{
+					Targets: []string{"claude", "opencode", "copilot"},
+				},
 			},
-			wantTool:  tools.Copilot,
+			wantTools: []tools.Tool{tools.Claude, tools.OpenCode, tools.Copilot},
 			wantError: false,
 		},
 		{
 			name: "empty defaults to claude",
 			config: Config{
-				DefaultTool: "",
+				Install: InstallConfig{
+					Targets: []string{},
+				},
 			},
-			wantTool:  tools.Claude,
+			wantTools: []tools.Tool{tools.Claude},
 			wantError: false,
 		},
 		{
 			name: "invalid tool",
 			config: Config{
-				DefaultTool: "invalid",
+				Install: InstallConfig{
+					Targets: []string{"invalid"},
+				},
 			},
-			wantTool:  -1,
+			wantTools: nil,
 			wantError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tool, err := tt.config.GetDefaultTool()
+			toolsList, err := tt.config.GetDefaultTargets()
 			if tt.wantError {
 				if err == nil {
-					t.Errorf("GetDefaultTool() expected error, got nil")
+					t.Errorf("GetDefaultTargets() expected error, got nil")
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("GetDefaultTool() unexpected error: %v", err)
+				t.Errorf("GetDefaultTargets() unexpected error: %v", err)
 			}
-			if tool != tt.wantTool {
-				t.Errorf("GetDefaultTool() = %v, want %v", tool, tt.wantTool)
+			if len(toolsList) != len(tt.wantTools) {
+				t.Errorf("GetDefaultTargets() length = %v, want %v", len(toolsList), len(tt.wantTools))
+				return
+			}
+			for i, wantTool := range tt.wantTools {
+				if toolsList[i] != wantTool {
+					t.Errorf("GetDefaultTargets()[%d] = %v, want %v", i, toolsList[i], wantTool)
+				}
 			}
 		})
+	}
+}
+
+func TestGetConfigPath(t *testing.T) {
+	// Test that GetConfigPath returns a valid path
+	path, err := GetConfigPath()
+	if err != nil {
+		t.Fatalf("GetConfigPath() error = %v, want nil", err)
+	}
+
+	// Path should end with ai-repo/ai-repo.yaml
+	if !filepath.IsAbs(path) {
+		t.Errorf("GetConfigPath() = %v, want absolute path", path)
+	}
+
+	// Path should contain .config/ai-repo/ai-repo.yaml
+	if !filepath.IsAbs(path) || filepath.Base(path) != DefaultConfigFileName {
+		t.Errorf("GetConfigPath() = %v, want path ending with %v", path, DefaultConfigFileName)
+	}
+}
+
+func TestMigrateConfig(t *testing.T) {
+	// Create temp directory for old config
+	oldDir := t.TempDir()
+	oldPath := filepath.Join(oldDir, OldConfigFileName)
+
+	// Create temp directory for new config
+	newDir := t.TempDir()
+	newPath := filepath.Join(newDir, "ai-repo", DefaultConfigFileName)
+
+	// Write old config
+	oldConfigData := []byte("default-tool: opencode\n")
+	if err := os.WriteFile(oldPath, oldConfigData, 0644); err != nil {
+		t.Fatalf("failed to write old config: %v", err)
+	}
+
+	// Migrate
+	if err := migrateConfig(oldPath, newPath); err != nil {
+		t.Fatalf("migrateConfig() error = %v, want nil", err)
+	}
+
+	// Check new config exists
+	if _, err := os.Stat(newPath); os.IsNotExist(err) {
+		t.Errorf("new config file does not exist at %v", newPath)
+	}
+
+	// Check old config still exists
+	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+		t.Errorf("old config file should still exist at %v", oldPath)
+	}
+
+	// Verify content
+	newData, err := os.ReadFile(newPath)
+	if err != nil {
+		t.Fatalf("failed to read new config: %v", err)
+	}
+	if string(newData) != string(oldConfigData) {
+		t.Errorf("new config content = %v, want %v", string(newData), string(oldConfigData))
+	}
+}
+
+func TestLoadGlobal_NoConfig(t *testing.T) {
+	// Temporarily override home directory functions for testing
+	// This test just ensures LoadGlobal returns defaults when no config exists
+	cfg, err := LoadGlobal()
+	if err != nil {
+		t.Fatalf("LoadGlobal() error = %v, want nil", err)
+	}
+
+	// Should return default config
+	if len(cfg.Install.Targets) != 1 || cfg.Install.Targets[0] != DefaultToolValue {
+		t.Errorf("LoadGlobal().Install.Targets = %v, want [%v]", cfg.Install.Targets, DefaultToolValue)
 	}
 }

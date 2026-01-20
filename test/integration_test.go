@@ -109,7 +109,7 @@ echo "Test script"
 
 	// Step 3: Install resources in project
 	t.Log("Step 3: Installing resources")
-	installer, err := install.NewInstaller(projectDir, tools.Claude)
+	installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("Failed to create installer: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestErrorCases(t *testing.T) {
 
 	t.Run("install non-existent resource", func(t *testing.T) {
 		projectDir := t.TempDir()
-		installer, err := install.NewInstaller(projectDir, tools.Claude)
+		installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
 		if err != nil {
 			t.Fatalf("Failed to create installer: %v", err)
 		}
@@ -290,7 +290,7 @@ description: A test command for multi-tool testing
 		projectDir := t.TempDir()
 
 		// Create installer with Claude as default
-		installer, err := install.NewInstaller(projectDir, tools.Claude)
+		installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
 		if err != nil {
 			t.Fatalf("Failed to create installer: %v", err)
 		}
@@ -322,7 +322,7 @@ description: A test command for multi-tool testing
 		}
 
 		// Create installer with Claude as default (should be ignored)
-		installer, err := install.NewInstaller(projectDir, tools.Claude)
+		installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
 		if err != nil {
 			t.Fatalf("Failed to create installer: %v", err)
 		}
@@ -357,7 +357,7 @@ description: A test command for multi-tool testing
 		}
 
 		// Create installer with any default (should be ignored)
-		installer, err := install.NewInstaller(projectDir, tools.Copilot)
+		installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Copilot})
 		if err != nil {
 			t.Fatalf("Failed to create installer: %v", err)
 		}
@@ -401,7 +401,7 @@ description: A test command for multi-tool testing
 		}
 
 		// Create installer - should detect Copilot
-		installer, err := install.NewInstaller(projectDir, tools.Claude)
+		installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
 		if err != nil {
 			t.Fatalf("Failed to create installer: %v", err)
 		}
@@ -428,12 +428,12 @@ description: A test command for multi-tool testing
 
 // TestConfigIntegration tests the config functionality
 func TestConfigIntegration(t *testing.T) {
-	t.Run("load config with default tool", func(t *testing.T) {
+	t.Run("load config with default targets", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		// Create a config file
-		configPath := filepath.Join(tmpDir, ".ai-repo.yaml")
-		configContent := "default-tool: opencode\n"
+		// Create a config file with new format
+		configPath := filepath.Join(tmpDir, "ai-repo.yaml")
+		configContent := "install:\n  targets: [opencode]\n"
 		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 			t.Fatalf("Failed to create config file: %v", err)
 		}
@@ -444,18 +444,18 @@ func TestConfigIntegration(t *testing.T) {
 			t.Fatalf("Failed to load config: %v", err)
 		}
 
-		// Verify default tool
-		if cfg.DefaultTool != "opencode" {
-			t.Errorf("DefaultTool = %v, want opencode", cfg.DefaultTool)
+		// Verify install targets
+		if len(cfg.Install.Targets) != 1 || cfg.Install.Targets[0] != "opencode" {
+			t.Errorf("Install.Targets = %v, want [opencode]", cfg.Install.Targets)
 		}
 
-		// Get default tool as type
-		tool, err := cfg.GetDefaultTool()
+		// Get default targets as types
+		targets, err := cfg.GetDefaultTargets()
 		if err != nil {
-			t.Fatalf("Failed to get default tool: %v", err)
+			t.Fatalf("Failed to get default targets: %v", err)
 		}
-		if tool != tools.OpenCode {
-			t.Errorf("GetDefaultTool() = %v, want OpenCode", tool)
+		if len(targets) != 1 || targets[0] != tools.OpenCode {
+			t.Errorf("GetDefaultTargets() = %v, want [OpenCode]", targets)
 		}
 	})
 
@@ -469,16 +469,16 @@ func TestConfigIntegration(t *testing.T) {
 		}
 
 		// Verify defaults to claude
-		if cfg.DefaultTool != "claude" {
-			t.Errorf("DefaultTool = %v, want claude", cfg.DefaultTool)
+		if len(cfg.Install.Targets) != 1 || cfg.Install.Targets[0] != "claude" {
+			t.Errorf("Install.Targets = %v, want [claude]", cfg.Install.Targets)
 		}
 
-		tool, err := cfg.GetDefaultTool()
+		targets, err := cfg.GetDefaultTargets()
 		if err != nil {
-			t.Fatalf("Failed to get default tool: %v", err)
+			t.Fatalf("Failed to get default targets: %v", err)
 		}
-		if tool != tools.Claude {
-			t.Errorf("GetDefaultTool() = %v, want Claude", tool)
+		if len(targets) != 1 || targets[0] != tools.Claude {
+			t.Errorf("GetDefaultTargets() = %v, want [Claude]", targets)
 		}
 	})
 
@@ -486,8 +486,8 @@ func TestConfigIntegration(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create a config file with invalid tool
-		configPath := filepath.Join(tmpDir, ".ai-repo.yaml")
-		configContent := "default-tool: invalid\n"
+		configPath := filepath.Join(tmpDir, "ai-repo.yaml")
+		configContent := "install:\n  targets: [invalid]\n"
 		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 			t.Fatalf("Failed to create config file: %v", err)
 		}
@@ -623,7 +623,7 @@ Follow these instructions to test the agent workflow.
 
 	// Step 3: Install agent to Claude project
 	t.Log("Step 3: Installing agent to Claude project")
-	claudeInstaller, err := install.NewInstaller(projectDir, tools.Claude)
+	claudeInstaller, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("Failed to create Claude installer: %v", err)
 	}
@@ -668,7 +668,7 @@ Follow these instructions to test the agent workflow.
 		t.Fatalf("Failed to create .opencode directory: %v", err)
 	}
 
-	opencodeInstaller, err := install.NewInstaller(opencodeProjectDir, tools.OpenCode)
+	opencodeInstaller, err := install.NewInstaller(opencodeProjectDir, []tools.Tool{tools.OpenCode})
 	if err != nil {
 		t.Fatalf("Failed to create OpenCode installer: %v", err)
 	}
@@ -879,7 +879,7 @@ This agent is used for testing OpenCode import functionality.
 		t.Fatalf("Failed to create .opencode directory: %v", err)
 	}
 
-	installer, err := install.NewInstaller(projectDir, tools.OpenCode)
+	installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.OpenCode})
 	if err != nil {
 		t.Fatalf("Failed to create installer: %v", err)
 	}

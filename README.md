@@ -13,6 +13,7 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 - 🗂️ **Organized Storage**: Clean separation between commands, skills, and agents
 - 🔧 **Smart Installation**: Automatically detects existing tool directories
 - 💻 **Cross-platform**: Works on Linux and macOS (Windows support planned)
+- 🔨 **Shell Completion**: Tab completion for Bash, Zsh, Fish, and PowerShell
 
 ## Supported AI Tools
 
@@ -85,6 +86,102 @@ make build
 ```bash
 go install github.com/hk9890/ai-config-manager@latest
 ```
+
+## Shell Completion
+
+`ai-repo` supports shell completion for Bash, Zsh, Fish, and PowerShell, making it easier to discover and install resources.
+
+### Features
+
+- **Auto-complete resource names** when typing `ai-repo install skill <TAB>`
+- **Auto-complete commands** like `ai-repo install command <TAB>`
+- **Auto-complete agents** like `ai-repo install agent <TAB>`
+- **Dynamically queries your repository** to show available resources
+
+### Setup
+
+#### Bash
+
+**Option 1: Load for current session**
+```bash
+source <(ai-repo completion bash)
+```
+
+**Option 2: Load automatically for all sessions**
+
+Linux:
+```bash
+ai-repo completion bash > /etc/bash_completion.d/ai-repo
+```
+
+macOS (with Homebrew):
+```bash
+ai-repo completion bash > $(brew --prefix)/etc/bash_completion.d/ai-repo
+```
+
+#### Zsh
+
+**Enable completions (if not already enabled):**
+```bash
+echo "autoload -U compinit; compinit" >> ~/.zshrc
+```
+
+**Install completion:**
+```bash
+ai-repo completion zsh > "${fpath[1]}/_ai-repo"
+```
+
+Then start a new shell.
+
+#### Fish
+
+**Option 1: Load for current session**
+```bash
+ai-repo completion fish | source
+```
+
+**Option 2: Load automatically for all sessions**
+```bash
+ai-repo completion fish > ~/.config/fish/completions/ai-repo.fish
+```
+
+#### PowerShell
+
+**Option 1: Load for current session**
+```powershell
+ai-repo completion powershell | Out-String | Invoke-Expression
+```
+
+**Option 2: Load automatically for all sessions**
+```powershell
+# Generate completion script
+ai-repo completion powershell > ai-repo.ps1
+
+# Add to your PowerShell profile
+# Find profile location: $PROFILE
+```
+
+### Usage Examples
+
+After setting up completion, you can use TAB to auto-complete resource names:
+
+```bash
+# List all available skills
+ai-repo install skill <TAB>
+# Shows: atlassian-cli  dynatrace-api  dynatrace-control  github-docs  skill-creator
+
+# List all available commands
+ai-repo install command <TAB>
+# Shows: test  review  deploy  build
+
+# List all available agents
+ai-repo install agent <TAB>
+# Shows: code-reviewer  qa-tester  beads-task-agent
+```
+
+The completion dynamically queries your repository, so newly added resources are immediately available for completion!
+
+
 
 ## Quick Start
 
@@ -795,4 +892,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Remote repository support
 - [ ] Resource versioning
 - [ ] Update/upgrade commands
-- [ ] Shell completion
+- [x] Shell completion

@@ -58,7 +58,7 @@ description: A test skill
 func TestNewInstaller(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	installer, err := NewInstaller(tmpDir, tools.Claude)
+	installer, err := NewInstaller(tmpDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("NewInstaller() error = %v", err)
 	}
@@ -78,13 +78,13 @@ func TestDetectInstallTargets(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupFunc     func(string) error
-		defaultTool   tools.Tool
+		defaultTools  []tools.Tool
 		expectedTools []tools.Tool
 	}{
 		{
 			name:          "no existing folders - uses default",
 			setupFunc:     func(dir string) error { return nil },
-			defaultTool:   tools.Claude,
+			defaultTools:  []tools.Tool{tools.Claude},
 			expectedTools: []tools.Tool{tools.Claude},
 		},
 		{
@@ -92,7 +92,7 @@ func TestDetectInstallTargets(t *testing.T) {
 			setupFunc: func(dir string) error {
 				return os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 			},
-			defaultTool:   tools.OpenCode,
+			defaultTools:  []tools.Tool{tools.OpenCode},
 			expectedTools: []tools.Tool{tools.Claude},
 		},
 		{
@@ -100,7 +100,7 @@ func TestDetectInstallTargets(t *testing.T) {
 			setupFunc: func(dir string) error {
 				return os.MkdirAll(filepath.Join(dir, ".opencode"), 0755)
 			},
-			defaultTool:   tools.Claude,
+			defaultTools:  []tools.Tool{tools.Claude},
 			expectedTools: []tools.Tool{tools.OpenCode},
 		},
 		{
@@ -111,7 +111,7 @@ func TestDetectInstallTargets(t *testing.T) {
 				}
 				return os.MkdirAll(filepath.Join(dir, ".opencode"), 0755)
 			},
-			defaultTool:   tools.Copilot,
+			defaultTools:  []tools.Tool{tools.Copilot},
 			expectedTools: []tools.Tool{tools.Claude, tools.OpenCode},
 		},
 		{
@@ -125,8 +125,14 @@ func TestDetectInstallTargets(t *testing.T) {
 				}
 				return os.MkdirAll(filepath.Join(dir, ".github", "skills"), 0755)
 			},
-			defaultTool:   tools.Claude,
+			defaultTools:  []tools.Tool{tools.Claude},
 			expectedTools: []tools.Tool{tools.Claude, tools.OpenCode, tools.Copilot},
+		},
+		{
+			name:          "no existing folders - multiple defaults",
+			setupFunc:     func(dir string) error { return nil },
+			defaultTools:  []tools.Tool{tools.Claude, tools.OpenCode},
+			expectedTools: []tools.Tool{tools.Claude, tools.OpenCode},
 		},
 	}
 
@@ -137,7 +143,7 @@ func TestDetectInstallTargets(t *testing.T) {
 				t.Fatalf("Setup failed: %v", err)
 			}
 
-			targets, err := DetectInstallTargets(tmpDir, tt.defaultTool)
+			targets, err := DetectInstallTargets(tmpDir, tt.defaultTools)
 			if err != nil {
 				t.Fatalf("DetectInstallTargets() error = %v", err)
 			}
@@ -169,7 +175,7 @@ func TestInstallCommand(t *testing.T) {
 	manager, _ := setupTestRepo(t)
 	projectDir := t.TempDir()
 
-	installer, err := NewInstaller(projectDir, tools.Claude)
+	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("NewInstaller() error = %v", err)
 	}
@@ -212,7 +218,7 @@ func TestInstallCommandMultipleTools(t *testing.T) {
 	os.MkdirAll(filepath.Join(projectDir, ".claude"), 0755)
 	os.MkdirAll(filepath.Join(projectDir, ".opencode"), 0755)
 
-	installer, err := NewInstaller(projectDir, tools.Claude)
+	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("NewInstaller() error = %v", err)
 	}
@@ -249,7 +255,7 @@ func TestInstallSkill(t *testing.T) {
 	manager, _ := setupTestRepo(t)
 	projectDir := t.TempDir()
 
-	installer, err := NewInstaller(projectDir, tools.Claude)
+	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("NewInstaller() error = %v", err)
 	}
@@ -288,7 +294,7 @@ func TestUninstall(t *testing.T) {
 	manager, _ := setupTestRepo(t)
 	projectDir := t.TempDir()
 
-	installer, err := NewInstaller(projectDir, tools.Claude)
+	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("NewInstaller() error = %v", err)
 	}
@@ -318,7 +324,7 @@ func TestUninstall(t *testing.T) {
 func TestUninstallNotInstalled(t *testing.T) {
 	projectDir := t.TempDir()
 
-	installer, err := NewInstaller(projectDir, tools.Claude)
+	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("NewInstaller() error = %v", err)
 	}
@@ -334,7 +340,7 @@ func TestList(t *testing.T) {
 	manager, _ := setupTestRepo(t)
 	projectDir := t.TempDir()
 
-	installer, err := NewInstaller(projectDir, tools.Claude)
+	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("NewInstaller() error = %v", err)
 	}
@@ -389,7 +395,7 @@ func TestIsInstalled(t *testing.T) {
 	manager, _ := setupTestRepo(t)
 	projectDir := t.TempDir()
 
-	installer, err := NewInstaller(projectDir, tools.Claude)
+	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("NewInstaller() error = %v", err)
 	}

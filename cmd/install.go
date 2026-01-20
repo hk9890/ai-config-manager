@@ -17,6 +17,83 @@ var (
 	installForceFlag bool
 )
 
+// Completion functions for shell tab completion
+
+// completeCommandNames provides completion for command names from the repository
+func completeCommandNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	manager, err := repo.NewManager()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	commandType := resource.Command
+	resources, err := manager.List(&commandType)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	var names []string
+	for _, res := range resources {
+		names = append(names, res.Name)
+	}
+
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeSkillNames provides completion for skill names from the repository
+func completeSkillNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	manager, err := repo.NewManager()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	skillType := resource.Skill
+	resources, err := manager.List(&skillType)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	var names []string
+	for _, res := range resources {
+		names = append(names, res.Name)
+	}
+
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeAgentNames provides completion for agent names from the repository
+func completeAgentNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	manager, err := repo.NewManager()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	agentType := resource.Agent
+	resources, err := manager.List(&agentType)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	var names []string
+	for _, res := range resources {
+		names = append(names, res.Name)
+	}
+
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
 // installCmd represents the install command
 var installCmd = &cobra.Command{
 	Use:   "install [command|skill|agent]",
@@ -58,7 +135,8 @@ Examples:
   
   # Set your default tool
   ai-repo config set default-tool opencode`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeCommandNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
@@ -72,7 +150,7 @@ Examples:
 			}
 		}
 
-		// Load config to get default tool
+		// Load config to get default targets
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("failed to get home directory: %w", err)
@@ -81,13 +159,13 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
-		defaultTool, err := cfg.GetDefaultTool()
+		defaultTargets, err := cfg.GetDefaultTargets()
 		if err != nil {
-			return fmt.Errorf("invalid default tool in config: %w", err)
+			return fmt.Errorf("invalid default targets in config: %w", err)
 		}
 
 		// Create installer
-		installer, err := install.NewInstaller(projectPath, defaultTool)
+		installer, err := install.NewInstaller(projectPath, defaultTargets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
@@ -163,7 +241,8 @@ Examples:
   
   # Set your default tool
   ai-repo config set default-tool copilot`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeSkillNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
@@ -177,7 +256,7 @@ Examples:
 			}
 		}
 
-		// Load config to get default tool
+		// Load config to get default targets
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("failed to get home directory: %w", err)
@@ -186,13 +265,13 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
-		defaultTool, err := cfg.GetDefaultTool()
+		defaultTargets, err := cfg.GetDefaultTargets()
 		if err != nil {
-			return fmt.Errorf("invalid default tool in config: %w", err)
+			return fmt.Errorf("invalid default targets in config: %w", err)
 		}
 
 		// Create installer
-		installer, err := install.NewInstaller(projectPath, defaultTool)
+		installer, err := install.NewInstaller(projectPath, defaultTargets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
@@ -271,7 +350,8 @@ Examples:
   
   # Set your default tool
   ai-repo config set default-tool claude`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeAgentNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
@@ -285,7 +365,7 @@ Examples:
 			}
 		}
 
-		// Load config to get default tool
+		// Load config to get default targets
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("failed to get home directory: %w", err)
@@ -294,13 +374,13 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
-		defaultTool, err := cfg.GetDefaultTool()
+		defaultTargets, err := cfg.GetDefaultTargets()
 		if err != nil {
-			return fmt.Errorf("invalid default tool in config: %w", err)
+			return fmt.Errorf("invalid default targets in config: %w", err)
 		}
 
 		// Create installer
-		installer, err := install.NewInstaller(projectPath, defaultTool)
+		installer, err := install.NewInstaller(projectPath, defaultTargets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}

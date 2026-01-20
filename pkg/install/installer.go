@@ -16,8 +16,8 @@ type Installer struct {
 	targetTools []tools.Tool // tools to install to
 }
 
-// NewInstaller creates a new installer for a project with a default tool
-func NewInstaller(projectPath string, defaultTool tools.Tool) (*Installer, error) {
+// NewInstaller creates a new installer for a project with default tools
+func NewInstaller(projectPath string, defaultTools []tools.Tool) (*Installer, error) {
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve project path: %w", err)
@@ -28,7 +28,7 @@ func NewInstaller(projectPath string, defaultTool tools.Tool) (*Installer, error
 	}
 
 	// Detect install targets
-	targets, err := DetectInstallTargets(absPath, defaultTool)
+	targets, err := DetectInstallTargets(absPath, defaultTools)
 	if err != nil {
 		return nil, fmt.Errorf("detecting install targets: %w", err)
 	}
@@ -39,8 +39,8 @@ func NewInstaller(projectPath string, defaultTool tools.Tool) (*Installer, error
 
 // DetectInstallTargets determines which tools to install to
 // If tool directories exist, returns ALL of them
-// If no tool directories exist, returns the defaultTool only
-func DetectInstallTargets(projectPath string, defaultTool tools.Tool) ([]tools.Tool, error) {
+// If no tool directories exist, returns the defaultTools
+func DetectInstallTargets(projectPath string, defaultTools []tools.Tool) ([]tools.Tool, error) {
 	existingTools, err := tools.DetectExistingTools(projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("detecting existing tools: %w", err)
@@ -51,8 +51,8 @@ func DetectInstallTargets(projectPath string, defaultTool tools.Tool) ([]tools.T
 		return existingTools, nil
 	}
 
-	// Otherwise, use the default tool
-	return []tools.Tool{defaultTool}, nil
+	// Otherwise, use the default tools
+	return defaultTools, nil
 }
 
 // InstallCommand installs a command resource by creating symlinks to target tools
