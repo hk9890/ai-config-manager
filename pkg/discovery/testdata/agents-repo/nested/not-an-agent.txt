@@ -1,0 +1,2 @@
+This is a text file, not an agent markdown file.
+It should be ignored during discovery.
