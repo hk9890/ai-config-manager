@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/discovery"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/repo"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/resource"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/source"
+	"github.com/hk9890/ai-config-manager/pkg/discovery"
+	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/source"
 )
 
 // isOnline checks if we have network connectivity

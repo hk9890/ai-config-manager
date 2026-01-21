@@ -82,14 +82,14 @@ Inspired by Vercel's add-skill tool and the agentskills.io ecosystem.
 
 ```bash
 # Using go install
-go install github.com/hans-m-leitner/ai-config-manager@v0.3.0
+go install github.com/hk9890/ai-config-manager@v0.3.0
 
 # Or download pre-built binaries from the release page
 ```
 
 ## 🔗 Links
 
-- [GitHub Repository](https://github.com/hans-m-leitner/ai-config-manager)
-- [Full Documentation](https://github.com/hans-m-leitner/ai-config-manager/blob/main/README.md)
-- [GitHub Sources Guide](https://github.com/hans-m-leitner/ai-config-manager/blob/main/docs/github-sources.md)
-- [Contributing Guide](https://github.com/hans-m-leitner/ai-config-manager/blob/main/CONTRIBUTING.md)
+- [GitHub Repository](https://github.com/hk9890/ai-config-manager)
+- [Full Documentation](https://github.com/hk9890/ai-config-manager/blob/main/README.md)
+- [GitHub Sources Guide](https://github.com/hk9890/ai-config-manager/blob/main/docs/github-sources.md)
+- [Contributing Guide](https://github.com/hk9890/ai-config-manager/blob/main/CONTRIBUTING.md)

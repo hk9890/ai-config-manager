@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/config"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/install"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/repo"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/resource"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/tools"
+	"github.com/hk9890/ai-config-manager/pkg/config"
+	"github.com/hk9890/ai-config-manager/pkg/install"
+	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
 
 // TestCompleteWorkflow tests the complete workflow: add -> list -> install -> remove

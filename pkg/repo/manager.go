@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
 // Manager manages the AI resources repository

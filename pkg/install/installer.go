@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/repo"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/resource"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/tools"
+	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
 
 // Installer manages resource installations in a project

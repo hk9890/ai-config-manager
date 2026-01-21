@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/version"
+	"github.com/hk9890/ai-config-manager/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

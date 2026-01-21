@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
 // SkillCandidate represents a skill discovered during search

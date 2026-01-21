@@ -487,7 +487,7 @@ import (
     "github.com/spf13/cobra"
     "gopkg.in/yaml.v3"
 
-    "github.com/hans-m-leitner/ai-config-manager/pkg/resource"
+    "github.com/hk9890/ai-config-manager/pkg/resource"
 )
 ```
 

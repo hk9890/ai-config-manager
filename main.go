@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/hans-m-leitner/ai-config-manager/cmd"
+	"github.com/hk9890/ai-config-manager/cmd"
 )
 
 func main() {

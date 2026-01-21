@@ -7,9 +7,9 @@ BINARY=ai-repo
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS=-ldflags "-s -w -X github.com/hans-m-leitner/ai-config-manager/pkg/version.Version=$(VERSION) \
-	-X github.com/hans-m-leitner/ai-config-manager/pkg/version.GitCommit=$(GIT_COMMIT) \
-	-X github.com/hans-m-leitner/ai-config-manager/pkg/version.BuildDate=$(BUILD_DATE)"
+LDFLAGS=-ldflags "-s -w -X github.com/hk9890/ai-config-manager/pkg/version.Version=$(VERSION) \
+	-X github.com/hk9890/ai-config-manager/pkg/version.GitCommit=$(GIT_COMMIT) \
+	-X github.com/hk9890/ai-config-manager/pkg/version.BuildDate=$(BUILD_DATE)"
 
 # Go parameters
 GOCMD=go

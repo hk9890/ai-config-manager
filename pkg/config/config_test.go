@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/tools"
+	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
 
 func TestLoad_NoConfigFile(t *testing.T) {

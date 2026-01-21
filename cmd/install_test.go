@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/tools"
+	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
 
 func TestParseTargetFlag(t *testing.T) {

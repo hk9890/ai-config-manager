@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
 const maxDepth = 5

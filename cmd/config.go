@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hans-m-leitner/ai-config-manager/pkg/config"
-	"github.com/hans-m-leitner/ai-config-manager/pkg/tools"
+	"github.com/hk9890/ai-config-manager/pkg/config"
+	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
