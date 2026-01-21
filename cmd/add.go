@@ -181,16 +181,25 @@ Example:
 
 // addAgentCmd represents the add agent subcommand
 var addAgentCmd = &cobra.Command{
-	Use:   "agent <path>",
+	Use:   "agent <source>",
 	Short: "Add an agent resource",
 	Long: `Add an agent resource to the repository.
 
 An agent is a single .md file with YAML frontmatter containing at minimum
 a description field.
 
-Example:
+Source Formats:
+  gh:owner/repo              GitHub repository (auto-discovers agents)
+  gh:owner/repo/path         Specific agent in repo
+  local:path or path         Local .md file
+  owner/repo                 GitHub shorthand
+
+Examples:
+  ai-repo add agent gh:myorg/agents
+  ai-repo add agent gh:myorg/repo/agents/code-reviewer.md
   ai-repo add agent ~/.opencode/agents/my-agent.md
-  ai-repo add agent ./my-agent.md --force`,
+  ai-repo add agent ./my-agent.md --force
+  ai-repo add agent myorg/agents`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourcePath := args[0]

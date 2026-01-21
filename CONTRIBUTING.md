@@ -99,6 +99,16 @@ ai-config-manager/
 │   │   ├── metadata.go    # YAML frontmatter parsing
 │   │   └── types.go       # Resource types and validation
 │   │
+│   ├── source/            # Source parsing and Git operations
+│   │   ├── parser.go      # Parse source formats (gh:, local:, git:)
+│   │   └── git.go         # Git clone and temp directory management
+│   │
+│   ├── discovery/         # Auto-discovery of resources
+│   │   ├── skills.go      # Skill auto-discovery algorithm
+│   │   ├── commands.go    # Command auto-discovery algorithm
+│   │   ├── agents.go      # Agent auto-discovery algorithm
+│   │   └── testdata/      # Test fixtures for discovery
+│   │
 │   ├── install/           # Installation logic
 │   │   └── installer.go   # Symlink creation, tool detection
 │   │
@@ -110,7 +120,8 @@ ai-config-manager/
 │
 ├── test/                   # Integration tests
 │   ├── integration_test.go       # End-to-end workflow tests
-│   └── bulk_import_test.go       # Bulk import integration tests
+│   ├── bulk_import_test.go       # Bulk import integration tests
+│   └── github_sources_test.go    # GitHub source integration tests
 │
 ├── examples/               # Example resources
 │   ├── sample-command.md
@@ -130,11 +141,24 @@ ai-config-manager/
 
 ### Architecture Flow
 
-1. **User runs CLI command** → `cmd/` (Cobra)
+#### Adding Resources (Local)
+
+1. **User runs CLI command** → `cmd/add.go` (Cobra)
 2. **Command validates input** → `pkg/resource/` (validation)
-3. **Manager handles operation** → `pkg/repo/` (add/remove/list)
+3. **Manager handles operation** → `pkg/repo/manager.go` (add/remove/list)
 4. **Resources stored** → `~/.local/share/ai-config/repo/`
 5. **Installation creates symlinks** → `pkg/install/` → `.claude/`, `.opencode/`, etc.
+
+#### Adding Resources (GitHub)
+
+1. **User runs CLI command** → `cmd/add.go` with GitHub source
+2. **Parse source format** → `pkg/source/parser.go` (gh:owner/repo → ParsedSource)
+3. **Clone repository** → `pkg/source/git.go` (git clone to temp dir)
+4. **Auto-discover resources** → `pkg/discovery/` (search standard locations)
+5. **User selection** (if multiple resources found)
+6. **Copy to repository** → `pkg/repo/manager.go` (centralized storage)
+7. **Cleanup temp directory** → `pkg/source/git.go`
+8. **Installation works as before** → symlinks to centralized repo
 
 ### Key Design Patterns
 
@@ -157,6 +181,177 @@ ai-config-manager/
 - No duplication of resources
 - Single source of truth in repository
 - Easy updates (modify in repo, all projects updated)
+
+**Source Parsing and Discovery:**
+- Flexible source formats (gh:, local:, http:, git:)
+- Auto-discovery follows tool conventions
+- Priority-based search paths
+- Handles multi-resource repositories
+
+### GitHub Source Architecture
+
+The GitHub source feature allows users to add resources directly from GitHub repositories with automatic discovery.
+
+#### Source Parser (`pkg/source/parser.go`)
+
+**Purpose:** Parse and normalize different source formats into a unified structure.
+
+**Types:**
+```go
+type SourceType string
+
+const (
+    GitHub  SourceType = "github"
+    GitLab  SourceType = "gitlab"  // Future
+    Local   SourceType = "local"
+    GitURL  SourceType = "git-url"
+)
+
+type ParsedSource struct {
+    Type      SourceType
+    URL       string      // Full Git URL
+    LocalPath string      // For local sources
+    Ref       string      // Branch/tag (optional)
+    Subpath   string      // Path within repo (optional)
+}
+```
+
+**Parsing Rules:**
+- `gh:owner/repo` → GitHub with constructed URL
+- `gh:owner/repo/path` → GitHub with subpath
+- `gh:owner/repo@branch` → GitHub with ref
+- `gh:owner/repo/path@branch` → Both subpath and ref
+- `local:path` or bare paths → Local
+- `https://` or `git@` URLs → GitURL
+- `owner/repo` (no prefix) → Infer GitHub
+
+#### Git Operations (`pkg/source/git.go`)
+
+**Purpose:** Clone repositories and manage temporary directories.
+
+**Functions:**
+```go
+// CloneRepo clones a Git repository to a temporary directory
+func CloneRepo(url string, ref string) (tempDir string, err error)
+
+// CleanupTempDir removes a temporary directory (with safety checks)
+func CleanupTempDir(dir string) error
+```
+
+**Implementation Details:**
+- Uses `git clone --depth 1` for shallow clones (faster)
+- Creates temp directory using `os.MkdirTemp()`
+- If ref specified, uses `--branch <ref>` flag
+- Cleanup validates path is in temp directory (security)
+- Always cleanup, even on errors (defer pattern)
+
+#### Auto-Discovery (`pkg/discovery/`)
+
+**Purpose:** Find resources in repositories following tool conventions.
+
+**Skills Discovery** (`pkg/discovery/skills.go`):
+
+Priority search order:
+1. Direct path: `basePath/subpath/SKILL.md`
+2. Standard directories:
+   - `skills/`
+   - `.claude/skills/`
+   - `.opencode/skills/`
+   - `.github/skills/`
+   - `.codex/skills/`, `.cursor/skills/`, `.goose/skills/`
+   - `.kilocode/skills/`, `.kiro/skills/`, `.roo/skills/`
+   - `.trae/skills/`, `.agents/skills/`, `.agent/skills/`
+3. Recursive search (max depth 5) if not found
+
+**Commands Discovery** (`pkg/discovery/commands.go`):
+
+Search locations:
+1. `commands/`
+2. `.claude/commands/`
+3. `.opencode/commands/`
+4. Recursive search for `.md` files (excluding `SKILL.md`, `README.md`)
+
+**Agents Discovery** (`pkg/discovery/agents.go`):
+
+Search locations:
+1. `agents/`
+2. `.claude/agents/`
+3. `.opencode/agents/`
+4. Recursive search for `.md` files with agent frontmatter
+
+**Common Patterns:**
+- Return `[]*resource.Resource`, not error if nothing found
+- Deduplicate by resource name (first found wins)
+- Validate frontmatter before including
+- Max recursion depth of 5 levels
+
+#### Integration in Add Command (`cmd/add.go`)
+
+**Workflow:**
+```go
+// 1. Parse source
+parsed := source.ParseSource(input)
+
+// 2. Handle based on type
+switch parsed.Type {
+case source.Local:
+    // Existing behavior - add directly
+    manager.AddSkill(parsed.LocalPath)
+
+case source.GitHub, source.GitURL:
+    // Clone repository
+    tempDir, err := source.CloneRepo(parsed.URL, parsed.Ref)
+    defer source.CleanupTempDir(tempDir)
+    
+    // Discover resources
+    searchPath := tempDir
+    if parsed.Subpath != "" {
+        searchPath = filepath.Join(tempDir, parsed.Subpath)
+    }
+    
+    resources, err := discovery.DiscoverSkills(searchPath, "")
+    
+    // Handle selection
+    if len(resources) == 0 {
+        return fmt.Errorf("no skills found in %s", parsed.URL)
+    }
+    if len(resources) == 1 {
+        // Add automatically
+        manager.AddSkill(resources[0].Path)
+    } else {
+        // Interactive selection or error
+        selected := promptUserSelection(resources)
+        manager.AddSkill(selected.Path)
+    }
+}
+```
+
+### Testing GitHub Sources
+
+When adding tests for GitHub sources:
+
+1. **Use test fixtures** - Create mock repository structures in `testdata/`
+2. **Mock git operations** - Use environment variables or test helpers to avoid real clones
+3. **Test all source formats** - gh:, local:, https:, git@, shorthand
+4. **Test discovery edge cases** - no resources, multiple resources, nested directories
+5. **Test error handling** - invalid repos, network failures, cleanup on error
+
+**Example test structure:**
+```go
+func TestDiscoverSkills(t *testing.T) {
+    testRepo := setupTestRepo(t, "multi-skill-repo")
+    defer cleanupTestRepo(testRepo)
+    
+    skills, err := discovery.DiscoverSkills(testRepo, "")
+    if err != nil {
+        t.Fatalf("DiscoverSkills failed: %v", err)
+    }
+    
+    if len(skills) != 3 {
+        t.Errorf("Expected 3 skills, got %d", len(skills))
+    }
+}
+```
 
 ## Development Workflow
 

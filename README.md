@@ -209,6 +209,10 @@ ai-repo config get install.targets
 
 ### 2. Add Resources to Repository
 
+Resources can be added from multiple sources: local files, GitHub repositories, or bulk imports from tool directories.
+
+#### From Local Files
+
 ```bash
 # Add a command (single .md file)
 ai-repo add command ~/.claude/commands/my-command.md
@@ -218,10 +222,40 @@ ai-repo add skill ~/my-skills/pdf-processing
 
 # Add an agent (single .md file)
 ai-repo add agent ~/.claude/agents/code-reviewer.md
+```
 
+#### From GitHub Repositories
+
+```bash
+# Add a skill from GitHub
+ai-repo add skill gh:vercel-labs/agent-skills
+
+# Add a specific skill from a multi-skill repo
+ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+
+# Add from a specific branch or tag
+ai-repo add skill gh:anthropics/skills@v1.0.0
+
+# Shorthand - GitHub prefix is inferred for owner/repo format
+ai-repo add skill vercel-labs/agent-skills
+
+# Add commands from GitHub
+ai-repo add command gh:myorg/commands
+
+# Add agents from GitHub
+ai-repo add agent gh:myorg/agents/code-reviewer
+```
+
+#### From Tool Directories (Bulk Import)
+
+```bash
 # Import from OpenCode directory
 ai-repo add opencode ~/.opencode
+
+# Import from Claude directory
+ai-repo add claude ~/.claude
 ```
+
 
 ## Bulk Import
 
@@ -503,6 +537,123 @@ If you were using an earlier version with `.ai/` directories:
 
 3. **Fresh start**: Delete `.ai/` and reinstall resources - they'll use your configured default tool
 
+## Source Formats
+
+`ai-repo` supports multiple source formats for adding resources, making it easy to share and discover resources across teams and the community.
+
+### GitHub Sources
+
+Add resources directly from GitHub repositories using the `gh:` prefix:
+
+```bash
+# Basic syntax
+ai-repo add skill gh:owner/repo
+
+# With specific path (for multi-resource repos)
+ai-repo add skill gh:owner/repo/path/to/skill
+
+# With branch or tag reference
+ai-repo add skill gh:owner/repo@branch-name
+ai-repo add skill gh:owner/repo@v1.0.0
+
+# Combined: path and reference
+ai-repo add skill gh:owner/repo/skills/my-skill@main
+```
+
+**Examples:**
+```bash
+# Add a skill from Vercel's agent-skills repository
+ai-repo add skill gh:vercel-labs/agent-skills
+
+# Add a specific skill from a multi-skill repo
+ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+
+# Add from a specific version tag
+ai-repo add skill gh:anthropics/skills@v2.1.0
+```
+
+**How it works:**
+1. `ai-repo` clones the repository to a temporary directory
+2. Auto-discovers resources in standard locations (see [Auto-Discovery](#auto-discovery))
+3. Copies found resources to your centralized repository (`~/.local/share/ai-config/repo/`)
+4. Cleans up the temporary directory
+
+### Local Sources
+
+Add resources from your local filesystem using the `local:` prefix or a direct path:
+
+```bash
+# Explicit local prefix
+ai-repo add skill local:./my-skill
+ai-repo add skill local:/absolute/path/to/skill
+
+# Direct path (local: is implied)
+ai-repo add skill ./my-skill
+ai-repo add skill ~/my-skills/pdf-processing
+```
+
+**Note:** Local sources work exactly as before - the `local:` prefix is optional for backward compatibility.
+
+### Git URL Sources
+
+Add from any Git repository using full URLs:
+
+```bash
+# HTTPS URLs
+ai-repo add skill https://github.com/owner/repo.git
+ai-repo add skill https://gitlab.com/owner/repo.git
+
+# SSH URLs
+ai-repo add skill git@github.com:owner/repo.git
+
+# With branch reference
+ai-repo add skill https://github.com/owner/repo.git@develop
+```
+
+### Shorthand Syntax
+
+For convenience, `ai-repo` infers the `gh:` prefix for GitHub-style `owner/repo` patterns:
+
+```bash
+# These are equivalent:
+ai-repo add skill vercel-labs/agent-skills
+ai-repo add skill gh:vercel-labs/agent-skills
+
+# With path:
+ai-repo add skill vercel-labs/agent-skills/skills/frontend-design
+ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+```
+
+### Auto-Discovery
+
+When adding resources from GitHub or Git URLs, `ai-repo` automatically searches for resources in standard locations:
+
+**Skills** are searched in this priority order:
+1. `SKILL.md` in the specified path (if subpath provided)
+2. `skills/` directory
+3. `.claude/skills/`
+4. `.opencode/skills/`
+5. `.github/skills/`
+6. `.codex/skills/`, `.cursor/skills/`, `.goose/skills/`, etc.
+7. Recursive search (max depth 5) if not found above
+
+**Commands** are searched in:
+1. `commands/` directory
+2. `.claude/commands/`
+3. `.opencode/commands/`
+4. Recursive search for `.md` files (excluding `SKILL.md`, `README.md`)
+
+**Agents** are searched in:
+1. `agents/` directory
+2. `.claude/agents/`
+3. `.opencode/agents/`
+4. Recursive search for `.md` files with agent frontmatter
+
+**Interactive Selection:**
+- If a single resource is found, it's added automatically
+- If multiple resources are found, you'll be prompted to select one
+- If a specific subpath is provided, exactly one resource should exist at that location
+
 ## Commands
 
 ### `ai-repo config`
@@ -527,17 +678,29 @@ ai-repo config set install.targets claude,opencode
 
 ### `ai-repo add`
 
-Add resources to the repository.
+Add resources to the repository from various sources.
 
 ```bash
-# Add a single command
+# Add from GitHub (with auto-discovery)
+ai-repo add skill gh:owner/repo
+ai-repo add skill gh:owner/repo/path/to/skill
+ai-repo add skill gh:owner/repo@v1.0.0
+
+# Add from local path
 ai-repo add command <path-to-file.md>
-
-# Add a single skill
 ai-repo add skill <path-to-directory>
-
-# Add a single agent
 ai-repo add agent <path-to-file.md>
+
+# Add using shorthand (infers gh: for owner/repo)
+ai-repo add skill vercel-labs/agent-skills
+
+# Add from Git URL
+ai-repo add skill https://github.com/owner/repo.git
+ai-repo add skill git@github.com:owner/repo.git
+
+# Add with explicit local prefix
+ai-repo add skill local:./my-skill
+ai-repo add skill local:/absolute/path/to/skill
 
 # Add all resources from a Claude plugin
 ai-repo add plugin <path-to-plugin>
@@ -556,6 +719,14 @@ ai-repo add plugin ./plugin --skip-existing
 ai-repo add claude ~/.claude --dry-run
 ai-repo add opencode ~/.opencode --skip-existing
 ```
+
+**Source Formats:**
+- `gh:owner/repo[/path][@ref]` - GitHub repository
+- `local:path` or just `path` - Local filesystem
+- `https://...` or `git@...` - Any Git repository
+- `owner/repo` - Shorthand for GitHub (infers `gh:` prefix)
+
+See [Source Formats](#source-formats) for detailed documentation.
 
 ### `ai-repo list`
 
@@ -628,7 +799,124 @@ ai-repo rm agent old-reviewer
 
 ## Resource Formats
 
-### Commands
+### Source Formats
+
+`ai-repo` supports multiple source formats for adding resources, making it easy to share and discover resources across teams and the community.
+
+### GitHub Sources
+
+Add resources directly from GitHub repositories using the `gh:` prefix:
+
+```bash
+# Basic syntax
+ai-repo add skill gh:owner/repo
+
+# With specific path (for multi-resource repos)
+ai-repo add skill gh:owner/repo/path/to/skill
+
+# With branch or tag reference
+ai-repo add skill gh:owner/repo@branch-name
+ai-repo add skill gh:owner/repo@v1.0.0
+
+# Combined: path and reference
+ai-repo add skill gh:owner/repo/skills/my-skill@main
+```
+
+**Examples:**
+```bash
+# Add a skill from Vercel's agent-skills repository
+ai-repo add skill gh:vercel-labs/agent-skills
+
+# Add a specific skill from a multi-skill repo
+ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+
+# Add from a specific version tag
+ai-repo add skill gh:anthropics/skills@v2.1.0
+```
+
+**How it works:**
+1. `ai-repo` clones the repository to a temporary directory
+2. Auto-discovers resources in standard locations (see [Auto-Discovery](#auto-discovery))
+3. Copies found resources to your centralized repository (`~/.local/share/ai-config/repo/`)
+4. Cleans up the temporary directory
+
+### Local Sources
+
+Add resources from your local filesystem using the `local:` prefix or a direct path:
+
+```bash
+# Explicit local prefix
+ai-repo add skill local:./my-skill
+ai-repo add skill local:/absolute/path/to/skill
+
+# Direct path (local: is implied)
+ai-repo add skill ./my-skill
+ai-repo add skill ~/my-skills/pdf-processing
+```
+
+**Note:** Local sources work exactly as before - the `local:` prefix is optional for backward compatibility.
+
+### Git URL Sources
+
+Add from any Git repository using full URLs:
+
+```bash
+# HTTPS URLs
+ai-repo add skill https://github.com/owner/repo.git
+ai-repo add skill https://gitlab.com/owner/repo.git
+
+# SSH URLs
+ai-repo add skill git@github.com:owner/repo.git
+
+# With branch reference
+ai-repo add skill https://github.com/owner/repo.git@develop
+```
+
+### Shorthand Syntax
+
+For convenience, `ai-repo` infers the `gh:` prefix for GitHub-style `owner/repo` patterns:
+
+```bash
+# These are equivalent:
+ai-repo add skill vercel-labs/agent-skills
+ai-repo add skill gh:vercel-labs/agent-skills
+
+# With path:
+ai-repo add skill vercel-labs/agent-skills/skills/frontend-design
+ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+```
+
+### Auto-Discovery
+
+When adding resources from GitHub or Git URLs, `ai-repo` automatically searches for resources in standard locations:
+
+**Skills** are searched in this priority order:
+1. `SKILL.md` in the specified path (if subpath provided)
+2. `skills/` directory
+3. `.claude/skills/`
+4. `.opencode/skills/`
+5. `.github/skills/`
+6. `.codex/skills/`, `.cursor/skills/`, `.goose/skills/`, etc.
+7. Recursive search (max depth 5) if not found above
+
+**Commands** are searched in:
+1. `commands/` directory
+2. `.claude/commands/`
+3. `.opencode/commands/`
+4. Recursive search for `.md` files (excluding `SKILL.md`, `README.md`)
+
+**Agents** are searched in:
+1. `agents/` directory
+2. `.claude/agents/`
+3. `.opencode/agents/`
+4. Recursive search for `.md` files with agent frontmatter
+
+**Interactive Selection:**
+- If a single resource is found, it's added automatically
+- If multiple resources are found, you'll be prompted to select one
+- If a specific subpath is provided, exactly one resource should exist at that location
+
+## Commands
 
 Commands are single `.md` files with YAML frontmatter, following the Claude Code slash command format.
 
@@ -973,11 +1261,132 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Issues: https://github.com/hk9890/ai-config-manager/issues
 - Discussions: https://github.com/hk9890/ai-config-manager/discussions
 
+## Troubleshooting
+
+### GitHub Source Issues
+
+**Problem: "Git clone failed" error**
+
+Solution:
+- Ensure `git` is installed: `git --version`
+- Check internet connectivity
+- Verify repository URL is correct and accessible
+- For private repositories, ensure you have SSH keys or credentials configured
+
+**Problem: "No resources found in repository"**
+
+Solution:
+- Verify the repository contains resources in standard locations
+- Try specifying a direct path: `ai-repo add skill gh:owner/repo/path/to/skill`
+- Check that resources have valid frontmatter (SKILL.md with name and description)
+- Use the repository's documentation to find resource locations
+
+**Problem: "Multiple resources found, please specify path"**
+
+Solution:
+- Add the specific path to your command: `ai-repo add skill gh:owner/repo/skills/specific-skill`
+- List available resources by cloning the repo manually: `git clone https://github.com/owner/repo && ls -R`
+
+**Problem: Network timeout or slow clones**
+
+Solution:
+- Check your internet connection
+- For large repositories, consider cloning manually first, then using `local:` source
+- Repository is cloned with `--depth 1` (shallow) for speed, but may still be large
+
+### Local Source Issues
+
+**Problem: "Path does not exist"**
+
+Solution:
+- Verify the path is correct: `ls <path>`
+- Use absolute paths to avoid confusion: `/home/user/skills/my-skill`
+- Check for typos in the path
+
+**Problem: "Directory must contain SKILL.md"**
+
+Solution:
+- Ensure your skill directory has a `SKILL.md` file (case-sensitive)
+- Verify SKILL.md has valid YAML frontmatter with at least `name` and `description`
+
+**Problem: "Folder name does not match skill name in SKILL.md"**
+
+Solution:
+- Rename the directory to match the `name` field in SKILL.md frontmatter
+- Or update the `name` field in SKILL.md to match the directory name
+
+### Installation Issues
+
+**Problem: Symlink creation fails**
+
+Solution:
+- Ensure you have write permissions in the project directory
+- On Windows, run as administrator (symlinks require elevated permissions)
+- Check that the repository path is accessible: `ls ~/.local/share/ai-config/repo/`
+
+**Problem: "Resource already exists"**
+
+Solution:
+- Use `--force` flag to overwrite: `ai-repo add skill gh:owner/repo --force`
+- Or remove the existing resource first: `ai-repo remove skill <name>`
+- Check what's installed: `ai-repo list`
+
+### Configuration Issues
+
+**Problem: "Config file not found" or invalid config**
+
+Solution:
+- Config location: `~/.config/ai-repo/ai-repo.yaml`
+- Reset config: Delete the file and run `ai-repo config set install.targets claude`
+- Check config syntax: `cat ~/.config/ai-repo/ai-repo.yaml`
+
+**Problem: Resources installing to wrong tool directory**
+
+Solution:
+- Check your default targets: `ai-repo config get install.targets`
+- Set desired targets: `ai-repo config set install.targets claude,opencode`
+- Use `--target` flag to override: `ai-repo install skill name --target claude`
+
+### General Debugging
+
+**Enable verbose output:**
+```bash
+# Most commands support verbose flags (check with --help)
+ai-repo add skill gh:owner/repo -v
+```
+
+**Check repository contents:**
+```bash
+# List all resources in your repository
+ai-repo list
+
+# Check repository directory directly
+ls -la ~/.local/share/ai-config/repo/skills/
+ls -la ~/.local/share/ai-config/repo/commands/
+ls -la ~/.local/share/ai-config/repo/agents/
+```
+
+**Verify Git installation:**
+```bash
+git --version
+# Should output: git version 2.x.x or higher
+```
+
+**Check permissions:**
+```bash
+# Repository directory
+ls -ld ~/.local/share/ai-config/repo/
+
+# Project directories
+ls -ld .claude/ .opencode/ .github/skills/
+```
+
 ## Roadmap
 
+- [x] GitHub source support with auto-discovery
+- [x] Shell completion
 - [ ] Windows support (junction instead of symlinks)
 - [ ] Search functionality for resources
-- [ ] Remote repository support
+- [ ] GitLab source support
 - [ ] Resource versioning
 - [ ] Update/upgrade commands
-- [x] Shell completion
