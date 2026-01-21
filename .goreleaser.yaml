@@ -18,9 +18,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X github.com/hans-m-leitner/ai-config-manager/pkg/version.Version={{.Version}}
-      - -X github.com/hans-m-leitner/ai-config-manager/pkg/version.GitCommit={{.ShortCommit}}
-      - -X github.com/hans-m-leitner/ai-config-manager/pkg/version.BuildDate={{.Date}}
+      - -X github.com/hk9890/ai-config-manager/pkg/version.Version={{.Version}}
+      - -X github.com/hk9890/ai-config-manager/pkg/version.GitCommit={{.ShortCommit}}
+      - -X github.com/hk9890/ai-config-manager/pkg/version.BuildDate={{.Date}}
 
 archives:
   - format: tar.gz

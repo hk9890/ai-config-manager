@@ -75,7 +75,7 @@ jobs:
           fi
           
           go build \
-            -ldflags "-s -w -X github.com/hans-m-leitner/ai-config-manager/pkg/version.Version=${{ steps.version.outputs.version }} -X github.com/hans-m-leitner/ai-config-manager/pkg/version.GitCommit=${{ steps.version.outputs.commit }} -X github.com/hans-m-leitner/ai-config-manager/pkg/version.BuildDate=${{ steps.version.outputs.date }}" \
+            -ldflags "-s -w -X github.com/hk9890/ai-config-manager/pkg/version.Version=${{ steps.version.outputs.version }} -X github.com/hk9890/ai-config-manager/pkg/version.GitCommit=${{ steps.version.outputs.commit }} -X github.com/hk9890/ai-config-manager/pkg/version.BuildDate=${{ steps.version.outputs.date }}" \
             -o "bin/${BINARY_NAME}" \
             .
 
