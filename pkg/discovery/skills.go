@@ -17,26 +17,41 @@ type SkillCandidate struct {
 // DiscoverSkills searches for skills following the priority-based algorithm
 // It searches in standard locations first, then falls back to recursive search
 func DiscoverSkills(basePath string, subpath string) ([]*resource.Resource, error) {
-	// Validate base path exists
-	if _, err := os.Stat(basePath); err != nil {
-		return nil, fmt.Errorf("base path does not exist: %w", err)
-	}
-
-	// Build the search root
+	// Build the initial search root
 	searchRoot := basePath
 	if subpath != "" {
 		searchRoot = filepath.Join(basePath, subpath)
-		// Validate search root exists
-		if _, err := os.Stat(searchRoot); err != nil {
-			return nil, fmt.Errorf("search path does not exist: %w", err)
+	}
+
+	// Check if searchRoot exists and is accessible
+	searchRootInfo, searchRootErr := os.Stat(searchRoot)
+
+	// If searchRoot exists, check if it's a skill directory
+	if searchRootErr == nil && searchRootInfo.IsDir() {
+		if isSkillDir(searchRoot) {
+			skill, err := resource.LoadSkill(searchRoot)
+			if err == nil && skill.Name != "" && skill.Description != "" {
+				return []*resource.Resource{skill}, nil
+			}
 		}
 	}
 
-	// Check if searchRoot itself is a skill (has SKILL.md)
-	if isSkillDir(searchRoot) {
-		skill, err := resource.LoadSkill(searchRoot)
-		if err == nil && skill.Name != "" && skill.Description != "" {
-			return []*resource.Resource{skill}, nil
+	// If searchRoot doesn't exist, try searching from immediate parent directory
+	// This handles cases where the path might be slightly incorrect (e.g., typo in skill name)
+	// but we don't want to fall back too far (which would mask real errors)
+	if searchRootErr != nil {
+		parentPath := filepath.Dir(searchRoot)
+		// Only fall back if the parent is a valid, different directory
+		if parentPath != searchRoot && parentPath != "." && parentPath != "/" {
+			if info, err := os.Stat(parentPath); err == nil && info.IsDir() {
+				searchRoot = parentPath
+			} else {
+				// Parent doesn't exist either, this is a real error
+				return nil, fmt.Errorf("base path does not exist: %w", searchRootErr)
+			}
+		} else {
+			// Can't fall back, this is a real error
+			return nil, fmt.Errorf("base path does not exist: %w", searchRootErr)
 		}
 	}
 

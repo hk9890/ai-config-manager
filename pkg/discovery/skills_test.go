@@ -178,7 +178,8 @@ func TestDiscoverSkills_InvalidSkillIgnored(t *testing.T) {
 }
 
 func TestDiscoverSkills_NonExistentPath(t *testing.T) {
-	basePath := filepath.Join("testdata", "nonexistent")
+	// Use a path where even the parent doesn't exist
+	basePath := filepath.Join("testdata", "nonexistent-parent", "nonexistent")
 
 	_, err := DiscoverSkills(basePath, "")
 	if err == nil {
@@ -189,9 +190,16 @@ func TestDiscoverSkills_NonExistentPath(t *testing.T) {
 func TestDiscoverSkills_NonExistentSubpath(t *testing.T) {
 	basePath := filepath.Join("testdata", "single-skill")
 
-	_, err := DiscoverSkills(basePath, "nonexistent")
-	if err == nil {
-		t.Error("expected error for nonexistent subpath")
+	// With lenient path handling, nonexistent subpath falls back to basePath
+	// and should find the skill in the parent directory
+	skills, err := DiscoverSkills(basePath, "nonexistent")
+	if err != nil {
+		t.Errorf("unexpected error for nonexistent subpath (should fall back to parent): %v", err)
+	}
+
+	// Should find at least the skill1 in basePath
+	if len(skills) == 0 {
+		t.Error("expected to find skills after falling back to parent directory")
 	}
 }
 

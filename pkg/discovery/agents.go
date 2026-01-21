@@ -38,9 +38,35 @@ func DiscoverAgents(basePath string, subpath string) ([]*resource.Resource, erro
 		searchPath = filepath.Join(basePath, subpath)
 	}
 
-	// Check if search path exists
-	if _, err := os.Stat(searchPath); err != nil {
-		return nil, fmt.Errorf("search path does not exist: %w", err)
+	// Check if search path exists, but be lenient with subpaths
+	searchPathInfo, searchPathErr := os.Stat(searchPath)
+
+	// If searchPath doesn't exist but we have a subpath, try parent directories
+	if searchPathErr != nil && subpath != "" {
+		currentPath := searchPath
+		for {
+			parentPath := filepath.Dir(currentPath)
+			if parentPath == currentPath || parentPath == basePath {
+				searchPath = basePath
+				break
+			}
+			if info, err := os.Stat(parentPath); err == nil && info.IsDir() {
+				searchPath = parentPath
+				break
+			}
+			currentPath = parentPath
+		}
+		// Re-check the new search path
+		searchPathInfo, searchPathErr = os.Stat(searchPath)
+	}
+
+	// Check if search path exists (after trying to find a valid parent)
+	if searchPathErr != nil {
+		return nil, fmt.Errorf("search path does not exist: %w", searchPathErr)
+	}
+
+	if !searchPathInfo.IsDir() {
+		return nil, fmt.Errorf("search path is not a directory: %s", searchPath)
 	}
 
 	// Priority locations to search

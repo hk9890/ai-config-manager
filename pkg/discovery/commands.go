@@ -19,9 +19,35 @@ func DiscoverCommands(basePath string, subpath string) ([]*resource.Resource, er
 		searchPath = filepath.Join(basePath, subpath)
 	}
 
-	// Verify base path exists
-	if _, err := os.Stat(searchPath); err != nil {
-		return nil, fmt.Errorf("path does not exist: %w", err)
+	// Verify search path exists, but be lenient with subpaths
+	searchPathInfo, searchPathErr := os.Stat(searchPath)
+
+	// If searchPath doesn't exist but we have a subpath, try parent directories
+	if searchPathErr != nil && subpath != "" {
+		currentPath := searchPath
+		for {
+			parentPath := filepath.Dir(currentPath)
+			if parentPath == currentPath || parentPath == basePath {
+				searchPath = basePath
+				break
+			}
+			if info, err := os.Stat(parentPath); err == nil && info.IsDir() {
+				searchPath = parentPath
+				break
+			}
+			currentPath = parentPath
+		}
+		// Re-check the new search path
+		searchPathInfo, searchPathErr = os.Stat(searchPath)
+	}
+
+	// Verify base path exists (after trying to find a valid parent)
+	if searchPathErr != nil {
+		return nil, fmt.Errorf("path does not exist: %w", searchPathErr)
+	}
+
+	if !searchPathInfo.IsDir() {
+		return nil, fmt.Errorf("path is not a directory: %s", searchPath)
 	}
 
 	// Try priority locations first
