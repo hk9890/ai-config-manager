@@ -1,0 +1,573 @@
+package source
+
+import (
+	"path/filepath"
+	"testing"
+)
+
+func TestParseSource_GitHubPrefix(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantType    SourceType
+		wantURL     string
+		wantRef     string
+		wantSubpath string
+		wantError   bool
+	}{
+		{
+			name:        "basic owner/repo",
+			input:       "gh:owner/repo",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "",
+			wantSubpath: "",
+			wantError:   false,
+		},
+		{
+			name:        "with subpath",
+			input:       "gh:owner/repo/path/to/skill",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "",
+			wantSubpath: "path/to/skill",
+			wantError:   false,
+		},
+		{
+			name:        "with ref",
+			input:       "gh:owner/repo@main",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo/tree/main",
+			wantRef:     "main",
+			wantSubpath: "",
+			wantError:   false,
+		},
+		{
+			name:        "with ref and subpath",
+			input:       "gh:owner/repo@main/path/to/skill",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo/tree/main",
+			wantRef:     "main",
+			wantSubpath: "path/to/skill",
+			wantError:   false,
+		},
+		{
+			name:        "with .git suffix",
+			input:       "gh:owner/repo.git",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "",
+			wantSubpath: "",
+			wantError:   false,
+		},
+		{
+			name:      "empty after prefix",
+			input:     "gh:",
+			wantError: true,
+		},
+		{
+			name:      "missing repo",
+			input:     "gh:owner",
+			wantError: true,
+		},
+		{
+			name:      "empty owner",
+			input:     "gh:/repo",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSource(tt.input)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ParseSource(%q) expected error, got nil", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("ParseSource(%q).Type = %v, want %v", tt.input, got.Type, tt.wantType)
+			}
+			if got.URL != tt.wantURL {
+				t.Errorf("ParseSource(%q).URL = %v, want %v", tt.input, got.URL, tt.wantURL)
+			}
+			if got.Ref != tt.wantRef {
+				t.Errorf("ParseSource(%q).Ref = %v, want %v", tt.input, got.Ref, tt.wantRef)
+			}
+			if got.Subpath != tt.wantSubpath {
+				t.Errorf("ParseSource(%q).Subpath = %v, want %v", tt.input, got.Subpath, tt.wantSubpath)
+			}
+		})
+	}
+}
+
+func TestParseSource_LocalPrefix(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		wantType      SourceType
+		wantLocalPath string
+		wantError     bool
+	}{
+		{
+			name:          "relative path",
+			input:         "local:./path/to/skill",
+			wantType:      Local,
+			wantLocalPath: "path/to/skill",
+			wantError:     false,
+		},
+		{
+			name:          "absolute path",
+			input:         "local:/abs/path/to/skill",
+			wantType:      Local,
+			wantLocalPath: "/abs/path/to/skill",
+			wantError:     false,
+		},
+		{
+			name:      "empty after prefix",
+			input:     "local:",
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSource(tt.input)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ParseSource(%q) expected error, got nil", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("ParseSource(%q).Type = %v, want %v", tt.input, got.Type, tt.wantType)
+			}
+			if got.LocalPath != tt.wantLocalPath {
+				t.Errorf("ParseSource(%q).LocalPath = %v, want %v", tt.input, got.LocalPath, tt.wantLocalPath)
+			}
+		})
+	}
+}
+
+func TestParseSource_GitHubURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantType    SourceType
+		wantURL     string
+		wantRef     string
+		wantSubpath string
+		wantError   bool
+	}{
+		{
+			name:        "basic GitHub URL",
+			input:       "https://github.com/owner/repo",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "",
+			wantSubpath: "",
+			wantError:   false,
+		},
+		{
+			name:        "GitHub URL with .git",
+			input:       "https://github.com/owner/repo.git",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "",
+			wantSubpath: "",
+			wantError:   false,
+		},
+		{
+			name:        "GitHub tree URL",
+			input:       "https://github.com/owner/repo/tree/main",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "main",
+			wantSubpath: "",
+			wantError:   false,
+		},
+		{
+			name:        "GitHub tree URL with subpath",
+			input:       "https://github.com/owner/repo/tree/main/path/to/skill",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "main",
+			wantSubpath: "path/to/skill",
+			wantError:   false,
+		},
+		{
+			name:        "GitHub blob URL",
+			input:       "https://github.com/owner/repo/blob/main/README.md",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "main",
+			wantSubpath: "README.md",
+			wantError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSource(tt.input)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ParseSource(%q) expected error, got nil", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("ParseSource(%q).Type = %v, want %v", tt.input, got.Type, tt.wantType)
+			}
+			if got.URL != tt.wantURL {
+				t.Errorf("ParseSource(%q).URL = %v, want %v", tt.input, got.URL, tt.wantURL)
+			}
+			if got.Ref != tt.wantRef {
+				t.Errorf("ParseSource(%q).Ref = %v, want %v", tt.input, got.Ref, tt.wantRef)
+			}
+			if got.Subpath != tt.wantSubpath {
+				t.Errorf("ParseSource(%q).Subpath = %v, want %v", tt.input, got.Subpath, tt.wantSubpath)
+			}
+		})
+	}
+}
+
+func TestParseSource_GitSSH(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantType  SourceType
+		wantURL   string
+		wantError bool
+	}{
+		{
+			name:      "GitHub SSH",
+			input:     "git@github.com:owner/repo.git",
+			wantType:  GitHub,
+			wantURL:   "https://github.com/owner/repo",
+			wantError: false,
+		},
+		{
+			name:      "GitHub SSH without .git",
+			input:     "git@github.com:owner/repo",
+			wantType:  GitHub,
+			wantURL:   "https://github.com/owner/repo",
+			wantError: false,
+		},
+		{
+			name:      "GitLab SSH",
+			input:     "git@gitlab.com:owner/repo.git",
+			wantType:  GitLab,
+			wantURL:   "https://gitlab.com/owner/repo",
+			wantError: false,
+		},
+		{
+			name:      "generic Git SSH",
+			input:     "git@example.com:owner/repo.git",
+			wantType:  GitURL,
+			wantURL:   "https://example.com/owner/repo",
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSource(tt.input)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ParseSource(%q) expected error, got nil", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("ParseSource(%q).Type = %v, want %v", tt.input, got.Type, tt.wantType)
+			}
+			if got.URL != tt.wantURL {
+				t.Errorf("ParseSource(%q).URL = %v, want %v", tt.input, got.URL, tt.wantURL)
+			}
+		})
+	}
+}
+
+func TestParseSource_GitLabURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantType  SourceType
+		wantURL   string
+		wantError bool
+	}{
+		{
+			name:      "basic GitLab URL",
+			input:     "https://gitlab.com/owner/repo",
+			wantType:  GitLab,
+			wantURL:   "https://gitlab.com/owner/repo",
+			wantError: false,
+		},
+		{
+			name:      "GitLab URL with .git",
+			input:     "https://gitlab.com/owner/repo.git",
+			wantType:  GitLab,
+			wantURL:   "https://gitlab.com/owner/repo",
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSource(tt.input)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ParseSource(%q) expected error, got nil", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("ParseSource(%q).Type = %v, want %v", tt.input, got.Type, tt.wantType)
+			}
+			if got.URL != tt.wantURL {
+				t.Errorf("ParseSource(%q).URL = %v, want %v", tt.input, got.URL, tt.wantURL)
+			}
+		})
+	}
+}
+
+func TestParseSource_GenericGitURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantType  SourceType
+		wantURL   string
+		wantError bool
+	}{
+		{
+			name:      "generic HTTPS URL",
+			input:     "https://example.com/repo.git",
+			wantType:  GitURL,
+			wantURL:   "https://example.com/repo.git",
+			wantError: false,
+		},
+		{
+			name:      "generic HTTP URL",
+			input:     "http://example.com/repo.git",
+			wantType:  GitURL,
+			wantURL:   "http://example.com/repo.git",
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSource(tt.input)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ParseSource(%q) expected error, got nil", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("ParseSource(%q).Type = %v, want %v", tt.input, got.Type, tt.wantType)
+			}
+			if got.URL != tt.wantURL {
+				t.Errorf("ParseSource(%q).URL = %v, want %v", tt.input, got.URL, tt.wantURL)
+			}
+		})
+	}
+}
+
+func TestParseSource_InferredTypes(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		wantType      SourceType
+		wantURL       string
+		wantLocalPath string
+		wantError     bool
+	}{
+		{
+			name:      "inferred GitHub owner/repo",
+			input:     "owner/repo",
+			wantType:  GitHub,
+			wantURL:   "https://github.com/owner/repo",
+			wantError: false,
+		},
+		{
+			name:          "inferred local relative path",
+			input:         "./path/to/skill",
+			wantType:      Local,
+			wantLocalPath: "path/to/skill",
+			wantError:     false,
+		},
+		{
+			name:          "inferred local parent path",
+			input:         "../path/to/skill",
+			wantType:      Local,
+			wantLocalPath: filepath.Clean("../path/to/skill"),
+			wantError:     false,
+		},
+		{
+			name:          "inferred local absolute path",
+			input:         "/abs/path/to/skill",
+			wantType:      Local,
+			wantLocalPath: "/abs/path/to/skill",
+			wantError:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSource(tt.input)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ParseSource(%q) expected error, got nil", tt.input)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("ParseSource(%q).Type = %v, want %v", tt.input, got.Type, tt.wantType)
+			}
+			if tt.wantType == GitHub && got.URL != tt.wantURL {
+				t.Errorf("ParseSource(%q).URL = %v, want %v", tt.input, got.URL, tt.wantURL)
+			}
+			if tt.wantType == Local && got.LocalPath != tt.wantLocalPath {
+				t.Errorf("ParseSource(%q).LocalPath = %v, want %v", tt.input, got.LocalPath, tt.wantLocalPath)
+			}
+		})
+	}
+}
+
+func TestParseSource_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantError bool
+	}{
+		{
+			name:      "empty string",
+			input:     "",
+			wantError: true,
+		},
+		{
+			name:      "whitespace only",
+			input:     "   ",
+			wantError: true,
+		},
+		{
+			name:      "invalid format",
+			input:     "invalid-format",
+			wantError: true,
+		},
+		{
+			name:      "just a slash",
+			input:     "/",
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseSource(tt.input)
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("ParseSource(%q) expected error, got nil", tt.input)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				}
+			}
+		})
+	}
+}
+
+func TestParseSource_TrailingSlashes(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantType    SourceType
+		wantURL     string
+		wantSubpath string
+	}{
+		{
+			name:        "GitHub with trailing slash",
+			input:       "gh:owner/repo/",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantSubpath: "",
+		},
+		{
+			name:        "GitHub URL with trailing slash",
+			input:       "https://github.com/owner/repo/",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantSubpath: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSource(tt.input)
+			if err != nil {
+				t.Errorf("ParseSource(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("ParseSource(%q).Type = %v, want %v", tt.input, got.Type, tt.wantType)
+			}
+			if got.URL != tt.wantURL {
+				t.Errorf("ParseSource(%q).URL = %v, want %v", tt.input, got.URL, tt.wantURL)
+			}
+			if got.Subpath != tt.wantSubpath {
+				t.Errorf("ParseSource(%q).Subpath = %v, want %v", tt.input, got.Subpath, tt.wantSubpath)
+			}
+		})
+	}
+}
+
+func TestSourceType_String(t *testing.T) {
+	tests := []struct {
+		sourceType SourceType
+		expected   string
+	}{
+		{GitHub, "github"},
+		{GitLab, "gitlab"},
+		{Local, "local"},
+		{GitURL, "git-url"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			if got := string(tt.sourceType); got != tt.expected {
+				t.Errorf("SourceType = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
