@@ -185,13 +185,13 @@ Examples:
 			return err
 		}
 
-		// Determine targets to use
-		var targets []tools.Tool
+		// Create installer
+		var installer *install.Installer
 		if explicitTargets != nil {
-			// Use explicit targets from --target flag
-			targets = explicitTargets
+			// Use explicit targets from --target flag (bypass detection)
+			installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
 		} else {
-			// Load config to get default targets
+			// Auto-detect existing tools or use config defaults
 			home, err := os.UserHomeDir()
 			if err != nil {
 				return fmt.Errorf("failed to get home directory: %w", err)
@@ -200,14 +200,13 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
-			targets, err = cfg.GetDefaultTargets()
+			defaultTargets, err := cfg.GetDefaultTargets()
 			if err != nil {
 				return fmt.Errorf("invalid default targets in config: %w", err)
 			}
+			// NewInstaller will auto-detect existing tool directories
+			installer, err = install.NewInstaller(projectPath, defaultTargets)
 		}
-
-		// Create installer with explicit targets
-		installer, err := install.NewInstallerWithTargets(projectPath, targets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
@@ -310,13 +309,13 @@ Examples:
 			return err
 		}
 
-		// Determine targets to use
-		var targets []tools.Tool
+		// Create installer
+		var installer *install.Installer
 		if explicitTargets != nil {
-			// Use explicit targets from --target flag
-			targets = explicitTargets
+			// Use explicit targets from --target flag (bypass detection)
+			installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
 		} else {
-			// Load config to get default targets
+			// Auto-detect existing tools or use config defaults
 			home, err := os.UserHomeDir()
 			if err != nil {
 				return fmt.Errorf("failed to get home directory: %w", err)
@@ -325,14 +324,13 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
-			targets, err = cfg.GetDefaultTargets()
+			defaultTargets, err := cfg.GetDefaultTargets()
 			if err != nil {
 				return fmt.Errorf("invalid default targets in config: %w", err)
 			}
+			// NewInstaller will auto-detect existing tool directories
+			installer, err = install.NewInstaller(projectPath, defaultTargets)
 		}
-
-		// Create installer with explicit targets
-		installer, err := install.NewInstallerWithTargets(projectPath, targets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
@@ -438,13 +436,13 @@ Examples:
 			return err
 		}
 
-		// Determine targets to use
-		var targets []tools.Tool
+		// Create installer
+		var installer *install.Installer
 		if explicitTargets != nil {
-			// Use explicit targets from --target flag
-			targets = explicitTargets
+			// Use explicit targets from --target flag (bypass detection)
+			installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
 		} else {
-			// Load config to get default targets
+			// Auto-detect existing tools or use config defaults
 			home, err := os.UserHomeDir()
 			if err != nil {
 				return fmt.Errorf("failed to get home directory: %w", err)
@@ -453,14 +451,13 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
-			targets, err = cfg.GetDefaultTargets()
+			defaultTargets, err := cfg.GetDefaultTargets()
 			if err != nil {
 				return fmt.Errorf("invalid default targets in config: %w", err)
 			}
+			// NewInstaller will auto-detect existing tool directories
+			installer, err = install.NewInstaller(projectPath, defaultTargets)
 		}
-
-		// Create installer with explicit targets
-		installer, err := install.NewInstallerWithTargets(projectPath, targets)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
