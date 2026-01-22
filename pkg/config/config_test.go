@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/adrg/xdg"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
 
@@ -394,8 +395,31 @@ func TestMigrateConfig(t *testing.T) {
 }
 
 func TestLoadGlobal_NoConfig(t *testing.T) {
-	// Temporarily override home directory functions for testing
-	// This test just ensures LoadGlobal returns defaults when no config exists
+	// Create temp directory for isolated test environment
+	tmpDir, err := os.MkdirTemp("", "config-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Override XDG_CONFIG_HOME to use temp directory
+	// This isolates the test from the actual user's config
+	oldXDGConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer func() {
+		os.Setenv("XDG_CONFIG_HOME", oldXDGConfigHome)
+		xdg.Reload() // Restore original paths
+	}()
+
+	// Also override HOME to prevent fallback to ~/.ai-repo.yaml
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
+	// Reload XDG paths to pick up new environment variables
+	xdg.Reload()
+
+	// LoadGlobal should return defaults when no config exists
 	cfg, err := LoadGlobal()
 	if err != nil {
 		t.Fatalf("LoadGlobal() error = %v, want nil", err)
