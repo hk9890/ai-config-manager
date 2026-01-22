@@ -215,45 +215,45 @@ Resources can be added from multiple sources: local files, GitHub repositories, 
 
 ```bash
 # Add a command (single .md file)
-aimgr add command ~/.claude/commands/my-command.md
+aimgr repo add command ~/.claude/commands/my-command.md
 
 # Add a skill (directory with SKILL.md)
-aimgr add skill ~/my-skills/pdf-processing
+aimgr repo add skill ~/my-skills/pdf-processing
 
 # Add an agent (single .md file)
-aimgr add agent ~/.claude/agents/code-reviewer.md
+aimgr repo add agent ~/.claude/agents/code-reviewer.md
 ```
 
 #### From GitHub Repositories
 
 ```bash
 # Add a skill from GitHub
-aimgr add skill gh:vercel-labs/agent-skills
+aimgr repo add skill gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific branch or tag
-aimgr add skill gh:anthropics/skills@v1.0.0
+aimgr repo add skill gh:anthropics/skills@v1.0.0
 
 # Shorthand - GitHub prefix is inferred for owner/repo format
-aimgr add skill vercel-labs/agent-skills
+aimgr repo add skill vercel-labs/agent-skills
 
 # Add commands from GitHub
-aimgr add command gh:myorg/commands
+aimgr repo add command gh:myorg/commands
 
 # Add agents from GitHub
-aimgr add agent gh:myorg/agents/code-reviewer
+aimgr repo add agent gh:myorg/agents/code-reviewer
 ```
 
 #### From Tool Directories (Bulk Import)
 
 ```bash
 # Import from OpenCode directory
-aimgr add opencode ~/.opencode
+aimgr repo add opencode ~/.opencode
 
 # Import from Claude directory
-aimgr add claude ~/.claude
+aimgr repo add claude ~/.claude
 ```
 
 
@@ -267,7 +267,7 @@ Import all commands and skills from a Claude plugin directory:
 
 ```bash
 # Import from a Claude plugin
-aimgr add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
+aimgr repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
 
 # Example output:
 # Importing from plugin: example-plugin
@@ -292,10 +292,10 @@ Import all commands, skills, and agents from a `.claude/` configuration folder:
 
 ```bash
 # Import from .claude folder
-aimgr add claude ~/.claude
+aimgr repo add claude ~/.claude
 
 # Import from project's .claude folder
-aimgr add claude ~/my-project/.claude
+aimgr repo add claude ~/my-project/.claude
 
 # Example output:
 # Importing from Claude folder: /home/user/.claude
@@ -325,10 +325,10 @@ Import all resources from an `.opencode/` configuration folder:
 
 ```bash
 # Import from .opencode folder
-aimgr add opencode ~/.opencode
+aimgr repo add opencode ~/.opencode
 
 # Import from project's .opencode folder
-aimgr add opencode ~/my-project/.opencode
+aimgr repo add opencode ~/my-project/.opencode
 
 # Example output:
 # Importing from OpenCode folder: /home/user/.opencode
@@ -354,16 +354,16 @@ Control how conflicts are handled when importing:
 
 ```bash
 # Force overwrite existing resources
-aimgr add plugin ./my-plugin --force
+aimgr repo add plugin ./my-plugin --force
 
 # Skip existing resources (no error)
-aimgr add claude ~/.claude --skip-existing
+aimgr repo add claude ~/.claude --skip-existing
 
 # Preview what would be imported (dry run)
-aimgr add plugin ./plugin --dry-run
+aimgr repo add plugin ./plugin --dry-run
 
 # Default behavior: fail on first conflict
-aimgr add plugin ./plugin  # Error if any resource already exists
+aimgr repo add plugin ./plugin  # Error if any resource already exists
 ```
 
 ### Bulk Import Use Cases
@@ -371,20 +371,20 @@ aimgr add plugin ./plugin  # Error if any resource already exists
 **Scenario 1: Setting up your aimgr from existing Claude setup**
 ```bash
 # Import all your existing commands and skills at once
-aimgr add claude ~/.claude
+aimgr repo add claude ~/.claude
 ```
 
 **Scenario 2: Installing a complete plugin**
 ```bash
 # Import all resources from a plugin in one command
-aimgr add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/pr-review-toolkit
+aimgr repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/pr-review-toolkit
 ```
 
 **Scenario 3: Migrating resources between machines**
 ```bash
 # On machine A: your resources are already in aimgr
 # On machine B: import from a cloned .claude folder
-aimgr add claude ~/cloned-config/.claude
+aimgr repo add claude ~/cloned-config/.claude
 ```
 
 
@@ -393,19 +393,19 @@ aimgr add claude ~/cloned-config/.claude
 
 ```bash
 # List all resources
-aimgr list
+aimgr repo list
 
 # List only commands
-aimgr list command
+aimgr repo list command
 
 # List only skills
-aimgr list skill
+aimgr repo list skill
 
 # List only agents
-aimgr list agent
+aimgr repo list agent
 
 # JSON output
-aimgr list --format=json
+aimgr repo list --format=json
 ```
 
 ### 4. Install in a Project
@@ -414,13 +414,16 @@ aimgr list --format=json
 cd your-project/
 
 # Install a command
-aimgr install command my-command
+aimgr install command/my-command
 
 # Install a skill
-aimgr install skill pdf-processing
+aimgr install skill/pdf-processing
 
 # Install an agent
-aimgr install agent code-reviewer
+aimgr install agent/code-reviewer
+
+# Install multiple resources at once
+aimgr install skill/pdf-processing command/my-command agent/code-reviewer
 
 # Resources are symlinked to tool-specific directories
 # Example: .claude/commands/, .opencode/commands/, etc.
@@ -430,13 +433,17 @@ aimgr install agent code-reviewer
 
 ```bash
 # Remove from repository (with confirmation)
-aimgr remove command my-command
+aimgr repo remove command my-command
 
 # Force remove (skip confirmation)
-aimgr remove skill old-skill --force
+aimgr repo remove skill old-skill --force
 
 # Remove an agent
-aimgr remove agent old-agent
+aimgr repo remove agent old-agent
+
+# Uninstall from project (removes symlinks)
+aimgr uninstall skill/old-skill
+aimgr uninstall command/my-command agent/old-agent
 ```
 
 ## Multi-Tool Support
@@ -454,13 +461,13 @@ aimgr config set install.targets claude
 
 # Install in fresh project
 cd ~/my-new-project
-aimgr install command test
+aimgr install command/test
 
 # Result: Creates .claude/commands/test.md
 
 # Or install to multiple tools by default
 aimgr config set install.targets claude,opencode
-aimgr install command test
+aimgr install command/test
 # Result: Creates both .claude/commands/test.md and .opencode/commands/test.md
 ```
 
@@ -470,7 +477,7 @@ When a tool directory already exists (e.g., `.opencode/`), `aimgr` installs to t
 ```bash
 # Project already has .opencode directory
 cd ~/existing-opencode-project
-aimgr install command test
+aimgr install command/test
 
 # Result: Uses existing .opencode/commands/test.md
 # (Even if your default targets are set to 'claude')
@@ -482,7 +489,7 @@ When multiple tool directories exist, `aimgr` installs to **ALL** of them:
 ```bash
 # Project has both .claude and .opencode directories
 cd ~/multi-tool-project
-aimgr install skill pdf-processing
+aimgr install skill/pdf-processing
 
 # Result: Installs to BOTH:
 #   - .claude/skills/pdf-processing
@@ -547,29 +554,29 @@ Add resources directly from GitHub repositories using the `gh:` prefix:
 
 ```bash
 # Basic syntax
-aimgr add skill gh:owner/repo
+aimgr repo add skill gh:owner/repo
 
 # With specific path (for multi-resource repos)
-aimgr add skill gh:owner/repo/path/to/skill
+aimgr repo add skill gh:owner/repo/path/to/skill
 
 # With branch or tag reference
-aimgr add skill gh:owner/repo@branch-name
-aimgr add skill gh:owner/repo@v1.0.0
+aimgr repo add skill gh:owner/repo@branch-name
+aimgr repo add skill gh:owner/repo@v1.0.0
 
 # Combined: path and reference
-aimgr add skill gh:owner/repo/skills/my-skill@main
+aimgr repo add skill gh:owner/repo/skills/my-skill@main
 ```
 
 **Examples:**
 ```bash
 # Add a skill from Vercel's agent-skills repository
-aimgr add skill gh:vercel-labs/agent-skills
+aimgr repo add skill gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific version tag
-aimgr add skill gh:anthropics/skills@v2.1.0
+aimgr repo add skill gh:anthropics/skills@v2.1.0
 ```
 
 **How it works:**
@@ -584,12 +591,12 @@ Add resources from your local filesystem using the `local:` prefix or a direct p
 
 ```bash
 # Explicit local prefix
-aimgr add skill local:./my-skill
-aimgr add skill local:/absolute/path/to/skill
+aimgr repo add skill local:./my-skill
+aimgr repo add skill local:/absolute/path/to/skill
 
 # Direct path (local: is implied)
-aimgr add skill ./my-skill
-aimgr add skill ~/my-skills/pdf-processing
+aimgr repo add skill ./my-skill
+aimgr repo add skill ~/my-skills/pdf-processing
 ```
 
 **Note:** Local sources work exactly as before - the `local:` prefix is optional for backward compatibility.
@@ -600,14 +607,14 @@ Add from any Git repository using full URLs:
 
 ```bash
 # HTTPS URLs
-aimgr add skill https://github.com/owner/repo.git
-aimgr add skill https://gitlab.com/owner/repo.git
+aimgr repo add skill https://github.com/owner/repo.git
+aimgr repo add skill https://gitlab.com/owner/repo.git
 
 # SSH URLs
-aimgr add skill git@github.com:owner/repo.git
+aimgr repo add skill git@github.com:owner/repo.git
 
 # With branch reference
-aimgr add skill https://github.com/owner/repo.git@develop
+aimgr repo add skill https://github.com/owner/repo.git@develop
 ```
 
 ### Shorthand Syntax
@@ -616,12 +623,12 @@ For convenience, `aimgr` infers the `gh:` prefix for GitHub-style `owner/repo` p
 
 ```bash
 # These are equivalent:
-aimgr add skill vercel-labs/agent-skills
-aimgr add skill gh:vercel-labs/agent-skills
+aimgr repo add skill vercel-labs/agent-skills
+aimgr repo add skill gh:vercel-labs/agent-skills
 
 # With path:
-aimgr add skill vercel-labs/agent-skills/skills/frontend-design
-aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo add skill vercel-labs/agent-skills/skills/frontend-design
+aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
 ```
 
 ### Auto-Discovery
@@ -676,48 +683,48 @@ aimgr config set install.targets claude
 aimgr config set install.targets claude,opencode
 ```
 
-### `aimgr add`
+### `aimgr repo add`
 
 Add resources to the repository from various sources.
 
 ```bash
 # Add from GitHub (with auto-discovery)
-aimgr add skill gh:owner/repo
-aimgr add skill gh:owner/repo/path/to/skill
-aimgr add skill gh:owner/repo@v1.0.0
+aimgr repo add skill gh:owner/repo
+aimgr repo add skill gh:owner/repo/path/to/skill
+aimgr repo add skill gh:owner/repo@v1.0.0
 
 # Add from local path
-aimgr add command <path-to-file.md>
-aimgr add skill <path-to-directory>
-aimgr add agent <path-to-file.md>
+aimgr repo add command <path-to-file.md>
+aimgr repo add skill <path-to-directory>
+aimgr repo add agent <path-to-file.md>
 
 # Add using shorthand (infers gh: for owner/repo)
-aimgr add skill vercel-labs/agent-skills
+aimgr repo add skill vercel-labs/agent-skills
 
 # Add from Git URL
-aimgr add skill https://github.com/owner/repo.git
-aimgr add skill git@github.com:owner/repo.git
+aimgr repo add skill https://github.com/owner/repo.git
+aimgr repo add skill git@github.com:owner/repo.git
 
 # Add with explicit local prefix
-aimgr add skill local:./my-skill
-aimgr add skill local:/absolute/path/to/skill
+aimgr repo add skill local:./my-skill
+aimgr repo add skill local:/absolute/path/to/skill
 
 # Add all resources from a Claude plugin
-aimgr add plugin <path-to-plugin>
+aimgr repo add plugin <path-to-plugin>
 
 # Add all resources from a Claude folder
-aimgr add claude <path-to-.claude-folder>
+aimgr repo add claude <path-to-.claude-folder>
 
 # Add all resources from an OpenCode folder
-aimgr add opencode <path-to-.opencode-folder>
+aimgr repo add opencode <path-to-.opencode-folder>
 
 # Overwrite existing resource
-aimgr add command my-command.md --force
+aimgr repo add command my-command.md --force
 
 # Bulk import with conflict handling
-aimgr add plugin ./plugin --skip-existing
-aimgr add claude ~/.claude --dry-run
-aimgr add opencode ~/.opencode --skip-existing
+aimgr repo add plugin ./plugin --skip-existing
+aimgr repo add claude ~/.claude --dry-run
+aimgr repo add opencode ~/.opencode --skip-existing
 ```
 
 **Source Formats:**
@@ -728,74 +735,180 @@ aimgr add opencode ~/.opencode --skip-existing
 
 See [Source Formats](#source-formats) for detailed documentation.
 
-### `aimgr list`
+### `aimgr repo list`
 
 List resources in the repository.
 
 ```bash
 # List all
-aimgr list
+aimgr repo list
 
 # Filter by type
-aimgr list command
-aimgr list skill
-aimgr list agent
+aimgr repo list command
+aimgr repo list skill
+aimgr repo list agent
 
 # Output formats
-aimgr list --format=table  # Default
-aimgr list --format=json
-aimgr list --format=yaml
+aimgr repo list --format=table  # Default
+aimgr repo list --format=json
+aimgr repo list --format=yaml
 ```
 
 ### `aimgr install`
 
-Install resources to a project.
+Install resources to a project using type/name format.
 
 ```bash
-# Install command
-aimgr install command <name>
+# Install single resource
+aimgr install skill/pdf-processing
+aimgr install command/test
+aimgr install agent/code-reviewer
 
-# Install skill
-aimgr install skill <name>
-
-# Install agent
-aimgr install agent <name>
+# Install multiple resources at once
+aimgr install skill/foo skill/bar command/test agent/reviewer
 
 # Custom project path
-aimgr install command test --project-path ~/my-project
+aimgr install command/test --project-path ~/my-project
 
 # Force reinstall
-aimgr install skill utils --force
-aimgr install agent code-reviewer --force
+aimgr install skill/utils --force
+aimgr install agent/code-reviewer --force
 
 # Install to specific tool(s) - overrides defaults and existing directories
-aimgr install command test --target claude
-aimgr install skill utils --target opencode
-aimgr install agent reviewer --target claude,opencode
+aimgr install command/test --target claude
+aimgr install skill/utils --target opencode
+aimgr install agent/reviewer --target claude,opencode
 ```
+
+**Resource Format:** `type/name` where type is `skill`, `command`, or `agent`
 
 **Flags:**
 - `--project-path`: Specify project directory (defaults to current directory)
 - `--force`: Overwrite existing installations
 - `--target`: Specify which tool(s) to install to (accepts comma-separated values). Overrides both default targets and existing directory detection.
 
-### `aimgr remove`
+### `aimgr repo remove`
 
 Remove resources from the repository.
 
 ```bash
 # Remove with confirmation
-aimgr remove command <name>
-aimgr remove skill <name>
-aimgr remove agent <name>
+aimgr repo remove command <name>
+aimgr repo remove skill <name>
+aimgr repo remove agent <name>
 
 # Skip confirmation
-aimgr remove command test --force
+aimgr repo remove command test --force
 
 # Alias
-aimgr rm command old-test
-aimgr rm agent old-reviewer
+aimgr repo rm command old-test
+aimgr repo rm agent old-reviewer
 ```
+
+### `aimgr uninstall`
+
+Uninstall resources from a project (removes symlinks).
+
+```bash
+# Uninstall single resource
+aimgr uninstall skill/pdf-processing
+aimgr uninstall command/test
+aimgr uninstall agent/code-reviewer
+
+# Uninstall multiple resources at once
+aimgr uninstall skill/foo skill/bar command/test
+
+# Uninstall from specific project
+aimgr uninstall skill/foo --project-path ~/my-project
+
+# Force uninstall
+aimgr uninstall command/review --force
+```
+
+**Resource Format:** `type/name` where type is `skill`, `command`, or `agent`
+
+**Safety:**
+- Only removes symlinks pointing to the aimgr repository
+- Warns about non-symlinks or symlinks pointing elsewhere
+- Automatically detects and removes from all tool directories
+
+**Flags:**
+- `--project-path`: Specify project directory (defaults to current directory)
+- `--force`: Force uninstall (placeholder for future confirmation prompts)
+
+### `aimgr repo show`
+
+Display detailed information about a resource, including metadata and source information.
+
+```bash
+# Show skill details
+aimgr repo show skill pdf-processing
+
+# Show command details
+aimgr repo show command test
+
+# Show agent details
+aimgr repo show agent code-reviewer
+```
+
+**Output includes:**
+- Resource name, type, and description
+- Version, author, and license information
+- Source details (GitHub URL, local path, etc.)
+- Metadata tracking information
+- Installation status
+
+**Use cases:**
+- Check resource metadata before installing
+- Verify resource source for updates
+- Review resource details and documentation
+- Debug installation issues
+
+### `aimgr repo update`
+
+Update resources from their original sources (requires metadata tracking).
+
+```bash
+# Update all resources
+aimgr repo update
+
+# Update specific skill
+aimgr repo update skill pdf-processing
+
+# Update specific command
+aimgr repo update command test
+
+# Update specific agent
+aimgr repo update agent code-reviewer
+
+# Preview updates without applying (dry run)
+aimgr repo update --dry-run
+
+# Force update, overwriting local changes
+aimgr repo update --force
+```
+
+**How it works:**
+1. Reads source information from resource metadata (`.aimgr-meta.yaml`)
+2. Fetches latest version from original source (GitHub, local path, etc.)
+3. Updates the repository copy
+4. Preserves existing symlinks to projects
+
+**Supported sources:**
+- **GitHub**: Re-clones and updates from repository
+- **Local**: Copies latest version from local path
+- **File**: Re-copies from original file location
+
+**Metadata tracking:**
+Resources added from GitHub or other sources automatically store metadata including:
+- Source type (github, local, file)
+- Source URL or path
+- Git reference (branch/tag)
+- Added and updated timestamps
+
+**Flags:**
+- `--dry-run`: Preview what would be updated without making changes
+- `--force`: Force update even if local changes detected
 
 ## Resource Formats
 
@@ -809,29 +922,29 @@ Add resources directly from GitHub repositories using the `gh:` prefix:
 
 ```bash
 # Basic syntax
-aimgr add skill gh:owner/repo
+aimgr repo add skill gh:owner/repo
 
 # With specific path (for multi-resource repos)
-aimgr add skill gh:owner/repo/path/to/skill
+aimgr repo add skill gh:owner/repo/path/to/skill
 
 # With branch or tag reference
-aimgr add skill gh:owner/repo@branch-name
-aimgr add skill gh:owner/repo@v1.0.0
+aimgr repo add skill gh:owner/repo@branch-name
+aimgr repo add skill gh:owner/repo@v1.0.0
 
 # Combined: path and reference
-aimgr add skill gh:owner/repo/skills/my-skill@main
+aimgr repo add skill gh:owner/repo/skills/my-skill@main
 ```
 
 **Examples:**
 ```bash
 # Add a skill from Vercel's agent-skills repository
-aimgr add skill gh:vercel-labs/agent-skills
+aimgr repo add skill gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific version tag
-aimgr add skill gh:anthropics/skills@v2.1.0
+aimgr repo add skill gh:anthropics/skills@v2.1.0
 ```
 
 **How it works:**
@@ -846,12 +959,12 @@ Add resources from your local filesystem using the `local:` prefix or a direct p
 
 ```bash
 # Explicit local prefix
-aimgr add skill local:./my-skill
-aimgr add skill local:/absolute/path/to/skill
+aimgr repo add skill local:./my-skill
+aimgr repo add skill local:/absolute/path/to/skill
 
 # Direct path (local: is implied)
-aimgr add skill ./my-skill
-aimgr add skill ~/my-skills/pdf-processing
+aimgr repo add skill ./my-skill
+aimgr repo add skill ~/my-skills/pdf-processing
 ```
 
 **Note:** Local sources work exactly as before - the `local:` prefix is optional for backward compatibility.
@@ -862,14 +975,14 @@ Add from any Git repository using full URLs:
 
 ```bash
 # HTTPS URLs
-aimgr add skill https://github.com/owner/repo.git
-aimgr add skill https://gitlab.com/owner/repo.git
+aimgr repo add skill https://github.com/owner/repo.git
+aimgr repo add skill https://gitlab.com/owner/repo.git
 
 # SSH URLs
-aimgr add skill git@github.com:owner/repo.git
+aimgr repo add skill git@github.com:owner/repo.git
 
 # With branch reference
-aimgr add skill https://github.com/owner/repo.git@develop
+aimgr repo add skill https://github.com/owner/repo.git@develop
 ```
 
 ### Shorthand Syntax
@@ -878,12 +991,12 @@ For convenience, `aimgr` infers the `gh:` prefix for GitHub-style `owner/repo` p
 
 ```bash
 # These are equivalent:
-aimgr add skill vercel-labs/agent-skills
-aimgr add skill gh:vercel-labs/agent-skills
+aimgr repo add skill vercel-labs/agent-skills
+aimgr repo add skill gh:vercel-labs/agent-skills
 
 # With path:
-aimgr add skill vercel-labs/agent-skills/skills/frontend-design
-aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo add skill vercel-labs/agent-skills/skills/frontend-design
+aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
 ```
 
 ### Auto-Discovery
@@ -1067,6 +1180,118 @@ Commands, skills, and agents must follow these naming rules:
 **Valid:** `test`, `run-coverage`, `pdf-processing`, `skill-v2`  
 **Invalid:** `Test`, `test_coverage`, `-test`, `test--cmd`
 
+## Metadata Tracking
+
+aimgr automatically tracks metadata about resource sources, enabling features like `repo update` and `repo show`.
+
+### What is Tracked
+
+When you add a resource from GitHub or other sources, aimgr stores:
+
+- **Source type**: `github`, `local`, or `file`
+- **Source location**: URL, path, or file location
+- **Git reference**: Branch or tag (for GitHub sources)
+- **Subpath**: Path within repository (if applicable)
+- **Timestamps**: When resource was added and last updated
+
+### Metadata File Location
+
+Metadata is stored alongside resources in `.aimgr-meta.yaml` files:
+
+**Skills:**
+```
+~/.local/share/ai-config/repo/skills/my-skill/.aimgr-meta.yaml
+```
+
+**Commands:**
+```
+~/.local/share/ai-config/repo/commands/.aimgr-meta/my-command.yaml
+```
+
+**Agents:**
+```
+~/.local/share/ai-config/repo/agents/.aimgr-meta/my-agent.yaml
+```
+
+### Metadata Format
+
+```yaml
+name: pdf-processing
+type: skill
+source:
+  type: github
+  url: https://github.com/owner/repo
+  ref: main
+  path: skills/pdf-processing
+added: "2026-01-22T10:30:00Z"
+updated: "2026-01-22T10:30:00Z"
+```
+
+**Source Types:**
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `github` | GitHub repository | `gh:owner/repo` or GitHub URLs |
+| `local` | Local directory/file | `./my-skill` or `/path/to/skill` |
+| `file` | Direct file copy | `~/commands/test.md` |
+
+### Using Metadata
+
+**View metadata:**
+```bash
+# Show detailed resource info including metadata
+aimgr repo show skill pdf-processing
+aimgr repo show command test
+aimgr repo show agent code-reviewer
+```
+
+**Update from source:**
+```bash
+# Update specific resource from its original source
+aimgr repo update skill pdf-processing
+
+# Update all resources that have source metadata
+aimgr repo update
+
+# Preview what would be updated
+aimgr repo update --dry-run
+```
+
+### Manual Metadata
+
+For resources added before metadata tracking or from sources without auto-tracking, you can manually create metadata files to enable updates.
+
+**Example: Add metadata for a local skill**
+
+Create `~/.local/share/ai-config/repo/skills/my-skill/.aimgr-meta.yaml`:
+
+```yaml
+name: my-skill
+type: skill
+source:
+  type: local
+  path: /home/user/projects/my-skill
+added: "2026-01-22T10:00:00Z"
+updated: "2026-01-22T10:00:00Z"
+```
+
+Then run:
+```bash
+aimgr repo update skill my-skill
+```
+
+### Metadata Best Practices
+
+1. **Add from GitHub when possible** - Enables automatic updates
+2. **Use specific refs** - Tag versions (e.g., `@v1.0.0`) for stability
+3. **Keep local sources accessible** - Update requires access to original path
+4. **Check metadata with `repo show`** - Verify source info before updating
+5. **Use `--dry-run`** - Preview updates before applying
+
+### Metadata Privacy
+
+Metadata files are stored locally in your repository and are **not** shared with projects when you install resources. Symlinks point directly to resource files, not metadata.
+
 ## Repository Structure
 
 Resources are stored in `~/.local/share/ai-config/repo/` (XDG data directory):
@@ -1212,14 +1437,14 @@ This is useful when you want to install a resource to a specific tool without ch
 1. Create a `.md` file with valid name: `my-command.md`
 2. Add YAML frontmatter with `description`
 3. Write command body in markdown
-4. Test: `aimgr add command ./my-command.md`
+4. Test: `aimgr repo add command ./my-command.md`
 
 ### Create a Skill
 
 1. Create directory with valid name: `my-skill/`
 2. Create `SKILL.md` with frontmatter (name must match directory)
 3. Optionally add `scripts/`, `references/`, `assets/`
-4. Test: `aimgr add skill ./my-skill`
+4. Test: `aimgr repo add skill ./my-skill`
 
 ### Create an Agent
 
@@ -1227,7 +1452,7 @@ This is useful when you want to install a resource to a specific tool without ch
 2. Add YAML frontmatter with `description`
 3. Optionally add `type`, `instructions`, `capabilities` (OpenCode format)
 4. Write agent documentation in markdown body
-5. Test: `aimgr add agent ./my-agent.md`
+5. Test: `aimgr repo add agent ./my-agent.md`
 
 See [examples/README.md](examples/README.md) for detailed instructions.
 
@@ -1277,14 +1502,14 @@ Solution:
 
 Solution:
 - Verify the repository contains resources in standard locations
-- Try specifying a direct path: `aimgr add skill gh:owner/repo/path/to/skill`
+- Try specifying a direct path: `aimgr repo add skill gh:owner/repo/path/to/skill`
 - Check that resources have valid frontmatter (SKILL.md with name and description)
 - Use the repository's documentation to find resource locations
 
 **Problem: "Multiple resources found, please specify path"**
 
 Solution:
-- Add the specific path to your command: `aimgr add skill gh:owner/repo/skills/specific-skill`
+- Add the specific path to your command: `aimgr repo add skill gh:owner/repo/skills/specific-skill`
 - List available resources by cloning the repo manually: `git clone https://github.com/owner/repo && ls -R`
 
 **Problem: Network timeout or slow clones**
@@ -1327,8 +1552,8 @@ Solution:
 **Problem: "Resource already exists"**
 
 Solution:
-- Use `--force` flag to overwrite: `aimgr add skill gh:owner/repo --force`
-- Or remove the existing resource first: `aimgr remove skill <name>`
+- Use `--force` flag to overwrite: `aimgr repo add skill gh:owner/repo --force`
+- Or remove the existing resource first: `aimgr repo remove skill <name>`
 - Check what's installed: `aimgr list`
 
 ### Configuration Issues
@@ -1352,13 +1577,13 @@ Solution:
 **Enable verbose output:**
 ```bash
 # Most commands support verbose flags (check with --help)
-aimgr add skill gh:owner/repo -v
+aimgr repo add skill gh:owner/repo -v
 ```
 
 **Check repository contents:**
 ```bash
 # List all resources in your repository
-aimgr list
+aimgr repo list
 
 # Check repository directory directly
 ls -la ~/.local/share/ai-config/repo/skills/

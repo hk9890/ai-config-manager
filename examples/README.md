@@ -196,14 +196,14 @@ Commands, skills, and agents must follow these naming rules:
 1. Create a new `.md` file with a valid name (e.g., `my-command.md`)
 2. Add YAML frontmatter with at least a `description`
 3. Write the command body in markdown
-4. Test locally: `ai-repo add command ./my-command.md`
+4. Test locally: `aimgr repo add command ./my-command.md`
 
 ### Skills
 
 1. Create a directory with a valid name (e.g., `my-skill/`)
 2. Create `SKILL.md` with frontmatter (name must match directory)
 3. Add optional `scripts/`, `references/`, or `assets/` directories
-4. Test locally: `ai-repo add skill ./my-skill`
+4. Test locally: `aimgr repo add skill ./my-skill`
 
 ### Agents
 
@@ -213,14 +213,14 @@ Commands, skills, and agents must follow these naming rules:
    - **OpenCode**: Add `type`, `instructions`, `capabilities` to frontmatter
    - **Claude**: Put instructions in markdown body
 4. Write agent documentation in markdown
-5. Test locally: `ai-repo add agent ./my-agent.md`
+5. Test locally: `aimgr repo add agent ./my-agent.md`
 
 ## Testing Before Adding
 
 ### Validate a command:
 ```bash
-# This will validate the format without adding to repo
-ai-repo add command ./my-command.md --help
+# Add to repository - validation happens automatically
+aimgr repo add command ./my-command.md
 ```
 
 ### Validate a skill:
@@ -230,6 +230,9 @@ cat my-skill/SKILL.md
 
 # Verify name matches directory
 ls -d my-skill/
+
+# Add to repository - validation happens automatically
+aimgr repo add skill ./my-skill
 ```
 
 ## Using the Examples
@@ -237,18 +240,18 @@ ls -d my-skill/
 ### Add examples to your repository:
 ```bash
 # Add the sample command
-ai-repo add command examples/sample-command.md
+aimgr repo add command examples/sample-command.md
 
 # Add the sample skill
-ai-repo add skill examples/sample-skill
+aimgr repo add skill examples/sample-skill
 
 # Add sample agents
-ai-repo add agent examples/sample-agent.md
-ai-repo add agent examples/minimal-agent.md
-ai-repo add agent examples/claude-style-agent.md
+aimgr repo add agent examples/sample-agent.md
+aimgr repo add agent examples/minimal-agent.md
+aimgr repo add agent examples/claude-style-agent.md
 
 # List to verify
-ai-repo list
+aimgr repo list
 ```
 
 ### Install in a project:
@@ -256,13 +259,16 @@ ai-repo list
 cd your-project/
 
 # Install the command
-ai-repo install command sample-command
+aimgr install command/sample-command
 
 # Install the skill
-ai-repo install skill sample-skill
+aimgr install skill/sample-skill
 
 # Install an agent
-ai-repo install agent sample-agent
+aimgr install agent/sample-agent
+
+# Install multiple resources at once
+aimgr install command/sample-command skill/sample-skill agent/sample-agent
 
 # Verify installation
 ls -la .claude/commands/
@@ -276,7 +282,8 @@ ls -la .claude/agents/
 - **Claude Code Agents:** https://code.claude.com/docs/agents
 - **OpenCode Agents:** https://opencode.ai/docs/agents
 - **AgentSkills Specification:** https://agentskills.io/specification
-- **ai-repo Documentation:** ../README.md
+- **aimgr Documentation:** ../README.md
+- **Migration Guide:** ../MIGRATION.md (for users migrating from ai-repo)
 
 ## Contributing
 
