@@ -18,7 +18,7 @@ var removeCmd = &cobra.Command{
 	Use:     "remove [command|skill]",
 	Aliases: []string{"rm"},
 	Short:   "Remove a resource from the repository",
-	Long: `Remove a command or skill resource from the ai-repo repository.
+	Long: `Remove a command or skill resource from the aimgr repository.
 
 This permanently deletes the resource from the repository.`,
 }
@@ -32,8 +32,8 @@ var removeCommandCmd = &cobra.Command{
 This permanently deletes the command file from the repository.
 
 Example:
-  ai-repo remove command my-command
-  ai-repo rm command test --force`,
+  aimgr remove command my-command
+  aimgr rm command test --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -47,7 +47,7 @@ Example:
 		// Verify command exists
 		res, err := manager.Get(name, resource.Command)
 		if err != nil {
-			return fmt.Errorf("command '%s' not found in repository. Use 'ai-repo list' to see available resources.", name)
+			return fmt.Errorf("command '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
 		}
 
 		// Confirmation prompt (unless --force)
@@ -92,8 +92,8 @@ var removeSkillCmd = &cobra.Command{
 This permanently deletes the skill folder with all scripts, references, and assets.
 
 Example:
-  ai-repo remove skill pdf-processing
-  ai-repo rm skill my-skill --force`,
+  aimgr remove skill pdf-processing
+  aimgr rm skill my-skill --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -107,7 +107,7 @@ Example:
 		// Verify skill exists
 		res, err := manager.Get(name, resource.Skill)
 		if err != nil {
-			return fmt.Errorf("skill '%s' not found in repository. Use 'ai-repo list' to see available resources.", name)
+			return fmt.Errorf("skill '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
 		}
 
 		// Confirmation prompt (unless --force)

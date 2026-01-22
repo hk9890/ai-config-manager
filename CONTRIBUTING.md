@@ -1,6 +1,6 @@
-# Contributing to ai-repo
+# Contributing to aimgr
 
-Thank you for your interest in contributing to ai-repo! This document provides guidelines and information for developers.
+Thank you for your interest in contributing to aimgr! This document provides guidelines and information for developers.
 
 ## Table of Contents
 
@@ -40,7 +40,7 @@ make all
 
 ```bash
 # Build
-make build              # Build binary to ./ai-repo
+make build              # Build binary to ./aimgr
 
 # Testing
 make test              # Run all tests (unit + integration + vet)
@@ -60,7 +60,7 @@ make clean             # Remove build artifacts
 
 ### Overview
 
-ai-repo is a CLI tool built with Go that manages AI resources (commands and skills) across multiple AI coding tools. It uses a centralized repository with symlink-based installation.
+aimgr is a CLI tool built with Go that manages AI resources (commands and skills) across multiple AI coding tools. It uses a centralized repository with symlink-based installation.
 
 **Key Concepts:**
 - **Resources**: Commands (single .md files) and Skills (directories with SKILL.md)
@@ -85,7 +85,7 @@ ai-config-manager/
 │
 ├── pkg/                    # Core packages
 │   ├── config/            # Configuration management
-│   │   └── config.go      # Load/save ~/.config/ai-repo/ai-repo.yaml
+│   │   └── config.go      # Load/save ~/.config/aimgr/aimgr.yaml
 │   │
 │   ├── repo/              # Repository management
 │   │   └── manager.go     # Add/remove/list resources, bulk import
@@ -699,4 +699,4 @@ Use junction points instead of symlinks for Windows compatibility.
 - **Discussions**: [GitHub Discussions](https://github.com/hk9890/ai-config-manager/discussions)
 - **Documentation**: See [README.md](README.md) for user docs, [AGENTS.md](AGENTS.md) for AI agent quick reference
 
-Thank you for contributing to ai-repo! 🎉
+Thank you for contributing to aimgr! 🎉

@@ -15,8 +15,8 @@ var (
 // GetVersion returns a formatted version string
 func GetVersion() string {
 	if Version == "dev" || (GitCommit == "" && BuildDate == "") {
-		return fmt.Sprintf("ai-repo version %s", Version)
+		return fmt.Sprintf("aimgr version %s", Version)
 	}
 
-	return fmt.Sprintf("ai-repo version %s (commit: %s, built: %s)", Version, GitCommit, BuildDate)
+	return fmt.Sprintf("aimgr version %s (commit: %s, built: %s)", Version, GitCommit, BuildDate)
 }

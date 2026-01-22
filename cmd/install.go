@@ -126,7 +126,7 @@ var installCmd = &cobra.Command{
 Multi-tool behavior:
   - If tool directories exist (.claude, .opencode, .github/skills), installs to ALL of them
   - If no tool directories exist, creates and installs to your default tool
-  - Default tool is configured in ~/.ai-repo.yaml (use 'ai-repo config set default-tool <tool>')
+  - Default tool is configured in ~/.aimgr.yaml (use 'aimgr config set default-tool <tool>')
 
 Supported tools:
   - claude:   Claude Code (.claude/commands, .claude/skills, .claude/agents)
@@ -148,22 +148,22 @@ Note: GitHub Copilot does not support commands, only skills.
 
 Examples:
   # Install to current project (uses detected tools or default)
-  ai-repo install command my-command
+  aimgr install command my-command
   
   # Install to specific project
-  ai-repo install command test --project-path ~/my-project
+  aimgr install command test --project-path ~/my-project
   
   # Install to specific target tool
-  ai-repo install command my-command --target claude
+  aimgr install command my-command --target claude
   
   # Install to multiple specific tools
-  ai-repo install command my-command --target claude,opencode
+  aimgr install command my-command --target claude,opencode
   
   # Force reinstall
-  ai-repo install command review --force
+  aimgr install command review --force
   
   # Set your default tool
-  ai-repo config set default-tool opencode`,
+  aimgr config set default-tool opencode`,
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeCommandNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -220,7 +220,7 @@ Examples:
 		// Verify command exists in repo
 		res, err := manager.Get(name, resource.Command)
 		if err != nil {
-			return fmt.Errorf("command '%s' not found in repository. Use 'ai-repo list' to see available resources.", name)
+			return fmt.Errorf("command '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
 		}
 
 		// Check if already installed
@@ -272,22 +272,22 @@ All three supported tools (Claude Code, OpenCode, and GitHub Copilot) support sk
 
 Examples:
   # Install to current project (uses detected tools or default)
-  ai-repo install skill pdf-processing
+  aimgr install skill pdf-processing
   
   # Install to specific project
-  ai-repo install skill my-skill --project-path ~/my-project
+  aimgr install skill my-skill --project-path ~/my-project
   
   # Install to specific target tool
-  ai-repo install skill my-skill --target copilot
+  aimgr install skill my-skill --target copilot
   
   # Install to multiple specific tools
-  ai-repo install skill my-skill --target claude,opencode,copilot
+  aimgr install skill my-skill --target claude,opencode,copilot
   
   # Force reinstall
-  ai-repo install skill utils --force
+  aimgr install skill utils --force
   
   # Set your default tool
-  ai-repo config set default-tool copilot`,
+  aimgr config set default-tool copilot`,
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeSkillNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -344,7 +344,7 @@ Examples:
 		// Verify skill exists in repo
 		res, err := manager.Get(name, resource.Skill)
 		if err != nil {
-			return fmt.Errorf("skill '%s' not found in repository. Use 'ai-repo list' to see available resources.", name)
+			return fmt.Errorf("skill '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
 		}
 
 		// Check if already installed
@@ -399,22 +399,22 @@ Note: GitHub Copilot does not support agents. Claude Code and OpenCode support a
 
 Examples:
   # Install to current project (uses detected tools or default)
-  ai-repo install agent beads-task-agent
+  aimgr install agent beads-task-agent
   
   # Install to specific project
-  ai-repo install agent my-agent --project-path ~/my-project
+  aimgr install agent my-agent --project-path ~/my-project
   
   # Install to specific target tool
-  ai-repo install agent my-agent --target opencode
+  aimgr install agent my-agent --target opencode
   
   # Install to multiple specific tools
-  ai-repo install agent my-agent --target claude,opencode
+  aimgr install agent my-agent --target claude,opencode
   
   # Force reinstall
-  ai-repo install agent beads-verify-agent --force
+  aimgr install agent beads-verify-agent --force
   
   # Set your default tool
-  ai-repo config set default-tool claude`,
+  aimgr config set default-tool claude`,
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeAgentNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -471,7 +471,7 @@ Examples:
 		// Verify agent exists in repo
 		res, err := manager.Get(name, resource.Agent)
 		if err != nil {
-			return fmt.Errorf("agent '%s' not found in repository. Use 'ai-repo list' to see available resources.", name)
+			return fmt.Errorf("agent '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
 		}
 
 		// Check if already installed

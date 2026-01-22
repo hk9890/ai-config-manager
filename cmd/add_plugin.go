@@ -25,9 +25,9 @@ A Claude plugin is a directory containing .claude-plugin/plugin.json with
 commands/, skills/, and/or agents/ subdirectories.
 
 Example:
-  ai-repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
-  ai-repo add plugin ./my-plugin --force
-  ai-repo add plugin ./plugin --dry-run`,
+  aimgr add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
+  aimgr add plugin ./my-plugin --force
+  aimgr add plugin ./plugin --dry-run`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pluginPath := args[0]

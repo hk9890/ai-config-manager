@@ -19,9 +19,9 @@ An OpenCode folder is a directory named .opencode or containing .opencode/,
 with commands/, skills/, and/or agents/ subdirectories.
 
 Example:
-  ai-repo add opencode ~/.opencode
-  ai-repo add opencode ./my-project/.opencode --force
-  ai-repo add opencode ./opencode-config --dry-run`,
+  aimgr add opencode ~/.opencode
+  aimgr add opencode ./my-project/.opencode --force
+  aimgr add opencode ./opencode-config --dry-run`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		opencodePath := args[0]

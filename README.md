@@ -1,4 +1,4 @@
-# ai-repo - AI Resources Manager
+# aimgr - AI Resources Manager
 
 A command-line tool for discovering, installing, and managing AI resources (commands and skills) across multiple AI coding tools including Claude Code, OpenCode, and GitHub Copilot.
 
@@ -17,7 +17,7 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 
 ## Supported AI Tools
 
-`ai-repo` supports three major AI coding tools:
+`aimgr` supports three major AI coding tools:
 
 | Tool | Commands | Skills | Agents | Directory |
 |------|----------|--------|--------|-----------|
@@ -37,32 +37,32 @@ Download the latest release for your platform from the [Releases page](https://g
 
 **Linux (amd64)**:
 ```bash
-curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/ai-repo_VERSION_linux_amd64.tar.gz | tar xz
-sudo mv ai-repo /usr/local/bin/
+curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_linux_amd64.tar.gz | tar xz
+sudo mv aimgr /usr/local/bin/
 ```
 
 **Linux (arm64)**:
 ```bash
-curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/ai-repo_VERSION_linux_arm64.tar.gz | tar xz
-sudo mv ai-repo /usr/local/bin/
+curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_linux_arm64.tar.gz | tar xz
+sudo mv aimgr /usr/local/bin/
 ```
 
 **macOS (Intel)**:
 ```bash
-curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/ai-repo_VERSION_darwin_amd64.tar.gz | tar xz
-sudo mv ai-repo /usr/local/bin/
+curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_darwin_amd64.tar.gz | tar xz
+sudo mv aimgr /usr/local/bin/
 ```
 
 **macOS (Apple Silicon)**:
 ```bash
-curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/ai-repo_VERSION_darwin_arm64.tar.gz | tar xz
-sudo mv ai-repo /usr/local/bin/
+curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_darwin_arm64.tar.gz | tar xz
+sudo mv aimgr /usr/local/bin/
 ```
 
 **Windows (PowerShell)**:
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/hk9890/ai-config-manager/releases/latest/download/ai-repo_VERSION_windows_amd64.zip" -OutFile "ai-repo.zip"
-Expand-Archive -Path "ai-repo.zip" -DestinationPath "."
+Invoke-WebRequest -Uri "https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_windows_amd64.zip" -OutFile "aimgr.zip"
+Expand-Archive -Path "aimgr.zip" -DestinationPath "."
 ```
 
 *Note: Replace `VERSION` with the actual version number (e.g., `v0.1.0`).*
@@ -89,13 +89,13 @@ go install github.com/hk9890/ai-config-manager@latest
 
 ## Shell Completion
 
-`ai-repo` supports shell completion for Bash, Zsh, Fish, and PowerShell, making it easier to discover and install resources.
+`aimgr` supports shell completion for Bash, Zsh, Fish, and PowerShell, making it easier to discover and install resources.
 
 ### Features
 
-- **Auto-complete resource names** when typing `ai-repo install skill <TAB>`
-- **Auto-complete commands** like `ai-repo install command <TAB>`
-- **Auto-complete agents** like `ai-repo install agent <TAB>`
+- **Auto-complete resource names** when typing `aimgr install skill <TAB>`
+- **Auto-complete commands** like `aimgr install command <TAB>`
+- **Auto-complete agents** like `aimgr install agent <TAB>`
 - **Dynamically queries your repository** to show available resources
 
 ### Setup
@@ -104,19 +104,19 @@ go install github.com/hk9890/ai-config-manager@latest
 
 **Option 1: Load for current session**
 ```bash
-source <(ai-repo completion bash)
+source <(aimgr completion bash)
 ```
 
 **Option 2: Load automatically for all sessions**
 
 Linux:
 ```bash
-ai-repo completion bash > /etc/bash_completion.d/ai-repo
+aimgr completion bash > /etc/bash_completion.d/aimgr
 ```
 
 macOS (with Homebrew):
 ```bash
-ai-repo completion bash > $(brew --prefix)/etc/bash_completion.d/ai-repo
+aimgr completion bash > $(brew --prefix)/etc/bash_completion.d/aimgr
 ```
 
 #### Zsh
@@ -128,7 +128,7 @@ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
 **Install completion:**
 ```bash
-ai-repo completion zsh > "${fpath[1]}/_ai-repo"
+aimgr completion zsh > "${fpath[1]}/_aimgr"
 ```
 
 Then start a new shell.
@@ -137,25 +137,25 @@ Then start a new shell.
 
 **Option 1: Load for current session**
 ```bash
-ai-repo completion fish | source
+aimgr completion fish | source
 ```
 
 **Option 2: Load automatically for all sessions**
 ```bash
-ai-repo completion fish > ~/.config/fish/completions/ai-repo.fish
+aimgr completion fish > ~/.config/fish/completions/aimgr.fish
 ```
 
 #### PowerShell
 
 **Option 1: Load for current session**
 ```powershell
-ai-repo completion powershell | Out-String | Invoke-Expression
+aimgr completion powershell | Out-String | Invoke-Expression
 ```
 
 **Option 2: Load automatically for all sessions**
 ```powershell
 # Generate completion script
-ai-repo completion powershell > ai-repo.ps1
+aimgr completion powershell > aimgr.ps1
 
 # Add to your PowerShell profile
 # Find profile location: $PROFILE
@@ -167,15 +167,15 @@ After setting up completion, you can use TAB to auto-complete resource names:
 
 ```bash
 # List all available skills
-ai-repo install skill <TAB>
+aimgr install skill <TAB>
 # Shows: atlassian-cli  dynatrace-api  dynatrace-control  github-docs  skill-creator
 
 # List all available commands
-ai-repo install command <TAB>
+aimgr install command <TAB>
 # Shows: test  review  deploy  build
 
 # List all available agents
-ai-repo install agent <TAB>
+aimgr install agent <TAB>
 # Shows: code-reviewer  qa-tester  beads-task-agent
 ```
 
@@ -189,22 +189,22 @@ The completion dynamically queries your repository, so newly added resources are
 
 ```bash
 # Display version information
-ai-repo --version
-# Output: ai-repo version 0.1.0 (commit: a1b2c3d, built: 2026-01-18T19:30:00Z)
+aimgr --version
+# Output: aimgr version 0.1.0 (commit: a1b2c3d, built: 2026-01-18T19:30:00Z)
 
 # Short form
-ai-repo -v
+aimgr -v
 ```
 
 ### 1. Configure Your Default Installation Targets
 
 ```bash
 # Set your preferred AI tools (claude, opencode, or copilot)
-ai-repo config set install.targets claude
-ai-repo config set install.targets claude,opencode  # Multiple tools
+aimgr config set install.targets claude
+aimgr config set install.targets claude,opencode  # Multiple tools
 
 # Check current setting
-ai-repo config get install.targets
+aimgr config get install.targets
 ```
 
 ### 2. Add Resources to Repository
@@ -215,45 +215,45 @@ Resources can be added from multiple sources: local files, GitHub repositories, 
 
 ```bash
 # Add a command (single .md file)
-ai-repo add command ~/.claude/commands/my-command.md
+aimgr add command ~/.claude/commands/my-command.md
 
 # Add a skill (directory with SKILL.md)
-ai-repo add skill ~/my-skills/pdf-processing
+aimgr add skill ~/my-skills/pdf-processing
 
 # Add an agent (single .md file)
-ai-repo add agent ~/.claude/agents/code-reviewer.md
+aimgr add agent ~/.claude/agents/code-reviewer.md
 ```
 
 #### From GitHub Repositories
 
 ```bash
 # Add a skill from GitHub
-ai-repo add skill gh:vercel-labs/agent-skills
+aimgr add skill gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific branch or tag
-ai-repo add skill gh:anthropics/skills@v1.0.0
+aimgr add skill gh:anthropics/skills@v1.0.0
 
 # Shorthand - GitHub prefix is inferred for owner/repo format
-ai-repo add skill vercel-labs/agent-skills
+aimgr add skill vercel-labs/agent-skills
 
 # Add commands from GitHub
-ai-repo add command gh:myorg/commands
+aimgr add command gh:myorg/commands
 
 # Add agents from GitHub
-ai-repo add agent gh:myorg/agents/code-reviewer
+aimgr add agent gh:myorg/agents/code-reviewer
 ```
 
 #### From Tool Directories (Bulk Import)
 
 ```bash
 # Import from OpenCode directory
-ai-repo add opencode ~/.opencode
+aimgr add opencode ~/.opencode
 
 # Import from Claude directory
-ai-repo add claude ~/.claude
+aimgr add claude ~/.claude
 ```
 
 
@@ -267,7 +267,7 @@ Import all commands and skills from a Claude plugin directory:
 
 ```bash
 # Import from a Claude plugin
-ai-repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
+aimgr add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
 
 # Example output:
 # Importing from plugin: example-plugin
@@ -292,10 +292,10 @@ Import all commands, skills, and agents from a `.claude/` configuration folder:
 
 ```bash
 # Import from .claude folder
-ai-repo add claude ~/.claude
+aimgr add claude ~/.claude
 
 # Import from project's .claude folder
-ai-repo add claude ~/my-project/.claude
+aimgr add claude ~/my-project/.claude
 
 # Example output:
 # Importing from Claude folder: /home/user/.claude
@@ -325,10 +325,10 @@ Import all resources from an `.opencode/` configuration folder:
 
 ```bash
 # Import from .opencode folder
-ai-repo add opencode ~/.opencode
+aimgr add opencode ~/.opencode
 
 # Import from project's .opencode folder
-ai-repo add opencode ~/my-project/.opencode
+aimgr add opencode ~/my-project/.opencode
 
 # Example output:
 # Importing from OpenCode folder: /home/user/.opencode
@@ -354,37 +354,37 @@ Control how conflicts are handled when importing:
 
 ```bash
 # Force overwrite existing resources
-ai-repo add plugin ./my-plugin --force
+aimgr add plugin ./my-plugin --force
 
 # Skip existing resources (no error)
-ai-repo add claude ~/.claude --skip-existing
+aimgr add claude ~/.claude --skip-existing
 
 # Preview what would be imported (dry run)
-ai-repo add plugin ./plugin --dry-run
+aimgr add plugin ./plugin --dry-run
 
 # Default behavior: fail on first conflict
-ai-repo add plugin ./plugin  # Error if any resource already exists
+aimgr add plugin ./plugin  # Error if any resource already exists
 ```
 
 ### Bulk Import Use Cases
 
-**Scenario 1: Setting up your ai-repo from existing Claude setup**
+**Scenario 1: Setting up your aimgr from existing Claude setup**
 ```bash
 # Import all your existing commands and skills at once
-ai-repo add claude ~/.claude
+aimgr add claude ~/.claude
 ```
 
 **Scenario 2: Installing a complete plugin**
 ```bash
 # Import all resources from a plugin in one command
-ai-repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/pr-review-toolkit
+aimgr add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/pr-review-toolkit
 ```
 
 **Scenario 3: Migrating resources between machines**
 ```bash
-# On machine A: your resources are already in ai-repo
+# On machine A: your resources are already in aimgr
 # On machine B: import from a cloned .claude folder
-ai-repo add claude ~/cloned-config/.claude
+aimgr add claude ~/cloned-config/.claude
 ```
 
 
@@ -393,19 +393,19 @@ ai-repo add claude ~/cloned-config/.claude
 
 ```bash
 # List all resources
-ai-repo list
+aimgr list
 
 # List only commands
-ai-repo list command
+aimgr list command
 
 # List only skills
-ai-repo list skill
+aimgr list skill
 
 # List only agents
-ai-repo list agent
+aimgr list agent
 
 # JSON output
-ai-repo list --format=json
+aimgr list --format=json
 ```
 
 ### 4. Install in a Project
@@ -414,13 +414,13 @@ ai-repo list --format=json
 cd your-project/
 
 # Install a command
-ai-repo install command my-command
+aimgr install command my-command
 
 # Install a skill
-ai-repo install skill pdf-processing
+aimgr install skill pdf-processing
 
 # Install an agent
-ai-repo install agent code-reviewer
+aimgr install agent code-reviewer
 
 # Resources are symlinked to tool-specific directories
 # Example: .claude/commands/, .opencode/commands/, etc.
@@ -430,59 +430,59 @@ ai-repo install agent code-reviewer
 
 ```bash
 # Remove from repository (with confirmation)
-ai-repo remove command my-command
+aimgr remove command my-command
 
 # Force remove (skip confirmation)
-ai-repo remove skill old-skill --force
+aimgr remove skill old-skill --force
 
 # Remove an agent
-ai-repo remove agent old-agent
+aimgr remove agent old-agent
 ```
 
 ## Multi-Tool Support
 
 ### Installation Behavior
 
-`ai-repo` intelligently handles installation based on your project's existing tool directories:
+`aimgr` intelligently handles installation based on your project's existing tool directories:
 
 #### Scenario 1: Fresh Project (No Tool Directories)
-When installing to a project with no existing tool directories, `ai-repo` creates and uses your configured default installation targets:
+When installing to a project with no existing tool directories, `aimgr` creates and uses your configured default installation targets:
 
 ```bash
 # Set default targets
-ai-repo config set install.targets claude
+aimgr config set install.targets claude
 
 # Install in fresh project
 cd ~/my-new-project
-ai-repo install command test
+aimgr install command test
 
 # Result: Creates .claude/commands/test.md
 
 # Or install to multiple tools by default
-ai-repo config set install.targets claude,opencode
-ai-repo install command test
+aimgr config set install.targets claude,opencode
+aimgr install command test
 # Result: Creates both .claude/commands/test.md and .opencode/commands/test.md
 ```
 
 #### Scenario 2: Existing Tool Directory
-When a tool directory already exists (e.g., `.opencode/`), `ai-repo` installs to that directory, ignoring your default installation targets:
+When a tool directory already exists (e.g., `.opencode/`), `aimgr` installs to that directory, ignoring your default installation targets:
 
 ```bash
 # Project already has .opencode directory
 cd ~/existing-opencode-project
-ai-repo install command test
+aimgr install command test
 
 # Result: Uses existing .opencode/commands/test.md
 # (Even if your default targets are set to 'claude')
 ```
 
 #### Scenario 3: Multiple Tool Directories
-When multiple tool directories exist, `ai-repo` installs to **ALL** of them:
+When multiple tool directories exist, `aimgr` installs to **ALL** of them:
 
 ```bash
 # Project has both .claude and .opencode directories
 cd ~/multi-tool-project
-ai-repo install skill pdf-processing
+aimgr install skill pdf-processing
 
 # Result: Installs to BOTH:
 #   - .claude/skills/pdf-processing
@@ -497,17 +497,17 @@ Use the `config` command to set or view your default installation targets:
 
 ```bash
 # Set default target (single tool)
-ai-repo config set install.targets claude
-ai-repo config set install.targets opencode
-ai-repo config set install.targets copilot
+aimgr config set install.targets claude
+aimgr config set install.targets opencode
+aimgr config set install.targets copilot
 
 # Set multiple default targets
-ai-repo config set install.targets claude,opencode
+aimgr config set install.targets claude,opencode
 
 # View current setting
-ai-repo config get install.targets
+aimgr config get install.targets
 
-# Configuration is stored in ~/.config/ai-repo/ai-repo.yaml
+# Configuration is stored in ~/.config/aimgr/aimgr.yaml
 ```
 
 The `install.targets` setting controls which tool directories are created when installing to a fresh project (one without existing tool directories). You can specify multiple tools to install resources to all of them by default.
@@ -539,7 +539,7 @@ If you were using an earlier version with `.ai/` directories:
 
 ## Source Formats
 
-`ai-repo` supports multiple source formats for adding resources, making it easy to share and discover resources across teams and the community.
+`aimgr` supports multiple source formats for adding resources, making it easy to share and discover resources across teams and the community.
 
 ### GitHub Sources
 
@@ -547,33 +547,33 @@ Add resources directly from GitHub repositories using the `gh:` prefix:
 
 ```bash
 # Basic syntax
-ai-repo add skill gh:owner/repo
+aimgr add skill gh:owner/repo
 
 # With specific path (for multi-resource repos)
-ai-repo add skill gh:owner/repo/path/to/skill
+aimgr add skill gh:owner/repo/path/to/skill
 
 # With branch or tag reference
-ai-repo add skill gh:owner/repo@branch-name
-ai-repo add skill gh:owner/repo@v1.0.0
+aimgr add skill gh:owner/repo@branch-name
+aimgr add skill gh:owner/repo@v1.0.0
 
 # Combined: path and reference
-ai-repo add skill gh:owner/repo/skills/my-skill@main
+aimgr add skill gh:owner/repo/skills/my-skill@main
 ```
 
 **Examples:**
 ```bash
 # Add a skill from Vercel's agent-skills repository
-ai-repo add skill gh:vercel-labs/agent-skills
+aimgr add skill gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific version tag
-ai-repo add skill gh:anthropics/skills@v2.1.0
+aimgr add skill gh:anthropics/skills@v2.1.0
 ```
 
 **How it works:**
-1. `ai-repo` clones the repository to a temporary directory
+1. `aimgr` clones the repository to a temporary directory
 2. Auto-discovers resources in standard locations (see [Auto-Discovery](#auto-discovery))
 3. Copies found resources to your centralized repository (`~/.local/share/ai-config/repo/`)
 4. Cleans up the temporary directory
@@ -584,12 +584,12 @@ Add resources from your local filesystem using the `local:` prefix or a direct p
 
 ```bash
 # Explicit local prefix
-ai-repo add skill local:./my-skill
-ai-repo add skill local:/absolute/path/to/skill
+aimgr add skill local:./my-skill
+aimgr add skill local:/absolute/path/to/skill
 
 # Direct path (local: is implied)
-ai-repo add skill ./my-skill
-ai-repo add skill ~/my-skills/pdf-processing
+aimgr add skill ./my-skill
+aimgr add skill ~/my-skills/pdf-processing
 ```
 
 **Note:** Local sources work exactly as before - the `local:` prefix is optional for backward compatibility.
@@ -600,33 +600,33 @@ Add from any Git repository using full URLs:
 
 ```bash
 # HTTPS URLs
-ai-repo add skill https://github.com/owner/repo.git
-ai-repo add skill https://gitlab.com/owner/repo.git
+aimgr add skill https://github.com/owner/repo.git
+aimgr add skill https://gitlab.com/owner/repo.git
 
 # SSH URLs
-ai-repo add skill git@github.com:owner/repo.git
+aimgr add skill git@github.com:owner/repo.git
 
 # With branch reference
-ai-repo add skill https://github.com/owner/repo.git@develop
+aimgr add skill https://github.com/owner/repo.git@develop
 ```
 
 ### Shorthand Syntax
 
-For convenience, `ai-repo` infers the `gh:` prefix for GitHub-style `owner/repo` patterns:
+For convenience, `aimgr` infers the `gh:` prefix for GitHub-style `owner/repo` patterns:
 
 ```bash
 # These are equivalent:
-ai-repo add skill vercel-labs/agent-skills
-ai-repo add skill gh:vercel-labs/agent-skills
+aimgr add skill vercel-labs/agent-skills
+aimgr add skill gh:vercel-labs/agent-skills
 
 # With path:
-ai-repo add skill vercel-labs/agent-skills/skills/frontend-design
-ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr add skill vercel-labs/agent-skills/skills/frontend-design
+aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
 ```
 
 ### Auto-Discovery
 
-When adding resources from GitHub or Git URLs, `ai-repo` automatically searches for resources in standard locations:
+When adding resources from GitHub or Git URLs, `aimgr` automatically searches for resources in standard locations:
 
 **Skills** are searched in this priority order:
 1. `SKILL.md` in the specified path (if subpath provided)
@@ -656,68 +656,68 @@ When adding resources from GitHub or Git URLs, `ai-repo` automatically searches 
 
 ## Commands
 
-### `ai-repo config`
+### `aimgr config`
 
 View and manage configuration settings.
 
 ```bash
 # Get a setting
-ai-repo config get install.targets
+aimgr config get install.targets
 
 # Set a setting (single tool)
-ai-repo config set install.targets <tool>
+aimgr config set install.targets <tool>
 
 # Set multiple targets
-ai-repo config set install.targets <tool1>,<tool2>
+aimgr config set install.targets <tool1>,<tool2>
 
 # Valid tools: claude, opencode, copilot
 # Examples:
-ai-repo config set install.targets claude
-ai-repo config set install.targets claude,opencode
+aimgr config set install.targets claude
+aimgr config set install.targets claude,opencode
 ```
 
-### `ai-repo add`
+### `aimgr add`
 
 Add resources to the repository from various sources.
 
 ```bash
 # Add from GitHub (with auto-discovery)
-ai-repo add skill gh:owner/repo
-ai-repo add skill gh:owner/repo/path/to/skill
-ai-repo add skill gh:owner/repo@v1.0.0
+aimgr add skill gh:owner/repo
+aimgr add skill gh:owner/repo/path/to/skill
+aimgr add skill gh:owner/repo@v1.0.0
 
 # Add from local path
-ai-repo add command <path-to-file.md>
-ai-repo add skill <path-to-directory>
-ai-repo add agent <path-to-file.md>
+aimgr add command <path-to-file.md>
+aimgr add skill <path-to-directory>
+aimgr add agent <path-to-file.md>
 
 # Add using shorthand (infers gh: for owner/repo)
-ai-repo add skill vercel-labs/agent-skills
+aimgr add skill vercel-labs/agent-skills
 
 # Add from Git URL
-ai-repo add skill https://github.com/owner/repo.git
-ai-repo add skill git@github.com:owner/repo.git
+aimgr add skill https://github.com/owner/repo.git
+aimgr add skill git@github.com:owner/repo.git
 
 # Add with explicit local prefix
-ai-repo add skill local:./my-skill
-ai-repo add skill local:/absolute/path/to/skill
+aimgr add skill local:./my-skill
+aimgr add skill local:/absolute/path/to/skill
 
 # Add all resources from a Claude plugin
-ai-repo add plugin <path-to-plugin>
+aimgr add plugin <path-to-plugin>
 
 # Add all resources from a Claude folder
-ai-repo add claude <path-to-.claude-folder>
+aimgr add claude <path-to-.claude-folder>
 
 # Add all resources from an OpenCode folder
-ai-repo add opencode <path-to-.opencode-folder>
+aimgr add opencode <path-to-.opencode-folder>
 
 # Overwrite existing resource
-ai-repo add command my-command.md --force
+aimgr add command my-command.md --force
 
 # Bulk import with conflict handling
-ai-repo add plugin ./plugin --skip-existing
-ai-repo add claude ~/.claude --dry-run
-ai-repo add opencode ~/.opencode --skip-existing
+aimgr add plugin ./plugin --skip-existing
+aimgr add claude ~/.claude --dry-run
+aimgr add opencode ~/.opencode --skip-existing
 ```
 
 **Source Formats:**
@@ -728,50 +728,50 @@ ai-repo add opencode ~/.opencode --skip-existing
 
 See [Source Formats](#source-formats) for detailed documentation.
 
-### `ai-repo list`
+### `aimgr list`
 
 List resources in the repository.
 
 ```bash
 # List all
-ai-repo list
+aimgr list
 
 # Filter by type
-ai-repo list command
-ai-repo list skill
-ai-repo list agent
+aimgr list command
+aimgr list skill
+aimgr list agent
 
 # Output formats
-ai-repo list --format=table  # Default
-ai-repo list --format=json
-ai-repo list --format=yaml
+aimgr list --format=table  # Default
+aimgr list --format=json
+aimgr list --format=yaml
 ```
 
-### `ai-repo install`
+### `aimgr install`
 
 Install resources to a project.
 
 ```bash
 # Install command
-ai-repo install command <name>
+aimgr install command <name>
 
 # Install skill
-ai-repo install skill <name>
+aimgr install skill <name>
 
 # Install agent
-ai-repo install agent <name>
+aimgr install agent <name>
 
 # Custom project path
-ai-repo install command test --project-path ~/my-project
+aimgr install command test --project-path ~/my-project
 
 # Force reinstall
-ai-repo install skill utils --force
-ai-repo install agent code-reviewer --force
+aimgr install skill utils --force
+aimgr install agent code-reviewer --force
 
 # Install to specific tool(s) - overrides defaults and existing directories
-ai-repo install command test --target claude
-ai-repo install skill utils --target opencode
-ai-repo install agent reviewer --target claude,opencode
+aimgr install command test --target claude
+aimgr install skill utils --target opencode
+aimgr install agent reviewer --target claude,opencode
 ```
 
 **Flags:**
@@ -779,29 +779,29 @@ ai-repo install agent reviewer --target claude,opencode
 - `--force`: Overwrite existing installations
 - `--target`: Specify which tool(s) to install to (accepts comma-separated values). Overrides both default targets and existing directory detection.
 
-### `ai-repo remove`
+### `aimgr remove`
 
 Remove resources from the repository.
 
 ```bash
 # Remove with confirmation
-ai-repo remove command <name>
-ai-repo remove skill <name>
-ai-repo remove agent <name>
+aimgr remove command <name>
+aimgr remove skill <name>
+aimgr remove agent <name>
 
 # Skip confirmation
-ai-repo remove command test --force
+aimgr remove command test --force
 
 # Alias
-ai-repo rm command old-test
-ai-repo rm agent old-reviewer
+aimgr rm command old-test
+aimgr rm agent old-reviewer
 ```
 
 ## Resource Formats
 
 ### Source Formats
 
-`ai-repo` supports multiple source formats for adding resources, making it easy to share and discover resources across teams and the community.
+`aimgr` supports multiple source formats for adding resources, making it easy to share and discover resources across teams and the community.
 
 ### GitHub Sources
 
@@ -809,33 +809,33 @@ Add resources directly from GitHub repositories using the `gh:` prefix:
 
 ```bash
 # Basic syntax
-ai-repo add skill gh:owner/repo
+aimgr add skill gh:owner/repo
 
 # With specific path (for multi-resource repos)
-ai-repo add skill gh:owner/repo/path/to/skill
+aimgr add skill gh:owner/repo/path/to/skill
 
 # With branch or tag reference
-ai-repo add skill gh:owner/repo@branch-name
-ai-repo add skill gh:owner/repo@v1.0.0
+aimgr add skill gh:owner/repo@branch-name
+aimgr add skill gh:owner/repo@v1.0.0
 
 # Combined: path and reference
-ai-repo add skill gh:owner/repo/skills/my-skill@main
+aimgr add skill gh:owner/repo/skills/my-skill@main
 ```
 
 **Examples:**
 ```bash
 # Add a skill from Vercel's agent-skills repository
-ai-repo add skill gh:vercel-labs/agent-skills
+aimgr add skill gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific version tag
-ai-repo add skill gh:anthropics/skills@v2.1.0
+aimgr add skill gh:anthropics/skills@v2.1.0
 ```
 
 **How it works:**
-1. `ai-repo` clones the repository to a temporary directory
+1. `aimgr` clones the repository to a temporary directory
 2. Auto-discovers resources in standard locations (see [Auto-Discovery](#auto-discovery))
 3. Copies found resources to your centralized repository (`~/.local/share/ai-config/repo/`)
 4. Cleans up the temporary directory
@@ -846,12 +846,12 @@ Add resources from your local filesystem using the `local:` prefix or a direct p
 
 ```bash
 # Explicit local prefix
-ai-repo add skill local:./my-skill
-ai-repo add skill local:/absolute/path/to/skill
+aimgr add skill local:./my-skill
+aimgr add skill local:/absolute/path/to/skill
 
 # Direct path (local: is implied)
-ai-repo add skill ./my-skill
-ai-repo add skill ~/my-skills/pdf-processing
+aimgr add skill ./my-skill
+aimgr add skill ~/my-skills/pdf-processing
 ```
 
 **Note:** Local sources work exactly as before - the `local:` prefix is optional for backward compatibility.
@@ -862,33 +862,33 @@ Add from any Git repository using full URLs:
 
 ```bash
 # HTTPS URLs
-ai-repo add skill https://github.com/owner/repo.git
-ai-repo add skill https://gitlab.com/owner/repo.git
+aimgr add skill https://github.com/owner/repo.git
+aimgr add skill https://gitlab.com/owner/repo.git
 
 # SSH URLs
-ai-repo add skill git@github.com:owner/repo.git
+aimgr add skill git@github.com:owner/repo.git
 
 # With branch reference
-ai-repo add skill https://github.com/owner/repo.git@develop
+aimgr add skill https://github.com/owner/repo.git@develop
 ```
 
 ### Shorthand Syntax
 
-For convenience, `ai-repo` infers the `gh:` prefix for GitHub-style `owner/repo` patterns:
+For convenience, `aimgr` infers the `gh:` prefix for GitHub-style `owner/repo` patterns:
 
 ```bash
 # These are equivalent:
-ai-repo add skill vercel-labs/agent-skills
-ai-repo add skill gh:vercel-labs/agent-skills
+aimgr add skill vercel-labs/agent-skills
+aimgr add skill gh:vercel-labs/agent-skills
 
 # With path:
-ai-repo add skill vercel-labs/agent-skills/skills/frontend-design
-ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr add skill vercel-labs/agent-skills/skills/frontend-design
+aimgr add skill gh:vercel-labs/agent-skills/skills/frontend-design
 ```
 
 ### Auto-Discovery
 
-When adding resources from GitHub or Git URLs, `ai-repo` automatically searches for resources in standard locations:
+When adding resources from GitHub or Git URLs, `aimgr` automatically searches for resources in standard locations:
 
 **Skills** are searched in this priority order:
 1. `SKILL.md` in the specified path (if subpath provided)
@@ -1150,8 +1150,8 @@ If you're upgrading from v0.2.0 or earlier, there are two key changes:
 
 ### Config Location Changed
 
-**Old location:** `~/.ai-repo.yaml`  
-**New location:** `~/.config/ai-repo/ai-repo.yaml`
+**Old location:** `~/.aimgr.yaml`  
+**New location:** `~/.config/aimgr/aimgr.yaml`
 
 **Migration:** Automatic on first run. The tool will detect your old config file and copy it to the new location. Your old file is left intact for safety.
 
@@ -1176,21 +1176,21 @@ install:
   targets: [claude, opencode]
 ```
 
-**Migration:** Automatic. When you run any `ai-repo` command, the tool will automatically convert `default-tool` to `install.targets` format. Your config file will be updated to the new format.
+**Migration:** Automatic. When you run any `aimgr` command, the tool will automatically convert `default-tool` to `install.targets` format. Your config file will be updated to the new format.
 
 ### Command Changes
 
 **Old commands:**
 ```bash
-ai-repo config set default-tool claude
-ai-repo config get default-tool
+aimgr config set default-tool claude
+aimgr config get default-tool
 ```
 
 **New commands:**
 ```bash
-ai-repo config set install.targets claude
-ai-repo config set install.targets claude,opencode  # Multiple tools
-ai-repo config get install.targets
+aimgr config set install.targets claude
+aimgr config set install.targets claude,opencode  # Multiple tools
+aimgr config get install.targets
 ```
 
 ### New Feature: --target Flag
@@ -1199,8 +1199,8 @@ You can now override the installation target for individual operations:
 
 ```bash
 # Install to specific tool(s), ignoring defaults
-ai-repo install command test --target claude
-ai-repo install skill utils --target claude,opencode
+aimgr install command test --target claude
+aimgr install skill utils --target claude,opencode
 ```
 
 This is useful when you want to install a resource to a specific tool without changing your global configuration.
@@ -1212,14 +1212,14 @@ This is useful when you want to install a resource to a specific tool without ch
 1. Create a `.md` file with valid name: `my-command.md`
 2. Add YAML frontmatter with `description`
 3. Write command body in markdown
-4. Test: `ai-repo add command ./my-command.md`
+4. Test: `aimgr add command ./my-command.md`
 
 ### Create a Skill
 
 1. Create directory with valid name: `my-skill/`
 2. Create `SKILL.md` with frontmatter (name must match directory)
 3. Optionally add `scripts/`, `references/`, `assets/`
-4. Test: `ai-repo add skill ./my-skill`
+4. Test: `aimgr add skill ./my-skill`
 
 ### Create an Agent
 
@@ -1227,13 +1227,13 @@ This is useful when you want to install a resource to a specific tool without ch
 2. Add YAML frontmatter with `description`
 3. Optionally add `type`, `instructions`, `capabilities` (OpenCode format)
 4. Write agent documentation in markdown body
-5. Test: `ai-repo add agent ./my-agent.md`
+5. Test: `aimgr add agent ./my-agent.md`
 
 See [examples/README.md](examples/README.md) for detailed instructions.
 
 ## Development
 
-For information on building, testing, and contributing to ai-repo, please see [CONTRIBUTING.md](CONTRIBUTING.md).
+For information on building, testing, and contributing to aimgr, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
@@ -1277,14 +1277,14 @@ Solution:
 
 Solution:
 - Verify the repository contains resources in standard locations
-- Try specifying a direct path: `ai-repo add skill gh:owner/repo/path/to/skill`
+- Try specifying a direct path: `aimgr add skill gh:owner/repo/path/to/skill`
 - Check that resources have valid frontmatter (SKILL.md with name and description)
 - Use the repository's documentation to find resource locations
 
 **Problem: "Multiple resources found, please specify path"**
 
 Solution:
-- Add the specific path to your command: `ai-repo add skill gh:owner/repo/skills/specific-skill`
+- Add the specific path to your command: `aimgr add skill gh:owner/repo/skills/specific-skill`
 - List available resources by cloning the repo manually: `git clone https://github.com/owner/repo && ls -R`
 
 **Problem: Network timeout or slow clones**
@@ -1327,38 +1327,38 @@ Solution:
 **Problem: "Resource already exists"**
 
 Solution:
-- Use `--force` flag to overwrite: `ai-repo add skill gh:owner/repo --force`
-- Or remove the existing resource first: `ai-repo remove skill <name>`
-- Check what's installed: `ai-repo list`
+- Use `--force` flag to overwrite: `aimgr add skill gh:owner/repo --force`
+- Or remove the existing resource first: `aimgr remove skill <name>`
+- Check what's installed: `aimgr list`
 
 ### Configuration Issues
 
 **Problem: "Config file not found" or invalid config**
 
 Solution:
-- Config location: `~/.config/ai-repo/ai-repo.yaml`
-- Reset config: Delete the file and run `ai-repo config set install.targets claude`
-- Check config syntax: `cat ~/.config/ai-repo/ai-repo.yaml`
+- Config location: `~/.config/aimgr/aimgr.yaml`
+- Reset config: Delete the file and run `aimgr config set install.targets claude`
+- Check config syntax: `cat ~/.config/aimgr/aimgr.yaml`
 
 **Problem: Resources installing to wrong tool directory**
 
 Solution:
-- Check your default targets: `ai-repo config get install.targets`
-- Set desired targets: `ai-repo config set install.targets claude,opencode`
-- Use `--target` flag to override: `ai-repo install skill name --target claude`
+- Check your default targets: `aimgr config get install.targets`
+- Set desired targets: `aimgr config set install.targets claude,opencode`
+- Use `--target` flag to override: `aimgr install skill name --target claude`
 
 ### General Debugging
 
 **Enable verbose output:**
 ```bash
 # Most commands support verbose flags (check with --help)
-ai-repo add skill gh:owner/repo -v
+aimgr add skill gh:owner/repo -v
 ```
 
 **Check repository contents:**
 ```bash
 # List all resources in your repository
-ai-repo list
+aimgr list
 
 # Check repository directory directly
 ls -la ~/.local/share/ai-config/repo/skills/

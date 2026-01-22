@@ -4,7 +4,7 @@ This document provides guidelines for AI coding agents working in the ai-config-
 
 ## Project Overview
 
-**ai-repo** is a CLI tool for managing AI resources (commands, skills, and agents) across multiple AI coding tools (Claude Code, OpenCode, GitHub Copilot). It uses a centralized repository with symlink-based installation.
+**aimgr** is a CLI tool for managing AI resources (commands, skills, and agents) across multiple AI coding tools (Claude Code, OpenCode, GitHub Copilot). It uses a centralized repository with symlink-based installation.
 
 - **Language**: Go 1.25.6
 - **Architecture**: CLI built with Cobra, resource management with symlinks
@@ -378,8 +378,8 @@ Import all resources from OpenCode directories:
 
 ```bash
 # Import from .opencode folder
-ai-repo add opencode ~/.opencode
-ai-repo add opencode ~/project/.opencode
+aimgr add opencode ~/.opencode
+aimgr add opencode ~/project/.opencode
 ```
 
 This imports:

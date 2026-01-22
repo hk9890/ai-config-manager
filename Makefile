@@ -1,7 +1,7 @@
 .PHONY: build test integration-test install clean help
 
 # Binary name
-BINARY=ai-repo
+BINARY=aimgr
 
 # Version information
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")

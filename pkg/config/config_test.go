@@ -343,12 +343,12 @@ func TestGetConfigPath(t *testing.T) {
 		t.Fatalf("GetConfigPath() error = %v, want nil", err)
 	}
 
-	// Path should end with ai-repo/ai-repo.yaml
+	// Path should end with aimgr/aimgr.yaml
 	if !filepath.IsAbs(path) {
 		t.Errorf("GetConfigPath() = %v, want absolute path", path)
 	}
 
-	// Path should contain .config/ai-repo/ai-repo.yaml
+	// Path should contain .config/aimgr/aimgr.yaml
 	if !filepath.IsAbs(path) || filepath.Base(path) != DefaultConfigFileName {
 		t.Errorf("GetConfigPath() = %v, want path ending with %v", path, DefaultConfigFileName)
 	}
@@ -361,7 +361,7 @@ func TestMigrateConfig(t *testing.T) {
 
 	// Create temp directory for new config
 	newDir := t.TempDir()
-	newPath := filepath.Join(newDir, "ai-repo", DefaultConfigFileName)
+	newPath := filepath.Join(newDir, "aimgr", DefaultConfigFileName)
 
 	// Write old config
 	oldConfigData := []byte("default-tool: opencode\n")

@@ -16,9 +16,9 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "ai-repo",
+	Use:   "aimgr",
 	Short: "Manage AI resources (commands and skills) for LLM tools",
-	Long: `ai-repo is a CLI tool for discovering, installing, and managing
+	Long: `aimgr is a CLI tool for discovering, installing, and managing
 AI resources like commands and skills across different LLM tools
 (Claude Code, OpenCode, etc.).
 
@@ -49,7 +49,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/ai-repo/ai-repo.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/aimgr/aimgr.yaml)")
 
 	// Version flag
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Show version information")
@@ -65,15 +65,15 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search config in XDG config directory first (~/.config/ai-repo/)
-		configDir := home + "/.config/ai-repo"
+		// Search config in XDG config directory first (~/.config/aimgr/)
+		configDir := home + "/.config/aimgr"
 		viper.AddConfigPath(configDir)
 
 		// Also search in home directory for backward compatibility
 		viper.AddConfigPath(home)
 
 		viper.SetConfigType("yaml")
-		viper.SetConfigName("ai-repo") // Will find both ai-repo.yaml and .ai-repo.yaml
+		viper.SetConfigName("aimgr") // Will find both aimgr.yaml and .aimgr.yaml
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match

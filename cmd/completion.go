@@ -10,19 +10,19 @@ import (
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh|fish|powershell]",
 	Short: "Generate shell completion script",
-	Long: `Generate shell completion script for ai-repo.
+	Long: `Generate shell completion script for aimgr.
 
 To load completions:
 
 Bash:
 
-  $ source <(ai-repo completion bash)
+  $ source <(aimgr completion bash)
 
   # To load completions for each session, execute once:
   # Linux:
-  $ ai-repo completion bash > /etc/bash_completion.d/ai-repo
+  $ aimgr completion bash > /etc/bash_completion.d/aimgr
   # macOS:
-  $ ai-repo completion bash > $(brew --prefix)/etc/bash_completion.d/ai-repo
+  $ aimgr completion bash > $(brew --prefix)/etc/bash_completion.d/aimgr
 
 Zsh:
 
@@ -32,23 +32,23 @@ Zsh:
   $ echo "autoload -U compinit; compinit" >> ~/.zshrc
 
   # To load completions for each session, execute once:
-  $ ai-repo completion zsh > "${fpath[1]}/_ai-repo"
+  $ aimgr completion zsh > "${fpath[1]}/_aimgr"
 
   # You will need to start a new shell for this setup to take effect.
 
 Fish:
 
-  $ ai-repo completion fish | source
+  $ aimgr completion fish | source
 
   # To load completions for each session, execute once:
-  $ ai-repo completion fish > ~/.config/fish/completions/ai-repo.fish
+  $ aimgr completion fish > ~/.config/fish/completions/aimgr.fish
 
 PowerShell:
 
-  PS> ai-repo completion powershell | Out-String | Invoke-Expression
+  PS> aimgr completion powershell | Out-String | Invoke-Expression
 
   # To load completions for every new session, run:
-  PS> ai-repo completion powershell > ai-repo.ps1
+  PS> aimgr completion powershell > aimgr.ps1
   # and source this file from your PowerShell profile.
 `,
 	DisableFlagsInUseLine: true,

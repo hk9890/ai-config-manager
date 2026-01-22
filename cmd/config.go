@@ -15,11 +15,11 @@ import (
 // configCmd represents the config command
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "View and manage ai-repo configuration",
-	Long: `View and manage ai-repo configuration settings.
+	Short: "View and manage aimgr configuration",
+	Long: `View and manage aimgr configuration settings.
 
-Configuration is stored in ~/.config/ai-repo/ai-repo.yaml and controls default
-behavior for ai-repo commands.`,
+Configuration is stored in ~/.config/aimgr/aimgr.yaml and controls default
+behavior for aimgr commands.`,
 }
 
 // configGetCmd represents the config get command
@@ -32,7 +32,7 @@ Available keys:
   install.targets - The default AI tools to install to (comma-separated: claude, opencode, copilot)
 
 Example:
-  ai-repo config get install.targets`,
+  aimgr config get install.targets`,
 	Args: cobra.ExactArgs(1),
 	RunE: configGet,
 }
@@ -52,9 +52,9 @@ Valid tools:
   copilot  - GitHub Copilot (supports skills only)
 
 Examples:
-  ai-repo config set install.targets claude
-  ai-repo config set install.targets claude,opencode
-  ai-repo config set install.targets claude,opencode,copilot`,
+  aimgr config set install.targets claude
+  aimgr config set install.targets claude,opencode
+  aimgr config set install.targets claude,opencode,copilot`,
 	Args: cobra.ExactArgs(2),
 	RunE: configSet,
 }

@@ -20,10 +20,10 @@ A Claude folder contains .claude/commands/, .claude/skills/, and/or .claude/agen
 You can specify either the .claude/ directory itself or its parent directory.
 
 Example:
-  ai-repo add claude ~/.claude
-  ai-repo add claude ~/my-project/.claude
-  ai-repo add claude ~/my-project --force
-  ai-repo add claude ./.claude --dry-run`,
+  aimgr add claude ~/.claude
+  aimgr add claude ~/my-project/.claude
+  aimgr add claude ~/my-project --force
+  aimgr add claude ./.claude --dry-run`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		claudePath := args[0]

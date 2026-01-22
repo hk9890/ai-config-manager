@@ -19,15 +19,15 @@ var formatFlag string
 var listCmd = &cobra.Command{
 	Use:   "list [command|skill|agent]",
 	Short: "List resources in the repository",
-	Long: `List all resources in the ai-repo repository, optionally filtered by type.
+	Long: `List all resources in the aimgr repository, optionally filtered by type.
 
 Examples:
-  ai-repo list                    # List all resources
-  ai-repo list command            # List only commands
-  ai-repo list skill              # List only skills
-  ai-repo list agent              # List only agents
-  ai-repo list --format=json      # Output as JSON
-  ai-repo list --format=yaml      # Output as YAML`,
+  aimgr list                    # List all resources
+  aimgr list command            # List only commands
+  aimgr list skill              # List only skills
+  aimgr list agent              # List only agents
+  aimgr list --format=json      # Output as JSON
+  aimgr list --format=yaml      # Output as YAML`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Parse optional type filter
@@ -67,7 +67,7 @@ Examples:
 			} else {
 				fmt.Println("No resources found in repository.")
 			}
-			fmt.Println("\nAdd resources with: ai-repo add command <file>, ai-repo add skill <folder>, or ai-repo add agent <file>")
+			fmt.Println("\nAdd resources with: aimgr add command <file>, aimgr add skill <folder>, or aimgr add agent <file>")
 			return nil
 		}
 

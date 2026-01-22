@@ -12,8 +12,8 @@ import (
 
 const (
 	// DefaultConfigFileName is the name of the config file (without leading dot for XDG)
-	DefaultConfigFileName = "ai-repo.yaml"
-	// OldConfigFileName is the legacy config file name in home directory
+	DefaultConfigFileName = "aimgr.yaml"
+	// OldConfigFileName is the legacy config file name in home directory (ai-repo for migration)
 	OldConfigFileName = ".ai-repo.yaml"
 	// DefaultToolValue is the default tool when not specified (legacy)
 	DefaultToolValue = "claude"
@@ -42,9 +42,9 @@ type InstallConfig struct {
 }
 
 // GetConfigPath returns the path to the config file in XDG config directory
-// Returns ~/.config/ai-repo/ai-repo.yaml
+// Returns ~/.config/aimgr/aimgr.yaml
 func GetConfigPath() (string, error) {
-	configDir := filepath.Join(xdg.ConfigHome, "ai-repo")
+	configDir := filepath.Join(xdg.ConfigHome, "aimgr")
 	return filepath.Join(configDir, DefaultConfigFileName), nil
 }
 
@@ -105,7 +105,7 @@ func Load(projectPath string) (*Config, error) {
 }
 
 // LoadGlobal loads the global configuration from XDG config directory
-// Checks ~/.config/ai-repo/ai-repo.yaml and falls back to ~/.ai-repo.yaml
+// Checks ~/.config/aimgr/aimgr.yaml and falls back to ~/.ai-repo.yaml
 // Automatically migrates from old location if found
 func LoadGlobal() (*Config, error) {
 	// Get new config path
