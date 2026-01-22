@@ -49,6 +49,9 @@ Examples:
   aimgr repo add command ./my-command.md --force
   aimgr repo add command myorg/commands`,
 	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveDefault
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
 
@@ -152,6 +155,9 @@ Examples:
   aimgr repo add skill ./my-skill --force
   aimgr repo add skill myorg/skills`,
 	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveDefault
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
 
@@ -265,6 +271,9 @@ Examples:
   aimgr repo add agent ./my-agent.md --force
   aimgr repo add agent myorg/agents`,
 	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveDefault
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
 

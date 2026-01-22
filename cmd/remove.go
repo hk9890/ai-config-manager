@@ -34,7 +34,8 @@ This permanently deletes the command file from the repository.
 Example:
   aimgr repo remove command my-command
   aimgr repo rm command test --force`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeCommandNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
@@ -94,7 +95,8 @@ This permanently deletes the skill folder with all scripts, references, and asse
 Example:
   aimgr repo remove skill pdf-processing
   aimgr repo rm skill my-skill --force`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeSkillNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
