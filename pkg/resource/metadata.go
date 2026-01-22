@@ -88,6 +88,27 @@ func (f Frontmatter) GetString(key string) string {
 	return ""
 }
 
+// GetStringSlice safely extracts a []string from frontmatter
+func (f Frontmatter) GetStringSlice(key string) []string {
+	if val, ok := f[key]; ok {
+		// Try []interface{} (from YAML unmarshaling)
+		if slice, ok := val.([]interface{}); ok {
+			var result []string
+			for _, item := range slice {
+				if str, ok := item.(string); ok {
+					result = append(result, str)
+				}
+			}
+			return result
+		}
+		// Try []string directly
+		if slice, ok := val.([]string); ok {
+			return slice
+		}
+	}
+	return nil
+}
+
 // GetMap safely extracts a map[string]string from frontmatter
 func (f Frontmatter) GetMap(key string) map[string]string {
 	result := make(map[string]string)

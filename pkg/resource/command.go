@@ -57,6 +57,53 @@ func LoadCommand(filePath string) (*Resource, error) {
 	return resource, nil
 }
 
+// LoadCommandResource loads a command resource with full details including content
+func LoadCommandResource(filePath string) (*CommandResource, error) {
+	// Validate it's a .md file
+	if filepath.Ext(filePath) != ".md" {
+		return nil, fmt.Errorf("command must be a .md file")
+	}
+
+	// Check file exists
+	if _, err := os.Stat(filePath); err != nil {
+		return nil, fmt.Errorf("file does not exist: %w", err)
+	}
+
+	// Parse frontmatter and content
+	frontmatter, content, err := ParseFrontmatter(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse frontmatter: %w", err)
+	}
+
+	// Extract name from filename (without .md extension)
+	name := strings.TrimSuffix(filepath.Base(filePath), ".md")
+
+	// Build command resource
+	cmd := &CommandResource{
+		Resource: Resource{
+			Name:        name,
+			Type:        Command,
+			Description: frontmatter.GetString("description"),
+			Version:     frontmatter.GetString("version"),
+			Author:      frontmatter.GetString("author"),
+			License:     frontmatter.GetString("license"),
+			Path:        filePath,
+			Metadata:    frontmatter.GetMap("metadata"),
+		},
+		Agent:        frontmatter.GetString("agent"),
+		Model:        frontmatter.GetString("model"),
+		AllowedTools: frontmatter.GetStringSlice("allowed-tools"),
+		Content:      content,
+	}
+
+	// Validate
+	if err := cmd.Resource.Validate(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
+	return cmd, nil
+}
+
 // ValidateCommand validates a command resource structure
 func ValidateCommand(filePath string) error {
 	_, err := LoadCommand(filePath)
