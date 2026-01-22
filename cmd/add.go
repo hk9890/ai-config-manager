@@ -39,15 +39,36 @@ a description field.
 Source Formats:
   gh:owner/repo              GitHub repository (auto-discovers commands)
   gh:owner/repo/path         Specific command in repo
-  local:path or path         Local .md file
-  owner/repo                 GitHub shorthand
+  gh:owner/repo@branch       Specific branch or tag
+  owner/repo                 GitHub shorthand (gh: prefix inferred)
+  local:path                 Local file (explicit)
+  ./path or ~/path           Local file (inferred)
+  /absolute/path             Absolute local path
+  https://github.com/...     Full HTTPS Git URL
+  git@github.com:...         SSH Git URL
 
 Examples:
-  aimgr repo add command gh:myorg/commands
-  aimgr repo add command gh:myorg/repo/commands/test-command.md
-  aimgr repo add command ~/.claude/commands/my-command.md
-  aimgr repo add command ./my-command.md --force
-  aimgr repo add command myorg/commands`,
+  # From GitHub
+  aimgr repo add command gh:owner/repo
+  
+  # Specific command in repo
+  aimgr repo add command gh:owner/repo/commands/test-command.md
+  
+  # Specific version
+  aimgr repo add command gh:owner/repo@v1.0.0
+  
+  # GitHub shorthand
+  aimgr repo add command owner/repo
+  
+  # Local file
+  aimgr repo add command ~/my-commands/test-command.md
+  aimgr repo add command ./test-command.md
+  
+  # Full Git URL
+  aimgr repo add command https://github.com/owner/repo.git
+  
+  # Force overwrite
+  aimgr repo add command ./test-command.md --force`,
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveDefault
@@ -145,15 +166,36 @@ The directory name must match the 'name' field in SKILL.md.
 Source Formats:
   gh:owner/repo              GitHub repository (auto-discovers skills)
   gh:owner/repo/path         Specific skill in repo
-  local:path or path         Local directory
-  owner/repo                 GitHub shorthand
+  gh:owner/repo@branch       Specific branch or tag
+  owner/repo                 GitHub shorthand (gh: prefix inferred)
+  local:path                 Local directory (explicit)
+  ./path or ~/path           Local directory (inferred)
+  /absolute/path             Absolute local path
+  https://github.com/...     Full HTTPS Git URL
+  git@github.com:...         SSH Git URL
 
 Examples:
-  aimgr repo add skill gh:myorg/skills
-  aimgr repo add skill gh:myorg/repo/skills/pdf-processing
+  # From GitHub
+  aimgr repo add skill gh:owner/repo
+  
+  # Specific skill in repo
+  aimgr repo add skill gh:owner/repo/skills/pdf-processing
+  
+  # Specific version
+  aimgr repo add skill gh:owner/repo@v1.0.0
+  
+  # GitHub shorthand
+  aimgr repo add skill owner/repo
+  
+  # Local directory
   aimgr repo add skill ~/my-skills/pdf-processing
-  aimgr repo add skill ./my-skill --force
-  aimgr repo add skill myorg/skills`,
+  aimgr repo add skill ./pdf-processing
+  
+  # Full Git URL
+  aimgr repo add skill https://github.com/owner/repo.git
+  
+  # Force overwrite
+  aimgr repo add skill ./pdf-processing --force`,
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveDefault
@@ -261,15 +303,36 @@ a description field.
 Source Formats:
   gh:owner/repo              GitHub repository (auto-discovers agents)
   gh:owner/repo/path         Specific agent in repo
-  local:path or path         Local .md file
-  owner/repo                 GitHub shorthand
+  gh:owner/repo@branch       Specific branch or tag
+  owner/repo                 GitHub shorthand (gh: prefix inferred)
+  local:path                 Local file (explicit)
+  ./path or ~/path           Local file (inferred)
+  /absolute/path             Absolute local path
+  https://github.com/...     Full HTTPS Git URL
+  git@github.com:...         SSH Git URL
 
 Examples:
-  aimgr repo add agent gh:myorg/agents
-  aimgr repo add agent gh:myorg/repo/agents/code-reviewer.md
-  aimgr repo add agent ~/.opencode/agents/my-agent.md
-  aimgr repo add agent ./my-agent.md --force
-  aimgr repo add agent myorg/agents`,
+  # From GitHub
+  aimgr repo add agent gh:owner/repo
+  
+  # Specific agent in repo
+  aimgr repo add agent gh:owner/repo/agents/code-reviewer.md
+  
+  # Specific version
+  aimgr repo add agent gh:owner/repo@v1.0.0
+  
+  # GitHub shorthand
+  aimgr repo add agent owner/repo
+  
+  # Local file
+  aimgr repo add agent ~/.opencode/agents/code-reviewer.md
+  aimgr repo add agent ./code-reviewer.md
+  
+  # Full Git URL
+  aimgr repo add agent https://github.com/owner/repo.git
+  
+  # Force overwrite
+  aimgr repo add agent ./code-reviewer.md --force`,
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveDefault
