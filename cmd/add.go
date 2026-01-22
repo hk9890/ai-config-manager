@@ -109,8 +109,14 @@ Examples:
 			_ = manager.Remove(res.Name, resource.Command)
 		}
 
+		// Determine source info for metadata
+		sourceType, sourceURL, err := determineSourceInfo(parsed, sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to determine source info: %w", err)
+		}
+
 		// Add the command
-		if err := manager.AddCommand(sourcePath); err != nil {
+		if err := manager.AddCommand(sourcePath, sourceURL, sourceType); err != nil {
 			return fmt.Errorf("failed to add command: %w", err)
 		}
 
@@ -213,8 +219,14 @@ Examples:
 			_ = manager.Remove(res.Name, resource.Skill)
 		}
 
+		// Determine source info for metadata
+		sourceType, sourceURL, err := determineSourceInfo(parsed, sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to determine source info: %w", err)
+		}
+
 		// Add the skill
-		if err := manager.AddSkill(sourcePath); err != nil {
+		if err := manager.AddSkill(sourcePath, sourceURL, sourceType); err != nil {
 			return fmt.Errorf("failed to add skill: %w", err)
 		}
 
@@ -313,8 +325,14 @@ Examples:
 			_ = manager.Remove(res.Name, resource.Agent)
 		}
 
+		// Determine source info for metadata
+		sourceType, sourceURL, err := determineSourceInfo(parsed, sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to determine source info: %w", err)
+		}
+
 		// Add the agent
-		if err := manager.AddAgent(sourcePath); err != nil {
+		if err := manager.AddAgent(sourcePath, sourceURL, sourceType); err != nil {
 			return fmt.Errorf("failed to add agent: %w", err)
 		}
 
@@ -397,8 +415,11 @@ func addCommandFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) er
 		_ = manager.Remove(selectedCommand.Name, resource.Command)
 	}
 
+	// Determine source info for metadata (GitHub source)
+	sourceType, sourceURL := formatGitHubSourceInfo(parsed)
+
 	// Add the command using manager
-	if err := manager.AddCommand(commandPath); err != nil {
+	if err := manager.AddCommand(commandPath, sourceURL, sourceType); err != nil {
 		return fmt.Errorf("failed to add command: %w", err)
 	}
 
@@ -463,8 +484,11 @@ func addSkillFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) erro
 		_ = manager.Remove(selectedSkill.Name, resource.Skill)
 	}
 
+	// Determine source info for metadata (GitHub source)
+	sourceType, sourceURL := formatGitHubSourceInfo(parsed)
+
 	// Add the skill using manager
-	if err := manager.AddSkill(skillPath); err != nil {
+	if err := manager.AddSkill(skillPath, sourceURL, sourceType); err != nil {
 		return fmt.Errorf("failed to add skill: %w", err)
 	}
 
@@ -532,8 +556,11 @@ func addAgentFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) erro
 		_ = manager.Remove(selectedAgent.Name, resource.Agent)
 	}
 
+	// Determine source info for metadata (GitHub source)
+	sourceType, sourceURL := formatGitHubSourceInfo(parsed)
+
 	// Add the agent using manager
-	if err := manager.AddAgent(agentPath); err != nil {
+	if err := manager.AddAgent(agentPath, sourceURL, sourceType); err != nil {
 		return fmt.Errorf("failed to add agent: %w", err)
 	}
 
@@ -679,4 +706,75 @@ func findAgentFile(searchPath, name string) (string, error) {
 		return "", fmt.Errorf("agent file not found for: %s", name)
 	}
 	return found, nil
+}
+
+// determineSourceInfo determines the source type and URL from a parsed source and local path
+func determineSourceInfo(parsed *source.ParsedSource, localPath string) (string, string, error) {
+	switch parsed.Type {
+	case source.GitHub:
+		// GitHub source: type="github", url="gh:owner/repo/path"
+		return "github", formatGitHubShortURL(parsed), nil
+
+	case source.GitURL:
+		// Git URL: type="github", url=original URL
+		return "github", parsed.URL, nil
+
+	case source.Local:
+		// Local source: need to determine if file or directory
+		info, err := os.Stat(localPath)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to stat path: %w", err)
+		}
+
+		// Convert to absolute path
+		absPath, err := filepath.Abs(localPath)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		// Format as file:// URL
+		fileURL := "file://" + absPath
+
+		if info.IsDir() {
+			return "local", fileURL, nil
+		}
+		return "file", fileURL, nil
+
+	default:
+		return "", "", fmt.Errorf("unsupported source type: %s", parsed.Type)
+	}
+}
+
+// formatGitHubSourceInfo formats GitHub source info for metadata
+func formatGitHubSourceInfo(parsed *source.ParsedSource) (string, string) {
+	return "github", formatGitHubShortURL(parsed)
+}
+
+// formatGitHubShortURL formats a GitHub URL in the gh:owner/repo/path format
+func formatGitHubShortURL(parsed *source.ParsedSource) string {
+	// Extract owner/repo from the GitHub URL
+	// URL format: https://github.com/owner/repo
+	url := strings.TrimPrefix(parsed.URL, "https://github.com/")
+	url = strings.TrimPrefix(url, "http://github.com/")
+
+	// Remove /tree/branch if present
+	if strings.Contains(url, "/tree/") {
+		parts := strings.SplitN(url, "/tree/", 2)
+		url = parts[0]
+	}
+
+	// Build the gh: format URL
+	result := "gh:" + url
+
+	// Add subpath if present
+	if parsed.Subpath != "" {
+		result = result + "/" + parsed.Subpath
+	}
+
+	// Add ref if present
+	if parsed.Ref != "" {
+		result = result + "@" + parsed.Ref
+	}
+
+	return result
 }
