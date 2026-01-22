@@ -432,7 +432,7 @@ func TestConfigIntegration(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create a config file with new format
-		configPath := filepath.Join(tmpDir, "ai-repo.yaml")
+		configPath := filepath.Join(tmpDir, "aimgr.yaml")
 		configContent := "install:\n  targets: [opencode]\n"
 		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 			t.Fatalf("Failed to create config file: %v", err)
@@ -486,7 +486,7 @@ func TestConfigIntegration(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Create a config file with invalid tool
-		configPath := filepath.Join(tmpDir, "ai-repo.yaml")
+		configPath := filepath.Join(tmpDir, "aimgr.yaml")
 		configContent := "install:\n  targets: [invalid]\n"
 		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 			t.Fatalf("Failed to create config file: %v", err)
