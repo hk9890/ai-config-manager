@@ -43,11 +43,11 @@ Source Formats:
   owner/repo                 GitHub shorthand
 
 Examples:
-  aimgr add command gh:myorg/commands
-  aimgr add command gh:myorg/repo/commands/test-command.md
-  aimgr add command ~/.claude/commands/my-command.md
-  aimgr add command ./my-command.md --force
-  aimgr add command myorg/commands`,
+  aimgr repo add command gh:myorg/commands
+  aimgr repo add command gh:myorg/repo/commands/test-command.md
+  aimgr repo add command ~/.claude/commands/my-command.md
+  aimgr repo add command ./my-command.md --force
+  aimgr repo add command myorg/commands`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
@@ -140,11 +140,11 @@ Source Formats:
   owner/repo                 GitHub shorthand
 
 Examples:
-  aimgr add skill gh:myorg/skills
-  aimgr add skill gh:myorg/repo/skills/pdf-processing
-  aimgr add skill ~/my-skills/pdf-processing
-  aimgr add skill ./my-skill --force
-  aimgr add skill myorg/skills`,
+  aimgr repo add skill gh:myorg/skills
+  aimgr repo add skill gh:myorg/repo/skills/pdf-processing
+  aimgr repo add skill ~/my-skills/pdf-processing
+  aimgr repo add skill ./my-skill --force
+  aimgr repo add skill myorg/skills`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
@@ -247,11 +247,11 @@ Source Formats:
   owner/repo                 GitHub shorthand
 
 Examples:
-  aimgr add agent gh:myorg/agents
-  aimgr add agent gh:myorg/repo/agents/code-reviewer.md
-  aimgr add agent ~/.opencode/agents/my-agent.md
-  aimgr add agent ./my-agent.md --force
-  aimgr add agent myorg/agents`,
+  aimgr repo add agent gh:myorg/agents
+  aimgr repo add agent gh:myorg/repo/agents/code-reviewer.md
+  aimgr repo add agent ~/.opencode/agents/my-agent.md
+  aimgr repo add agent ./my-agent.md --force
+  aimgr repo add agent myorg/agents`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
@@ -329,7 +329,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(addCmd)
+	repoCmd.AddCommand(addCmd)
 	addCmd.AddCommand(addCommandCmd)
 	addCmd.AddCommand(addSkillCmd)
 	addCmd.AddCommand(addAgentCmd)

@@ -32,8 +32,8 @@ var removeCommandCmd = &cobra.Command{
 This permanently deletes the command file from the repository.
 
 Example:
-  aimgr remove command my-command
-  aimgr rm command test --force`,
+  aimgr repo remove command my-command
+  aimgr repo rm command test --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -47,7 +47,7 @@ Example:
 		// Verify command exists
 		res, err := manager.Get(name, resource.Command)
 		if err != nil {
-			return fmt.Errorf("command '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
+			return fmt.Errorf("command '%s' not found in repository. Use 'aimgr repo list' to see available resources.", name)
 		}
 
 		// Confirmation prompt (unless --force)
@@ -92,8 +92,8 @@ var removeSkillCmd = &cobra.Command{
 This permanently deletes the skill folder with all scripts, references, and assets.
 
 Example:
-  aimgr remove skill pdf-processing
-  aimgr rm skill my-skill --force`,
+  aimgr repo remove skill pdf-processing
+  aimgr repo rm skill my-skill --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -107,7 +107,7 @@ Example:
 		// Verify skill exists
 		res, err := manager.Get(name, resource.Skill)
 		if err != nil {
-			return fmt.Errorf("skill '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
+			return fmt.Errorf("skill '%s' not found in repository. Use 'aimgr repo list' to see available resources.", name)
 		}
 
 		// Confirmation prompt (unless --force)
@@ -149,7 +149,7 @@ Example:
 }
 
 func init() {
-	rootCmd.AddCommand(removeCmd)
+	repoCmd.AddCommand(removeCmd)
 	removeCmd.AddCommand(removeCommandCmd)
 	removeCmd.AddCommand(removeSkillCmd)
 

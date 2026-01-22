@@ -22,12 +22,12 @@ var listCmd = &cobra.Command{
 	Long: `List all resources in the aimgr repository, optionally filtered by type.
 
 Examples:
-  aimgr list                    # List all resources
-  aimgr list command            # List only commands
-  aimgr list skill              # List only skills
-  aimgr list agent              # List only agents
-  aimgr list --format=json      # Output as JSON
-  aimgr list --format=yaml      # Output as YAML`,
+  aimgr repo list                    # List all resources
+  aimgr repo list command            # List only commands
+  aimgr repo list skill              # List only skills
+  aimgr repo list agent              # List only agents
+  aimgr repo list --format=json      # Output as JSON
+  aimgr repo list --format=yaml      # Output as YAML`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Parse optional type filter
@@ -67,7 +67,7 @@ Examples:
 			} else {
 				fmt.Println("No resources found in repository.")
 			}
-			fmt.Println("\nAdd resources with: aimgr add command <file>, aimgr add skill <folder>, or aimgr add agent <file>")
+			fmt.Println("\nAdd resources with: aimgr repo add command <file>, aimgr repo add skill <folder>, or aimgr repo add agent <file>")
 			return nil
 		}
 
@@ -168,6 +168,6 @@ func truncateString(s string, maxLen int) string {
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
+	repoCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVar(&formatFlag, "format", "table", "Output format (table|json|yaml)")
 }
