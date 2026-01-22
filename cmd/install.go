@@ -19,6 +19,16 @@ var (
 	installTargetFlag string
 )
 
+// installResult tracks the result of installing a single resource
+type installResult struct {
+	resourceType resource.ResourceType
+	name         string
+	success      bool
+	skipped      bool
+	message      string
+	toolsAdded   []tools.Tool
+}
+
 // parseTargetFlag parses the --target flag and returns a list of tools
 // If the flag is empty, returns nil (use defaults)
 // If the flag contains values, parses and validates them
@@ -40,88 +50,16 @@ func parseTargetFlag(targetFlag string) ([]tools.Tool, error) {
 	return targets, nil
 }
 
-// Completion functions for shell tab completion
-
-// completeCommandNames provides completion for command names from the repository
-func completeCommandNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	manager, err := repo.NewManager()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	commandType := resource.Command
-	resources, err := manager.List(&commandType)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	var names []string
-	for _, res := range resources {
-		names = append(names, res.Name)
-	}
-
-	return names, cobra.ShellCompDirectiveNoFileComp
-}
-
-// completeSkillNames provides completion for skill names from the repository
-func completeSkillNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	manager, err := repo.NewManager()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	skillType := resource.Skill
-	resources, err := manager.List(&skillType)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	var names []string
-	for _, res := range resources {
-		names = append(names, res.Name)
-	}
-
-	return names, cobra.ShellCompDirectiveNoFileComp
-}
-
-// completeAgentNames provides completion for agent names from the repository
-func completeAgentNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	manager, err := repo.NewManager()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	agentType := resource.Agent
-	resources, err := manager.List(&agentType)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	var names []string
-	for _, res := range resources {
-		names = append(names, res.Name)
-	}
-
-	return names, cobra.ShellCompDirectiveNoFileComp
-}
-
 // installCmd represents the install command
 var installCmd = &cobra.Command{
-	Use:   "install [command|skill|agent]",
-	Short: "Install a resource to a project",
-	Long: `Install a command, skill, or agent resource from the repository to a project.
+	Use:   "install <resource>...",
+	Short: "Install resources to a project",
+	Long: `Install one or more resources (commands, skills, or agents) to a project.
+
+Resources are specified using the format 'type/name':
+  - command/name (or commands/name)
+  - skill/name (or skills/name)
+  - agent/name (or agents/name)
 
 Multi-tool behavior:
   - If tool directories exist (.claude, .opencode, .github/skills), installs to ALL of them
@@ -131,44 +69,26 @@ Multi-tool behavior:
 Supported tools:
   - claude:   Claude Code (.claude/commands, .claude/skills, .claude/agents)
   - opencode: OpenCode (.opencode/commands, .opencode/skills, .opencode/agents)
-  - copilot:  GitHub Copilot (.github/skills only - no commands or agents support)`,
-}
-
-// installCommandCmd represents the install command subcommand
-var installCommandCmd = &cobra.Command{
-	Use:   "command <name>",
-	Short: "Install a command resource",
-	Long: `Install a command resource from the repository to the current project.
-
-Creates symlinks in tool-specific directories. If multiple AI tools are detected
-in your project (e.g., both .claude and .opencode directories exist), the command
-will be installed to all of them.
-
-Note: GitHub Copilot does not support commands, only skills.
+  - copilot:  GitHub Copilot (.github/skills only - no commands or agents support)
 
 Examples:
-  # Install to current project (uses detected tools or default)
-  aimgr install command my-command
-  
-  # Install to specific project
-  aimgr install command test --project-path ~/my-project
-  
-  # Install to specific target tool
-  aimgr install command my-command --target claude
-  
-  # Install to multiple specific tools
-  aimgr install command my-command --target claude,opencode
-  
-  # Force reinstall
-  aimgr install command review --force
-  
-  # Set your default tool
-  aimgr config set default-tool opencode`,
-	Args:              cobra.ExactArgs(1),
-	ValidArgsFunction: completeCommandNames,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
+  # Install a single skill
+  aimgr install skill/pdf-processing
 
+  # Install multiple resources at once
+  aimgr install skill/foo command/bar agent/reviewer
+
+  # Install to specific project
+  aimgr install skill/test --project-path ~/project
+
+  # Force reinstall
+  aimgr install command/test --force
+
+  # Install to specific target
+  aimgr install skill/utils --target claude`,
+	Args:              cobra.MinimumNArgs(1),
+	ValidArgsFunction: completeInstallResources,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get project path (current directory or flag)
 		projectPath := projectPathFlag
 		if projectPath == "" {
@@ -214,317 +134,174 @@ Examples:
 		// Create repo manager
 		manager, err := repo.NewManager()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create repository manager: %w", err)
 		}
 
-		// Verify command exists in repo
-		res, err := manager.Get(name, resource.Command)
-		if err != nil {
-			return fmt.Errorf("command '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
+		// Track results
+		var results []installResult
+
+		// Process each resource argument
+		for _, arg := range args {
+			result := processInstall(arg, installer, manager)
+			results = append(results, result)
 		}
 
-		// Check if already installed
-		if !installForceFlag && installer.IsInstalled(name, resource.Command) {
-			return fmt.Errorf("command '%s' is already installed (use --force to reinstall)", name)
-		}
+		// Print results
+		printInstallSummary(results)
 
-		// Remove existing if force mode
-		if installForceFlag && installer.IsInstalled(name, resource.Command) {
-			if err := installer.Uninstall(name, resource.Command); err != nil {
-				return fmt.Errorf("failed to remove existing installation: %w", err)
+		// Return error if any resource failed
+		for _, result := range results {
+			if !result.success && !result.skipped {
+				return fmt.Errorf("some resources failed to install")
 			}
-		}
-
-		// Install command
-		if err := installer.InstallCommand(name, manager); err != nil {
-			return fmt.Errorf("failed to install command: %w", err)
-		}
-
-		// Success message
-		targetTools := installer.GetTargetTools()
-		fmt.Printf("✓ Installed command '%s'\n", name)
-		for _, tool := range targetTools {
-			toolInfo := tools.GetToolInfo(tool)
-			if toolInfo.SupportsCommands {
-				installPath := fmt.Sprintf("%s/%s.md", toolInfo.CommandsDir, name)
-				fmt.Printf("  → %s\n", installPath)
-			}
-		}
-		if res.Description != "" {
-			fmt.Printf("  Description: %s\n", res.Description)
 		}
 
 		return nil
 	},
 }
 
-// installSkillCmd represents the install skill subcommand
-var installSkillCmd = &cobra.Command{
-	Use:   "skill <name>",
-	Short: "Install a skill resource",
-	Long: `Install a skill resource from the repository to the current project.
-
-Creates symlinks in tool-specific directories. If multiple AI tools are detected
-in your project (e.g., both .claude and .opencode directories exist), the skill
-will be installed to all of them.
-
-All three supported tools (Claude Code, OpenCode, and GitHub Copilot) support skills.
-
-Examples:
-  # Install to current project (uses detected tools or default)
-  aimgr install skill pdf-processing
-  
-  # Install to specific project
-  aimgr install skill my-skill --project-path ~/my-project
-  
-  # Install to specific target tool
-  aimgr install skill my-skill --target copilot
-  
-  # Install to multiple specific tools
-  aimgr install skill my-skill --target claude,opencode,copilot
-  
-  # Force reinstall
-  aimgr install skill utils --force
-  
-  # Set your default tool
-  aimgr config set default-tool copilot`,
-	Args:              cobra.ExactArgs(1),
-	ValidArgsFunction: completeSkillNames,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-
-		// Get project path (current directory or flag)
-		projectPath := projectPathFlag
-		if projectPath == "" {
-			var err error
-			projectPath, err = os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get current directory: %w", err)
-			}
+// processInstall processes installing a single resource
+func processInstall(arg string, installer *install.Installer, manager *repo.Manager) installResult {
+	// Parse resource argument
+	resourceType, name, err := parseResourceArg(arg)
+	if err != nil {
+		return installResult{
+			name:    arg,
+			success: false,
+			message: err.Error(),
 		}
+	}
 
-		// Parse target flag (if provided)
-		explicitTargets, err := parseTargetFlag(installTargetFlag)
-		if err != nil {
-			return err
-		}
+	result := installResult{
+		resourceType: resourceType,
+		name:         name,
+		toolsAdded:   []tools.Tool{},
+	}
 
-		// Create installer
-		var installer *install.Installer
-		if explicitTargets != nil {
-			// Use explicit targets from --target flag (bypass detection)
-			installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
-		} else {
-			// Auto-detect existing tools or use config defaults
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return fmt.Errorf("failed to get home directory: %w", err)
-			}
-			cfg, err := config.Load(home)
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-			defaultTargets, err := cfg.GetDefaultTargets()
-			if err != nil {
-				return fmt.Errorf("invalid default targets in config: %w", err)
-			}
-			// NewInstaller will auto-detect existing tool directories
-			installer, err = install.NewInstaller(projectPath, defaultTargets)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to create installer: %w", err)
-		}
+	// Verify resource exists in repo
+	res, err := manager.Get(name, resourceType)
+	if err != nil {
+		result.success = false
+		result.message = fmt.Sprintf("%s '%s' not found in repository. Use 'aimgr list' to see available resources.", resourceType, name)
+		return result
+	}
 
-		// Create repo manager
-		manager, err := repo.NewManager()
-		if err != nil {
-			return err
-		}
+	// Check if already installed
+	if !installForceFlag && installer.IsInstalled(name, resourceType) {
+		result.skipped = true
+		result.message = "already installed (use --force to reinstall)"
+		return result
+	}
 
-		// Verify skill exists in repo
-		res, err := manager.Get(name, resource.Skill)
-		if err != nil {
-			return fmt.Errorf("skill '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
+	// Remove existing if force mode
+	if installForceFlag && installer.IsInstalled(name, resourceType) {
+		if err := installer.Uninstall(name, resourceType); err != nil {
+			result.success = false
+			result.message = fmt.Sprintf("failed to remove existing installation: %v", err)
+			return result
 		}
+	}
 
-		// Check if already installed
-		if !installForceFlag && installer.IsInstalled(name, resource.Skill) {
-			return fmt.Errorf("skill '%s' is already installed (use --force to reinstall)", name)
-		}
+	// Install based on resource type
+	var installErr error
+	switch resourceType {
+	case resource.Command:
+		installErr = installer.InstallCommand(name, manager)
+	case resource.Skill:
+		installErr = installer.InstallSkill(name, manager)
+	case resource.Agent:
+		installErr = installer.InstallAgent(name, manager)
+	default:
+		result.success = false
+		result.message = fmt.Sprintf("unsupported resource type: %s", resourceType)
+		return result
+	}
 
-		// Remove existing if force mode
-		if installForceFlag && installer.IsInstalled(name, resource.Skill) {
-			if err := installer.Uninstall(name, resource.Skill); err != nil {
-				return fmt.Errorf("failed to remove existing installation: %w", err)
-			}
-		}
+	if installErr != nil {
+		result.success = false
+		result.message = fmt.Sprintf("failed to install: %v", installErr)
+		return result
+	}
 
-		// Install skill
-		if err := installer.InstallSkill(name, manager); err != nil {
-			return fmt.Errorf("failed to install skill: %w", err)
-		}
+	// Success
+	result.success = true
+	result.toolsAdded = installer.GetTargetTools()
 
-		// Success message
-		targetTools := installer.GetTargetTools()
-		fmt.Printf("✓ Installed skill '%s'\n", name)
-		for _, tool := range targetTools {
-			toolInfo := tools.GetToolInfo(tool)
-			if toolInfo.SupportsSkills {
-				installPath := fmt.Sprintf("%s/%s", toolInfo.SkillsDir, name)
-				fmt.Printf("  → %s\n", installPath)
-			}
-		}
-		if res.Version != "" {
-			fmt.Printf("  Version: %s\n", res.Version)
-		}
-		if res.Description != "" {
-			fmt.Printf("  Description: %s\n", res.Description)
-		}
+	// Add description/version to message if available
+	var metaParts []string
+	if res.Version != "" {
+		metaParts = append(metaParts, fmt.Sprintf("Version: %s", res.Version))
+	}
+	if res.Description != "" {
+		metaParts = append(metaParts, fmt.Sprintf("Description: %s", res.Description))
+	}
+	if len(metaParts) > 0 {
+		result.message = strings.Join(metaParts, ", ")
+	}
 
-		return nil
-	},
+	return result
 }
 
-// installAgentCmd represents the install agent subcommand
-var installAgentCmd = &cobra.Command{
-	Use:   "agent <name>",
-	Short: "Install an agent resource",
-	Long: `Install an agent resource from the repository to the current project.
+// printInstallSummary prints a summary of install results
+func printInstallSummary(results []installResult) {
+	successCount := 0
+	skipCount := 0
+	failCount := 0
 
-Creates symlinks in tool-specific directories. If multiple AI tools are detected
-in your project (e.g., both .claude and .opencode directories exist), the agent
-will be installed to all of them.
-
-Note: GitHub Copilot does not support agents. Claude Code and OpenCode support agents.
-
-Examples:
-  # Install to current project (uses detected tools or default)
-  aimgr install agent beads-task-agent
-  
-  # Install to specific project
-  aimgr install agent my-agent --project-path ~/my-project
-  
-  # Install to specific target tool
-  aimgr install agent my-agent --target opencode
-  
-  # Install to multiple specific tools
-  aimgr install agent my-agent --target claude,opencode
-  
-  # Force reinstall
-  aimgr install agent beads-verify-agent --force
-  
-  # Set your default tool
-  aimgr config set default-tool claude`,
-	Args:              cobra.ExactArgs(1),
-	ValidArgsFunction: completeAgentNames,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-
-		// Get project path (current directory or flag)
-		projectPath := projectPathFlag
-		if projectPath == "" {
-			var err error
-			projectPath, err = os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get current directory: %w", err)
+	for _, result := range results {
+		if result.success {
+			successCount++
+			// Print success
+			fmt.Printf("✓ Installed %s '%s'\n", result.resourceType, result.name)
+			for _, tool := range result.toolsAdded {
+				toolInfo := tools.GetToolInfo(tool)
+				var installPath string
+				switch result.resourceType {
+				case resource.Command:
+					if toolInfo.SupportsCommands {
+						installPath = fmt.Sprintf("%s/%s.md", toolInfo.CommandsDir, result.name)
+					}
+				case resource.Skill:
+					if toolInfo.SupportsSkills {
+						installPath = fmt.Sprintf("%s/%s", toolInfo.SkillsDir, result.name)
+					}
+				case resource.Agent:
+					if toolInfo.SupportsAgents {
+						installPath = fmt.Sprintf("%s/%s.md", toolInfo.AgentsDir, result.name)
+					}
+				}
+				if installPath != "" {
+					fmt.Printf("  → %s\n", installPath)
+				}
 			}
-		}
-
-		// Parse target flag (if provided)
-		explicitTargets, err := parseTargetFlag(installTargetFlag)
-		if err != nil {
-			return err
-		}
-
-		// Create installer
-		var installer *install.Installer
-		if explicitTargets != nil {
-			// Use explicit targets from --target flag (bypass detection)
-			installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
+			if result.message != "" {
+				fmt.Printf("  %s\n", result.message)
+			}
+		} else if result.skipped {
+			skipCount++
+			// Print skipped
+			fmt.Printf("⊘ Skipped %s '%s': %s\n", result.resourceType, result.name, result.message)
 		} else {
-			// Auto-detect existing tools or use config defaults
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return fmt.Errorf("failed to get home directory: %w", err)
-			}
-			cfg, err := config.Load(home)
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-			defaultTargets, err := cfg.GetDefaultTargets()
-			if err != nil {
-				return fmt.Errorf("invalid default targets in config: %w", err)
-			}
-			// NewInstaller will auto-detect existing tool directories
-			installer, err = install.NewInstaller(projectPath, defaultTargets)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to create installer: %w", err)
-		}
-
-		// Create repo manager
-		manager, err := repo.NewManager()
-		if err != nil {
-			return err
-		}
-
-		// Verify agent exists in repo
-		res, err := manager.Get(name, resource.Agent)
-		if err != nil {
-			return fmt.Errorf("agent '%s' not found in repository. Use 'aimgr list' to see available resources.", name)
-		}
-
-		// Check if already installed
-		if !installForceFlag && installer.IsInstalled(name, resource.Agent) {
-			return fmt.Errorf("agent '%s' is already installed (use --force to reinstall)", name)
-		}
-
-		// Remove existing if force mode
-		if installForceFlag && installer.IsInstalled(name, resource.Agent) {
-			if err := installer.Uninstall(name, resource.Agent); err != nil {
-				return fmt.Errorf("failed to remove existing installation: %w", err)
+			failCount++
+			// Print failure
+			if result.resourceType != "" {
+				fmt.Printf("✗ Failed to install %s '%s': %s\n", result.resourceType, result.name, result.message)
+			} else {
+				fmt.Printf("✗ Failed: %s\n", result.message)
 			}
 		}
+	}
 
-		// Install agent
-		if err := installer.InstallAgent(name, manager); err != nil {
-			return fmt.Errorf("failed to install agent: %w", err)
-		}
-
-		// Success message
-		targetTools := installer.GetTargetTools()
-		fmt.Printf("✓ Installed agent '%s'\n", name)
-		for _, tool := range targetTools {
-			toolInfo := tools.GetToolInfo(tool)
-			if toolInfo.SupportsAgents {
-				installPath := fmt.Sprintf("%s/%s.md", toolInfo.AgentsDir, name)
-				fmt.Printf("  → %s\n", installPath)
-			}
-		}
-		if res.Description != "" {
-			fmt.Printf("  Description: %s\n", res.Description)
-		}
-
-		return nil
-	},
+	// Print summary
+	fmt.Println()
+	fmt.Printf("Summary: %d installed, %d skipped, %d failed\n", successCount, skipCount, failCount)
 }
 
 func init() {
 	rootCmd.AddCommand(installCmd)
-	installCmd.AddCommand(installCommandCmd)
-	installCmd.AddCommand(installSkillCmd)
-	installCmd.AddCommand(installAgentCmd)
 
-	// Add flags to all subcommands
-	installCommandCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
-	installCommandCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
-	installCommandCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
-
-	installSkillCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
-	installSkillCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
-	installSkillCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
-
-	installAgentCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
-	installAgentCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
-	installAgentCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
+	// Add flags to install command
+	installCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
+	installCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
+	installCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
 }

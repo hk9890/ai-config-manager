@@ -375,8 +375,8 @@ description: A skill for install testing
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addOutput)
 	}
 
-	// Test: aimgr install skill install-skill
-	output, err := runAimgr(t, "install", "skill", "install-skill", "--project-path", projectDir)
+	// Test: aimgr install skill/install-skill
+	output, err := runAimgr(t, "install", "skill/install-skill", "--project-path", projectDir)
 	if err != nil {
 		t.Fatalf("Failed to install skill: %v\nOutput: %s", err, output)
 	}
@@ -442,12 +442,12 @@ description: Multi test skill
 	}
 
 	// Test: install both resources
-	output, err := runAimgr(t, "install", "command", "multi-cmd", "--project-path", projectDir)
+	output, err := runAimgr(t, "install", "command/multi-cmd", "--project-path", projectDir)
 	if err != nil {
 		t.Fatalf("Failed to install command: %v\nOutput: %s", err, output)
 	}
 
-	output, err = runAimgr(t, "install", "skill", "multi-skill", "--project-path", projectDir)
+	output, err = runAimgr(t, "install", "skill/multi-skill", "--project-path", projectDir)
 	if err != nil {
 		t.Fatalf("Failed to install skill: %v\nOutput: %s", err, output)
 	}
@@ -502,7 +502,7 @@ description: A skill for uninstall testing
 	}
 
 	// Install it
-	installOutput, err := runAimgr(t, "install", "skill", "uninstall-skill", "--project-path", projectDir)
+	installOutput, err := runAimgr(t, "install", "skill/uninstall-skill", "--project-path", projectDir)
 	if err != nil {
 		t.Fatalf("Failed to install skill: %v\nOutput: %s", err, installOutput)
 	}

@@ -99,6 +99,81 @@ func completeResourceArgs(cmd *cobra.Command, args []string, toComplete string) 
 	return suggestions, cobra.ShellCompDirectiveNoFileComp
 }
 
+// completeCommandNames provides completion for command names from the repository
+func completeCommandNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	manager, err := repo.NewManager()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	commandType := resource.Command
+	resources, err := manager.List(&commandType)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	var names []string
+	for _, res := range resources {
+		names = append(names, res.Name)
+	}
+
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeSkillNames provides completion for skill names from the repository
+func completeSkillNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	manager, err := repo.NewManager()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	skillType := resource.Skill
+	resources, err := manager.List(&skillType)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	var names []string
+	for _, res := range resources {
+		names = append(names, res.Name)
+	}
+
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeAgentNames provides completion for agent names from the repository
+func completeAgentNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	manager, err := repo.NewManager()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	agentType := resource.Agent
+	resources, err := manager.List(&agentType)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	var names []string
+	for _, res := range resources {
+		names = append(names, res.Name)
+	}
+
+	return names, cobra.ShellCompDirectiveNoFileComp
+}
+
 // completeInstallResources provides shell completion for install command with type prefix support
 // Handles both old-style subcommands and new type/name format
 func completeInstallResources(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
