@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/adrg/xdg"
+	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
@@ -61,7 +63,7 @@ func (m *Manager) Init() error {
 }
 
 // AddCommand adds a command resource to the repository
-func (m *Manager) AddCommand(sourcePath string) error {
+func (m *Manager) AddCommand(sourcePath, sourceURL, sourceType string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -84,11 +86,25 @@ func (m *Manager) AddCommand(sourcePath string) error {
 		return fmt.Errorf("failed to copy command: %w", err)
 	}
 
+	// Create and save metadata
+	now := time.Now()
+	meta := &metadata.ResourceMetadata{
+		Name:           res.Name,
+		Type:           resource.Command,
+		SourceType:     sourceType,
+		SourceURL:      sourceURL,
+		FirstInstalled: now,
+		LastUpdated:    now,
+	}
+	if err := metadata.Save(meta, m.repoPath); err != nil {
+		return fmt.Errorf("failed to save metadata: %w", err)
+	}
+
 	return nil
 }
 
 // AddSkill adds a skill resource to the repository
-func (m *Manager) AddSkill(sourcePath string) error {
+func (m *Manager) AddSkill(sourcePath, sourceURL, sourceType string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -111,11 +127,25 @@ func (m *Manager) AddSkill(sourcePath string) error {
 		return fmt.Errorf("failed to copy skill: %w", err)
 	}
 
+	// Create and save metadata
+	now := time.Now()
+	meta := &metadata.ResourceMetadata{
+		Name:           res.Name,
+		Type:           resource.Skill,
+		SourceType:     sourceType,
+		SourceURL:      sourceURL,
+		FirstInstalled: now,
+		LastUpdated:    now,
+	}
+	if err := metadata.Save(meta, m.repoPath); err != nil {
+		return fmt.Errorf("failed to save metadata: %w", err)
+	}
+
 	return nil
 }
 
 // AddAgent adds an agent resource to the repository
-func (m *Manager) AddAgent(sourcePath string) error {
+func (m *Manager) AddAgent(sourcePath, sourceURL, sourceType string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -136,6 +166,20 @@ func (m *Manager) AddAgent(sourcePath string) error {
 	// Copy the file
 	if err := copyFile(sourcePath, destPath); err != nil {
 		return fmt.Errorf("failed to copy agent: %w", err)
+	}
+
+	// Create and save metadata
+	now := time.Now()
+	meta := &metadata.ResourceMetadata{
+		Name:           res.Name,
+		Type:           resource.Agent,
+		SourceType:     sourceType,
+		SourceURL:      sourceURL,
+		FirstInstalled: now,
+		LastUpdated:    now,
+	}
+	if err := metadata.Save(meta, m.repoPath); err != nil {
+		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
 	return nil
@@ -259,6 +303,14 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 		return fmt.Errorf("failed to remove resource: %w", err)
 	}
 
+	// Remove metadata file
+	metadataPath := metadata.GetMetadataPath(name, resourceType, m.repoPath)
+	if _, err := os.Stat(metadataPath); err == nil {
+		if err := os.Remove(metadataPath); err != nil {
+			return fmt.Errorf("failed to remove metadata: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -279,6 +331,11 @@ func (m *Manager) GetPath(name string, resourceType resource.ResourceType) strin
 // GetRepoPath returns the repository root path
 func (m *Manager) GetRepoPath() string {
 	return m.repoPath
+}
+
+// GetMetadata retrieves metadata for a specific resource
+func (m *Manager) GetMetadata(name string, resourceType resource.ResourceType) (*metadata.ResourceMetadata, error) {
+	return metadata.Load(name, resourceType, m.repoPath)
 }
 
 // copyFile copies a single file from src to dst
@@ -457,13 +514,21 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 
 	// Import the resource (unless dry run)
 	if !opts.DryRun {
+		// Get absolute path for source URL
+		absPath, err := filepath.Abs(sourcePath)
+		if err != nil {
+			absPath = sourcePath
+		}
+		sourceURL := "file://" + absPath
+		sourceType := "file"
+
 		switch resourceType {
 		case resource.Command:
-			err = m.AddCommand(sourcePath)
+			err = m.AddCommand(sourcePath, sourceURL, sourceType)
 		case resource.Skill:
-			err = m.AddSkill(sourcePath)
+			err = m.AddSkill(sourcePath, sourceURL, sourceType)
 		case resource.Agent:
-			err = m.AddAgent(sourcePath)
+			err = m.AddAgent(sourcePath, sourceURL, sourceType)
 		}
 
 		if err != nil {

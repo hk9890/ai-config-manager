@@ -28,7 +28,7 @@ description: A test command
 	if err := os.WriteFile(testCmd, []byte(cmdContent), 0644); err != nil {
 		t.Fatalf("Failed to create test command: %v", err)
 	}
-	if err := manager.AddCommand(testCmd); err != nil {
+	if err := manager.AddCommand(testCmd, "file://"+testCmd, "file"); err != nil {
 		t.Fatalf("Failed to add command to repo: %v", err)
 	}
 
@@ -48,7 +48,7 @@ description: A test skill
 	if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
 		t.Fatalf("Failed to create SKILL.md: %v", err)
 	}
-	if err := manager.AddSkill(skillDir); err != nil {
+	if err := manager.AddSkill(skillDir, "file://"+skillDir, "file"); err != nil {
 		t.Fatalf("Failed to add skill to repo: %v", err)
 	}
 

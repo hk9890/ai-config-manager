@@ -70,11 +70,11 @@ echo "Test script"
 	t.Log("Step 1: Adding resources to repository")
 	manager := repo.NewManagerWithPath(repoDir)
 
-	if err := manager.AddCommand(testCmdPath); err != nil {
+	if err := manager.AddCommand(testCmdPath, "file://"+testCmdPath, "file"); err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
 
-	if err := manager.AddSkill(skillDir); err != nil {
+	if err := manager.AddSkill(skillDir, "file://"+skillDir, "file"); err != nil {
 		t.Fatalf("Failed to add skill: %v", err)
 	}
 
@@ -201,7 +201,7 @@ func TestErrorCases(t *testing.T) {
 
 	t.Run("add invalid command", func(t *testing.T) {
 		// Try to add a non-existent file
-		err := manager.AddCommand("/nonexistent/file.md")
+		err := manager.AddCommand("/nonexistent/file.md", "file://"+"/nonexistent/file.md", "file")
 		if err == nil {
 			t.Error("Expected error for non-existent command, got nil")
 		}
@@ -209,7 +209,7 @@ func TestErrorCases(t *testing.T) {
 
 	t.Run("add invalid skill", func(t *testing.T) {
 		// Try to add a non-existent directory
-		err := manager.AddSkill("/nonexistent/skill")
+		err := manager.AddSkill("/nonexistent/skill", "file://"+"/nonexistent/skill", "file")
 		if err == nil {
 			t.Error("Expected error for non-existent skill, got nil")
 		}
@@ -255,12 +255,12 @@ description: A duplicate command
 		}
 
 		// Add it once
-		if err := manager.AddCommand(testCmdPath); err != nil {
+		if err := manager.AddCommand(testCmdPath, "file://"+testCmdPath, "file"); err != nil {
 			t.Fatalf("Failed to add command: %v", err)
 		}
 
 		// Try to add again - should fail
-		err := manager.AddCommand(testCmdPath)
+		err := manager.AddCommand(testCmdPath, "file://"+testCmdPath, "file")
 		if err == nil {
 			t.Error("Expected error for duplicate resource, got nil")
 		}
@@ -282,7 +282,7 @@ description: A test command for multi-tool testing
 	if err := os.WriteFile(testCmdPath, []byte(cmdContent), 0644); err != nil {
 		t.Fatalf("Failed to create test command: %v", err)
 	}
-	if err := manager.AddCommand(testCmdPath); err != nil {
+	if err := manager.AddCommand(testCmdPath, "file://"+testCmdPath, "file"); err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
 
@@ -517,7 +517,7 @@ func TestWithExampleResources(t *testing.T) {
 			t.Skip("sample-command.md not found")
 		}
 
-		if err := manager.AddCommand(sampleCmdPath); err != nil {
+		if err := manager.AddCommand(sampleCmdPath, "file://"+sampleCmdPath, "file"); err != nil {
 			t.Errorf("Failed to add sample command: %v", err)
 		}
 
@@ -537,7 +537,7 @@ func TestWithExampleResources(t *testing.T) {
 			t.Skip("sample-skill directory not found")
 		}
 
-		if err := manager.AddSkill(sampleSkillPath); err != nil {
+		if err := manager.AddSkill(sampleSkillPath, "file://"+sampleSkillPath, "file"); err != nil {
 			t.Errorf("Failed to add sample skill: %v", err)
 		}
 
@@ -591,7 +591,7 @@ Follow these instructions to test the agent workflow.
 	t.Log("Step 1: Adding agent to repository")
 	manager := repo.NewManagerWithPath(repoDir)
 
-	if err := manager.AddAgent(testAgentPath); err != nil {
+	if err := manager.AddAgent(testAgentPath, "file://"+testAgentPath, "file"); err != nil {
 		t.Fatalf("Failed to add agent: %v", err)
 	}
 

@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
@@ -48,7 +50,7 @@ This is a test command.
 	}
 
 	// Add the command
-	err := manager.AddCommand(testCmd)
+	err := manager.AddCommand(testCmd, "file://"+testCmd, "file")
 	if err != nil {
 		t.Fatalf("AddCommand() error = %v", err)
 	}
@@ -86,12 +88,12 @@ description: A test command
 	}
 
 	// Add the command first time - should succeed
-	if err := manager.AddCommand(testCmd); err != nil {
+	if err := manager.AddCommand(testCmd, "file://"+testCmd, "file"); err != nil {
 		t.Fatalf("First AddCommand() error = %v", err)
 	}
 
 	// Add the same command again - should fail
-	err := manager.AddCommand(testCmd)
+	err := manager.AddCommand(testCmd, "file://"+testCmd, "file")
 	if err == nil {
 		t.Error("AddCommand() expected error for duplicate command, got nil")
 	}
@@ -122,7 +124,7 @@ This is a test skill.
 	}
 
 	// Add the skill
-	err := manager.AddSkill(skillDir)
+	err := manager.AddSkill(skillDir, "file://"+skillDir, "file")
 	if err != nil {
 		t.Fatalf("AddSkill() error = %v", err)
 	}
@@ -186,7 +188,7 @@ description: A test skill with subdirectories
 	}
 
 	// Add the skill
-	err := manager.AddSkill(skillDir)
+	err := manager.AddSkill(skillDir, "file://"+skillDir, "file")
 	if err != nil {
 		t.Fatalf("AddSkill() error = %v", err)
 	}
@@ -219,7 +221,7 @@ description: A test command
 	if err := os.WriteFile(testCmd, []byte(cmdContent), 0644); err != nil {
 		t.Fatalf("Failed to create test command: %v", err)
 	}
-	if err := manager.AddCommand(testCmd); err != nil {
+	if err := manager.AddCommand(testCmd, "file://"+testCmd, "file"); err != nil {
 		t.Fatalf("AddCommand() error = %v", err)
 	}
 
@@ -239,7 +241,7 @@ description: A test skill
 	if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
 		t.Fatalf("Failed to create SKILL.md: %v", err)
 	}
-	if err := manager.AddSkill(skillDir); err != nil {
+	if err := manager.AddSkill(skillDir, "file://"+skillDir, "file"); err != nil {
 		t.Fatalf("AddSkill() error = %v", err)
 	}
 
@@ -295,7 +297,7 @@ description: A test command
 	if err := os.WriteFile(testCmd, []byte(cmdContent), 0644); err != nil {
 		t.Fatalf("Failed to create test command: %v", err)
 	}
-	if err := manager.AddCommand(testCmd); err != nil {
+	if err := manager.AddCommand(testCmd, "file://"+testCmd, "file"); err != nil {
 		t.Fatalf("AddCommand() error = %v", err)
 	}
 
@@ -338,7 +340,7 @@ description: A test command
 	if err := os.WriteFile(testCmd, []byte(cmdContent), 0644); err != nil {
 		t.Fatalf("Failed to create test command: %v", err)
 	}
-	if err := manager.AddCommand(testCmd); err != nil {
+	if err := manager.AddCommand(testCmd, "file://"+testCmd, "file"); err != nil {
 		t.Fatalf("AddCommand() error = %v", err)
 	}
 
@@ -463,7 +465,7 @@ func TestAddBulk(t *testing.T) {
 				// Add first command
 				cmd1Path := filepath.Join(tmpDir, "existing.md")
 				os.WriteFile(cmd1Path, []byte("---\ndescription: Existing\n---\n"), 0644)
-				manager.AddCommand(cmd1Path)
+				manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
 
 				// Try to add again
 				cmd2Path := filepath.Join(tmpDir, "existing.md")
@@ -483,7 +485,7 @@ func TestAddBulk(t *testing.T) {
 				// Add first command
 				cmd1Path := filepath.Join(tmpDir, "forced.md")
 				os.WriteFile(cmd1Path, []byte("---\ndescription: Original\n---\n"), 0644)
-				manager.AddCommand(cmd1Path)
+				manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
 
 				// Force overwrite
 				cmd2Path := filepath.Join(tmpDir, "forced.md")
@@ -503,7 +505,7 @@ func TestAddBulk(t *testing.T) {
 				// Add first command
 				cmd1Path := filepath.Join(tmpDir, "conflict.md")
 				os.WriteFile(cmd1Path, []byte("---\ndescription: Conflict\n---\n"), 0644)
-				manager.AddCommand(cmd1Path)
+				manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
 
 				// Try to add again without flags
 				cmd2Path := filepath.Join(tmpDir, "conflict.md")
@@ -578,5 +580,273 @@ func TestAddBulk(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAddCommandCreatesMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := NewManagerWithPath(tmpDir)
+
+	// Create a test command
+	testCmd := filepath.Join(tmpDir, "test-cmd.md")
+	cmdContent := `---
+description: A test command
+---
+
+# Test Command
+`
+	if err := os.WriteFile(testCmd, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	// Add the command
+	sourceURL := "gh:owner/repo/test-cmd.md"
+	sourceType := "github"
+	beforeAdd := time.Now().Add(-time.Second) // Allow for slight clock differences
+
+	err := manager.AddCommand(testCmd, sourceURL, sourceType)
+	if err != nil {
+		t.Fatalf("AddCommand() error = %v", err)
+	}
+
+	afterAdd := time.Now().Add(time.Second)
+
+	// Verify metadata file exists
+	metadataPath := metadata.GetMetadataPath("test-cmd", resource.Command, manager.GetRepoPath())
+	if _, err := os.Stat(metadataPath); err != nil {
+		t.Errorf("Metadata file was not created: %v", err)
+	}
+
+	// Verify metadata content
+	meta, err := manager.GetMetadata("test-cmd", resource.Command)
+	if err != nil {
+		t.Fatalf("GetMetadata() error = %v", err)
+	}
+
+	if meta.Name != "test-cmd" {
+		t.Errorf("Metadata name = %v, want test-cmd", meta.Name)
+	}
+	if meta.Type != resource.Command {
+		t.Errorf("Metadata type = %v, want command", meta.Type)
+	}
+	if meta.SourceURL != sourceURL {
+		t.Errorf("Metadata sourceURL = %v, want %v", meta.SourceURL, sourceURL)
+	}
+	if meta.SourceType != sourceType {
+		t.Errorf("Metadata sourceType = %v, want %v", meta.SourceType, sourceType)
+	}
+	if meta.FirstInstalled.Before(beforeAdd) || meta.FirstInstalled.After(afterAdd) {
+		t.Errorf("Metadata FirstInstalled = %v, want between %v and %v", meta.FirstInstalled, beforeAdd, afterAdd)
+	}
+	if meta.LastUpdated.Before(beforeAdd) || meta.LastUpdated.After(afterAdd) {
+		t.Errorf("Metadata LastUpdated = %v, want between %v and %v", meta.LastUpdated, beforeAdd, afterAdd)
+	}
+}
+
+func TestAddSkillCreatesMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := NewManagerWithPath(tmpDir)
+
+	// Create a test skill
+	skillDir := filepath.Join(tmpDir, "test-skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("Failed to create skill directory: %v", err)
+	}
+
+	skillMdPath := filepath.Join(skillDir, "SKILL.md")
+	skillContent := `---
+name: test-skill
+description: A test skill
+---
+
+# Test Skill
+`
+	if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
+		t.Fatalf("Failed to create SKILL.md: %v", err)
+	}
+
+	// Add the skill
+	sourceURL := "file:///local/path/test-skill"
+	sourceType := "local"
+
+	err := manager.AddSkill(skillDir, sourceURL, sourceType)
+	if err != nil {
+		t.Fatalf("AddSkill() error = %v", err)
+	}
+
+	// Verify metadata file exists
+	metadataPath := metadata.GetMetadataPath("test-skill", resource.Skill, manager.GetRepoPath())
+	if _, err := os.Stat(metadataPath); err != nil {
+		t.Errorf("Metadata file was not created: %v", err)
+	}
+
+	// Verify metadata content
+	meta, err := manager.GetMetadata("test-skill", resource.Skill)
+	if err != nil {
+		t.Fatalf("GetMetadata() error = %v", err)
+	}
+
+	if meta.Name != "test-skill" {
+		t.Errorf("Metadata name = %v, want test-skill", meta.Name)
+	}
+	if meta.Type != resource.Skill {
+		t.Errorf("Metadata type = %v, want skill", meta.Type)
+	}
+	if meta.SourceURL != sourceURL {
+		t.Errorf("Metadata sourceURL = %v, want %v", meta.SourceURL, sourceURL)
+	}
+	if meta.SourceType != sourceType {
+		t.Errorf("Metadata sourceType = %v, want %v", meta.SourceType, sourceType)
+	}
+}
+
+func TestAddAgentCreatesMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := NewManagerWithPath(tmpDir)
+
+	// Create a test agent
+	testAgent := filepath.Join(tmpDir, "test-agent.md")
+	agentContent := `---
+description: A test agent
+---
+
+# Test Agent
+`
+	if err := os.WriteFile(testAgent, []byte(agentContent), 0644); err != nil {
+		t.Fatalf("Failed to create test agent: %v", err)
+	}
+
+	// Add the agent
+	sourceURL := "gh:owner/repo/agents/test-agent.md"
+	sourceType := "github"
+
+	err := manager.AddAgent(testAgent, sourceURL, sourceType)
+	if err != nil {
+		t.Fatalf("AddAgent() error = %v", err)
+	}
+
+	// Verify metadata file exists
+	metadataPath := metadata.GetMetadataPath("test-agent", resource.Agent, manager.GetRepoPath())
+	if _, err := os.Stat(metadataPath); err != nil {
+		t.Errorf("Metadata file was not created: %v", err)
+	}
+
+	// Verify metadata content
+	meta, err := manager.GetMetadata("test-agent", resource.Agent)
+	if err != nil {
+		t.Fatalf("GetMetadata() error = %v", err)
+	}
+
+	if meta.Name != "test-agent" {
+		t.Errorf("Metadata name = %v, want test-agent", meta.Name)
+	}
+	if meta.Type != resource.Agent {
+		t.Errorf("Metadata type = %v, want agent", meta.Type)
+	}
+	if meta.SourceURL != sourceURL {
+		t.Errorf("Metadata sourceURL = %v, want %v", meta.SourceURL, sourceURL)
+	}
+	if meta.SourceType != sourceType {
+		t.Errorf("Metadata sourceType = %v, want %v", meta.SourceType, sourceType)
+	}
+}
+
+func TestRemoveDeletesMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := NewManagerWithPath(tmpDir)
+
+	// Create and add a test command
+	testCmd := filepath.Join(tmpDir, "test-cmd.md")
+	cmdContent := `---
+description: A test command
+---
+
+# Test Command
+`
+	if err := os.WriteFile(testCmd, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	if err := manager.AddCommand(testCmd, "file://"+testCmd, "file"); err != nil {
+		t.Fatalf("AddCommand() error = %v", err)
+	}
+
+	// Verify metadata exists
+	metadataPath := metadata.GetMetadataPath("test-cmd", resource.Command, manager.GetRepoPath())
+	if _, err := os.Stat(metadataPath); err != nil {
+		t.Fatalf("Metadata file was not created: %v", err)
+	}
+
+	// Remove the command
+	err := manager.Remove("test-cmd", resource.Command)
+	if err != nil {
+		t.Fatalf("Remove() error = %v", err)
+	}
+
+	// Verify metadata was deleted
+	if _, err := os.Stat(metadataPath); err == nil {
+		t.Error("Metadata file still exists after removal")
+	}
+}
+
+func TestGetMetadataNotFound(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := NewManagerWithPath(tmpDir)
+
+	_, err := manager.GetMetadata("nonexistent", resource.Command)
+	if err == nil {
+		t.Error("GetMetadata() expected error for nonexistent resource, got nil")
+	}
+}
+
+func TestBulkImportCreatesMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+	repoPath := filepath.Join(tmpDir, "repo")
+	manager := NewManagerWithPath(repoPath)
+
+	// Create test commands
+	cmd1Path := filepath.Join(tmpDir, "cmd1.md")
+	cmd2Path := filepath.Join(tmpDir, "cmd2.md")
+
+	os.WriteFile(cmd1Path, []byte("---\ndescription: Command 1\n---\n"), 0644)
+	os.WriteFile(cmd2Path, []byte("---\ndescription: Command 2\n---\n"), 0644)
+
+	// Bulk import
+	sources := []string{cmd1Path, cmd2Path}
+	result, err := manager.AddBulk(sources, BulkImportOptions{})
+	if err != nil {
+		t.Fatalf("AddBulk() error = %v", err)
+	}
+
+	if len(result.Added) != 2 {
+		t.Errorf("AddBulk() added count = %v, want 2", len(result.Added))
+	}
+
+	// Verify metadata files exist
+	meta1Path := metadata.GetMetadataPath("cmd1", resource.Command, manager.GetRepoPath())
+	if _, err := os.Stat(meta1Path); err != nil {
+		t.Errorf("Metadata file for cmd1 was not created: %v", err)
+	}
+
+	meta2Path := metadata.GetMetadataPath("cmd2", resource.Command, manager.GetRepoPath())
+	if _, err := os.Stat(meta2Path); err != nil {
+		t.Errorf("Metadata file for cmd2 was not created: %v", err)
+	}
+
+	// Verify metadata contains correct source info (file:// URLs)
+	meta1, err := manager.GetMetadata("cmd1", resource.Command)
+	if err != nil {
+		t.Fatalf("GetMetadata(cmd1) error = %v", err)
+	}
+	if meta1.SourceType != "file" {
+		t.Errorf("cmd1 SourceType = %v, want file", meta1.SourceType)
+	}
+
+	meta2, err := manager.GetMetadata("cmd2", resource.Command)
+	if err != nil {
+		t.Fatalf("GetMetadata(cmd2) error = %v", err)
+	}
+	if meta2.SourceType != "file" {
+		t.Errorf("cmd2 SourceType = %v, want file", meta2.SourceType)
 	}
 }

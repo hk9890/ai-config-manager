@@ -183,7 +183,7 @@ func TestBulkImportConflicts(t *testing.T) {
 		// Add first command
 		cmd1Path := filepath.Join(tmpDir, "conflict.md")
 		os.WriteFile(cmd1Path, []byte("---\ndescription: Original\n---\n"), 0644)
-		if err := manager.AddCommand(cmd1Path); err != nil {
+		if err := manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file"); err != nil {
 			t.Fatalf("Failed to add first command: %v", err)
 		}
 
@@ -206,7 +206,7 @@ func TestBulkImportConflicts(t *testing.T) {
 		// Add first command
 		cmd1Path := filepath.Join(tmpDir, "skip.md")
 		os.WriteFile(cmd1Path, []byte("---\ndescription: Existing\n---\n"), 0644)
-		if err := manager.AddCommand(cmd1Path); err != nil {
+		if err := manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file"); err != nil {
 			t.Fatalf("Failed to add first command: %v", err)
 		}
 
@@ -229,7 +229,7 @@ func TestBulkImportConflicts(t *testing.T) {
 		// Add first command
 		cmd1Path := filepath.Join(tmpDir, "fail.md")
 		os.WriteFile(cmd1Path, []byte("---\ndescription: Existing\n---\n"), 0644)
-		if err := manager.AddCommand(cmd1Path); err != nil {
+		if err := manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file"); err != nil {
 			t.Fatalf("Failed to add first command: %v", err)
 		}
 

@@ -113,7 +113,7 @@ This demonstrates adding a skill from a GitHub source.
 		}
 
 		// Add the skill to the manager
-		err := manager.AddSkill(testSkillDir)
+		err := manager.AddSkill(testSkillDir, "file://"+testSkillDir, "file")
 		if err != nil {
 			t.Fatalf("Failed to add skill to repository: %v", err)
 		}
@@ -435,7 +435,7 @@ This is a local skill for testing.
 		}
 
 		// Add the local skill to repository
-		err = manager.AddSkill(parsed.LocalPath)
+		err = manager.AddSkill(parsed.LocalPath, "file://"+parsed.LocalPath, "file")
 		if err != nil {
 			t.Fatalf("Failed to add local skill: %v", err)
 		}
@@ -477,7 +477,7 @@ This is a local command for testing.
 		}
 
 		// Add the local command to repository
-		err = manager.AddCommand(parsed.LocalPath)
+		err = manager.AddCommand(parsed.LocalPath, "file://"+parsed.LocalPath, "file")
 		if err != nil {
 			t.Fatalf("Failed to add local command: %v", err)
 		}
