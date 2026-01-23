@@ -28,7 +28,8 @@ Examples:
   aimgr repo list agent              # List only agents
   aimgr repo list --format=json      # Output as JSON
   aimgr repo list --format=yaml      # Output as YAML`,
-	Args: cobra.MaximumNArgs(1),
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeResourceTypes,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Parse optional type filter
 		var resourceType *resource.ResourceType

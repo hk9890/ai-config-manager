@@ -38,7 +38,8 @@ Examples:
   aimgr list --format=json           # Output as JSON
   aimgr list --format=yaml           # Output as YAML
   aimgr list --path ~/project        # List in specific directory`,
-	Args: cobra.MaximumNArgs(1),
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeResourceTypes,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Parse optional type filter
 		var resourceType *resource.ResourceType

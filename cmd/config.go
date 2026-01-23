@@ -33,8 +33,9 @@ Available keys:
 
 Example:
   aimgr config get install.targets`,
-	Args: cobra.ExactArgs(1),
-	RunE: configGet,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeConfigKeys,
+	RunE:              configGet,
 }
 
 // configSetCmd represents the config set command
@@ -55,8 +56,9 @@ Examples:
   aimgr config set install.targets claude
   aimgr config set install.targets claude,opencode
   aimgr config set install.targets claude,opencode,copilot`,
-	Args: cobra.ExactArgs(2),
-	RunE: configSet,
+	Args:              cobra.ExactArgs(2),
+	ValidArgsFunction: completeConfigSetArgs,
+	RunE:              configSet,
 }
 
 func init() {

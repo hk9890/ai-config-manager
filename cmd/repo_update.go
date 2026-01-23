@@ -93,7 +93,8 @@ Examples:
   aimgr repo update skill my-skill     # Update specific skill
   aimgr repo update skill              # Update all skills
   aimgr repo update skill my-skill --dry-run`,
-	Args: cobra.MaximumNArgs(1),
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeSkillNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager, err := repo.NewManager()
 		if err != nil {
@@ -128,7 +129,8 @@ Examples:
   aimgr repo update command my-cmd     # Update specific command
   aimgr repo update command            # Update all commands
   aimgr repo update command my-cmd --dry-run`,
-	Args: cobra.MaximumNArgs(1),
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeCommandNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager, err := repo.NewManager()
 		if err != nil {
@@ -163,7 +165,8 @@ Examples:
   aimgr repo update agent my-agent     # Update specific agent
   aimgr repo update agent              # Update all agents
   aimgr repo update agent my-agent --dry-run`,
-	Args: cobra.MaximumNArgs(1),
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeAgentNames,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager, err := repo.NewManager()
 		if err != nil {
