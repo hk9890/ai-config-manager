@@ -29,7 +29,8 @@ var configGetCmd = &cobra.Command{
 	Long: `Get a configuration value.
 
 Available keys:
-  install.targets - The default AI tools to install to (comma-separated: claude, opencode, copilot)
+  install.targets - The default AI tools to install to (recommended)
+  default-tool    - Legacy: first install target (use install.targets instead)
 
 Example:
   aimgr config get install.targets`,
@@ -70,8 +71,9 @@ func init() {
 func configGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	if key != "install.targets" {
-		return fmt.Errorf("unknown config key: %s (available: install.targets)", key)
+	// Support both new and legacy config keys
+	if key != "install.targets" && key != "default-tool" {
+		return fmt.Errorf("unknown config key: %s (available: install.targets, default-tool)", key)
 	}
 
 	// Load global config
@@ -83,6 +85,16 @@ func configGet(cmd *cobra.Command, args []string) error {
 	// Get config path for display
 	configPath, _ := config.GetConfigPath()
 	fmt.Fprintf(os.Stderr, "Using config file: %s\n", configPath)
+
+	// Handle legacy default-tool key
+	if key == "default-tool" {
+		if len(cfg.Install.Targets) == 0 {
+			fmt.Printf("default-tool: claude\n")
+		} else {
+			fmt.Printf("default-tool: %s\n", cfg.Install.Targets[0])
+		}
+		return nil
+	}
 
 	// Print value
 	if len(cfg.Install.Targets) == 0 {
