@@ -11,6 +11,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/source"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -69,9 +70,37 @@ Examples:
   
   # Force overwrite
   aimgr repo add command ./test-command.md --force`,
-	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveDefault
+	},
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return fmt.Errorf(`requires a source argument
+
+Source Formats:
+  gh:owner/repo              GitHub repository (auto-discovers commands)
+  gh:owner/repo/path         Specific command file in GitHub repo
+  owner/repo                 GitHub shorthand (gh: inferred)
+  ./path or ~/path           Local .md file path
+  https://github.com/...     Full GitHub URL
+
+Examples:
+  # From GitHub (discovers all commands in repo)
+  aimgr repo add command gh:owner/repo
+  aimgr repo add command owner/repo                   # shorthand
+
+  # Specific command from GitHub
+  aimgr repo add command gh:owner/repo/commands/test.md
+
+  # From local file
+  aimgr repo add command ~/my-commands/test-command.md
+
+Run 'aimgr repo add command --help' for more details.`)
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
+		}
+		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
@@ -196,9 +225,37 @@ Examples:
   
   # Force overwrite
   aimgr repo add skill ./pdf-processing --force`,
-	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveDefault
+	},
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return fmt.Errorf(`requires a source argument
+
+Source Formats:
+  gh:owner/repo              GitHub repository (auto-discovers skills)
+  gh:owner/repo/path         Specific skill in GitHub repo
+  owner/repo                 GitHub shorthand (gh: inferred)
+  ./path or ~/path           Local directory path
+  https://github.com/...     Full GitHub URL
+
+Examples:
+  # From GitHub (discovers all skills in repo)
+  aimgr repo add skill gh:anthropics/skills
+  aimgr repo add skill anthropics/skills              # shorthand
+
+  # Specific skill from GitHub
+  aimgr repo add skill gh:anthropics/skills/pdf
+
+  # From local directory
+  aimgr repo add skill ~/my-skills/pdf-processing
+
+Run 'aimgr repo add skill --help' for more details.`)
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
+		}
+		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
@@ -333,9 +390,37 @@ Examples:
   
   # Force overwrite
   aimgr repo add agent ./code-reviewer.md --force`,
-	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveDefault
+	},
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return fmt.Errorf(`requires a source argument
+
+Source Formats:
+  gh:owner/repo              GitHub repository (auto-discovers agents)
+  gh:owner/repo/path         Specific agent file in GitHub repo
+  owner/repo                 GitHub shorthand (gh: inferred)
+  ./path or ~/path           Local .md file path
+  https://github.com/...     Full GitHub URL
+
+Examples:
+  # From GitHub (discovers all agents in repo)
+  aimgr repo add agent gh:owner/repo
+  aimgr repo add agent owner/repo                     # shorthand
+
+  # Specific agent from GitHub
+  aimgr repo add agent gh:owner/repo/agents/reviewer.md
+
+  # From local file
+  aimgr repo add agent ~/.opencode/agents/code-reviewer.md
+
+Run 'aimgr repo add agent --help' for more details.`)
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
+		}
+		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
@@ -653,16 +738,34 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 	}
 
 	// Multiple resources found, prompt user to select
-	fmt.Printf("Multiple %ss found:\n", resourceType)
+	// Print header
+	fmt.Printf("Multiple %ss found in repository:\n\n", resourceType)
+
+	// Create table
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header("#", "Name", "Description")
+
+	// Add rows
 	for i, res := range resources {
 		desc := res.Description
 		if desc == "" {
 			desc = "(no description)"
 		}
-		fmt.Printf("  %d. %s - %s\n", i+1, res.Name, desc)
+		// Truncate description to 60 chars (same as list command)
+		desc = truncateString(desc, 60)
+
+		if err := table.Append(fmt.Sprintf("%d", i+1), res.Name, desc); err != nil {
+			return nil, fmt.Errorf("failed to add row: %w", err)
+		}
 	}
 
-	fmt.Print("\nSelect a resource (1-", len(resources), "): ")
+	// Render table
+	if err := table.Render(); err != nil {
+		return nil, fmt.Errorf("failed to render table: %w", err)
+	}
+
+	// Prompt for selection
+	fmt.Printf("\nSelect a resource (1-%d, or 'q' to cancel): ", len(resources))
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
@@ -670,6 +773,12 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 	}
 
 	input = strings.TrimSpace(input)
+
+	// Allow 'q' to cancel
+	if input == "q" || input == "Q" {
+		return nil, fmt.Errorf("selection cancelled by user")
+	}
+
 	var selection int
 	_, err = fmt.Sscanf(input, "%d", &selection)
 	if err != nil || selection < 1 || selection > len(resources) {
