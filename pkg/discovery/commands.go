@@ -122,6 +122,11 @@ func recursiveSearchCommands(basePath string, depth int) ([]*resource.Resource, 
 			continue
 		}
 
+		// Skip agents and skills directories (they're handled by their own discovery)
+		if entry.Name() == "agents" || entry.Name() == "skills" {
+			continue
+		}
+
 		subdirPath := filepath.Join(basePath, entry.Name())
 		subCommands, err := recursiveSearchCommands(subdirPath, depth+1)
 		if err == nil {

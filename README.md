@@ -209,9 +209,11 @@ aimgr config get install.targets
 
 ### 2. Add Resources to Repository
 
-Resources can be added from multiple sources: local files, GitHub repositories, or bulk imports from tool directories.
+Resources can be added from multiple sources: local files, GitHub repositories, or bulk discovery from folders.
 
-#### From Local Files
+#### Add Individual Resources
+
+Add specific resources by type:
 
 ```bash
 # Add a command (single .md file)
@@ -224,7 +226,51 @@ aimgr repo add skill ~/my-skills/pdf-processing
 aimgr repo add agent ~/.claude/agents/code-reviewer.md
 ```
 
-#### From GitHub Repositories
+#### Bulk Add - Auto-Discovery
+
+Auto-discover and add all resources (commands, skills, agents) from a folder or GitHub repository:
+
+```bash
+# From local folders
+aimgr repo add bulk ~/.opencode/           # Discovers all resources in .opencode
+aimgr repo add bulk ~/project/.claude/     # Discovers all resources in .claude
+aimgr repo add bulk ./my-resources/        # Any folder with resources
+
+# From GitHub
+aimgr repo add bulk gh:owner/repo          # Auto-discovers all resources in repo
+aimgr repo add bulk gh:owner/repo@v1.0.0   # Specific version
+aimgr repo add bulk owner/repo             # Shorthand (gh: inferred)
+
+# With options
+aimgr repo add bulk ~/.opencode/ --force         # Overwrite existing
+aimgr repo add bulk ./resources/ --skip-existing # Skip conflicts
+aimgr repo add bulk ./test/ --dry-run            # Preview without importing
+
+# Example output:
+# Importing from: /home/user/.opencode
+# 
+# Found: 5 commands, 3 skills, 2 agents
+# 
+# ✓ Added command 'test-command'
+# ✓ Added command 'debug-helper'
+# ...
+# ✓ Added skill 'pdf-processing'
+# ...
+# ✓ Added agent 'code-reviewer'
+# 
+# Summary: 10 added, 0 skipped, 0 failed
+```
+
+**How Bulk Discovery Works:**
+
+- Searches recursively in the folder for commands (*.md), skills (*/SKILL.md), and agents (*.md)
+- Automatically detects resource types and validates them
+- Handles Claude (`.claude/`), OpenCode (`.opencode/`), and GitHub Copilot (`.github/`) structures
+- Skips common directories like `node_modules`, `.git`, etc.
+
+#### From GitHub (Individual Resources)
+
+Add specific resources from GitHub repositories:
 
 ```bash
 # Add a skill from GitHub
@@ -236,158 +282,12 @@ aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
 # Add from a specific branch or tag
 aimgr repo add skill gh:anthropics/skills@v1.0.0
 
-# Shorthand - GitHub prefix is inferred for owner/repo format
-aimgr repo add skill vercel-labs/agent-skills
-
 # Add commands from GitHub
-aimgr repo add command gh:myorg/commands
+aimgr repo add command gh:myorg/commands/my-command.md
 
 # Add agents from GitHub
-aimgr repo add agent gh:myorg/agents/code-reviewer
+aimgr repo add agent gh:myorg/agents/code-reviewer.md
 ```
-
-#### From Tool Directories (Bulk Import)
-
-```bash
-# Import from OpenCode directory
-aimgr repo add opencode ~/.opencode
-
-# Import from Claude directory
-aimgr repo add claude ~/.claude
-```
-
-
-## Bulk Import
-
-Import multiple resources at once from Claude plugins or Claude configuration folders.
-
-### Import from Claude Plugin
-
-Import all commands and skills from a Claude plugin directory:
-
-```bash
-# Import from a Claude plugin
-aimgr repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/example-plugin
-
-# Example output:
-# Importing from plugin: example-plugin
-#   Description: A comprehensive example plugin
-# 
-# Found: 1 commands, 1 skills
-# 
-# ✓ Added command 'example-command'
-# ✓ Added skill 'example-skill'
-# 
-# Summary: 2 added, 0 skipped, 0 failed
-```
-
-**Flags:**
-- `--force` / `-f`: Overwrite existing resources
-- `--skip-existing`: Skip conflicts silently
-- `--dry-run`: Preview without importing
-
-### Import from Claude Folder
-
-Import all commands, skills, and agents from a `.claude/` configuration folder:
-
-```bash
-# Import from .claude folder
-aimgr repo add claude ~/.claude
-
-# Import from project's .claude folder
-aimgr repo add claude ~/my-project/.claude
-
-# Example output:
-# Importing from Claude folder: /home/user/.claude
-# 
-# Found: 5 commands, 3 skills, 2 agents
-#
-# ✓ Added command 'test'
-# ✓ Added command 'review'
-# ✓ Added command 'deploy'
-# ✓ Added skill 'pdf-processor'
-# ✓ Added skill 'code-analyzer'
-# ✓ Added agent 'code-reviewer'
-# ⊘ Skipped 'git-release' (already exists)
-# 
-# Summary: 6 added, 1 skipped, 0 failed
-```
-
-**What gets imported:**
-- Commands from `.claude/commands/*.md`
-- Skills from `.claude/skills/*/SKILL.md`
-- Agents from `.claude/agents/*.md`
-- Works with both `.claude` directory and parent directories containing `.claude/`
-
-### Import from OpenCode Folder
-
-Import all resources from an `.opencode/` configuration folder:
-
-```bash
-# Import from .opencode folder
-aimgr repo add opencode ~/.opencode
-
-# Import from project's .opencode folder
-aimgr repo add opencode ~/my-project/.opencode
-
-# Example output:
-# Importing from OpenCode folder: /home/user/.opencode
-# 
-# Found: 3 commands, 2 skills, 1 agents
-#
-# ✓ Added command 'build'
-# ✓ Added command 'test'
-# ✓ Added skill 'data-processor'
-# ✓ Added agent 'qa-reviewer'
-# 
-# Summary: 4 added, 0 skipped, 0 failed
-```
-
-**What gets imported:**
-- Commands from `.opencode/commands/*.md`
-- Skills from `.opencode/skills/*/SKILL.md`
-- Agents from `.opencode/agents/*.md`
-
-### Handling Conflicts
-
-Control how conflicts are handled when importing:
-
-```bash
-# Force overwrite existing resources
-aimgr repo add plugin ./my-plugin --force
-
-# Skip existing resources (no error)
-aimgr repo add claude ~/.claude --skip-existing
-
-# Preview what would be imported (dry run)
-aimgr repo add plugin ./plugin --dry-run
-
-# Default behavior: fail on first conflict
-aimgr repo add plugin ./plugin  # Error if any resource already exists
-```
-
-### Bulk Import Use Cases
-
-**Scenario 1: Setting up your aimgr from existing Claude setup**
-```bash
-# Import all your existing commands and skills at once
-aimgr repo add claude ~/.claude
-```
-
-**Scenario 2: Installing a complete plugin**
-```bash
-# Import all resources from a plugin in one command
-aimgr repo add plugin ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/pr-review-toolkit
-```
-
-**Scenario 3: Migrating resources between machines**
-```bash
-# On machine A: your resources are already in aimgr
-# On machine B: import from a cloned .claude folder
-aimgr repo add claude ~/cloned-config/.claude
-```
-
-
 
 ### 3. List Available Resources
 

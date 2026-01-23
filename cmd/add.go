@@ -17,15 +17,41 @@ import (
 
 var forceFlag bool
 
+var (
+	skipExistingFlag bool
+	dryRunFlag       bool
+)
+
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:   "add [command|skill|agent]",
-	Short: "Add a resource to the repository",
-	Long: `Add a command, skill, or agent resource to the aimgr repository.
+	Use:   "add [command|skill|agent|bulk]",
+	Short: "Add resources to the repository",
+	Long: `Add resources to the aimgr repository.
+
+You can add individual resources by type, or use bulk to auto-discover all resources:
+
+Subcommands:
+  command  Add a single command resource (.md file)
+  skill    Add a single skill resource (directory with SKILL.md)
+  agent    Add a single agent resource (.md file)
+  bulk     Auto-discover and add all resources from a folder or URL
 
 Commands are single .md files with YAML frontmatter.
 Skills are directories containing a SKILL.md file.
-Agents are single .md files with YAML frontmatter.`,
+Agents are single .md files with YAML frontmatter.
+
+Examples:
+  # Add specific resources
+  aimgr repo add command ./my-command.md
+  aimgr repo add skill ./my-skill/
+  aimgr repo add agent ./my-agent.md
+
+  # Bulk add all resources from a folder
+  aimgr repo add bulk ~/.opencode/
+  aimgr repo add bulk ~/project/.claude/
+  
+  # Bulk add from GitHub
+  aimgr repo add bulk gh:owner/repo`,
 }
 
 // addCommandCmd represents the add command subcommand
@@ -958,4 +984,52 @@ func formatGitHubShortURL(parsed *source.ParsedSource) string {
 	}
 
 	return result
+}
+
+// printImportResults prints a formatted summary of import results
+func printImportResults(result *repo.BulkImportResult) {
+	// Print added resources
+	for _, path := range result.Added {
+		resourceType := "resource"
+		name := filepath.Base(path)
+
+		// Determine type
+		if filepath.Ext(path) == ".md" {
+			// Could be command or agent - check parent directory
+			parentDir := filepath.Base(filepath.Dir(path))
+			if parentDir == "agents" {
+				resourceType = "agent"
+			} else {
+				resourceType = "command"
+			}
+			name = name[:len(name)-3] // Remove .md
+		} else {
+			resourceType = "skill"
+		}
+
+		fmt.Printf("✓ Added %s '%s'\n", resourceType, name)
+	}
+
+	// Print skipped resources
+	for _, path := range result.Skipped {
+		name := filepath.Base(path)
+		if filepath.Ext(path) == ".md" {
+			name = name[:len(name)-3]
+		}
+		fmt.Printf("⊘ Skipped '%s' (already exists)\n", name)
+	}
+
+	// Print failed resources
+	for _, fail := range result.Failed {
+		name := filepath.Base(fail.Path)
+		if filepath.Ext(fail.Path) == ".md" {
+			name = name[:len(name)-3]
+		}
+		fmt.Printf("✗ Failed '%s': %s\n", name, fail.Message)
+	}
+
+	// Print summary
+	fmt.Println()
+	fmt.Printf("Summary: %d added, %d skipped, %d failed\n",
+		len(result.Added), len(result.Skipped), len(result.Failed))
 }

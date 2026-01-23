@@ -210,6 +210,8 @@ func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Reso
 // shouldSkipDirectory returns true if the directory should be skipped during recursive search
 func shouldSkipDirectory(name string) bool {
 	skipDirs := []string{
+		"commands",   // Commands are handled by command discovery
+		"skills",     // Skills are handled by skill discovery
 		"node_modules",
 		".git",
 		".svn",
