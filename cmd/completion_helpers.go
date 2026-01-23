@@ -249,3 +249,33 @@ func completeUninstallResources(cmd *cobra.Command, args []string, toComplete st
 	// For now, reuse the same logic as install
 	return completeInstallResources(cmd, args, toComplete)
 }
+
+// completeResourceTypes provides completion for resource type arguments
+func completeResourceTypes(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	types := []string{"command", "skill", "agent"}
+	return types, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeConfigKeys provides completion for config key names
+func completeConfigKeys(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	keys := []string{"install.targets"}
+	return keys, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeConfigSetArgs provides completion for config set command (key and value)
+func completeConfigSetArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) == 0 {
+		// Complete config keys
+		return []string{"install.targets"}, cobra.ShellCompDirectiveNoFileComp
+	} else if len(args) == 1 && args[0] == "install.targets" {
+		// Complete tool names for install.targets
+		return []string{"claude", "opencode", "copilot"}, cobra.ShellCompDirectiveNoFileComp
+	}
+	return nil, cobra.ShellCompDirectiveNoFileComp
+}
