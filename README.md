@@ -787,6 +787,46 @@ aimgr install agent/reviewer --target claude,opencode
 - `--force`: Overwrite existing installations
 - `--target`: Specify which tool(s) to install to (accepts comma-separated values). Overrides both default targets and existing directory detection.
 
+
+### `aimgr list`
+
+List resources installed in the current project directory.
+
+```bash
+# List all installed resources
+aimgr list
+
+# Filter by type
+aimgr list command
+aimgr list skill
+aimgr list agent
+
+# Output formats
+aimgr list --format=table  # Default
+aimgr list --format=json
+aimgr list --format=yaml
+
+# List in specific directory
+aimgr list --path ~/my-project
+aimgr list skill --path /path/to/project
+```
+
+**Key Differences from `aimgr repo list`:**
+- `aimgr repo list` - Shows resources in the centralized repository
+- `aimgr list` - Shows resources installed in the current/specified project
+
+**Flags:**
+- `--format`: Output format (table, json, yaml)
+- `--path`: Project directory path (defaults to current directory)
+
+**Output includes:**
+- Resource type (command, skill, agent)
+- Resource name
+- **Target tools** (claude, opencode, copilot) - shows where each resource is installed
+- Description
+
+Only resources installed via `aimgr install` (symlinks) are shown. Manually copied files are excluded.
+
 ### `aimgr repo remove`
 
 Remove resources from the repository.
