@@ -3,6 +3,7 @@ package repo
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -848,5 +849,112 @@ func TestBulkImportCreatesMetadata(t *testing.T) {
 	}
 	if meta2.SourceType != "file" {
 		t.Errorf("cmd2 SourceType = %v, want file", meta2.SourceType)
+	}
+}
+
+// TestBulkImportWithGitSourceURL verifies that Git source URLs are properly stored in metadata
+func TestBulkImportWithGitSourceURL(t *testing.T) {
+	tmpDir := t.TempDir()
+	repoPath := filepath.Join(tmpDir, "repo")
+	manager := NewManagerWithPath(repoPath)
+
+	// Create test command
+	cmdPath := filepath.Join(tmpDir, "test-cmd.md")
+	cmdContent := `---
+name: test-cmd
+description: Test command for Git source metadata
+---
+
+# Test Command
+
+Test content.
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	// Test with GitHub source URL
+	opts := BulkImportOptions{
+		SourceURL:  "https://github.com/owner/repo",
+		SourceType: "github",
+	}
+
+	result, err := manager.AddBulk([]string{cmdPath}, opts)
+	if err != nil {
+		t.Fatalf("AddBulk() error = %v", err)
+	}
+
+	if len(result.Added) != 1 {
+		t.Fatalf("AddBulk() added count = %v, want 1", len(result.Added))
+	}
+
+	// Verify metadata has Git source URL, not temp path
+	meta, err := manager.GetMetadata("test-cmd", resource.Command)
+	if err != nil {
+		t.Fatalf("GetMetadata() error = %v", err)
+	}
+
+	if meta.SourceType != "github" {
+		t.Errorf("SourceType = %v, want github", meta.SourceType)
+	}
+
+	if meta.SourceURL != "https://github.com/owner/repo" {
+		t.Errorf("SourceURL = %v, want https://github.com/owner/repo", meta.SourceURL)
+	}
+
+	// Verify it doesn't contain temp path or file:// URL
+	if strings.Contains(meta.SourceURL, "file://") {
+		t.Errorf("SourceURL should not contain file:// for Git sources: %v", meta.SourceURL)
+	}
+	if strings.Contains(meta.SourceURL, tmpDir) {
+		t.Errorf("SourceURL should not contain temp path: %v", meta.SourceURL)
+	}
+}
+
+// TestBulkImportWithoutSourceInfo verifies fallback to file:// for local sources
+func TestBulkImportWithoutSourceInfo(t *testing.T) {
+	tmpDir := t.TempDir()
+	repoPath := filepath.Join(tmpDir, "repo")
+	manager := NewManagerWithPath(repoPath)
+
+	// Create test command
+	cmdPath := filepath.Join(tmpDir, "local-cmd.md")
+	cmdContent := `---
+name: local-cmd
+description: Local command
+---
+
+# Local Command
+
+Test content.
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	// Test without source info (should fall back to file://)
+	opts := BulkImportOptions{}
+
+	result, err := manager.AddBulk([]string{cmdPath}, opts)
+	if err != nil {
+		t.Fatalf("AddBulk() error = %v", err)
+	}
+
+	if len(result.Added) != 1 {
+		t.Fatalf("AddBulk() added count = %v, want 1", len(result.Added))
+	}
+
+	// Verify metadata has file:// URL
+	meta, err := manager.GetMetadata("local-cmd", resource.Command)
+	if err != nil {
+		t.Fatalf("GetMetadata() error = %v", err)
+	}
+
+	if meta.SourceType != "file" {
+		t.Errorf("SourceType = %v, want file", meta.SourceType)
+	}
+
+	if !strings.HasPrefix(meta.SourceURL, "file://") {
+		t.Errorf("SourceURL = %v, should start with file://", meta.SourceURL)
 	}
 }

@@ -571,11 +571,19 @@ func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error
 		}
 	}
 
-	// Import using bulk add
+	// Determine source type
+	sourceType := "github"
+	if parsed.Type == source.GitURL {
+		sourceType = "git-url"
+	}
+
+	// Import using bulk add with original source URL
 	opts := repo.BulkImportOptions{
 		Force:        forceFlag,
 		SkipExisting: skipExistingFlag,
 		DryRun:       dryRunFlag,
+		SourceURL:    parsed.URL,
+		SourceType:   sourceType,
 	}
 
 	result, err := manager.AddBulk(allPaths, opts)

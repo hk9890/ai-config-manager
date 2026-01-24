@@ -406,9 +406,11 @@ func copyDir(src, dst string) error {
 
 // BulkImportOptions contains options for bulk import operations
 type BulkImportOptions struct {
-	Force        bool // Overwrite existing resources
-	SkipExisting bool // Skip conflicts silently
-	DryRun       bool // Preview only, don't actually import
+	Force        bool   // Overwrite existing resources
+	SkipExisting bool   // Skip conflicts silently
+	DryRun       bool   // Preview only, don't actually import
+	SourceURL    string // Original source URL (for Git sources)
+	SourceType   string // Source type (github, git-url, file, local)
 }
 
 // ImportError represents an error during resource import
@@ -519,13 +521,22 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 
 	// Import the resource (unless dry run)
 	if !opts.DryRun {
-		// Get absolute path for source URL
-		absPath, err := filepath.Abs(sourcePath)
-		if err != nil {
-			absPath = sourcePath
+		// Determine source URL and type
+		var sourceURL, sourceType string
+
+		// Use provided source info if available, otherwise fall back to file://
+		if opts.SourceURL != "" && opts.SourceType != "" {
+			sourceURL = opts.SourceURL
+			sourceType = opts.SourceType
+		} else {
+			// Fall back to file:// for local sources
+			absPath, err := filepath.Abs(sourcePath)
+			if err != nil {
+				absPath = sourcePath
+			}
+			sourceURL = "file://" + absPath
+			sourceType = "file"
 		}
-		sourceURL := "file://" + absPath
-		sourceType := "file"
 
 		switch resourceType {
 		case resource.Command:
