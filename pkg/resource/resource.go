@@ -89,12 +89,12 @@ func DetectType(path string) (ResourceType, error) {
 		}
 
 		// If we can't determine from path or fields, try loading as both
-		// Prefer agent if both succeed (agents are more minimal)
-		if _, agentErr := LoadAgent(path); agentErr == nil {
-			return Agent, nil
-		}
+		// Prefer command if both succeed (backward compatibility and more common)
 		if _, cmdErr := LoadCommand(path); cmdErr == nil {
 			return Command, nil
+		}
+		if _, agentErr := LoadAgent(path); agentErr == nil {
+			return Agent, nil
 		}
 
 		// Default to command for backward compatibility

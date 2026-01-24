@@ -181,7 +181,7 @@ func TestDetectType(t *testing.T) {
 				}
 				return file
 			},
-			wantType:  Agent,
+			wantType:  Command, // Prefer Command for backward compatibility when ambiguous
 			wantError: false,
 		},
 		{
