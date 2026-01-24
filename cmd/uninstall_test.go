@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
@@ -235,4 +237,336 @@ func stringContains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// Test helpers for uninstall pattern tests
+
+// setupTestRepoForUninstall creates a test repo and installs some resources
+func setupTestRepoForUninstall(t *testing.T) (repoPath string, projectPath string, cleanup func()) {
+	t.Helper()
+
+	// Create temp repo
+	repoDir := t.TempDir()
+
+	// Create directory structure
+	if err := os.MkdirAll(filepath.Join(repoDir, "commands"), 0755); err != nil {
+		t.Fatalf("failed to create commands dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(repoDir, "skills"), 0755); err != nil {
+		t.Fatalf("failed to create skills dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(repoDir, "agents"), 0755); err != nil {
+		t.Fatalf("failed to create agents dir: %v", err)
+	}
+
+	// Create test commands
+	testCommands := []string{"test-command", "pdf-command", "review-command"}
+	for _, name := range testCommands {
+		content := []byte(fmt.Sprintf("---\ndescription: %s\n---\n# %s", name, name))
+		path := filepath.Join(repoDir, "commands", name+".md")
+		if err := os.WriteFile(path, content, 0644); err != nil {
+			t.Fatalf("failed to create command %s: %v", name, err)
+		}
+	}
+
+	// Create test skills
+	testSkills := []string{"pdf-processing", "pdf-extraction", "image-processing", "test-skill"}
+	for _, name := range testSkills {
+		skillDir := filepath.Join(repoDir, "skills", name)
+		if err := os.MkdirAll(skillDir, 0755); err != nil {
+			t.Fatalf("failed to create skill dir %s: %v", name, err)
+		}
+		content := []byte(fmt.Sprintf("---\ndescription: %s\n---\n# %s", name, name))
+		path := filepath.Join(skillDir, "SKILL.md")
+		if err := os.WriteFile(path, content, 0644); err != nil {
+			t.Fatalf("failed to create skill %s: %v", name, err)
+		}
+	}
+
+	// Create test agents
+	testAgents := []string{"code-reviewer", "test-agent", "doc-generator"}
+	for _, name := range testAgents {
+		content := []byte(fmt.Sprintf("---\ndescription: %s\n---\n# %s", name, name))
+		path := filepath.Join(repoDir, "agents", name+".md")
+		if err := os.WriteFile(path, content, 0644); err != nil {
+			t.Fatalf("failed to create agent %s: %v", name, err)
+		}
+	}
+
+	// Create project directory
+	projectDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude", "commands"), 0755); err != nil {
+		t.Fatalf("failed to create project dirs: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude", "skills"), 0755); err != nil {
+		t.Fatalf("failed to create project dirs: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude", "agents"), 0755); err != nil {
+		t.Fatalf("failed to create project dirs: %v", err)
+	}
+
+	cleanup = func() {
+		// Cleanup is automatic with t.TempDir()
+	}
+
+	return repoDir, projectDir, cleanup
+}
+
+// installSymlink creates a symlink from project to repo
+func installSymlink(t *testing.T, projectPath, repoPath string, resourceType resource.ResourceType, name string) {
+	t.Helper()
+
+	var srcPath, dstPath string
+	switch resourceType {
+	case resource.Command:
+		srcPath = filepath.Join(repoPath, "commands", name+".md")
+		dstPath = filepath.Join(projectPath, ".claude", "commands", name+".md")
+	case resource.Skill:
+		srcPath = filepath.Join(repoPath, "skills", name)
+		dstPath = filepath.Join(projectPath, ".claude", "skills", name)
+	case resource.Agent:
+		srcPath = filepath.Join(repoPath, "agents", name+".md")
+		dstPath = filepath.Join(projectPath, ".claude", "agents", name+".md")
+	}
+
+	if err := os.Symlink(srcPath, dstPath); err != nil {
+		t.Fatalf("failed to create symlink for %s/%s: %v", resourceType, name, err)
+	}
+}
+
+// Test Pattern Expansion for Uninstall
+
+func TestExpandUninstallPattern_AllSkills(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install some skills
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-extraction")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "test-skill")
+
+	// Expand "skill/*" pattern
+	detectedTools := []tools.Tool{tools.Claude}
+	matches, err := expandUninstallPattern(projectPath, "skill/*", detectedTools)
+	if err != nil {
+		t.Fatalf("expandUninstallPattern failed: %v", err)
+	}
+
+	// Should match 3 installed skills
+	if len(matches) != 3 {
+		t.Errorf("expandUninstallPattern(skill/*) returned %d matches, want 3", len(matches))
+	}
+}
+
+func TestExpandUninstallPattern_PrefixMatch(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install some skills
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-extraction")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "test-skill")
+
+	// Expand "skill/pdf*" pattern
+	detectedTools := []tools.Tool{tools.Claude}
+	matches, err := expandUninstallPattern(projectPath, "skill/pdf*", detectedTools)
+	if err != nil {
+		t.Fatalf("expandUninstallPattern failed: %v", err)
+	}
+
+	// Should match 2 pdf skills
+	if len(matches) != 2 {
+		t.Errorf("expandUninstallPattern(skill/pdf*) returned %d matches, want 2", len(matches))
+	}
+
+	// Verify matches
+	expectedMatches := map[string]bool{
+		"skill/pdf-processing": true,
+		"skill/pdf-extraction": true,
+	}
+	for _, match := range matches {
+		if !expectedMatches[match] {
+			t.Errorf("unexpected match: %q", match)
+		}
+	}
+}
+
+func TestExpandUninstallPattern_AllTypes(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install resources with "test" in name across types
+	installSymlink(t, projectPath, repoPath, resource.Command, "test-command")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "test-skill")
+	installSymlink(t, projectPath, repoPath, resource.Agent, "test-agent")
+
+	// Expand "*test*" pattern (matches across all types)
+	detectedTools := []tools.Tool{tools.Claude}
+	matches, err := expandUninstallPattern(projectPath, "*test*", detectedTools)
+	if err != nil {
+		t.Fatalf("expandUninstallPattern failed: %v", err)
+	}
+
+	// Should match all 3 test resources
+	if len(matches) != 3 {
+		t.Errorf("expandUninstallPattern(*test*) returned %d matches, want 3", len(matches))
+		for _, m := range matches {
+			t.Logf("  match: %s", m)
+		}
+	}
+}
+
+func TestExpandUninstallPattern_NoMatches(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install one skill
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+
+	// Expand pattern that matches nothing
+	detectedTools := []tools.Tool{tools.Claude}
+	matches, err := expandUninstallPattern(projectPath, "skill/nomatch*", detectedTools)
+	if err != nil {
+		t.Fatalf("expandUninstallPattern failed: %v", err)
+	}
+
+	// Should return empty slice
+	if len(matches) != 0 {
+		t.Errorf("expandUninstallPattern(skill/nomatch*) returned %d matches, want 0", len(matches))
+	}
+}
+
+func TestExpandUninstallPattern_ExactName(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install a skill
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+
+	// Expand exact name (not a pattern)
+	detectedTools := []tools.Tool{tools.Claude}
+	matches, err := expandUninstallPattern(projectPath, "skill/pdf-processing", detectedTools)
+	if err != nil {
+		t.Fatalf("expandUninstallPattern failed: %v", err)
+	}
+
+	// Should return the exact name as-is
+	if len(matches) != 1 {
+		t.Fatalf("expandUninstallPattern(skill/pdf-processing) returned %d matches, want 1", len(matches))
+	}
+	if matches[0] != "skill/pdf-processing" {
+		t.Errorf("expandUninstallPattern(skill/pdf-processing) = %q, want 'skill/pdf-processing'", matches[0])
+	}
+}
+
+func TestScanToolDir_Commands(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install some commands
+	installSymlink(t, projectPath, repoPath, resource.Command, "test-command")
+	installSymlink(t, projectPath, repoPath, resource.Command, "pdf-command")
+
+	// Create matcher for "*command"
+	matcher, err := pattern.NewMatcher("*command")
+	if err != nil {
+		t.Fatalf("NewMatcher failed: %v", err)
+	}
+
+	// Scan .claude/commands directory
+	matches := scanToolDir(projectPath, ".claude/commands", resource.Command, matcher)
+
+	// Should find both commands
+	if len(matches) != 2 {
+		t.Errorf("scanToolDir returned %d matches, want 2", len(matches))
+	}
+}
+
+func TestScanToolDir_Skills(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install skills
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "image-processing")
+
+	// Create matcher for "*processing"
+	matcher, err := pattern.NewMatcher("*processing")
+	if err != nil {
+		t.Fatalf("NewMatcher failed: %v", err)
+	}
+
+	// Scan .claude/skills directory
+	matches := scanToolDir(projectPath, ".claude/skills", resource.Skill, matcher)
+
+	// Should find both skills
+	if len(matches) != 2 {
+		t.Errorf("scanToolDir returned %d matches, want 2", len(matches))
+	}
+}
+
+func TestScanToolDir_NonExistentDirectory(t *testing.T) {
+	projectPath := t.TempDir()
+
+	// Create matcher
+	matcher, err := pattern.NewMatcher("*")
+	if err != nil {
+		t.Fatalf("NewMatcher failed: %v", err)
+	}
+
+	// Scan non-existent directory
+	matches := scanToolDir(projectPath, ".claude/commands", resource.Command, matcher)
+
+	// Should return nil (no matches)
+	if matches != nil {
+		t.Errorf("scanToolDir on non-existent dir returned %v, want nil", matches)
+	}
+}
+
+func TestDeduplicateStrings(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{
+			name:  "no duplicates",
+			input: []string{"a", "b", "c"},
+			want:  []string{"a", "b", "c"},
+		},
+		{
+			name:  "with duplicates",
+			input: []string{"a", "b", "a", "c", "b"},
+			want:  []string{"a", "b", "c"},
+		},
+		{
+			name:  "all duplicates",
+			input: []string{"a", "a", "a"},
+			want:  []string{"a"},
+		},
+		{
+			name:  "empty slice",
+			input: []string{},
+			want:  []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := deduplicateStrings(tt.input)
+			if len(got) != len(tt.want) {
+				t.Errorf("deduplicateStrings() returned %d items, want %d", len(got), len(tt.want))
+			}
+			// Check all expected items are present
+			gotMap := make(map[string]bool)
+			for _, s := range got {
+				gotMap[s] = true
+			}
+			for _, s := range tt.want {
+				if !gotMap[s] {
+					t.Errorf("deduplicateStrings() missing expected item %q", s)
+				}
+			}
+		})
+	}
 }

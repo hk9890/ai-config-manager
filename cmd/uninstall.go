@@ -113,7 +113,7 @@ Examples:
 		for _, arg := range args {
 			// Check if this is a pattern or exact name
 			_, _, isPattern := pattern.ParsePattern(arg)
-			
+
 			if isPattern {
 				// Expand the pattern
 				expanded, err := expandUninstallPattern(projectPath, arg, installer.GetTargetTools())
@@ -329,7 +329,7 @@ func init() {
 func expandUninstallPattern(projectPath, resourceArg string, detectedTools []tools.Tool) ([]string, error) {
 	// Parse pattern
 	resourceType, _, isPattern := pattern.ParsePattern(resourceArg)
-	
+
 	// If not a pattern, return as-is
 	if !isPattern {
 		return []string{resourceArg}, nil
@@ -343,10 +343,10 @@ func expandUninstallPattern(projectPath, resourceArg string, detectedTools []too
 
 	// Scan installed resources from tool directories
 	var matches []string
-	
+
 	for _, tool := range detectedTools {
 		toolInfo := tools.GetToolInfo(tool)
-		
+
 		// Scan each resource type directory
 		if resourceType == "" || resourceType == resource.Command {
 			if toolInfo.SupportsCommands {
@@ -376,18 +376,18 @@ func expandUninstallPattern(projectPath, resourceArg string, detectedTools []too
 func scanToolDir(projectPath, toolDir string, resourceType resource.ResourceType, matcher *pattern.Matcher) []string {
 	// Build full path
 	fullPath := filepath.Join(projectPath, toolDir)
-	
+
 	// Read directory
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		// Directory doesn't exist or can't be read
 		return nil
 	}
-	
+
 	var matches []string
 	for _, entry := range entries {
 		name := entry.Name()
-		
+
 		// For commands and agents, remove .md extension
 		if resourceType == resource.Command || resourceType == resource.Agent {
 			if strings.HasSuffix(name, ".md") {
@@ -397,16 +397,16 @@ func scanToolDir(projectPath, toolDir string, resourceType resource.ResourceType
 				continue
 			}
 		}
-		
+
 		// For skills, name is the directory name (no extension to remove)
-		
+
 		// Test if name matches the pattern
 		if matcher.MatchName(name) {
 			// Format as type/name
 			matches = append(matches, fmt.Sprintf("%s/%s", resourceType, name))
 		}
 	}
-	
+
 	return matches
 }
 
@@ -414,13 +414,13 @@ func scanToolDir(projectPath, toolDir string, resourceType resource.ResourceType
 func deduplicateStrings(input []string) []string {
 	seen := make(map[string]bool)
 	var result []string
-	
+
 	for _, item := range input {
 		if !seen[item] {
 			seen[item] = true
 			result = append(result, item)
 		}
 	}
-	
+
 	return result
 }
