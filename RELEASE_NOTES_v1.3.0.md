@@ -23,17 +23,18 @@ The repository metadata structure has been reorganized into a cleaner `.metadata
     └── <source-hash>/
 ```
 
-**Migration Command:**
+**Migration Command (Historical - Removed in v1.4.0):**
 ```bash
-aimgr repo migrate-metadata [--dry-run]
+# This command has been removed as all metadata has been migrated
+# aimgr repo migrate-metadata [--dry-run]
 ```
 
-The migration utility automatically:
-- Detects old metadata format (`.metadata.json` files)
-- Converts to new directory structure
-- Preserves all metadata information
-- Supports dry-run mode for safe testing
-- Handles edge cases and validates integrity
+The migration utility (now removed) automatically:
+- Detected old metadata format (`.metadata.json` files)
+- Converted to new directory structure
+- Preserved all metadata information
+- Supported dry-run mode for safe testing
+- Handled edge cases and validated integrity
 
 ### 🎯 Pattern Matching Support
 
@@ -129,11 +130,14 @@ None. All changes are backward compatible:
 
 ## Upgrade Notes
 
-### Migrating Metadata
+### Migrating Metadata (Historical - Command Removed in v1.4.0)
 
-If you have an existing repository, migrate to the new metadata structure:
+**Note:** The `aimgr repo migrate-metadata` command has been removed as all repositories have been successfully migrated to the new metadata structure.
+
+If you have an existing repository from before v1.3.0, you will need to use v1.3.x to migrate:
 
 ```bash
+# Using v1.3.x (for historical reference):
 # Test migration first
 aimgr repo migrate-metadata --dry-run
 
@@ -141,7 +145,7 @@ aimgr repo migrate-metadata --dry-run
 aimgr repo migrate-metadata
 ```
 
-The migration is safe and preserves all existing metadata. The old `.metadata.json` files are removed after successful migration.
+The migration was safe and preserved all existing metadata. The old `.metadata.json` files were removed after successful migration.
 
 ### Using New Features
 

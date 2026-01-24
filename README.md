@@ -1497,23 +1497,27 @@ If you're upgrading from a version with the old metadata structure (`.aimgr-meta
 ~/.local/share/ai-config/repo/.metadata/commands/my-command-metadata.json
 ```
 
-**Migration command:**
+**Migration command (Removed in v1.4.0):**
+
+**Note:** The `aimgr repo migrate-metadata` command has been removed as all repositories have been successfully migrated. If you have an older repository, you will need to use aimgr v1.3.x to perform the migration.
+
 ```bash
+# Historical command (v1.3.x only):
 # Preview migration without making changes
-aimgr repo migrate-metadata --dry-run
+# aimgr repo migrate-metadata --dry-run
 
 # Run migration (prompts for confirmation)
-aimgr repo migrate-metadata
+# aimgr repo migrate-metadata
 
 # Force migration without confirmation
-aimgr repo migrate-metadata --force
+# aimgr repo migrate-metadata --force
 ```
 
-The migration command will:
-1. Find all old metadata files (`.aimgr-meta.yaml`)
-2. Convert YAML format to JSON
-3. Move files to the new `.metadata/` directory structure
-4. Clean up old metadata files after successful migration
+The migration command (v1.3.x) performed:
+1. Found all old metadata files (`.aimgr-meta.yaml`)
+2. Converted YAML format to JSON
+3. Moved files to the new `.metadata/` directory structure
+4. Cleaned up old metadata files after successful migration
 
 **Benefits of new structure:**
 - Centralized location for all metadata

@@ -199,25 +199,28 @@ Resources now store metadata about their sources for updates in a centralized `.
 - `local`: Local filesystem paths
 - `file`: Direct file sources
 
-**Migration from old metadata format:**
+**Migration from old metadata format (Historical - Command Removed in v1.4.0):**
 
-If you have metadata files in the old location (`.aimgr-meta.yaml` files), use the migration command:
+**Note:** The `aimgr repo migrate-metadata` command has been removed as all repositories have been successfully migrated. If you have an older repository from before v1.3.0, you will need to use aimgr v1.3.x to perform the migration.
+
+If you have metadata files in the old location (`.aimgr-meta.yaml` files), use the migration command from v1.3.x:
 ```bash
+# Historical command (v1.3.x only):
 # Preview migration without making changes
-aimgr repo migrate-metadata --dry-run
+# aimgr repo migrate-metadata --dry-run
 
 # Run migration (prompts for confirmation)
-aimgr repo migrate-metadata
+# aimgr repo migrate-metadata
 
 # Force migration without confirmation
-aimgr repo migrate-metadata --force
+# aimgr repo migrate-metadata --force
 ```
 
-The migration command will:
-1. Find all old metadata files in your repository
-2. Convert YAML format to JSON
-3. Move files to the new `.metadata/` directory structure
-4. Clean up old metadata files after successful migration
+The migration command (v1.3.x) performed:
+1. Found all old metadata files in your repository
+2. Converted YAML format to JSON
+3. Moved files to the new `.metadata/` directory structure
+4. Cleaned up old metadata files after successful migration
 
 ### 4. Batch Installation
 
