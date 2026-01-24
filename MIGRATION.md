@@ -166,39 +166,58 @@ aimgr repo update --force
 ```
 
 **How it works:**
-- Tracks source information in metadata files (`.aimgr-meta.yaml`)
+- Tracks source information in metadata files (stored in `.metadata/` directory)
 - Fetches latest version from original source
 - Updates repository copy
 - Preserves symlinks to projects
 
 ### 3. Metadata Tracking
 
-Resources now store metadata about their sources for updates.
+Resources now store metadata about their sources for updates in a centralized `.metadata/` directory.
 
 **Metadata file location:**
 ```
-~/.local/share/ai-config/repo/skills/my-skill/.aimgr-meta.yaml
-~/.local/share/ai-config/repo/commands/.aimgr-meta/my-command.yaml
-~/.local/share/ai-config/repo/agents/.aimgr-meta/my-agent.yaml
+~/.local/share/ai-config/repo/.metadata/skills/my-skill-metadata.json
+~/.local/share/ai-config/repo/.metadata/commands/my-command-metadata.json
+~/.local/share/ai-config/repo/.metadata/agents/my-agent-metadata.json
 ```
 
-**Metadata format:**
-```yaml
-name: my-skill
-type: skill
-source:
-  type: github
-  url: https://github.com/owner/repo
-  ref: main
-  path: skills/my-skill
-added: "2026-01-22T10:30:00Z"
-updated: "2026-01-22T10:30:00Z"
+**Metadata format (JSON):**
+```json
+{
+  "name": "my-skill",
+  "type": "skill",
+  "source_type": "github",
+  "source_url": "https://github.com/owner/repo",
+  "first_installed": "2026-01-22T10:30:00Z",
+  "last_updated": "2026-01-22T10:30:00Z"
+}
 ```
 
 **Source types:**
 - `github`: GitHub repositories
 - `local`: Local filesystem paths
 - `file`: Direct file sources
+
+**Migration from old metadata format:**
+
+If you have metadata files in the old location (`.aimgr-meta.yaml` files), use the migration command:
+```bash
+# Preview migration without making changes
+aimgr repo migrate-metadata --dry-run
+
+# Run migration (prompts for confirmation)
+aimgr repo migrate-metadata
+
+# Force migration without confirmation
+aimgr repo migrate-metadata --force
+```
+
+The migration command will:
+1. Find all old metadata files in your repository
+2. Convert YAML format to JSON
+3. Move files to the new `.metadata/` directory structure
+4. Clean up old metadata files after successful migration
 
 ### 4. Batch Installation
 

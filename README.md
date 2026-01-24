@@ -922,7 +922,7 @@ aimgr repo update --force
 ```
 
 **How it works:**
-1. Reads source information from resource metadata (`.aimgr-meta.yaml`)
+1. Reads source information from resource metadata (stored in `.metadata/` directory)
 2. Fetches latest version from original source (GitHub, local path, etc.)
 3. Updates the repository copy
 4. Preserves existing symlinks to projects
@@ -1229,35 +1229,38 @@ When you add a resource from GitHub or other sources, aimgr stores:
 
 ### Metadata File Location
 
-Metadata is stored alongside resources in `.aimgr-meta.yaml` files:
+Metadata is stored in a centralized `.metadata/` directory organized by resource type:
 
 **Skills:**
 ```
-~/.local/share/ai-config/repo/skills/my-skill/.aimgr-meta.yaml
+~/.local/share/ai-config/repo/.metadata/skills/my-skill-metadata.json
 ```
 
 **Commands:**
 ```
-~/.local/share/ai-config/repo/commands/.aimgr-meta/my-command.yaml
+~/.local/share/ai-config/repo/.metadata/commands/my-command-metadata.json
 ```
 
 **Agents:**
 ```
-~/.local/share/ai-config/repo/agents/.aimgr-meta/my-agent.yaml
+~/.local/share/ai-config/repo/.metadata/agents/my-agent-metadata.json
 ```
+
+This centralized structure keeps metadata separate from resource files and makes it easier to manage and back up.
 
 ### Metadata Format
 
-```yaml
-name: pdf-processing
-type: skill
-source:
-  type: github
-  url: https://github.com/owner/repo
-  ref: main
-  path: skills/pdf-processing
-added: "2026-01-22T10:30:00Z"
-updated: "2026-01-22T10:30:00Z"
+Metadata files are stored in JSON format for better performance and tooling support:
+
+```json
+{
+  "name": "pdf-processing",
+  "type": "skill",
+  "source_type": "github",
+  "source_url": "https://github.com/owner/repo",
+  "first_installed": "2026-01-22T10:30:00Z",
+  "last_updated": "2026-01-22T10:30:00Z"
+}
 ```
 
 **Source Types:**
@@ -1265,8 +1268,10 @@ updated: "2026-01-22T10:30:00Z"
 | Type | Description | Example |
 |------|-------------|---------|
 | `github` | GitHub repository | `gh:owner/repo` or GitHub URLs |
-| `local` | Local directory/file | `./my-skill` or `/path/to/skill` |
+| `local` | Local directory | `./my-skill` or `/path/to/skill` |
 | `file` | Direct file copy | `~/commands/test.md` |
+
+**Note:** The `source_type` and `source_url` fields are used for update tracking.
 
 ### Using Metadata
 
@@ -1296,16 +1301,17 @@ For resources added before metadata tracking or from sources without auto-tracki
 
 **Example: Add metadata for a local skill**
 
-Create `~/.local/share/ai-config/repo/skills/my-skill/.aimgr-meta.yaml`:
+Create `~/.local/share/ai-config/repo/.metadata/skills/my-skill-metadata.json`:
 
-```yaml
-name: my-skill
-type: skill
-source:
-  type: local
-  path: /home/user/projects/my-skill
-added: "2026-01-22T10:00:00Z"
-updated: "2026-01-22T10:00:00Z"
+```json
+{
+  "name": "my-skill",
+  "type": "skill",
+  "source_type": "local",
+  "source_url": "file:///home/user/projects/my-skill",
+  "first_installed": "2026-01-22T10:00:00Z",
+  "last_updated": "2026-01-22T10:00:00Z"
+}
 ```
 
 Then run:
@@ -1331,19 +1337,31 @@ Resources are stored in `~/.local/share/ai-config/repo/` (XDG data directory):
 
 ```
 ~/.local/share/ai-config/repo/
-├── commands/
+├── .metadata/                   # Centralized metadata storage (JSON)
+│   ├── commands/
+│   │   ├── test-metadata.json
+│   │   └── review-metadata.json
+│   ├── skills/
+│   │   ├── pdf-processing-metadata.json
+│   │   └── git-release-metadata.json
+│   └── agents/
+│       ├── code-reviewer-metadata.json
+│       └── qa-tester-metadata.json
+├── commands/                    # Command resources
 │   ├── test.md
 │   └── review.md
-├── skills/
+├── skills/                      # Skill resources
 │   ├── pdf-processing/
 │   │   ├── SKILL.md
 │   │   └── scripts/
 │   └── git-release/
 │       └── SKILL.md
-└── agents/
+└── agents/                      # Agent resources
     ├── code-reviewer.md
     └── qa-tester.md
 ```
+
+The `.metadata/` directory contains JSON files with source tracking information (GitHub URLs, local paths, timestamps) used for resource updates.
 
 ## Project Installation
 
@@ -1462,6 +1480,46 @@ aimgr install skill utils --target claude,opencode
 ```
 
 This is useful when you want to install a resource to a specific tool without changing your global configuration.
+
+### Metadata Structure Migration
+
+If you're upgrading from a version with the old metadata structure (`.aimgr-meta.yaml` files), the metadata files need to be migrated to the new centralized `.metadata/` directory structure.
+
+**Old structure:**
+```
+~/.local/share/ai-config/repo/skills/my-skill/.aimgr-meta.yaml
+~/.local/share/ai-config/repo/commands/.aimgr-meta/my-command.yaml
+```
+
+**New structure:**
+```
+~/.local/share/ai-config/repo/.metadata/skills/my-skill-metadata.json
+~/.local/share/ai-config/repo/.metadata/commands/my-command-metadata.json
+```
+
+**Migration command:**
+```bash
+# Preview migration without making changes
+aimgr repo migrate-metadata --dry-run
+
+# Run migration (prompts for confirmation)
+aimgr repo migrate-metadata
+
+# Force migration without confirmation
+aimgr repo migrate-metadata --force
+```
+
+The migration command will:
+1. Find all old metadata files (`.aimgr-meta.yaml`)
+2. Convert YAML format to JSON
+3. Move files to the new `.metadata/` directory structure
+4. Clean up old metadata files after successful migration
+
+**Benefits of new structure:**
+- Centralized location for all metadata
+- Better organization and easier backup
+- Faster lookup and processing
+- JSON format for better tooling support
 
 ## Migration Guide: Command Simplification
 

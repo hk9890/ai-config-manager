@@ -78,6 +78,7 @@ ai-config-manager/
 ├── pkg/
 │   ├── config/       # Configuration management
 │   ├── install/      # Installation/symlink logic
+│   ├── metadata/     # Metadata tracking and migration
 │   ├── repo/         # Repository management
 │   ├── resource/     # Resource types (command, skill, agent)
 │   ├── tools/        # Tool-specific info (Claude, OpenCode, Copilot)

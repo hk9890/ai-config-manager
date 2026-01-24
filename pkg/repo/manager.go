@@ -62,7 +62,8 @@ func (m *Manager) Init() error {
 	return nil
 }
 
-// AddCommand adds a command resource to the repository
+// AddCommand adds a command resource to the repository.
+// Metadata is automatically saved to .metadata/commands/<name>-metadata.json
 func (m *Manager) AddCommand(sourcePath, sourceURL, sourceType string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
@@ -103,7 +104,8 @@ func (m *Manager) AddCommand(sourcePath, sourceURL, sourceType string) error {
 	return nil
 }
 
-// AddSkill adds a skill resource to the repository
+// AddSkill adds a skill resource to the repository.
+// Metadata is automatically saved to .metadata/skills/<name>-metadata.json
 func (m *Manager) AddSkill(sourcePath, sourceURL, sourceType string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
@@ -144,7 +146,8 @@ func (m *Manager) AddSkill(sourcePath, sourceURL, sourceType string) error {
 	return nil
 }
 
-// AddAgent adds an agent resource to the repository
+// AddAgent adds an agent resource to the repository.
+// Metadata is automatically saved to .metadata/agents/<name>-metadata.json
 func (m *Manager) AddAgent(sourcePath, sourceURL, sourceType string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
@@ -289,7 +292,8 @@ func (m *Manager) Get(name string, resourceType resource.ResourceType) (*resourc
 	}
 }
 
-// Remove removes a resource from the repository
+// Remove removes a resource from the repository.
+// Also removes associated metadata from .metadata/<type>s/<name>-metadata.json
 func (m *Manager) Remove(name string, resourceType resource.ResourceType) error {
 	path := m.GetPath(name, resourceType)
 
@@ -333,7 +337,8 @@ func (m *Manager) GetRepoPath() string {
 	return m.repoPath
 }
 
-// GetMetadata retrieves metadata for a specific resource
+// GetMetadata retrieves metadata for a specific resource.
+// Loads metadata from .metadata/<type>s/<name>-metadata.json
 func (m *Manager) GetMetadata(name string, resourceType resource.ResourceType) (*metadata.ResourceMetadata, error) {
 	return metadata.Load(name, resourceType, m.repoPath)
 }
