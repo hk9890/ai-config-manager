@@ -11,7 +11,7 @@ import (
 func TestCLIBulkAdd(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
-	
+
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
 	// Create a folder with mixed resources
@@ -56,10 +56,10 @@ func TestCLIBulkAdd(t *testing.T) {
 		t.Fatalf("Failed to write agent 1: %v", err)
 	}
 
-	// Test: aimgr repo add bulk
-	output, err := runAimgr(t, "repo", "add", "bulk", resourcesDir)
+	// Test: aimgr repo add (unified command)
+	output, err := runAimgr(t, "repo", "add", resourcesDir)
 	if err != nil {
-		t.Fatalf("Failed to bulk add: %v\nOutput: %s", err, output)
+		t.Fatalf("Failed to add resources: %v\nOutput: %s", err, output)
 	}
 
 	// Verify output mentions resources
@@ -89,7 +89,7 @@ func TestCLIBulkAdd(t *testing.T) {
 func TestCLIBulkAddForce(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
-	
+
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
 	// Create and add a command first
@@ -99,7 +99,7 @@ func TestCLIBulkAddForce(t *testing.T) {
 		t.Fatalf("Failed to write command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "command", cmdPath)
+	_, err := runAimgr(t, "repo", "add", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command first time: %v", err)
 	}
@@ -117,10 +117,10 @@ func TestCLIBulkAddForce(t *testing.T) {
 		t.Fatalf("Failed to write command 2: %v", err)
 	}
 
-	// Try bulk add with force
-	output, err := runAimgr(t, "repo", "add", "bulk", "--force", resourcesDir)
+	// Try unified add with force
+	output, err := runAimgr(t, "repo", "add", "--force", resourcesDir)
 	if err != nil {
-		t.Fatalf("Force bulk add failed: %v\nOutput: %s", err, output)
+		t.Fatalf("Force add failed: %v\nOutput: %s", err, output)
 	}
 
 	if !strings.Contains(output, "Summary: 1 added") {
@@ -132,7 +132,7 @@ func TestCLIBulkAddForce(t *testing.T) {
 func TestCLIBulkAddSkipExisting(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
-	
+
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
 	// Create and add a command
@@ -142,7 +142,7 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 		t.Fatalf("Failed to write command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "command", cmdPath)
+	_, err := runAimgr(t, "repo", "add", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -159,10 +159,10 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 		t.Fatalf("Failed to write command 2: %v", err)
 	}
 
-	// Try bulk add with skip-existing
-	output, err := runAimgr(t, "repo", "add", "bulk", "--skip-existing", resourcesDir)
+	// Try unified add with skip-existing
+	output, err := runAimgr(t, "repo", "add", "--skip-existing", resourcesDir)
 	if err != nil {
-		t.Fatalf("Skip-existing bulk add failed: %v\nOutput: %s", err, output)
+		t.Fatalf("Skip-existing add failed: %v\nOutput: %s", err, output)
 	}
 
 	if !strings.Contains(output, "Summary: 0 added, 1 skipped") {
@@ -174,7 +174,7 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
-	
+
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
 	// Create and add a command
@@ -184,7 +184,7 @@ func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 		t.Fatalf("Failed to write command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "command", cmdPath)
+	_, err := runAimgr(t, "repo", "add", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -201,8 +201,8 @@ func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 		t.Fatalf("Failed to write command 2: %v", err)
 	}
 
-	// Try bulk add without flags (should fail)
-	_, err = runAimgr(t, "repo", "add", "bulk", resourcesDir)
+	// Try unified add without flags (should fail)
+	_, err = runAimgr(t, "repo", "add", resourcesDir)
 	if err == nil {
 		t.Error("Expected error on conflict without flags, got nil")
 	}
@@ -212,7 +212,7 @@ func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 func TestCLIBulkAddDryRun(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
-	
+
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
 	// Create a resources directory with one command
@@ -228,10 +228,10 @@ func TestCLIBulkAddDryRun(t *testing.T) {
 		t.Fatalf("Failed to write command: %v", err)
 	}
 
-	// Test bulk add with dry-run
-	output, err := runAimgr(t, "repo", "add", "bulk", "--dry-run", resourcesDir)
+	// Test unified add with dry-run
+	output, err := runAimgr(t, "repo", "add", "--dry-run", resourcesDir)
 	if err != nil {
-		t.Fatalf("Dry run bulk add failed: %v\nOutput: %s", err, output)
+		t.Fatalf("Dry run add failed: %v\nOutput: %s", err, output)
 	}
 
 	if !strings.Contains(output, "DRY RUN") {
@@ -253,11 +253,11 @@ func TestCLIBulkAddDryRun(t *testing.T) {
 	}
 }
 
-// TestCLIBulkAddEmptyFolder tests bulk add on an empty folder
+// TestCLIBulkAddEmptyFolder tests unified add on an empty folder
 func TestCLIBulkAddEmptyFolder(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
-	
+
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
 	// Create an empty resources directory
@@ -266,29 +266,35 @@ func TestCLIBulkAddEmptyFolder(t *testing.T) {
 		t.Fatalf("Failed to create empty dir: %v", err)
 	}
 
-	// Test bulk add on empty folder (should fail)
-	_, err := runAimgr(t, "repo", "add", "bulk", resourcesDir)
+	// Test unified add on empty folder (should fail)
+	_, err := runAimgr(t, "repo", "add", resourcesDir)
 	if err == nil {
 		t.Error("Expected error on empty folder, got nil")
 	}
 }
 
-// TestCLIBulkAddNonDirectory tests bulk add on a file instead of directory
-func TestCLIBulkAddNonDirectory(t *testing.T) {
+// TestCLIAddSingleFile tests unified add on a single file (should succeed for .md files)
+func TestCLIAddSingleFile(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
-	
+
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
-	// Create a file
-	filePath := filepath.Join(testDir, "notadir.txt")
-	if err := os.WriteFile(filePath, []byte("test"), 0644); err != nil {
-		t.Fatalf("Failed to create file: %v", err)
+	// Create a command file
+	cmdPath := filepath.Join(testDir, "test-cmd.md")
+	cmd := []byte("---\ndescription: Test command\n---\n# Test Command")
+	if err := os.WriteFile(cmdPath, cmd, 0644); err != nil {
+		t.Fatalf("Failed to create command file: %v", err)
 	}
 
-	// Test bulk add on a file (should fail)
-	_, err := runAimgr(t, "repo", "add", "bulk", filePath)
-	if err == nil {
-		t.Error("Expected error on file instead of directory, got nil")
+	// Test unified add on single file (should succeed)
+	output, err := runAimgr(t, "repo", "add", cmdPath)
+	if err != nil {
+		t.Fatalf("Failed to add single file: %v\nOutput: %s", err, output)
+	}
+
+	// Verify success
+	if !strings.Contains(output, "Added command") {
+		t.Errorf("Output should show added command, got: %s", output)
 	}
 }

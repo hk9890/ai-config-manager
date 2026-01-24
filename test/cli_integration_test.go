@@ -40,8 +40,8 @@ description: A test command
 		t.Fatalf("Failed to create test command: %v", err)
 	}
 
-	// Test: aimgr repo add command
-	output, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	// Test: aimgr repo add (unified command)
+	output, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v\nOutput: %s", err, output)
 	}
@@ -70,7 +70,7 @@ description: A command for list testing
 	}
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -108,7 +108,7 @@ license: MIT
 	}
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -164,7 +164,7 @@ license: Apache-2.0
 	}
 
 	// Add the skill
-	addOutput, err := runAimgr(t, "repo", "add", "skill", "--force", skillDir)
+	addOutput, err := runAimgr(t, "repo", "add", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addOutput)
 	}
@@ -212,7 +212,7 @@ version: "1.5.0"
 	}
 
 	// Add the agent
-	_, err := runAimgr(t, "repo", "add", "agent", "--force", agentPath)
+	_, err := runAimgr(t, "repo", "add", "--force", agentPath)
 	if err != nil {
 		t.Fatalf("Failed to add agent: %v", err)
 	}
@@ -257,7 +257,7 @@ version: "1.0.0"
 	}
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -312,7 +312,7 @@ description: Original
 	}
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -370,7 +370,7 @@ description: A skill for install testing
 	}
 
 	// Add to repository
-	addOutput, err := runAimgr(t, "repo", "add", "skill", "--force", skillDir)
+	addOutput, err := runAimgr(t, "repo", "add", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addOutput)
 	}
@@ -431,12 +431,12 @@ description: Multi test skill
 	}
 
 	// Add both to repository
-	addCmdOutput, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	addCmdOutput, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v\nOutput: %s", err, addCmdOutput)
 	}
 
-	addSkillOutput, err := runAimgr(t, "repo", "add", "skill", "--force", skillDir)
+	addSkillOutput, err := runAimgr(t, "repo", "add", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addSkillOutput)
 	}
@@ -496,7 +496,7 @@ description: A skill for uninstall testing
 	}
 
 	// Add to repository
-	addOutput, err := runAimgr(t, "repo", "add", "skill", "--force", skillDir)
+	addOutput, err := runAimgr(t, "repo", "add", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addOutput)
 	}
@@ -619,7 +619,7 @@ description: Metadata test command
 	}
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -668,7 +668,7 @@ description: Original
 	}
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -731,7 +731,7 @@ description: Remove test
 	}
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "add", "command", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
