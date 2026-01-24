@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/discovery"
+	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/source"
@@ -231,6 +232,98 @@ func addAgentFile(filePath string, res *resource.Resource, manager *repo.Manager
 	return nil
 }
 
+// applyFilter filters discovered resources based on a pattern.
+// Returns filtered slices and a boolean indicating if filtering was applied.
+func applyFilter(filterPattern string, commands, skills, agents []*resource.Resource) ([]*resource.Resource, []*resource.Resource, []*resource.Resource, error) {
+	if filterPattern == "" {
+		// No filter, return all resources
+		return commands, skills, agents, nil
+	}
+
+	// Parse the pattern
+	matcher, err := pattern.NewMatcher(filterPattern)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("invalid filter pattern: %w", err)
+	}
+
+	// If not a pattern (exact name), try to match by name across all types
+	if !matcher.IsPattern() {
+		// Exact match - find the resource by name
+		var filteredCommands []*resource.Resource
+		var filteredSkills []*resource.Resource
+		var filteredAgents []*resource.Resource
+
+		// Get the resource type filter (if specified)
+		resourceType := matcher.GetResourceType()
+
+		// Check commands (if no type filter or type is command)
+		if resourceType == "" || resourceType == resource.Command {
+			for _, cmd := range commands {
+				if cmd.Name == filterPattern || matcher.Match(cmd) {
+					filteredCommands = append(filteredCommands, cmd)
+				}
+			}
+		}
+
+		// Check skills (if no type filter or type is skill)
+		if resourceType == "" || resourceType == resource.Skill {
+			for _, skill := range skills {
+				if skill.Name == filterPattern || matcher.Match(skill) {
+					filteredSkills = append(filteredSkills, skill)
+				}
+			}
+		}
+
+		// Check agents (if no type filter or type is agent)
+		if resourceType == "" || resourceType == resource.Agent {
+			for _, agent := range agents {
+				if agent.Name == filterPattern || matcher.Match(agent) {
+					filteredAgents = append(filteredAgents, agent)
+				}
+			}
+		}
+
+		return filteredCommands, filteredSkills, filteredAgents, nil
+	}
+
+	// Pattern matching - filter each resource type
+	var filteredCommands []*resource.Resource
+	var filteredSkills []*resource.Resource
+	var filteredAgents []*resource.Resource
+
+	// Get the resource type filter (if specified)
+	resourceType := matcher.GetResourceType()
+
+	// Filter commands (if no type filter or type is command)
+	if resourceType == "" || resourceType == resource.Command {
+		for _, cmd := range commands {
+			if matcher.Match(cmd) {
+				filteredCommands = append(filteredCommands, cmd)
+			}
+		}
+	}
+
+	// Filter skills (if no type filter or type is skill)
+	if resourceType == "" || resourceType == resource.Skill {
+		for _, skill := range skills {
+			if matcher.Match(skill) {
+				filteredSkills = append(filteredSkills, skill)
+			}
+		}
+	}
+
+	// Filter agents (if no type filter or type is agent)
+	if resourceType == "" || resourceType == resource.Agent {
+		for _, agent := range agents {
+			if matcher.Match(agent) {
+				filteredAgents = append(filteredAgents, agent)
+			}
+		}
+	}
+
+	return filteredCommands, filteredSkills, filteredAgents, nil
+}
+
 // addBulkFromLocal handles bulk add from a local folder or single file
 func addBulkFromLocal(localPath string, manager *repo.Manager) error {
 	// Validate path exists
@@ -277,8 +370,42 @@ func addBulkFromLocal(localPath string, manager *repo.Manager) error {
 	if dryRunFlag {
 		fmt.Println("  Mode: DRY RUN (preview only)")
 	}
+	if filterFlag != "" {
+		fmt.Printf("  Filter: %s\n", filterFlag)
+	}
 	fmt.Println()
-	fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commands), len(skills), len(agents))
+
+	// Store original counts for reporting
+	origCommandCount := len(commands)
+	origSkillCount := len(skills)
+	origAgentCount := len(agents)
+
+	// Apply filter if specified
+	if filterFlag != "" {
+		var err error
+		commands, skills, agents, err = applyFilter(filterFlag, commands, skills, agents)
+		if err != nil {
+			return err
+		}
+
+		// Check if filter matched any resources
+		filteredTotal := len(commands) + len(skills) + len(agents)
+		if filteredTotal == 0 {
+			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filterFlag, totalResources)
+			return nil
+		}
+
+		// Show filtered counts
+		fmt.Printf("Found: %d commands, %d skills, %d agents", origCommandCount, origSkillCount, origAgentCount)
+		if filteredTotal < totalResources {
+			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filterFlag)
+		} else {
+			fmt.Println()
+			fmt.Println()
+		}
+	} else {
+		fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commands), len(skills), len(agents))
+	}
 
 	// Collect all resource paths
 	var allPaths []string
@@ -380,8 +507,42 @@ func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error
 	if dryRunFlag {
 		fmt.Println("  Mode: DRY RUN (preview only)")
 	}
+	if filterFlag != "" {
+		fmt.Printf("  Filter: %s\n", filterFlag)
+	}
 	fmt.Println()
-	fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commands), len(skills), len(agents))
+
+	// Store original counts for reporting
+	origCommandCount := len(commands)
+	origSkillCount := len(skills)
+	origAgentCount := len(agents)
+
+	// Apply filter if specified
+	if filterFlag != "" {
+		var err error
+		commands, skills, agents, err = applyFilter(filterFlag, commands, skills, agents)
+		if err != nil {
+			return err
+		}
+
+		// Check if filter matched any resources
+		filteredTotal := len(commands) + len(skills) + len(agents)
+		if filteredTotal == 0 {
+			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filterFlag, totalResources)
+			return nil
+		}
+
+		// Show filtered counts
+		fmt.Printf("Found: %d commands, %d skills, %d agents", origCommandCount, origSkillCount, origAgentCount)
+		if filteredTotal < totalResources {
+			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filterFlag)
+		} else {
+			fmt.Println()
+			fmt.Println()
+		}
+	} else {
+		fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commands), len(skills), len(agents))
+	}
 
 	// Collect all resource paths
 	var allPaths []string
