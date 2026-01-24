@@ -7,6 +7,7 @@ import (
 
 	"github.com/hk9890/ai-config-manager/pkg/config"
 	"github.com/hk9890/ai-config-manager/pkg/install"
+	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
@@ -50,6 +51,48 @@ func parseTargetFlag(targetFlag string) ([]tools.Tool, error) {
 	return targets, nil
 }
 
+// expandPattern expands a pattern to matching resources from repository.
+// If the argument is not a pattern, returns it as-is in a single-element slice.
+// Returns a slice of resource arguments in "type/name" format.
+func expandPattern(mgr *repo.Manager, resourceArg string) ([]string, error) {
+	// Parse pattern
+	resourceType, _, isPattern := pattern.ParsePattern(resourceArg)
+	if !isPattern {
+		// Not a pattern, return as-is
+		return []string{resourceArg}, nil
+	}
+
+	// Create matcher
+	matcher, err := pattern.NewMatcher(resourceArg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pattern '%s': %w", resourceArg, err)
+	}
+
+	// List resources from repository
+	var resources []resource.Resource
+	if resourceType != "" {
+		// Specific type filter
+		resources, err = mgr.List(&resourceType)
+	} else {
+		// All types
+		resources, err = mgr.List(nil)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to list resources: %w", err)
+	}
+
+	// Filter by pattern
+	var matches []string
+	for _, res := range resources {
+		if matcher.Match(&res) {
+			// Return in "type/name" format
+			matches = append(matches, fmt.Sprintf("%s/%s", res.Type, res.Name))
+		}
+	}
+
+	return matches, nil
+}
+
 // installCmd represents the install command
 var installCmd = &cobra.Command{
 	Use:   "install <resource>...",
@@ -60,6 +103,12 @@ Resources are specified using the format 'type/name':
   - command/name (or commands/name)
   - skill/name (or skills/name)
   - agent/name (or agents/name)
+
+Pattern matching is supported using glob syntax:
+  - * matches any sequence of characters
+  - ? matches any single character
+  - [abc] matches any character in the set
+  - {a,b} matches any alternative
 
 Multi-tool behavior:
   - If tool directories exist (.claude, .opencode, .github/skills), installs to ALL of them
@@ -77,6 +126,18 @@ Examples:
 
   # Install multiple resources at once
   aimgr install skill/foo command/bar agent/reviewer
+
+  # Install all skills
+  aimgr install "skill/*"
+
+  # Install all test resources across all types
+  aimgr install "*test*"
+
+  # Install skills starting with "pdf"
+  aimgr install "skill/pdf*"
+
+  # Install multiple patterns
+  aimgr install "skill/pdf*" "command/test*"
 
   # Install to specific project
   aimgr install skill/test --project-path ~/project
@@ -137,11 +198,34 @@ Examples:
 			return fmt.Errorf("failed to create repository manager: %w", err)
 		}
 
+		// Expand patterns in arguments
+		var expandedArgs []string
+		for _, arg := range args {
+			matches, err := expandPattern(manager, arg)
+			if err != nil {
+				return fmt.Errorf("failed to expand pattern '%s': %w", arg, err)
+			}
+
+			if len(matches) == 0 {
+				// Pattern matched nothing - show warning
+				fmt.Printf("⚠ Warning: pattern '%s' matched no resources\n", arg)
+				continue
+			}
+
+			// If it was a pattern with matches, show count
+			_, _, isPattern := pattern.ParsePattern(arg)
+			if isPattern && len(matches) > 1 {
+				fmt.Printf("Installing %d resources matching '%s'...\n", len(matches), arg)
+			}
+
+			expandedArgs = append(expandedArgs, matches...)
+		}
+
 		// Track results
 		var results []installResult
 
-		// Process each resource argument
-		for _, arg := range args {
+		// Process each expanded resource
+		for _, arg := range expandedArgs {
 			result := processInstall(arg, installer, manager)
 			results = append(results, result)
 		}
