@@ -71,17 +71,17 @@ func Load(name string, resourceType resource.ResourceType, repoPath string) (*Re
 }
 
 // GetMetadataPath returns the path to the metadata file for a resource
-// Pattern: <repoPath>/<type>s/<type>-<name>-metadata.json
+// Pattern: <repoPath>/.metadata/<type>s/<name>-metadata.json
 // Examples:
-//   - command: ~/.local/share/ai-config/repo/commands/command-mycmd-metadata.json
-//   - skill: ~/.local/share/ai-config/repo/skills/skill-myskill-metadata.json
-//   - agent: ~/.local/share/ai-config/repo/agents/agent-myagent-metadata.json
+//   - command: ~/.local/share/ai-config/repo/.metadata/commands/mycmd-metadata.json
+//   - skill: ~/.local/share/ai-config/repo/.metadata/skills/myskill-metadata.json
+//   - agent: ~/.local/share/ai-config/repo/.metadata/agents/myagent-metadata.json
 func GetMetadataPath(name string, resourceType resource.ResourceType, repoPath string) string {
 	// Get the resource type directory (commands, skills, agents)
 	typeDir := string(resourceType) + "s"
 
-	// Build filename: <type>-<name>-metadata.json
-	filename := fmt.Sprintf("%s-%s-metadata.json", resourceType, name)
+	// Build filename: <name>-metadata.json
+	filename := fmt.Sprintf("%s-metadata.json", name)
 
-	return filepath.Join(repoPath, typeDir, filename)
+	return filepath.Join(repoPath, ".metadata", typeDir, filename)
 }
