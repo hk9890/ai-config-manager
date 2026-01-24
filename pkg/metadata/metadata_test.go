@@ -23,28 +23,28 @@ func TestGetMetadataPath(t *testing.T) {
 			resourceName: "test-cmd",
 			resourceType: resource.Command,
 			repoPath:     "/home/user/.local/share/ai-config/repo",
-			wantPath:     "/home/user/.local/share/ai-config/repo/commands/command-test-cmd-metadata.json",
+			wantPath:     "/home/user/.local/share/ai-config/repo/.metadata/commands/test-cmd-metadata.json",
 		},
 		{
 			name:         "skill metadata path",
 			resourceName: "pdf-processor",
 			resourceType: resource.Skill,
 			repoPath:     "/home/user/.local/share/ai-config/repo",
-			wantPath:     "/home/user/.local/share/ai-config/repo/skills/skill-pdf-processor-metadata.json",
+			wantPath:     "/home/user/.local/share/ai-config/repo/.metadata/skills/pdf-processor-metadata.json",
 		},
 		{
 			name:         "agent metadata path",
 			resourceName: "code-reviewer",
 			resourceType: resource.Agent,
 			repoPath:     "/home/user/.local/share/ai-config/repo",
-			wantPath:     "/home/user/.local/share/ai-config/repo/agents/agent-code-reviewer-metadata.json",
+			wantPath:     "/home/user/.local/share/ai-config/repo/.metadata/agents/code-reviewer-metadata.json",
 		},
 		{
 			name:         "command with different repo path",
 			resourceName: "my-command",
 			resourceType: resource.Command,
 			repoPath:     "/tmp/test-repo",
-			wantPath:     "/tmp/test-repo/commands/command-my-command-metadata.json",
+			wantPath:     "/tmp/test-repo/.metadata/commands/my-command-metadata.json",
 		},
 	}
 
@@ -421,7 +421,7 @@ func TestLoadInvalidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create invalid JSON file
-	invalidPath := filepath.Join(tmpDir, "commands", "command-invalid-metadata.json")
+	invalidPath := filepath.Join(tmpDir, ".metadata", "commands", "invalid-metadata.json")
 	if err := os.MkdirAll(filepath.Dir(invalidPath), 0755); err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
