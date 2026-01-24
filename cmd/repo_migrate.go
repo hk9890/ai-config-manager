@@ -70,7 +70,7 @@ Examples:
 
 func init() {
 	repoCmd.AddCommand(repoMigrateMetadataCmd)
-	repoMigrateMetadataCmd.Flags().BoolVar(&migrateDryRunFlag, "dry-run", false, "Preview changes without moving files (note: migration library doesn't fully support this yet)")
+	repoMigrateMetadataCmd.Flags().BoolVar(&migrateDryRunFlag, "dry-run", false, "Preview changes without moving files")
 	repoMigrateMetadataCmd.Flags().BoolVar(&migrateForceFlag, "force", false, "Skip confirmation prompt")
 }
 
