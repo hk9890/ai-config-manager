@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
+	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"gopkg.in/yaml.v3"
 )
@@ -29,6 +30,9 @@ type Config struct {
 	// Install configuration for default installation targets
 	Install InstallConfig `yaml:"install"`
 
+	// Sync configuration for syncing resources from external sources
+	Sync SyncConfig `yaml:"sync"`
+
 	// DefaultTool is deprecated - use Install.Targets instead
 	// Kept for backward compatibility during migration
 	DefaultTool string `yaml:"default-tool,omitempty"`
@@ -39,6 +43,20 @@ type InstallConfig struct {
 	// Targets specifies which AI tools to install to by default
 	// Valid values: claude, opencode, copilot
 	Targets []string `yaml:"targets"`
+}
+
+// SyncSource represents a source for syncing resources
+type SyncSource struct {
+	// URL is the source URL (required, e.g., "https://github.com/owner/repo" or "gh:owner/repo")
+	URL string `yaml:"url"`
+	// Filter is an optional glob pattern to filter resources (e.g., "skill/*", "skill/pdf*")
+	Filter string `yaml:"filter,omitempty"`
+}
+
+// SyncConfig holds sync-related configuration
+type SyncConfig struct {
+	// Sources is a list of sources to sync from
+	Sources []SyncSource `yaml:"sources"`
 }
 
 // GetConfigPath returns the path to the config file in XDG config directory
@@ -209,6 +227,22 @@ func (c *Config) Validate() error {
 	for _, target := range c.Install.Targets {
 		if _, err := tools.ParseTool(target); err != nil {
 			return fmt.Errorf("install.targets: invalid tool '%s': %w", target, err)
+		}
+	}
+
+	// Validate sync sources
+	for i, source := range c.Sync.Sources {
+		// Validate URL is non-empty
+		if source.URL == "" {
+			return fmt.Errorf("sync.sources[%d]: url cannot be empty", i)
+		}
+
+		// Validate filter pattern if present
+		if source.Filter != "" {
+			_, err := pattern.NewMatcher(source.Filter)
+			if err != nil {
+				return fmt.Errorf("sync.sources[%d]: invalid filter pattern '%s': %w", i, source.Filter, err)
+			}
 		}
 	}
 
