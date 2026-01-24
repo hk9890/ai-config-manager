@@ -20,114 +20,61 @@ var forceFlag bool
 var (
 	skipExistingFlag bool
 	dryRunFlag       bool
+	filterFlag       string
 )
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:   "add [command|skill|agent|bulk]",
+	Use:   "add <source>",
 	Short: "Add resources to the repository",
 	Long: `Add resources to the aimgr repository.
 
-You can add individual resources by type, or use bulk to auto-discover all resources:
+This command auto-discovers and imports all resources (commands, skills, agents)
+from the specified source location.
 
-Subcommands:
-  command  Add a single command resource (.md file)
-  skill    Add a single skill resource (directory with SKILL.md)
-  agent    Add a single agent resource (.md file)
-  bulk     Auto-discover and add all resources from a folder or URL
+Source Formats:
+  Local folders:
+    ./path or ~/path           Local directory (relative or home)
+    /absolute/path             Absolute local path
+  
+  GitHub repositories:
+    gh:owner/repo              GitHub repository (shorthand)
+    owner/repo                 GitHub shorthand (gh: inferred)
+    https://github.com/...     Full HTTPS Git URL
+    git@github.com:...         SSH Git URL
+    gh:owner/repo@branch       Specific branch or tag
 
 Commands are single .md files with YAML frontmatter.
 Skills are directories containing a SKILL.md file.
 Agents are single .md files with YAML frontmatter.
 
 Examples:
-  # Add specific resources
-  aimgr repo add command ./my-command.md
-  aimgr repo add skill ./my-skill/
-  aimgr repo add agent ./my-agent.md
+  # Add all resources from local folder
+  aimgr repo add ~/.opencode/
+  aimgr repo add ~/project/.claude/
+  aimgr repo add ./my-resources/
 
-  # Bulk add all resources from a folder
-  aimgr repo add bulk ~/.opencode/
-  aimgr repo add bulk ~/project/.claude/
+  # Add all resources from GitHub
+  aimgr repo add https://github.com/owner/repo
+  aimgr repo add git@github.com:owner/repo.git
+  aimgr repo add gh:owner/repo
+  aimgr repo add owner/repo
   
-  # Bulk add from GitHub
-  aimgr repo add bulk gh:owner/repo`,
-}
-
-// addCommandCmd represents the add command subcommand
-var addCommandCmd = &cobra.Command{
-	Use:   "command <source>",
-	Short: "Add a command resource",
-	Long: `Add a command resource to the repository.
-
-A command is a single .md file with YAML frontmatter containing at minimum
-a description field.
-
-Source Formats:
-  gh:owner/repo              GitHub repository (auto-discovers commands)
-  gh:owner/repo/path         Specific command in repo
-  gh:owner/repo@branch       Specific branch or tag
-  owner/repo                 GitHub shorthand (gh: prefix inferred)
-  local:path                 Local file (explicit)
-  ./path or ~/path           Local file (inferred)
-  /absolute/path             Absolute local path
-  https://github.com/...     Full HTTPS Git URL
-  git@github.com:...         SSH Git URL
-
-Examples:
-  # From GitHub
-  aimgr repo add command gh:owner/repo
+  # Add specific version
+  aimgr repo add gh:owner/repo@v1.0.0
   
-  # Specific command in repo
-  aimgr repo add command gh:owner/repo/commands/test-command.md
+  # With options
+  aimgr repo add ~/resources/ --force
+  aimgr repo add gh:owner/repo --skip-existing
+  aimgr repo add ./test/ --dry-run
   
-  # Specific version
-  aimgr repo add command gh:owner/repo@v1.0.0
-  
-  # GitHub shorthand
-  aimgr repo add command owner/repo
-  
-  # Local file
-  aimgr repo add command ~/my-commands/test-command.md
-  aimgr repo add command ./test-command.md
-  
-  # Full Git URL
-  aimgr repo add command https://github.com/owner/repo.git
-  
-  # Force overwrite
-  aimgr repo add command ./test-command.md --force`,
+  # Filter resources (pattern matching)
+  aimgr repo add gh:owner/repo --filter "skill/*"
+  aimgr repo add ./resources/ --filter "*test*"`,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveDefault
 	},
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf(`requires a source argument
-
-Source Formats:
-  gh:owner/repo              GitHub repository (auto-discovers commands)
-  gh:owner/repo/path         Specific command file in GitHub repo
-  owner/repo                 GitHub shorthand (gh: inferred)
-  ./path or ~/path           Local .md file path
-  https://github.com/...     Full GitHub URL
-
-Examples:
-  # From GitHub (discovers all commands in repo)
-  aimgr repo add command gh:owner/repo
-  aimgr repo add command owner/repo                   # shorthand
-
-  # Specific command from GitHub
-  aimgr repo add command gh:owner/repo/commands/test.md
-
-  # From local file
-  aimgr repo add command ~/my-commands/test-command.md
-
-Run 'aimgr repo add command --help' for more details.`)
-		}
-		if len(args) > 1 {
-			return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
-		}
-		return nil
-	},
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sourceInput := args[0]
 
@@ -145,478 +92,243 @@ Run 'aimgr repo add command --help' for more details.`)
 
 		// Handle different source types
 		if parsed.Type == source.GitHub || parsed.Type == source.GitURL {
-			// GitHub/Git source - use auto-discovery workflow
-			return addCommandFromGitHub(parsed, manager)
+			return addBulkFromGitHub(parsed, manager)
 		}
 
-		// Local source - existing behavior
-		sourcePath := parsed.LocalPath
-
-		// Validate path exists
-		if _, err := os.Stat(sourcePath); err != nil {
-			return fmt.Errorf("path does not exist: %s", sourcePath)
-		}
-
-		// Validate it's a file
-		info, err := os.Stat(sourcePath)
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return fmt.Errorf("path is a directory, expected a .md file: %s", sourcePath)
-		}
-
-		// Validate it's a .md file
-		if filepath.Ext(sourcePath) != ".md" {
-			return fmt.Errorf("file must have .md extension: %s", sourcePath)
-		}
-
-		// Try to load and validate the command
-		res, err := resource.LoadCommand(sourcePath)
-		if err != nil {
-			return fmt.Errorf("invalid command resource: %w", err)
-		}
-
-		// Check if already exists (if not force mode)
-		if !forceFlag {
-			existing, _ := manager.Get(res.Name, resource.Command)
-			if existing != nil {
-				return fmt.Errorf("command '%s' already exists in repository (use --force to overwrite)", res.Name)
-			}
-		} else {
-			// Remove existing if force mode
-			_ = manager.Remove(res.Name, resource.Command)
-		}
-
-		// Determine source info for metadata
-		sourceType, sourceURL, err := determineSourceInfo(parsed, sourcePath)
-		if err != nil {
-			return fmt.Errorf("failed to determine source info: %w", err)
-		}
-
-		// Add the command
-		if err := manager.AddCommand(sourcePath, sourceURL, sourceType); err != nil {
-			return fmt.Errorf("failed to add command: %w", err)
-		}
-
-		// Success message
-		fmt.Printf("✓ Added command '%s' to repository\n", res.Name)
-		if res.Description != "" {
-			fmt.Printf("  Description: %s\n", res.Description)
-		}
-
-		return nil
-	},
-}
-
-// addSkillCmd represents the add skill subcommand
-var addSkillCmd = &cobra.Command{
-	Use:   "skill <source>",
-	Short: "Add a skill resource",
-	Long: `Add a skill resource to the repository.
-
-A skill is a directory containing a SKILL.md file with YAML frontmatter.
-The directory name must match the 'name' field in SKILL.md.
-
-Source Formats:
-  gh:owner/repo              GitHub repository (auto-discovers skills)
-  gh:owner/repo/path         Specific skill in repo
-  gh:owner/repo@branch       Specific branch or tag
-  owner/repo                 GitHub shorthand (gh: prefix inferred)
-  local:path                 Local directory (explicit)
-  ./path or ~/path           Local directory (inferred)
-  /absolute/path             Absolute local path
-  https://github.com/...     Full HTTPS Git URL
-  git@github.com:...         SSH Git URL
-
-Examples:
-  # From GitHub
-  aimgr repo add skill gh:owner/repo
-  
-  # Specific skill in repo
-  aimgr repo add skill gh:owner/repo/skills/pdf-processing
-  
-  # Specific version
-  aimgr repo add skill gh:owner/repo@v1.0.0
-  
-  # GitHub shorthand
-  aimgr repo add skill owner/repo
-  
-  # Local directory
-  aimgr repo add skill ~/my-skills/pdf-processing
-  aimgr repo add skill ./pdf-processing
-  
-  # Full Git URL
-  aimgr repo add skill https://github.com/owner/repo.git
-  
-  # Force overwrite
-  aimgr repo add skill ./pdf-processing --force`,
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return nil, cobra.ShellCompDirectiveDefault
-	},
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf(`requires a source argument
-
-Source Formats:
-  gh:owner/repo              GitHub repository (auto-discovers skills)
-  gh:owner/repo/path         Specific skill in GitHub repo
-  owner/repo                 GitHub shorthand (gh: inferred)
-  ./path or ~/path           Local directory path
-  https://github.com/...     Full GitHub URL
-
-Examples:
-  # From GitHub (discovers all skills in repo)
-  aimgr repo add skill gh:anthropics/skills
-  aimgr repo add skill anthropics/skills              # shorthand
-
-  # Specific skill from GitHub
-  aimgr repo add skill gh:anthropics/skills/pdf
-
-  # From local directory
-  aimgr repo add skill ~/my-skills/pdf-processing
-
-Run 'aimgr repo add skill --help' for more details.`)
-		}
-		if len(args) > 1 {
-			return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
-		}
-		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		sourceInput := args[0]
-
-		// Parse source
-		parsed, err := source.ParseSource(sourceInput)
-		if err != nil {
-			return fmt.Errorf("invalid source format: %w", err)
-		}
-
-		// Create manager
-		manager, err := repo.NewManager()
-		if err != nil {
-			return err
-		}
-
-		// Handle different source types
-		if parsed.Type == source.GitHub || parsed.Type == source.GitURL {
-			// GitHub/Git source - use auto-discovery workflow
-			return addSkillFromGitHub(parsed, manager)
-		}
-
-		// Local source - existing behavior
-		sourcePath := parsed.LocalPath
-
-		// Validate path exists
-		if _, err := os.Stat(sourcePath); err != nil {
-			return fmt.Errorf("path does not exist: %s", sourcePath)
-		}
-
-		// Validate it's a directory
-		info, err := os.Stat(sourcePath)
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			return fmt.Errorf("path is a file, expected a directory: %s", sourcePath)
-		}
-
-		// Check for SKILL.md
-		skillMdPath := filepath.Join(sourcePath, "SKILL.md")
-		if _, err := os.Stat(skillMdPath); err != nil {
-			return fmt.Errorf("directory must contain SKILL.md: %s", sourcePath)
-		}
-
-		// Try to load and validate the skill
-		res, err := resource.LoadSkill(sourcePath)
-		if err != nil {
-			return fmt.Errorf("invalid skill resource: %w", err)
-		}
-
-		// Validate folder name matches frontmatter name
-		dirName := filepath.Base(sourcePath)
-		if res.Name != dirName {
-			return fmt.Errorf("folder name '%s' does not match skill name '%s' in SKILL.md", dirName, res.Name)
-		}
-
-		// Check if already exists (if not force mode)
-		if !forceFlag {
-			existing, _ := manager.Get(res.Name, resource.Skill)
-			if existing != nil {
-				return fmt.Errorf("skill '%s' already exists in repository (use --force to overwrite)", res.Name)
-			}
-		} else {
-			// Remove existing if force mode
-			_ = manager.Remove(res.Name, resource.Skill)
-		}
-
-		// Determine source info for metadata
-		sourceType, sourceURL, err := determineSourceInfo(parsed, sourcePath)
-		if err != nil {
-			return fmt.Errorf("failed to determine source info: %w", err)
-		}
-
-		// Add the skill
-		if err := manager.AddSkill(sourcePath, sourceURL, sourceType); err != nil {
-			return fmt.Errorf("failed to add skill: %w", err)
-		}
-
-		// Success message
-		fmt.Printf("✓ Added skill '%s' to repository\n", res.Name)
-		if res.Version != "" {
-			fmt.Printf("  Version: %s\n", res.Version)
-		}
-		if res.Description != "" {
-			fmt.Printf("  Description: %s\n", res.Description)
-		}
-
-		return nil
-	},
-}
-
-// addAgentCmd represents the add agent subcommand
-var addAgentCmd = &cobra.Command{
-	Use:   "agent <source>",
-	Short: "Add an agent resource",
-	Long: `Add an agent resource to the repository.
-
-An agent is a single .md file with YAML frontmatter containing at minimum
-a description field.
-
-Source Formats:
-  gh:owner/repo              GitHub repository (auto-discovers agents)
-  gh:owner/repo/path         Specific agent in repo
-  gh:owner/repo@branch       Specific branch or tag
-  owner/repo                 GitHub shorthand (gh: prefix inferred)
-  local:path                 Local file (explicit)
-  ./path or ~/path           Local file (inferred)
-  /absolute/path             Absolute local path
-  https://github.com/...     Full HTTPS Git URL
-  git@github.com:...         SSH Git URL
-
-Examples:
-  # From GitHub
-  aimgr repo add agent gh:owner/repo
-  
-  # Specific agent in repo
-  aimgr repo add agent gh:owner/repo/agents/code-reviewer.md
-  
-  # Specific version
-  aimgr repo add agent gh:owner/repo@v1.0.0
-  
-  # GitHub shorthand
-  aimgr repo add agent owner/repo
-  
-  # Local file
-  aimgr repo add agent ~/.opencode/agents/code-reviewer.md
-  aimgr repo add agent ./code-reviewer.md
-  
-  # Full Git URL
-  aimgr repo add agent https://github.com/owner/repo.git
-  
-  # Force overwrite
-  aimgr repo add agent ./code-reviewer.md --force`,
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return nil, cobra.ShellCompDirectiveDefault
-	},
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return fmt.Errorf(`requires a source argument
-
-Source Formats:
-  gh:owner/repo              GitHub repository (auto-discovers agents)
-  gh:owner/repo/path         Specific agent file in GitHub repo
-  owner/repo                 GitHub shorthand (gh: inferred)
-  ./path or ~/path           Local .md file path
-  https://github.com/...     Full GitHub URL
-
-Examples:
-  # From GitHub (discovers all agents in repo)
-  aimgr repo add agent gh:owner/repo
-  aimgr repo add agent owner/repo                     # shorthand
-
-  # Specific agent from GitHub
-  aimgr repo add agent gh:owner/repo/agents/reviewer.md
-
-  # From local file
-  aimgr repo add agent ~/.opencode/agents/code-reviewer.md
-
-Run 'aimgr repo add agent --help' for more details.`)
-		}
-		if len(args) > 1 {
-			return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
-		}
-		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		sourceInput := args[0]
-
-		// Parse source
-		parsed, err := source.ParseSource(sourceInput)
-		if err != nil {
-			return fmt.Errorf("invalid source format: %w", err)
-		}
-
-		// Create manager
-		manager, err := repo.NewManager()
-		if err != nil {
-			return err
-		}
-
-		// Handle different source types
-		if parsed.Type == source.GitHub || parsed.Type == source.GitURL {
-			// GitHub/Git source - use auto-discovery workflow
-			return addAgentFromGitHub(parsed, manager)
-		}
-
-		// Local source - existing behavior
-		sourcePath := parsed.LocalPath
-
-		// Validate path exists
-		if _, err := os.Stat(sourcePath); err != nil {
-			return fmt.Errorf("path does not exist: %s", sourcePath)
-		}
-
-		// Validate it's a file
-		info, err := os.Stat(sourcePath)
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return fmt.Errorf("path is a directory, expected a .md file: %s", sourcePath)
-		}
-
-		// Validate it's a .md file
-		if filepath.Ext(sourcePath) != ".md" {
-			return fmt.Errorf("file must have .md extension: %s", sourcePath)
-		}
-
-		// Try to load and validate the agent
-		res, err := resource.LoadAgent(sourcePath)
-		if err != nil {
-			return fmt.Errorf("invalid agent resource: %w", err)
-		}
-
-		// Check if already exists (if not force mode)
-		if !forceFlag {
-			existing, _ := manager.Get(res.Name, resource.Agent)
-			if existing != nil {
-				return fmt.Errorf("agent '%s' already exists in repository (use --force to overwrite)", res.Name)
-			}
-		} else {
-			// Remove existing if force mode
-			_ = manager.Remove(res.Name, resource.Agent)
-		}
-
-		// Determine source info for metadata
-		sourceType, sourceURL, err := determineSourceInfo(parsed, sourcePath)
-		if err != nil {
-			return fmt.Errorf("failed to determine source info: %w", err)
-		}
-
-		// Add the agent
-		if err := manager.AddAgent(sourcePath, sourceURL, sourceType); err != nil {
-			return fmt.Errorf("failed to add agent: %w", err)
-		}
-
-		// Success message
-		fmt.Printf("✓ Added agent '%s' to repository\n", res.Name)
-		if res.Description != "" {
-			fmt.Printf("  Description: %s\n", res.Description)
-		}
-
-		return nil
+		// Local source
+		return addBulkFromLocal(parsed.LocalPath, manager)
 	},
 }
 
 func init() {
 	repoCmd.AddCommand(addCmd)
-	addCmd.AddCommand(addCommandCmd)
-	addCmd.AddCommand(addSkillCmd)
-	addCmd.AddCommand(addAgentCmd)
 
-	// Add --force flag to all subcommands
-	addCommandCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resource")
-	addSkillCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resource")
-	addAgentCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resource")
+	// Add flags
+	addCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resources")
+	addCmd.Flags().BoolVar(&skipExistingFlag, "skip-existing", false, "Skip conflicts silently")
+	addCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without importing")
+	addCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
 }
 
-// Helper functions for GitHub source integration
+// Helper functions for bulk add integration
 
-// addCommandFromGitHub handles adding a command from a GitHub source
-func addCommandFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error {
-	// Clone repository to temp directory
-	cloneURL, err := source.GetCloneURL(parsed)
-	if err != nil {
-		return fmt.Errorf("failed to get clone URL: %w", err)
+// addSingleResource adds a single file (command or agent) to the repository
+func addSingleResource(filePath string, manager *repo.Manager) error {
+	// Validate it's a .md file
+	if filepath.Ext(filePath) != ".md" {
+		return fmt.Errorf("file must have .md extension: %s", filePath)
 	}
 
-	tempDir, err := source.CloneRepo(cloneURL, parsed.Ref)
-	if err != nil {
-		return fmt.Errorf("git clone failed: %w", err)
-	}
-	defer source.CleanupTempDir(tempDir)
+	// Check parent directory to determine type
+	parentDir := filepath.Base(filepath.Dir(filePath))
 
-	// Discover commands
-	searchPath := tempDir
-	if parsed.Subpath != "" {
-		searchPath = filepath.Join(tempDir, parsed.Subpath)
-	}
-
-	commands, err := discovery.DiscoverCommands(searchPath, "")
-	if err != nil {
-		return fmt.Errorf("failed to discover commands: %w", err)
+	// If in agents/ directory, treat as agent
+	if parentDir == "agents" {
+		agent, err := resource.LoadAgent(filePath)
+		if err != nil {
+			return fmt.Errorf("invalid agent resource: %w", err)
+		}
+		return addAgentFile(filePath, agent, manager)
 	}
 
-	if len(commands) == 0 {
-		return fmt.Errorf("no commands found in repository: %s", parsed.URL)
+	// If in commands/ directory, treat as command
+	if parentDir == "commands" {
+		cmd, err := resource.LoadCommand(filePath)
+		if err != nil {
+			return fmt.Errorf("invalid command resource: %w", err)
+		}
+		return addCommandFile(filePath, cmd, manager)
 	}
 
-	// Handle resource selection
-	selectedCommand, err := selectResource(commands, "command")
-	if err != nil {
-		return err
+	// Otherwise, try to determine by content
+	// Try as agent first (agents have more specific fields)
+	agent, agentErr := resource.LoadAgent(filePath)
+	if agentErr == nil {
+		// Check if it has agent-specific fields (type, instructions, capabilities)
+		agentRes, err := resource.LoadAgentResource(filePath)
+		if err == nil && (agentRes.Type != "" || agentRes.Instructions != "" || len(agentRes.Capabilities) > 0) {
+			// Has agent-specific fields, treat as agent
+			return addAgentFile(filePath, agent, manager)
+		}
 	}
 
-	// Get the actual file path from the resource
-	commandPath := filepath.Join(searchPath, selectedCommand.Name+".md")
-
-	// Find the actual command file in the discovered locations
-	commandPath, err = findCommandFile(searchPath, selectedCommand.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find command file: %w", err)
+	// Try as command
+	cmd, cmdErr := resource.LoadCommand(filePath)
+	if cmdErr == nil {
+		// It's a command
+		return addCommandFile(filePath, cmd, manager)
 	}
 
+	// Neither worked, return both errors
+	return fmt.Errorf("invalid resource file (tried as agent: %v; tried as command: %v)", agentErr, cmdErr)
+}
+
+// addCommandFile adds a single command file to the repository
+func addCommandFile(filePath string, res *resource.Resource, manager *repo.Manager) error {
 	// Check if already exists (if not force mode)
 	if !forceFlag {
-		existing, _ := manager.Get(selectedCommand.Name, resource.Command)
+		existing, _ := manager.Get(res.Name, resource.Command)
 		if existing != nil {
-			return fmt.Errorf("command '%s' already exists in repository (use --force to overwrite)", selectedCommand.Name)
+			return fmt.Errorf("command '%s' already exists in repository (use --force to overwrite)", res.Name)
 		}
 	} else {
 		// Remove existing if force mode
-		_ = manager.Remove(selectedCommand.Name, resource.Command)
+		_ = manager.Remove(res.Name, resource.Command)
 	}
 
-	// Determine source info for metadata (GitHub source)
-	sourceType, sourceURL := formatGitHubSourceInfo(parsed)
+	// Determine source info
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	sourceURL := "file://" + absPath
 
-	// Add the command using manager
-	if err := manager.AddCommand(commandPath, sourceURL, sourceType); err != nil {
+	// Add the command
+	if err := manager.AddCommand(filePath, sourceURL, "file"); err != nil {
 		return fmt.Errorf("failed to add command: %w", err)
 	}
 
 	// Success message
-	fmt.Printf("✓ Added command '%s' to repository\n", selectedCommand.Name)
-	if selectedCommand.Description != "" {
-		fmt.Printf("  Description: %s\n", selectedCommand.Description)
+	fmt.Printf("✓ Added command '%s' to repository\n", res.Name)
+	if res.Description != "" {
+		fmt.Printf("  Description: %s\n", res.Description)
 	}
 
 	return nil
 }
 
-// addSkillFromGitHub handles adding a skill from a GitHub source
-func addSkillFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error {
+// addAgentFile adds a single agent file to the repository
+func addAgentFile(filePath string, res *resource.Resource, manager *repo.Manager) error {
+	// Check if already exists (if not force mode)
+	if !forceFlag {
+		existing, _ := manager.Get(res.Name, resource.Agent)
+		if existing != nil {
+			return fmt.Errorf("agent '%s' already exists in repository (use --force to overwrite)", res.Name)
+		}
+	} else {
+		// Remove existing if force mode
+		_ = manager.Remove(res.Name, resource.Agent)
+	}
+
+	// Determine source info
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	sourceURL := "file://" + absPath
+
+	// Add the agent
+	if err := manager.AddAgent(filePath, sourceURL, "file"); err != nil {
+		return fmt.Errorf("failed to add agent: %w", err)
+	}
+
+	// Success message
+	fmt.Printf("✓ Added agent '%s' to repository\n", res.Name)
+	if res.Description != "" {
+		fmt.Printf("  Description: %s\n", res.Description)
+	}
+
+	return nil
+}
+
+// addBulkFromLocal handles bulk add from a local folder or single file
+func addBulkFromLocal(localPath string, manager *repo.Manager) error {
+	// Validate path exists
+	if _, err := os.Stat(localPath); err != nil {
+		return fmt.Errorf("path does not exist: %s", localPath)
+	}
+
+	// Check if it's a file or directory
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return err
+	}
+
+	// If it's a single file, handle it specially
+	if !info.IsDir() {
+		return addSingleResource(localPath, manager)
+	}
+
+	// Discover all resources
+	commands, err := discovery.DiscoverCommands(localPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to discover commands: %w", err)
+	}
+
+	skills, err := discovery.DiscoverSkills(localPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to discover skills: %w", err)
+	}
+
+	agents, err := discovery.DiscoverAgents(localPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to discover agents: %w", err)
+	}
+
+	// Check if any resources found
+	totalResources := len(commands) + len(skills) + len(agents)
+	if totalResources == 0 {
+		return fmt.Errorf("no resources found in: %s\nExpected commands (*.md), skills (*/SKILL.md), or agents (*.md)", localPath)
+	}
+
+	// Print header
+	absPath, _ := filepath.Abs(localPath)
+	fmt.Printf("Importing from: %s\n", absPath)
+	if dryRunFlag {
+		fmt.Println("  Mode: DRY RUN (preview only)")
+	}
+	fmt.Println()
+	fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commands), len(skills), len(agents))
+
+	// Collect all resource paths
+	var allPaths []string
+
+	// Add commands
+	for _, cmd := range commands {
+		cmdPath, err := findCommandFile(localPath, cmd.Name)
+		if err == nil {
+			allPaths = append(allPaths, cmdPath)
+		}
+	}
+
+	// Add skills
+	for _, skill := range skills {
+		skillPath, err := findSkillDir(localPath, skill.Name)
+		if err == nil {
+			allPaths = append(allPaths, skillPath)
+		}
+	}
+
+	// Add agents
+	for _, agent := range agents {
+		agentPath, err := findAgentFile(localPath, agent.Name)
+		if err == nil {
+			allPaths = append(allPaths, agentPath)
+		}
+	}
+
+	// Import using bulk add
+	opts := repo.BulkImportOptions{
+		Force:        forceFlag,
+		SkipExisting: skipExistingFlag,
+		DryRun:       dryRunFlag,
+	}
+
+	result, err := manager.AddBulk(allPaths, opts)
+	if err != nil && !skipExistingFlag {
+		// Print partial results before error
+		printImportResults(result)
+		return err
+	}
+
+	// Print results
+	printImportResults(result)
+
+	return nil
+}
+
+// addBulkFromGitHub handles bulk add from a GitHub repository
+func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error {
 	// Clone repository to temp directory
 	cloneURL, err := source.GetCloneURL(parsed)
 	if err != nil {
@@ -629,10 +341,16 @@ func addSkillFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) erro
 	}
 	defer source.CleanupTempDir(tempDir)
 
-	// Discover skills
+	// Determine search path
 	searchPath := tempDir
 	if parsed.Subpath != "" {
 		searchPath = filepath.Join(tempDir, parsed.Subpath)
+	}
+
+	// Discover all resources
+	commands, err := discovery.DiscoverCommands(searchPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to discover commands: %w", err)
 	}
 
 	skills, err := discovery.DiscoverSkills(searchPath, "")
@@ -640,118 +358,74 @@ func addSkillFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) erro
 		return fmt.Errorf("failed to discover skills: %w", err)
 	}
 
-	if len(skills) == 0 {
-		return fmt.Errorf("no skills found in repository: %s", parsed.URL)
-	}
-
-	// Handle resource selection
-	selectedSkill, err := selectResource(skills, "skill")
-	if err != nil {
-		return err
-	}
-
-	// Find the skill directory
-	skillPath, err := findSkillDir(searchPath, selectedSkill.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find skill directory: %w", err)
-	}
-
-	// Check if already exists (if not force mode)
-	if !forceFlag {
-		existing, _ := manager.Get(selectedSkill.Name, resource.Skill)
-		if existing != nil {
-			return fmt.Errorf("skill '%s' already exists in repository (use --force to overwrite)", selectedSkill.Name)
-		}
-	} else {
-		// Remove existing if force mode
-		_ = manager.Remove(selectedSkill.Name, resource.Skill)
-	}
-
-	// Determine source info for metadata (GitHub source)
-	sourceType, sourceURL := formatGitHubSourceInfo(parsed)
-
-	// Add the skill using manager
-	if err := manager.AddSkill(skillPath, sourceURL, sourceType); err != nil {
-		return fmt.Errorf("failed to add skill: %w", err)
-	}
-
-	// Success message
-	fmt.Printf("✓ Added skill '%s' to repository\n", selectedSkill.Name)
-	if selectedSkill.Version != "" {
-		fmt.Printf("  Version: %s\n", selectedSkill.Version)
-	}
-	if selectedSkill.Description != "" {
-		fmt.Printf("  Description: %s\n", selectedSkill.Description)
-	}
-
-	return nil
-}
-
-// addAgentFromGitHub handles adding an agent from a GitHub source
-func addAgentFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error {
-	// Clone repository to temp directory
-	cloneURL, err := source.GetCloneURL(parsed)
-	if err != nil {
-		return fmt.Errorf("failed to get clone URL: %w", err)
-	}
-
-	tempDir, err := source.CloneRepo(cloneURL, parsed.Ref)
-	if err != nil {
-		return fmt.Errorf("git clone failed: %w", err)
-	}
-	defer source.CleanupTempDir(tempDir)
-
-	// Discover agents
-	searchPath := tempDir
-	if parsed.Subpath != "" {
-		searchPath = filepath.Join(tempDir, parsed.Subpath)
-	}
-
 	agents, err := discovery.DiscoverAgents(searchPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to discover agents: %w", err)
 	}
 
-	if len(agents) == 0 {
-		return fmt.Errorf("no agents found in repository: %s", parsed.URL)
+	// Check if any resources found
+	totalResources := len(commands) + len(skills) + len(agents)
+	if totalResources == 0 {
+		return fmt.Errorf("no resources found in repository: %s", parsed.URL)
 	}
 
-	// Handle resource selection
-	selectedAgent, err := selectResource(agents, "agent")
-	if err != nil {
+	// Print header
+	fmt.Printf("Importing from: %s\n", parsed.URL)
+	if parsed.Ref != "" {
+		fmt.Printf("  Branch/Tag: %s\n", parsed.Ref)
+	}
+	if parsed.Subpath != "" {
+		fmt.Printf("  Subpath: %s\n", parsed.Subpath)
+	}
+	if dryRunFlag {
+		fmt.Println("  Mode: DRY RUN (preview only)")
+	}
+	fmt.Println()
+	fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commands), len(skills), len(agents))
+
+	// Collect all resource paths
+	var allPaths []string
+
+	// Add commands
+	for _, cmd := range commands {
+		cmdPath, err := findCommandFile(searchPath, cmd.Name)
+		if err == nil {
+			allPaths = append(allPaths, cmdPath)
+		}
+	}
+
+	// Add skills
+	for _, skill := range skills {
+		skillPath, err := findSkillDir(searchPath, skill.Name)
+		if err == nil {
+			allPaths = append(allPaths, skillPath)
+		}
+	}
+
+	// Add agents
+	for _, agent := range agents {
+		agentPath, err := findAgentFile(searchPath, agent.Name)
+		if err == nil {
+			allPaths = append(allPaths, agentPath)
+		}
+	}
+
+	// Import using bulk add
+	opts := repo.BulkImportOptions{
+		Force:        forceFlag,
+		SkipExisting: skipExistingFlag,
+		DryRun:       dryRunFlag,
+	}
+
+	result, err := manager.AddBulk(allPaths, opts)
+	if err != nil && !skipExistingFlag {
+		// Print partial results before error
+		printImportResults(result)
 		return err
 	}
 
-	// Find the agent file
-	agentPath, err := findAgentFile(searchPath, selectedAgent.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find agent file: %w", err)
-	}
-
-	// Check if already exists (if not force mode)
-	if !forceFlag {
-		existing, _ := manager.Get(selectedAgent.Name, resource.Agent)
-		if existing != nil {
-			return fmt.Errorf("agent '%s' already exists in repository (use --force to overwrite)", selectedAgent.Name)
-		}
-	} else {
-		// Remove existing if force mode
-		_ = manager.Remove(selectedAgent.Name, resource.Agent)
-	}
-
-	// Determine source info for metadata (GitHub source)
-	sourceType, sourceURL := formatGitHubSourceInfo(parsed)
-
-	// Add the agent using manager
-	if err := manager.AddAgent(agentPath, sourceURL, sourceType); err != nil {
-		return fmt.Errorf("failed to add agent: %w", err)
-	}
-
-	// Success message
-	fmt.Printf("✓ Added agent '%s' to repository\n", selectedAgent.Name)
-	if selectedAgent.Description != "" {
-		fmt.Printf("  Description: %s\n", selectedAgent.Description)
-	}
+	// Print results
+	printImportResults(result)
 
 	return nil
 }
