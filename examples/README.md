@@ -219,8 +219,8 @@ Commands, skills, and agents must follow these naming rules:
 
 ### Validate a command:
 ```bash
-# Add to repository - validation happens automatically
-aimgr repo add command ./my-command.md
+# Add to repository - validation happens automatically (type auto-detected)
+aimgr repo add ./my-command.md
 ```
 
 ### Validate a skill:
@@ -231,24 +231,23 @@ cat my-skill/SKILL.md
 # Verify name matches directory
 ls -d my-skill/
 
-# Add to repository - validation happens automatically
-aimgr repo add skill ./my-skill
+# Add to repository - validation happens automatically (type auto-detected)
+aimgr repo add ./my-skill
 ```
 
 ## Using the Examples
 
 ### Add examples to your repository:
 ```bash
-# Add the sample command
-aimgr repo add command examples/sample-command.md
+# Add all example resources at once (auto-discovery)
+aimgr repo add examples/
 
-# Add the sample skill
-aimgr repo add skill examples/sample-skill
-
-# Add sample agents
-aimgr repo add agent examples/sample-agent.md
-aimgr repo add agent examples/minimal-agent.md
-aimgr repo add agent examples/claude-style-agent.md
+# Or add individually (type auto-detected)
+aimgr repo add examples/sample-command.md
+aimgr repo add examples/sample-skill
+aimgr repo add examples/sample-agent.md
+aimgr repo add examples/minimal-agent.md
+aimgr repo add examples/claude-style-agent.md
 
 # List to verify
 aimgr repo list
@@ -269,6 +268,9 @@ aimgr install agent/sample-agent
 
 # Install multiple resources at once
 aimgr install command/sample-command skill/sample-skill agent/sample-agent
+
+# Or install all sample resources with a pattern
+aimgr install "*/sample*"
 
 # Verify installation
 ls -la .claude/commands/

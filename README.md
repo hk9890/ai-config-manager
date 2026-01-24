@@ -213,38 +213,43 @@ Resources can be added from multiple sources: local files, GitHub repositories, 
 
 #### Add Individual Resources
 
-Add specific resources by type:
+Add specific resources (type is auto-detected):
 
 ```bash
-# Add a command (single .md file)
-aimgr repo add command ~/.claude/commands/my-command.md
+# Add a command (single .md file - auto-detected as command)
+aimgr repo add ~/.claude/commands/my-command.md
 
-# Add a skill (directory with SKILL.md)
-aimgr repo add skill ~/my-skills/pdf-processing
+# Add a skill (directory with SKILL.md - auto-detected as skill)
+aimgr repo add ~/my-skills/pdf-processing
 
-# Add an agent (single .md file)
-aimgr repo add agent ~/.claude/agents/code-reviewer.md
+# Add an agent (single .md file - auto-detected as agent)
+aimgr repo add ~/.claude/agents/code-reviewer.md
 ```
 
-#### Bulk Add - Auto-Discovery
+#### Auto-Discovery from Folders and Repositories
 
 Auto-discover and add all resources (commands, skills, agents) from a folder or GitHub repository:
 
 ```bash
 # From local folders
-aimgr repo add bulk ~/.opencode/           # Discovers all resources in .opencode
-aimgr repo add bulk ~/project/.claude/     # Discovers all resources in .claude
-aimgr repo add bulk ./my-resources/        # Any folder with resources
+aimgr repo add ~/.opencode/           # Discovers all resources in .opencode
+aimgr repo add ~/project/.claude/     # Discovers all resources in .claude
+aimgr repo add ./my-resources/        # Any folder with resources
 
 # From GitHub
-aimgr repo add bulk gh:owner/repo          # Auto-discovers all resources in repo
-aimgr repo add bulk gh:owner/repo@v1.0.0   # Specific version
-aimgr repo add bulk owner/repo             # Shorthand (gh: inferred)
+aimgr repo add gh:owner/repo          # Auto-discovers all resources in repo
+aimgr repo add gh:owner/repo@v1.0.0   # Specific version
+aimgr repo add owner/repo             # Shorthand (gh: inferred)
 
 # With options
-aimgr repo add bulk ~/.opencode/ --force         # Overwrite existing
-aimgr repo add bulk ./resources/ --skip-existing # Skip conflicts
-aimgr repo add bulk ./test/ --dry-run            # Preview without importing
+aimgr repo add ~/.opencode/ --force         # Overwrite existing
+aimgr repo add ./resources/ --skip-existing # Skip conflicts
+aimgr repo add ./test/ --dry-run            # Preview without importing
+
+# Filter resources with patterns
+aimgr repo add gh:owner/repo --filter "skill/*"     # Only add skills
+aimgr repo add ./resources/ --filter "skill/pdf*"   # Skills starting with "pdf"
+aimgr repo add ~/.claude/ --filter "*test*"         # Resources with "test" in name
 
 # Example output:
 # Importing from: /home/user/.opencode
@@ -261,32 +266,31 @@ aimgr repo add bulk ./test/ --dry-run            # Preview without importing
 # Summary: 10 added, 0 skipped, 0 failed
 ```
 
-**How Bulk Discovery Works:**
+**How Auto-Discovery Works:**
 
 - Searches recursively in the folder for commands (*.md), skills (*/SKILL.md), and agents (*.md)
 - Automatically detects resource types and validates them
 - Handles Claude (`.claude/`), OpenCode (`.opencode/`), and GitHub Copilot (`.github/`) structures
 - Skips common directories like `node_modules`, `.git`, etc.
+- Supports filtering with glob patterns via `--filter` flag
 
 #### From GitHub (Individual Resources)
 
 Add specific resources from GitHub repositories:
 
 ```bash
-# Add a skill from GitHub
-aimgr repo add skill gh:vercel-labs/agent-skills
+# Add resources from GitHub (type auto-detected)
+aimgr repo add gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo add gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific branch or tag
-aimgr repo add skill gh:anthropics/skills@v1.0.0
+aimgr repo add gh:anthropics/skills@v1.0.0
 
-# Add commands from GitHub
-aimgr repo add command gh:myorg/commands/my-command.md
-
-# Add agents from GitHub
-aimgr repo add agent gh:myorg/agents/code-reviewer.md
+# Add specific resource types using filters
+aimgr repo add gh:myorg/repo --filter "command/*"
+aimgr repo add gh:myorg/repo --filter "agent/*"
 ```
 
 ### 3. List Available Resources
@@ -324,6 +328,12 @@ aimgr install agent/code-reviewer
 
 # Install multiple resources at once
 aimgr install skill/pdf-processing command/my-command agent/code-reviewer
+
+# Use patterns to install multiple resources
+aimgr install "skill/*"              # Install all skills
+aimgr install "*test*"               # Install all resources with "test" in name
+aimgr install "skill/pdf*"           # Install skills starting with "pdf"
+aimgr install "command/test*" "agent/qa*"  # Multiple patterns
 
 # Resources are symlinked to tool-specific directories
 # Example: .claude/commands/, .opencode/commands/, etc.
@@ -561,6 +571,84 @@ When adding resources from GitHub or Git URLs, `aimgr` automatically searches fo
 - If multiple resources are found, you'll be prompted to select one
 - If a specific subpath is provided, exactly one resource should exist at that location
 
+## Pattern Syntax
+
+Many commands support glob patterns for matching multiple resources. Patterns work with `repo add --filter`, `install`, and `uninstall` commands.
+
+### Pattern Operators
+
+- `*` - Matches any sequence of characters
+- `?` - Matches any single character
+- `[abc]` - Matches any character in the set
+- `{a,b}` - Matches any alternative (a or b)
+
+### Pattern Format
+
+Patterns can optionally specify a resource type prefix:
+
+- `type/pattern` - Match specific type (e.g., `skill/pdf*`)
+- `pattern` - Match across all types (e.g., `*test*`)
+- `exact-name` - Exact match (no wildcards)
+
+### Pattern Examples
+
+**Adding resources with filters:**
+```bash
+# Add all skills from a repository
+aimgr repo add gh:owner/repo --filter "skill/*"
+
+# Add skills matching a pattern
+aimgr repo add gh:owner/repo --filter "skill/pdf*"
+
+# Add all resources with "test" in the name
+aimgr repo add ./resources/ --filter "*test*"
+
+# Add commands and agents only (no skills)
+aimgr repo add ~/.opencode/ --filter "command/*" --filter "agent/*"
+```
+
+**Installing resources with patterns:**
+```bash
+# Install all skills
+aimgr install "skill/*"
+
+# Install all test resources (any type)
+aimgr install "*test*"
+
+# Install PDF-related skills
+aimgr install "skill/pdf*"
+
+# Install multiple patterns
+aimgr install "skill/pdf*" "command/test*" "agent/qa*"
+
+# Install specific versions/variants
+aimgr install "skill/*-v2"           # All v2 skills
+aimgr install "command/{build,test}" # build and test commands
+```
+
+**Uninstalling with patterns:**
+```bash
+# Uninstall all skills
+aimgr uninstall "skill/*"
+
+# Uninstall test resources
+aimgr uninstall "*test*"
+
+# Uninstall old versions
+aimgr uninstall "skill/*-old"
+
+# Uninstall multiple patterns
+aimgr uninstall "skill/legacy-*" "command/deprecated-*"
+```
+
+### Pattern Behavior
+
+- **Exact match**: If no wildcards are present, matches exact resource name
+- **Type filtering**: `type/pattern` only matches resources of that type
+- **Cross-type matching**: `pattern` (without type prefix) matches across all types
+- **Empty matches**: If a pattern matches zero resources, a warning is shown
+- **Case-sensitive**: All pattern matching is case-sensitive
+
 ## Commands
 
 ### `aimgr config`
@@ -585,46 +673,46 @@ aimgr config set install.targets claude,opencode
 
 ### `aimgr repo add`
 
-Add resources to the repository from various sources.
+Add resources to the repository from various sources. Resource types are auto-detected from file structure and content.
 
 ```bash
 # Add from GitHub (with auto-discovery)
-aimgr repo add skill gh:owner/repo
-aimgr repo add skill gh:owner/repo/path/to/skill
-aimgr repo add skill gh:owner/repo@v1.0.0
+aimgr repo add gh:owner/repo
+aimgr repo add gh:owner/repo/path/to/resource
+aimgr repo add gh:owner/repo@v1.0.0
 
-# Add from local path
-aimgr repo add command <path-to-file.md>
-aimgr repo add skill <path-to-directory>
-aimgr repo add agent <path-to-file.md>
+# Add from local path (type auto-detected)
+aimgr repo add <path-to-file.md>           # Auto-detects command or agent
+aimgr repo add <path-to-directory>         # Auto-detects skill
+aimgr repo add ~/.claude/commands/test.md  # Command
+aimgr repo add ~/my-skills/pdf-processing  # Skill
+aimgr repo add ~/.claude/agents/reviewer.md # Agent
 
 # Add using shorthand (infers gh: for owner/repo)
-aimgr repo add skill vercel-labs/agent-skills
+aimgr repo add vercel-labs/agent-skills
 
 # Add from Git URL
-aimgr repo add skill https://github.com/owner/repo.git
-aimgr repo add skill git@github.com:owner/repo.git
+aimgr repo add https://github.com/owner/repo.git
+aimgr repo add git@github.com:owner/repo.git
 
 # Add with explicit local prefix
-aimgr repo add skill local:./my-skill
-aimgr repo add skill local:/absolute/path/to/skill
+aimgr repo add local:./my-resource
+aimgr repo add local:/absolute/path/to/resource
 
-# Add all resources from a Claude plugin
-aimgr repo add plugin <path-to-plugin>
+# Add all resources from a folder (auto-discovery)
+aimgr repo add ~/.opencode/
+aimgr repo add ~/project/.claude/
+aimgr repo add ./my-resources/
 
-# Add all resources from a Claude folder
-aimgr repo add claude <path-to-.claude-folder>
+# Filter resources during import
+aimgr repo add gh:owner/repo --filter "skill/*"       # Only skills
+aimgr repo add ~/.opencode/ --filter "skill/pdf*"     # Skills starting with "pdf"
+aimgr repo add ./resources/ --filter "*test*"         # Resources with "test" in name
 
-# Add all resources from an OpenCode folder
-aimgr repo add opencode <path-to-.opencode-folder>
-
-# Overwrite existing resource
-aimgr repo add command my-command.md --force
-
-# Bulk import with conflict handling
-aimgr repo add plugin ./plugin --skip-existing
-aimgr repo add claude ~/.claude --dry-run
-aimgr repo add opencode ~/.opencode --skip-existing
+# Import options
+aimgr repo add <source> --force                       # Overwrite existing
+aimgr repo add <source> --skip-existing               # Skip conflicts
+aimgr repo add <source> --dry-run                     # Preview without importing
 ```
 
 **Source Formats:**
@@ -633,7 +721,12 @@ aimgr repo add opencode ~/.opencode --skip-existing
 - `https://...` or `git@...` - Any Git repository
 - `owner/repo` - Shorthand for GitHub (infers `gh:` prefix)
 
-See [Source Formats](#source-formats) for detailed documentation.
+**Pattern Filtering:**
+- `--filter "type/*"` - Match specific resource type (skill/*, command/*, agent/*)
+- `--filter "pattern"` - Match resources by name pattern
+- `--filter "*test*"` - Match any resource with "test" in name
+
+See [Pattern Syntax](#pattern-syntax) and [Source Formats](#source-formats) for detailed documentation.
 
 ### `aimgr repo list`
 
@@ -1369,6 +1462,94 @@ aimgr install skill utils --target claude,opencode
 ```
 
 This is useful when you want to install a resource to a specific tool without changing your global configuration.
+
+## Migration Guide: Command Simplification
+
+In recent versions, aimgr unified its command structure to be simpler and more consistent. The old type-specific subcommands have been replaced with pattern-based filtering.
+
+### Command Changes Summary
+
+| Old Command | New Command | Notes |
+|-------------|-------------|-------|
+| `aimgr repo add bulk <source>` | `aimgr repo add <source>` | Auto-discovery is now the default behavior |
+| `aimgr repo add command <file>` | `aimgr repo add <file>` | Type auto-detected from file content |
+| `aimgr repo add skill <dir>` | `aimgr repo add <dir>` | Type auto-detected from SKILL.md |
+| `aimgr repo add agent <file>` | `aimgr repo add <file>` | Type auto-detected from frontmatter |
+| N/A | `aimgr repo add <source> --filter "type/*"` | New: Filter resources during import |
+
+### Before and After Examples
+
+**Adding all resources from a folder:**
+```bash
+# Old way
+aimgr repo add bulk ~/.opencode/
+
+# New way (exactly the same)
+aimgr repo add ~/.opencode/
+```
+
+**Adding only skills from a repository:**
+```bash
+# Old way (not possible - needed multiple commands)
+# 1. Clone repo manually
+# 2. Add each skill individually
+
+# New way
+aimgr repo add gh:owner/repo --filter "skill/*"
+```
+
+**Adding a single resource:**
+```bash
+# Old way
+aimgr repo add command ~/my-command.md
+aimgr repo add skill ~/my-skill/
+aimgr repo add agent ~/my-agent.md
+
+# New way (type auto-detected)
+aimgr repo add ~/my-command.md
+aimgr repo add ~/my-skill/
+aimgr repo add ~/my-agent.md
+```
+
+**Installing resources with patterns:**
+```bash
+# Old way (not possible - needed multiple commands)
+aimgr install skill/pdf-processing
+aimgr install skill/pdf-converter
+aimgr install skill/pdf-merger
+
+# New way
+aimgr install "skill/pdf*"
+```
+
+**Uninstalling multiple resources:**
+```bash
+# Old way (one at a time)
+aimgr uninstall skill/test-skill
+aimgr uninstall command/test-command
+aimgr uninstall agent/test-agent
+
+# New way
+aimgr uninstall "*test*"
+```
+
+### What's Improved
+
+✅ **Simpler**: One `add` command instead of multiple type-specific commands  
+✅ **More powerful**: Pattern matching for batch operations  
+✅ **Auto-detection**: Resource types detected automatically  
+✅ **Filtering**: Add only specific resources from large repos  
+✅ **Backward compatible**: Old workflows still work with new commands
+
+### Migration Checklist
+
+- ✅ Replace `repo add bulk` with `repo add` (both work)
+- ✅ Replace `repo add command/skill/agent` with `repo add` (type auto-detected)
+- ✅ Use `--filter` flag to selectively import resources
+- ✅ Use patterns with `install` and `uninstall` for batch operations
+- ✅ Update scripts and documentation to use new syntax
+
+All old commands continue to work - no breaking changes!
 
 ## Creating Resources
 

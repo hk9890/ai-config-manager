@@ -214,6 +214,14 @@ mgr.AddCommand(sourcePath)
 mgr.AddSkill(sourcePath)
 mgr.AddAgent(sourcePath)
 resources, err := mgr.List(nil)  // nil = all types
+
+// Bulk operations
+opts := repo.BulkImportOptions{
+    Force:        false,
+    SkipExisting: false,
+    DryRun:       false,
+}
+result, err := mgr.AddBulk(paths, opts)
 ```
 
 ### Tool Detection
@@ -222,6 +230,50 @@ tool, err := tools.ParseTool("claude")  // Returns tools.Claude
 tool, err := tools.ParseTool("opencode") // Returns tools.OpenCode
 info := tools.GetToolInfo(tool)         // Get dirs, etc.
 ```
+
+### Pattern Matching
+
+The `pkg/pattern` package provides glob pattern matching for resources:
+
+```go
+import "github.com/hk9890/ai-config-manager/pkg/pattern"
+
+// Parse pattern to extract type and check if it's a pattern
+resourceType, patternStr, isPattern := pattern.ParsePattern("skill/pdf*")
+// Returns: resource.Skill, "pdf*", true
+
+// Create a matcher
+matcher, err := pattern.NewMatcher("skill/pdf*")
+if err != nil {
+    return err
+}
+
+// Match against resources
+res := &resource.Resource{Type: resource.Skill, Name: "pdf-processing"}
+if matcher.Match(res) {
+    fmt.Println("Matched!")
+}
+
+// Check if pattern (vs exact name)
+if matcher.IsPattern() {
+    fmt.Println("This is a glob pattern")
+}
+
+// Get resource type filter (if specified)
+resType := matcher.GetResourceType()  // Returns resource.Skill or ""
+
+// Match by name only (useful when you already know the type)
+if matcher.MatchName("pdf-processing") {
+    fmt.Println("Name matches!")
+}
+```
+
+**Pattern Features:**
+- Supports standard glob operators: `*`, `?`, `[abc]`, `{a,b}`
+- Optional type prefix: `type/pattern` or just `pattern`
+- Type filtering: `skill/*` only matches skills
+- Cross-type matching: `*test*` matches across all types
+- Exact matching: No wildcards = exact name match
 
 ## Version Information
 Version is embedded at build time via ldflags in Makefile:
@@ -374,18 +426,26 @@ These fields are optional and allow more structured agent definitions. Claude fo
 
 #### Bulk Import
 
-Import all resources from OpenCode directories:
+Import all resources from directories using auto-discovery:
 
 ```bash
 # Import from .opencode folder
-aimgr add opencode ~/.opencode
-aimgr add opencode ~/project/.opencode
+aimgr repo add ~/.opencode
+aimgr repo add ~/project/.opencode
+
+# Import from .claude folder
+aimgr repo add ~/.claude
+aimgr repo add ~/project/.claude
+
+# Filter specific resource types
+aimgr repo add ~/.opencode --filter "skill/*"
+aimgr repo add ~/project/.claude --filter "agent/*"
 ```
 
 This imports:
-- Commands from `.opencode/commands/*.md`
-- Skills from `.opencode/skills/*/SKILL.md`
-- Agents from `.opencode/agents/*.md`
+- Commands from `.opencode/commands/*.md` or `.claude/commands/*.md`
+- Skills from `.opencode/skills/*/SKILL.md` or `.claude/skills/*/SKILL.md`
+- Agents from `.opencode/agents/*.md` or `.claude/agents/*.md`
 
 ## When Making Changes
 1. Run `make fmt` before committing
