@@ -728,6 +728,176 @@ aimgr repo add <source> --dry-run                     # Preview without importin
 
 See [Pattern Syntax](#pattern-syntax) and [Source Formats](#source-formats) for detailed documentation.
 
+### `aimgr repo sync`
+
+Automatically sync resources from configured sources in your global configuration file.
+
+This command reads the `sync.sources` list from `~/.config/aimgr/aimgr.yaml` and imports all resources from each source. It's perfect for:
+- Keeping your repository up-to-date with organization resources
+- Automatically importing from multiple repositories
+- Maintaining consistent resource sets across teams
+- Replacing manual `aimgr-init` setup scripts
+
+**Configuration File Location:** `~/.config/aimgr/aimgr.yaml`
+
+**Configuration Format:**
+
+```yaml
+sync:
+  sources:
+    - url: https://github.com/anthropics/skills
+    - url: gh:myorg/ai-resources@v1.0.0
+      filter: "skill/*"
+    - url: ~/local/resources
+      filter: "*test*"
+```
+
+Each source supports:
+- **url** (required): Source location (GitHub, Git URL, or local path)
+  - `https://github.com/owner/repo`
+  - `gh:owner/repo` or `owner/repo`
+  - `gh:owner/repo@v1.0.0` (with version tag)
+  - `~/local/path` or `/absolute/path`
+- **filter** (optional): Glob pattern to filter resources
+  - `"skill/*"` - Only skills
+  - `"command/*"` - Only commands
+  - `"agent/*"` - Only agents
+  - `"*test*"` - Any resource with "test" in name
+  - `"skill/pdf*"` - Skills starting with "pdf"
+
+**Usage:**
+
+```bash
+# Sync all configured sources (overwrites existing)
+aimgr repo sync
+
+# Sync without overwriting existing resources
+aimgr repo sync --skip-existing
+
+# Preview what would be synced without importing
+aimgr repo sync --dry-run
+```
+
+**Flags:**
+- `--skip-existing`: Skip resources that already exist (default: overwrite)
+- `--dry-run`: Preview without importing
+
+**Behavior:**
+- By default, existing resources are **overwritten** (force mode)
+- Use `--skip-existing` to preserve existing resources and skip conflicts
+- Each source is processed independently - failures in one don't affect others
+- Supports all source formats: GitHub, Git URLs, and local paths
+- Per-source filtering allows precise control over imported resources
+
+**Configuration Examples:**
+
+**Basic sync without filters:**
+```yaml
+sync:
+  sources:
+    - url: https://github.com/anthropics/skills
+    - url: gh:myorg/company-resources
+```
+
+**Sync with per-source filters:**
+```yaml
+sync:
+  sources:
+    # Import all skills from anthropics
+    - url: gh:anthropics/skills
+      filter: "skill/*"
+    
+    # Import only PDF-related skills from myorg
+    - url: gh:myorg/ai-tools
+      filter: "skill/pdf*"
+    
+    # Import all test resources from local directory
+    - url: ~/dev/test-resources
+      filter: "*test*"
+    
+    # Import everything from versioned release
+    - url: gh:myorg/resources@v2.1.0
+```
+
+**Mixed sources and filters:**
+```yaml
+sync:
+  sources:
+    # GitHub repos
+    - url: https://github.com/vercel-labs/agent-skills
+      filter: "skill/*"
+    
+    - url: gh:company/ai-commands@stable
+      filter: "command/*"
+    
+    # Local paths
+    - url: ~/.claude/
+      filter: "agent/*"
+    
+    - url: ~/projects/custom-skills
+      filter: "skill/*-v2"
+```
+
+**Migration from `aimgr-init` Script:**
+
+If you previously used an `aimgr-init` setup script to populate your repository, you can replace it with the sync configuration:
+
+**Old approach (aimgr-init script):**
+```bash
+#!/bin/bash
+# aimgr-init - Manual setup script
+aimgr repo add gh:anthropics/skills
+aimgr repo add gh:myorg/commands --filter "command/*"
+aimgr repo add ~/local/resources --filter "skill/*"
+```
+
+**New approach (config file):**
+```yaml
+# ~/.config/aimgr/aimgr.yaml
+sync:
+  sources:
+    - url: gh:anthropics/skills
+    - url: gh:myorg/commands
+      filter: "command/*"
+    - url: ~/local/resources
+      filter: "skill/*"
+```
+
+Then simply run:
+```bash
+aimgr repo sync
+```
+
+**Benefits of sync over manual scripts:**
+- ✅ Declarative configuration (version controllable)
+- ✅ One command to update everything
+- ✅ Per-source filtering
+- ✅ Automatic retry and error handling
+- ✅ Dry-run mode for preview
+- ✅ No need to maintain shell scripts
+
+**Example Workflow:**
+
+```bash
+# 1. Create or edit your config file
+vim ~/.config/aimgr/aimgr.yaml
+
+# 2. Add sync sources
+sync:
+  sources:
+    - url: gh:myorg/resources
+      filter: "skill/*"
+
+# 3. Preview what will be imported
+aimgr repo sync --dry-run
+
+# 4. Run the sync
+aimgr repo sync
+
+# 5. Update existing resources later
+aimgr repo sync --skip-existing  # Keep local changes
+```
+
 ### `aimgr repo list`
 
 List resources in the repository.
