@@ -24,6 +24,7 @@ type UpdateResult struct {
 	Name    string
 	Type    resource.ResourceType
 	Success bool
+	Skipped bool // True if resource was skipped (e.g., missing source)
 	Message string
 }
 
@@ -232,6 +233,7 @@ func updateSingleResource(manager *repo.Manager, name string, resourceType resou
 		Name:    name,
 		Type:    resourceType,
 		Success: false,
+		Skipped: false,
 	}
 
 	// Load metadata
@@ -253,7 +255,13 @@ func updateSingleResource(manager *repo.Manager, name string, resourceType resou
 	case "github", "git-url", "gitlab":
 		err = updateFromGitSource(manager, name, resourceType, meta)
 	case "local", "file":
-		err = updateFromLocalSource(manager, name, resourceType, meta)
+		skipped, updateErr := updateFromLocalSource(manager, name, resourceType, meta)
+		if skipped {
+			result.Skipped = true
+			result.Message = updateErr.Error()
+			return result
+		}
+		err = updateErr
 	default:
 		result.Message = fmt.Sprintf("Unknown source type: %s", meta.SourceType)
 		return result
@@ -316,7 +324,8 @@ func updateFromGitSource(manager *repo.Manager, name string, resourceType resour
 }
 
 // updateFromLocalSource updates a resource from a local source
-func updateFromLocalSource(manager *repo.Manager, name string, resourceType resource.ResourceType, meta *metadata.ResourceMetadata) error {
+// Returns (skipped bool, error) where skipped=true indicates the source path is missing
+func updateFromLocalSource(manager *repo.Manager, name string, resourceType resource.ResourceType, meta *metadata.ResourceMetadata) (bool, error) {
 	// Extract local path from source URL (format: file:///path/to/resource)
 	localPath := meta.SourceURL
 	if strings.HasPrefix(localPath, "file://") {
@@ -325,25 +334,28 @@ func updateFromLocalSource(manager *repo.Manager, name string, resourceType reso
 
 	// Check if source still exists
 	if _, err := os.Stat(localPath); err != nil {
-		return fmt.Errorf("source path no longer exists: %s", localPath)
+		// Source path missing - return as skipped with informative message
+		return true, fmt.Errorf("source path no longer exists (consider running 'aimgr repo prune' to clean up orphaned metadata)")
 	}
 
 	// Remove existing resource (force mode is implicit for update)
 	if err := manager.Remove(name, resourceType); err != nil {
-		return fmt.Errorf("failed to remove existing resource: %w", err)
+		return false, fmt.Errorf("failed to remove existing resource: %w", err)
 	}
 
 	// Re-add from local source
+	var addErr error
 	switch resourceType {
 	case resource.Command:
-		return manager.AddCommand(localPath, meta.SourceURL, meta.SourceType)
+		addErr = manager.AddCommand(localPath, meta.SourceURL, meta.SourceType)
 	case resource.Skill:
-		return manager.AddSkill(localPath, meta.SourceURL, meta.SourceType)
+		addErr = manager.AddSkill(localPath, meta.SourceURL, meta.SourceType)
 	case resource.Agent:
-		return manager.AddAgent(localPath, meta.SourceURL, meta.SourceType)
+		addErr = manager.AddAgent(localPath, meta.SourceURL, meta.SourceType)
 	default:
-		return fmt.Errorf("unsupported resource type: %s", resourceType)
+		addErr = fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
+	return false, addErr
 }
 
 // updateCommandFromClone updates a command from a cloned repository
@@ -406,6 +418,7 @@ func displayUpdateSummary(results []UpdateResult) {
 
 	successCount := 0
 	failCount := 0
+	skipCount := 0
 
 	// Display individual results
 	for _, result := range results {
@@ -416,6 +429,9 @@ func displayUpdateSummary(results []UpdateResult) {
 				fmt.Printf("✓ %s '%s': %s\n", result.Type, result.Name, result.Message)
 			}
 			successCount++
+		} else if result.Skipped {
+			fmt.Printf("⊘ %s '%s': %s\n", result.Type, result.Name, result.Message)
+			skipCount++
 		} else {
 			fmt.Printf("✗ %s '%s': %s\n", result.Type, result.Name, result.Message)
 			failCount++
@@ -425,8 +441,14 @@ func displayUpdateSummary(results []UpdateResult) {
 	// Display summary
 	fmt.Println()
 	if updateDryRunFlag {
-		fmt.Printf("Summary (dry run): %d would be updated, %d would fail\n", successCount, failCount)
+		fmt.Printf("Summary (dry run): %d would be updated, %d would fail, %d would be skipped\n", successCount, failCount, skipCount)
 	} else {
-		fmt.Printf("Summary: %d updated, %d failed\n", successCount, failCount)
+		fmt.Printf("Summary: %d updated, %d failed, %d skipped\n", successCount, failCount, skipCount)
+	}
+
+	// Display hint if there are skipped resources
+	if skipCount > 0 {
+		fmt.Println()
+		fmt.Println("Hint: Run 'aimgr repo prune' to clean up orphaned metadata for missing source paths")
 	}
 }
