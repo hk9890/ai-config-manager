@@ -53,6 +53,16 @@ func DetectType(path string) (ResourceType, error) {
 
 	// Check if it's a .md file
 	if filepath.Ext(path) == ".md" {
+		// Use path-based detection first (more reliable for bulk imports)
+		// Check if file is in agents/ or commands/ directory
+		cleanPath := filepath.ToSlash(filepath.Clean(path))
+		if filepath.Base(filepath.Dir(cleanPath)) == "agents" {
+			return Agent, nil
+		}
+		if filepath.Base(filepath.Dir(cleanPath)) == "commands" {
+			return Command, nil
+		}
+
 		// Parse frontmatter to distinguish between agent and command
 		frontmatter, _, err := ParseFrontmatter(path)
 		if err != nil {
@@ -60,15 +70,34 @@ func DetectType(path string) (ResourceType, error) {
 			return Command, nil
 		}
 
-		// Check for agent-specific fields (type, instructions)
-		// If either exists, it's an agent
+		// Check for agent-specific fields (type, instructions, capabilities)
+		// If any exist, it's an agent
 		_, hasType := frontmatter["type"]
 		_, hasInstructions := frontmatter["instructions"]
-		if hasType || hasInstructions {
+		_, hasCapabilities := frontmatter["capabilities"]
+		if hasType || hasInstructions || hasCapabilities {
 			return Agent, nil
 		}
 
-		// Otherwise, it's a command
+		// Check for command-specific fields (agent, model, allowed-tools)
+		// If any exist, it's a command
+		_, hasAgent := frontmatter["agent"]
+		_, hasModel := frontmatter["model"]
+		_, hasAllowedTools := frontmatter["allowed-tools"]
+		if hasAgent || hasModel || hasAllowedTools {
+			return Command, nil
+		}
+
+		// If we can't determine from path or fields, try loading as both
+		// Prefer agent if both succeed (agents are more minimal)
+		if _, agentErr := LoadAgent(path); agentErr == nil {
+			return Agent, nil
+		}
+		if _, cmdErr := LoadCommand(path); cmdErr == nil {
+			return Command, nil
+		}
+
+		// Default to command for backward compatibility
 		return Command, nil
 	}
 
