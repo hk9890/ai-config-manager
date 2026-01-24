@@ -16,6 +16,27 @@ func runAimgr(t *testing.T, args ...string) (string, error) {
 	binPath := filepath.Join("..", "aimgr")
 
 	cmd := exec.Command(binPath, args...)
+	// Start with parent environment
+	cmd.Env = os.Environ()
+
+	// Override with test-specific AIMGR_REPO_PATH if set
+	// NOTE: t.Setenv() only affects os.Getenv() in the test process,
+	// not child processes, so we need to explicitly propagate it
+	if repoPath := os.Getenv("AIMGR_REPO_PATH"); repoPath != "" {
+		// Replace or add AIMGR_REPO_PATH in the environment
+		found := false
+		for i, env := range cmd.Env {
+			if strings.HasPrefix(env, "AIMGR_REPO_PATH=") {
+				cmd.Env[i] = "AIMGR_REPO_PATH=" + repoPath
+				found = true
+				break
+			}
+		}
+		if !found {
+			cmd.Env = append(cmd.Env, "AIMGR_REPO_PATH="+repoPath)
+		}
+	}
+
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }

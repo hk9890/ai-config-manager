@@ -258,8 +258,7 @@ func TestCLIRepoVerifyTypeMismatches(t *testing.T) {
 	repoDir := t.TempDir()
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Manually create mismatched resource and metadata
-	// Create a command file
+	// Create a command resource AND its metadata with matching type
 	commandsDir := filepath.Join(repoDir, "commands")
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands directory: %v", err)
@@ -275,15 +274,30 @@ description: Type mismatch test
 		t.Fatalf("Failed to create command: %v", err)
 	}
 
-	// Create metadata with wrong type (agent instead of command)
+	// Create metadata in the commands directory but with agent type
+	// This creates a true type mismatch (resource says command, metadata says agent)
 	meta := &metadata.ResourceMetadata{
 		Name:       "type-mismatch",
-		Type:       resource.Agent, // Wrong type!
+		Type:       resource.Agent, // Wrong type - should be Command!
 		SourceType: "local",
 		SourceURL:  "file://" + cmdPath,
 	}
-	if err := metadata.Save(meta, repoDir); err != nil {
-		t.Fatalf("Failed to save metadata: %v", err)
+
+	// Manually save to commands metadata directory (not agents)
+	// This simulates corruption where metadata type doesn't match location
+	metadataDir := filepath.Join(repoDir, ".metadata", "commands")
+	if err := os.MkdirAll(metadataDir, 0755); err != nil {
+		t.Fatalf("Failed to create metadata directory: %v", err)
+	}
+
+	metadataPath := filepath.Join(metadataDir, "type-mismatch-metadata.json")
+	metadataJSON, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to marshal metadata: %v", err)
+	}
+
+	if err := os.WriteFile(metadataPath, metadataJSON, 0644); err != nil {
+		t.Fatalf("Failed to write metadata file: %v", err)
 	}
 
 	// Test: verify should detect type mismatch

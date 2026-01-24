@@ -20,8 +20,14 @@ type Manager struct {
 
 // NewManager creates a new repository manager
 // Repository is stored at ~/.ai-config/repo/ (XDG data directory)
+// Can be overridden with AIMGR_REPO_PATH environment variable
 func NewManager() (*Manager, error) {
-	repoPath := filepath.Join(xdg.DataHome, "ai-config", "repo")
+	// Check for environment variable override first
+	repoPath := os.Getenv("AIMGR_REPO_PATH")
+	if repoPath == "" {
+		// Default to XDG data directory
+		repoPath = filepath.Join(xdg.DataHome, "ai-config", "repo")
+	}
 	return &Manager{
 		repoPath: repoPath,
 	}, nil
