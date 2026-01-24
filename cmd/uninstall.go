@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/install"
+	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
@@ -39,6 +40,14 @@ Resources are specified using the format 'type/name':
   - skill/name (or skills/name)
   - agent/name (or agents/name)
 
+
+Pattern matching:
+  - Use * to match any sequence of characters
+  - Use ? to match any single character
+  - Use [abc] to match any character in the set
+  - Use {a,b} to match alternatives
+  - Patterns are expanded by scanning installed resources in the project
+
 Safety:
   - Only removes symlinks that point to the aimgr repository
   - Skips non-symlinks with a warning
@@ -55,6 +64,18 @@ Examples:
 
   # Uninstall multiple resources at once
   aimgr uninstall skill/foo skill/bar command/test agent/my-agent
+
+  # Uninstall all skills
+  aimgr uninstall "skill/*"
+
+  # Uninstall all test resources (any type)
+  aimgr uninstall "*test*"
+
+  # Uninstall skills starting with "pdf"
+  aimgr uninstall "skill/pdf*"
+
+  # Uninstall multiple patterns
+  aimgr uninstall "skill/pdf*" "command/test*"
 
   # Uninstall from a specific project
   aimgr uninstall skill/foo --project-path ~/my-project
@@ -87,15 +108,39 @@ Examples:
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
 
+		// Expand patterns in arguments
+		var expandedArgs []string
+		for _, arg := range args {
+			// Check if this is a pattern or exact name
+			_, _, isPattern := pattern.ParsePattern(arg)
+			
+			if isPattern {
+				// Expand the pattern
+				expanded, err := expandUninstallPattern(projectPath, arg, installer.GetTargetTools())
+				if err != nil {
+					return fmt.Errorf("failed to expand pattern '%s': %w", arg, err)
+				}
+				if len(expanded) == 0 {
+					fmt.Printf("Warning: pattern '%s' matches no installed resources\n", arg)
+				}
+				expandedArgs = append(expandedArgs, expanded...)
+			} else {
+				// Not a pattern, add as-is (will be validated by processUninstall)
+				expandedArgs = append(expandedArgs, arg)
+			}
+		}
+
+		// Deduplicate the expanded list
+		expandedArgs = deduplicateStrings(expandedArgs)
+
 		// Track results
 		var results []uninstallResult
 
 		// Process each resource argument
-		for _, arg := range args {
+		for _, arg := range expandedArgs {
 			result := processUninstall(arg, projectPath, repoPath, installer.GetTargetTools())
 			results = append(results, result)
 		}
-
 		// Print results
 		printUninstallSummary(results)
 
@@ -278,4 +323,104 @@ func init() {
 
 	uninstallCmd.Flags().StringVar(&uninstallProjectPathFlag, "project-path", "", "Project directory path (default: current directory)")
 	uninstallCmd.Flags().BoolVarP(&uninstallForceFlag, "force", "f", false, "Force uninstall (placeholder for future use)")
+}
+
+// expandUninstallPattern finds installed resources matching a pattern
+func expandUninstallPattern(projectPath, resourceArg string, detectedTools []tools.Tool) ([]string, error) {
+	// Parse pattern
+	resourceType, _, isPattern := pattern.ParsePattern(resourceArg)
+	
+	// If not a pattern, return as-is
+	if !isPattern {
+		return []string{resourceArg}, nil
+	}
+
+	// Create matcher
+	matcher, err := pattern.NewMatcher(resourceArg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pattern: %w", err)
+	}
+
+	// Scan installed resources from tool directories
+	var matches []string
+	
+	for _, tool := range detectedTools {
+		toolInfo := tools.GetToolInfo(tool)
+		
+		// Scan each resource type directory
+		if resourceType == "" || resourceType == resource.Command {
+			if toolInfo.SupportsCommands {
+				foundMatches := scanToolDir(projectPath, toolInfo.CommandsDir, resource.Command, matcher)
+				matches = append(matches, foundMatches...)
+			}
+		}
+		if resourceType == "" || resourceType == resource.Skill {
+			if toolInfo.SupportsSkills {
+				foundMatches := scanToolDir(projectPath, toolInfo.SkillsDir, resource.Skill, matcher)
+				matches = append(matches, foundMatches...)
+			}
+		}
+		if resourceType == "" || resourceType == resource.Agent {
+			if toolInfo.SupportsAgents {
+				foundMatches := scanToolDir(projectPath, toolInfo.AgentsDir, resource.Agent, matcher)
+				matches = append(matches, foundMatches...)
+			}
+		}
+	}
+
+	// Deduplicate
+	return deduplicateStrings(matches), nil
+}
+
+// scanToolDir scans a tool directory for resources matching a pattern
+func scanToolDir(projectPath, toolDir string, resourceType resource.ResourceType, matcher *pattern.Matcher) []string {
+	// Build full path
+	fullPath := filepath.Join(projectPath, toolDir)
+	
+	// Read directory
+	entries, err := os.ReadDir(fullPath)
+	if err != nil {
+		// Directory doesn't exist or can't be read
+		return nil
+	}
+	
+	var matches []string
+	for _, entry := range entries {
+		name := entry.Name()
+		
+		// For commands and agents, remove .md extension
+		if resourceType == resource.Command || resourceType == resource.Agent {
+			if strings.HasSuffix(name, ".md") {
+				name = strings.TrimSuffix(name, ".md")
+			} else {
+				// Skip non-.md files
+				continue
+			}
+		}
+		
+		// For skills, name is the directory name (no extension to remove)
+		
+		// Test if name matches the pattern
+		if matcher.MatchName(name) {
+			// Format as type/name
+			matches = append(matches, fmt.Sprintf("%s/%s", resourceType, name))
+		}
+	}
+	
+	return matches
+}
+
+// deduplicateStrings removes duplicate strings from a slice
+func deduplicateStrings(input []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	
+	for _, item := range input {
+		if !seen[item] {
+			seen[item] = true
+			result = append(result, item)
+		}
+	}
+	
+	return result
 }
