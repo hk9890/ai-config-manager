@@ -17,6 +17,11 @@ type MigrationResult struct {
 	Errors       []error
 }
 
+// MigrationOptions configures migration behavior
+type MigrationOptions struct {
+	DryRun bool // Preview changes without moving files
+}
+
 // MigrateMetadataFiles migrates all existing metadata files from their current locations
 // to the new .metadata/ directory structure.
 //
@@ -35,6 +40,11 @@ type MigrationResult struct {
 //   - Old: /repo/skills/skill-pdf-processor-metadata.json
 //   - New: /repo/.metadata/skills/pdf-processor-metadata.json
 func MigrateMetadataFiles(repoPath string) (*MigrationResult, error) {
+	return MigrateMetadataFilesWithOptions(repoPath, MigrationOptions{DryRun: false})
+}
+
+// MigrateMetadataFilesWithOptions migrates metadata files with custom options
+func MigrateMetadataFilesWithOptions(repoPath string, opts MigrationOptions) (*MigrationResult, error) {
 	if repoPath == "" {
 		return nil, fmt.Errorf("repoPath cannot be empty")
 	}
@@ -60,7 +70,7 @@ func MigrateMetadataFiles(repoPath string) (*MigrationResult, error) {
 
 	// Migrate each resource type
 	for _, resType := range resourceTypes {
-		if err := migrateResourceType(repoPath, resType, result); err != nil {
+		if err := migrateResourceType(repoPath, resType, result, opts.DryRun); err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("failed to migrate %s metadata: %w", resType, err))
 		}
 	}
@@ -69,7 +79,7 @@ func MigrateMetadataFiles(repoPath string) (*MigrationResult, error) {
 }
 
 // migrateResourceType migrates metadata files for a single resource type
-func migrateResourceType(repoPath string, resType resource.ResourceType, result *MigrationResult) error {
+func migrateResourceType(repoPath string, resType resource.ResourceType, result *MigrationResult, dryRun bool) error {
 	// Old directory: /repo/<type>s/
 	oldDir := filepath.Join(repoPath, string(resType)+"s")
 
@@ -118,18 +128,22 @@ func migrateResourceType(repoPath string, resType resource.ResourceType, result 
 		if _, err := os.Stat(newPath); err == nil {
 			// File already exists at new location, skip migration
 			result.SkippedFiles++
-			fmt.Printf("Skipping %s (already exists at new location)\n", filename)
+			if !dryRun {
+				fmt.Printf("Skipping %s (already exists at new location)\n", filename)
+			}
 			continue
 		}
 
 		// Migrate the file
-		if err := migrateFile(oldPath, newPath); err != nil {
+		if err := migrateFile(oldPath, newPath, dryRun); err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("failed to migrate %s: %w", filename, err))
 			continue
 		}
 
 		result.MovedFiles++
-		fmt.Printf("Migrated: %s -> %s\n", oldPath, newPath)
+		if !dryRun {
+			fmt.Printf("Migrated: %s -> %s\n", oldPath, newPath)
+		}
 	}
 
 	return nil
@@ -183,7 +197,26 @@ func getNewMetadataPath(repoPath, name string, resType resource.ResourceType) st
 }
 
 // migrateFile moves a file from oldPath to newPath
-func migrateFile(oldPath, newPath string) error {
+// If dryRun is true, only checks are performed without actually moving files
+func migrateFile(oldPath, newPath string, dryRun bool) error {
+	// Verify old file exists and is readable
+	if _, err := os.Stat(oldPath); err != nil {
+		return fmt.Errorf("failed to stat old file: %w", err)
+	}
+
+	// In dry-run mode, only verify paths and permissions
+	if dryRun {
+		// Check if parent directory can be created (without actually creating it)
+		newDir := filepath.Dir(newPath)
+		if _, err := os.Stat(filepath.Dir(newDir)); err != nil {
+			if os.IsNotExist(err) {
+				// Parent of new directory doesn't exist, this would fail
+				return fmt.Errorf("parent directory %s does not exist", filepath.Dir(newDir))
+			}
+		}
+		return nil
+	}
+
 	// Create parent directory for new location
 	newDir := filepath.Dir(newPath)
 	if err := os.MkdirAll(newDir, 0755); err != nil {
