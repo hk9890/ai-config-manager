@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-01-24
+
+### Added
+- **New `aimgr repo sync` command** for declarative multi-source repository synchronization
+  - Reads source URLs from config file (`~/.config/aimgr/aimgr.yaml`)
+  - Supports importing from multiple repositories in a single operation
+  - Per-source filtering with glob patterns (e.g., `skill/*`, `agent/beads-*`)
+  - Defaults to force-overwrite behavior (like external `aimgr-init` scripts)
+  - Supports `--skip-existing` and `--dry-run` flags
+  - Replaces need for external initialization scripts
+- New `sync.sources` configuration section in aimgr.yaml
+  - Each source can have optional filter pattern
+  - Supports GitHub URLs, Git URLs, and local paths
+  - Pattern matching using glob syntax (`*`, `?`, `[abc]`, `{a,b}`)
+
+### Changed
+- Refactored `addBulkFromLocal` and `addBulkFromGitHub` to accept filter parameters
+- Improved filter handling to support both CLI flags and config-based filters
+
+### Documentation
+- Added comprehensive "Repository Sync" section to README
+- Documented config file format with multiple examples
+- Added migration guide from external scripts to declarative config
+- Included per-source filtering examples and use cases
+
+### Testing
+- Added 9 comprehensive integration tests for sync command
+- Added 13 unit tests for sync config validation (85.7% coverage)
+- All tests pass with no regressions
+
 ## [1.4.0] - 2026-01-24
 
 ### Fixed
@@ -112,3 +142,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.2.0]: https://github.com/hk9890/ai-config-manager/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/hk9890/ai-config-manager/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/hk9890/ai-config-manager/releases/tag/v1.0.0
+
+[1.5.0]: https://github.com/hk9890/ai-config-manager/compare/v1.4.0...v1.5.0
