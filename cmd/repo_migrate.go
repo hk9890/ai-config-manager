@@ -48,10 +48,10 @@ Examples:
 
 		repoPath := manager.GetRepoPath()
 
-		// Dry run mode - just note that it's not fully implemented
+		// Dry run mode - preview message
 		if migrateDryRunFlag {
-			fmt.Println("Note: --dry-run flag shows what would be migrated, but the migration")
-			fmt.Println("      function prints output during scanning. Files will NOT be moved.")
+			fmt.Println("=== DRY RUN MODE ===")
+			fmt.Println("The following changes would be made:")
 			fmt.Println()
 		}
 
@@ -90,15 +90,18 @@ func runMigration(repoPath string, dryRun bool) (*metadata.MigrationResult, erro
 
 	// Run the migration
 	if dryRun {
-		fmt.Println("Scanning for metadata files (dry-run mode)...")
-		fmt.Println("WARNING: The underlying migration function will move files.")
-		fmt.Println("         This is a known limitation. Use with caution.")
+		fmt.Println("Scanning for metadata files to migrate...")
 		fmt.Println()
 	} else {
 		fmt.Println("Starting metadata migration...")
+		fmt.Println()
 	}
 
-	result, err := metadata.MigrateMetadataFiles(repoPath)
+	opts := metadata.MigrationOptions{
+		DryRun: dryRun,
+	}
+
+	result, err := metadata.MigrateMetadataFilesWithOptions(repoPath, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -144,9 +147,14 @@ func displayMigrationResults(result *metadata.MigrationResult, dryRun bool) {
 		}
 	} else {
 		if dryRun {
-			fmt.Println("\n✓ No errors found")
+			fmt.Println("\n✓ No errors found (dry run)")
 		} else {
 			fmt.Println("\n✓ Migration completed successfully")
 		}
+	}
+
+	// Additional message for dry run
+	if dryRun {
+		fmt.Println("\nRun without --dry-run to perform the migration.")
 	}
 }
