@@ -326,6 +326,11 @@ func applyFilter(filterPattern string, commands, skills, agents []*resource.Reso
 
 // addBulkFromLocal handles bulk add from a local folder or single file
 func addBulkFromLocal(localPath string, manager *repo.Manager) error {
+	return addBulkFromLocalWithFilter(localPath, manager, filterFlag)
+}
+
+// addBulkFromLocalWithFilter handles bulk add from a local folder or single file with a custom filter
+func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter string) error {
 	// Validate path exists
 	if _, err := os.Stat(localPath); err != nil {
 		return fmt.Errorf("path does not exist: %s", localPath)
@@ -370,8 +375,8 @@ func addBulkFromLocal(localPath string, manager *repo.Manager) error {
 	if dryRunFlag {
 		fmt.Println("  Mode: DRY RUN (preview only)")
 	}
-	if filterFlag != "" {
-		fmt.Printf("  Filter: %s\n", filterFlag)
+	if filter != "" {
+		fmt.Printf("  Filter: %s\n", filter)
 	}
 	fmt.Println()
 
@@ -381,9 +386,9 @@ func addBulkFromLocal(localPath string, manager *repo.Manager) error {
 	origAgentCount := len(agents)
 
 	// Apply filter if specified
-	if filterFlag != "" {
+	if filter != "" {
 		var err error
-		commands, skills, agents, err = applyFilter(filterFlag, commands, skills, agents)
+		commands, skills, agents, err = applyFilter(filter, commands, skills, agents)
 		if err != nil {
 			return err
 		}
@@ -391,14 +396,14 @@ func addBulkFromLocal(localPath string, manager *repo.Manager) error {
 		// Check if filter matched any resources
 		filteredTotal := len(commands) + len(skills) + len(agents)
 		if filteredTotal == 0 {
-			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filterFlag, totalResources)
+			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filter, totalResources)
 			return nil
 		}
 
 		// Show filtered counts
 		fmt.Printf("Found: %d commands, %d skills, %d agents", origCommandCount, origSkillCount, origAgentCount)
 		if filteredTotal < totalResources {
-			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filterFlag)
+			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filter)
 		} else {
 			fmt.Println()
 			fmt.Println()
@@ -456,6 +461,11 @@ func addBulkFromLocal(localPath string, manager *repo.Manager) error {
 
 // addBulkFromGitHub handles bulk add from a GitHub repository
 func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error {
+	return addBulkFromGitHubWithFilter(parsed, manager, filterFlag)
+}
+
+// addBulkFromGitHubWithFilter handles bulk add from a GitHub repository with a custom filter
+func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Manager, filter string) error {
 	// Clone repository to temp directory
 	cloneURL, err := source.GetCloneURL(parsed)
 	if err != nil {
@@ -507,8 +517,8 @@ func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error
 	if dryRunFlag {
 		fmt.Println("  Mode: DRY RUN (preview only)")
 	}
-	if filterFlag != "" {
-		fmt.Printf("  Filter: %s\n", filterFlag)
+	if filter != "" {
+		fmt.Printf("  Filter: %s\n", filter)
 	}
 	fmt.Println()
 
@@ -518,9 +528,9 @@ func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error
 	origAgentCount := len(agents)
 
 	// Apply filter if specified
-	if filterFlag != "" {
+	if filter != "" {
 		var err error
-		commands, skills, agents, err = applyFilter(filterFlag, commands, skills, agents)
+		commands, skills, agents, err = applyFilter(filter, commands, skills, agents)
 		if err != nil {
 			return err
 		}
@@ -528,14 +538,14 @@ func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error
 		// Check if filter matched any resources
 		filteredTotal := len(commands) + len(skills) + len(agents)
 		if filteredTotal == 0 {
-			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filterFlag, totalResources)
+			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filter, totalResources)
 			return nil
 		}
 
 		// Show filtered counts
 		fmt.Printf("Found: %d commands, %d skills, %d agents", origCommandCount, origSkillCount, origAgentCount)
 		if filteredTotal < totalResources {
-			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filterFlag)
+			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filter)
 		} else {
 			fmt.Println()
 			fmt.Println()
