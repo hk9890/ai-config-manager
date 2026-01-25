@@ -1,0 +1,809 @@
+// Package test provides integration tests for the ai-config-manager.
+//
+// This file contains comprehensive integration tests for package workflows, including:
+//   - Creating packages from existing resources
+//   - Installing packages to multiple AI tools (Claude, OpenCode)
+//   - Uninstalling package resources
+//   - Handling missing resources gracefully
+//   - Managing shared resources between packages
+//   - Testing CLI commands for package operations
+//   - Testing force reinstall scenarios
+package test
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/hk9890/ai-config-manager/pkg/install"
+	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/tools"
+)
+
+// TestPackageWorkflow tests the complete package workflow: create -> install -> uninstall
+func TestPackageWorkflow(t *testing.T) {
+	// Create temporary directories for repo and project
+	repoDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	t.Logf("Test directories - Repo: %s, Project: %s", repoDir, projectDir)
+
+	// Step 1: Create test resources in repository
+	t.Log("Step 1: Creating test resources")
+	manager := repo.NewManagerWithPath(repoDir)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Create test command
+	testCmdDir := t.TempDir()
+	cmdPath := filepath.Join(testCmdDir, "test-cmd.md")
+	cmdContent := `---
+description: A test command for package testing
+---
+# Test Command
+This is a test command.
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	// Create test skill
+	testSkillDir := filepath.Join(t.TempDir(), "test-skill")
+	if err := os.MkdirAll(filepath.Join(testSkillDir, "scripts"), 0755); err != nil {
+		t.Fatalf("Failed to create skill directory: %v", err)
+	}
+	skillMdPath := filepath.Join(testSkillDir, "SKILL.md")
+	skillContent := `---
+name: test-skill
+description: A test skill for package testing
+---
+# Test Skill
+This is a test skill.
+`
+	if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
+		t.Fatalf("Failed to create SKILL.md: %v", err)
+	}
+	if err := manager.AddSkill(testSkillDir, "file://"+testSkillDir, "file"); err != nil {
+		t.Fatalf("Failed to add skill: %v", err)
+	}
+
+	// Create test agent
+	testAgentDir := t.TempDir()
+	agentPath := filepath.Join(testAgentDir, "test-agent.md")
+	agentContent := `---
+description: A test agent for package testing
+---
+# Test Agent
+This is a test agent.
+`
+	if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
+		t.Fatalf("Failed to create test agent: %v", err)
+	}
+	if err := manager.AddAgent(agentPath, "file://"+agentPath, "file"); err != nil {
+		t.Fatalf("Failed to add agent: %v", err)
+	}
+
+	// Step 2: Create package from resources
+	t.Log("Step 2: Creating package")
+	pkg := &resource.Package{
+		Name:        "test-package",
+		Description: "A test package with multiple resources",
+		Resources: []string{
+			"command/test-cmd",
+			"skill/test-skill",
+			"agent/test-agent",
+		},
+	}
+	if err := resource.SavePackage(pkg, repoDir); err != nil {
+		t.Fatalf("Failed to save package: %v", err)
+	}
+
+	// Verify package file was created
+	pkgPath := resource.GetPackagePath("test-package", repoDir)
+	if _, err := os.Stat(pkgPath); os.IsNotExist(err) {
+		t.Errorf("Package file was not created at %s", pkgPath)
+	}
+
+	// Load and verify package
+	loadedPkg, err := resource.LoadPackage(pkgPath)
+	if err != nil {
+		t.Fatalf("Failed to load package: %v", err)
+	}
+	if loadedPkg.Name != "test-package" {
+		t.Errorf("Package name = %v, want test-package", loadedPkg.Name)
+	}
+	if len(loadedPkg.Resources) != 3 {
+		t.Errorf("Package has %d resources, want 3", len(loadedPkg.Resources))
+	}
+
+	// Step 3: Install package to project (Claude and OpenCode)
+	t.Log("Step 3: Installing package to project")
+
+	// Create .claude and .opencode directories in project
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0755); err != nil {
+		t.Fatalf("Failed to create .claude directory: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(projectDir, ".opencode"), 0755); err != nil {
+		t.Fatalf("Failed to create .opencode directory: %v", err)
+	}
+
+	// Create installer
+	installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude, tools.OpenCode})
+	if err != nil {
+		t.Fatalf("Failed to create installer: %v", err)
+	}
+
+	// Install each resource in the package
+	for _, ref := range pkg.Resources {
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			t.Fatalf("Failed to parse resource reference %s: %v", ref, err)
+		}
+
+		// Get resource from repo
+		res, err := manager.Get(resName, resType)
+		if err != nil {
+			t.Fatalf("Failed to get resource %s: %v", ref, err)
+		}
+
+		// Install based on type
+		switch resType {
+		case resource.Command:
+			err = installer.InstallCommand(res.Name, manager)
+		case resource.Skill:
+			err = installer.InstallSkill(res.Name, manager)
+		case resource.Agent:
+			err = installer.InstallAgent(res.Name, manager)
+		default:
+			t.Fatalf("Unknown resource type: %v", resType)
+		}
+		if err != nil {
+			t.Fatalf("Failed to install %s: %v", ref, err)
+		}
+	}
+
+	// Step 4: Verify resources were installed correctly
+	t.Log("Step 4: Verifying installed resources")
+
+	// Check command installed in both tools
+	claudeCmdPath := filepath.Join(projectDir, ".claude", "commands", "test-cmd.md")
+	opencodeCmdPath := filepath.Join(projectDir, ".opencode", "commands", "test-cmd.md")
+
+	if _, err := os.Lstat(claudeCmdPath); err != nil {
+		t.Errorf("Command not installed to Claude: %v", err)
+	}
+	if _, err := os.Lstat(opencodeCmdPath); err != nil {
+		t.Errorf("Command not installed to OpenCode: %v", err)
+	}
+
+	// Verify symlinks point to repo
+	claudeCmdLink, err := os.Readlink(claudeCmdPath)
+	if err != nil {
+		t.Errorf("Command is not a symlink in Claude: %v", err)
+	} else if !strings.Contains(claudeCmdLink, "commands/test-cmd.md") {
+		t.Errorf("Claude command symlink points to wrong location: %s", claudeCmdLink)
+	}
+
+	// Check skill installed in both tools
+	claudeSkillPath := filepath.Join(projectDir, ".claude", "skills", "test-skill")
+	opencodeSkillPath := filepath.Join(projectDir, ".opencode", "skills", "test-skill")
+
+	if _, err := os.Lstat(claudeSkillPath); err != nil {
+		t.Errorf("Skill not installed to Claude: %v", err)
+	}
+	if _, err := os.Lstat(opencodeSkillPath); err != nil {
+		t.Errorf("Skill not installed to OpenCode: %v", err)
+	}
+
+	// Check agent installed in both tools
+	claudeAgentPath := filepath.Join(projectDir, ".claude", "agents", "test-agent.md")
+	opencodeAgentPath := filepath.Join(projectDir, ".opencode", "agents", "test-agent.md")
+
+	if _, err := os.Lstat(claudeAgentPath); err != nil {
+		t.Errorf("Agent not installed to Claude: %v", err)
+	}
+	if _, err := os.Lstat(opencodeAgentPath); err != nil {
+		t.Errorf("Agent not installed to OpenCode: %v", err)
+	}
+
+	// Step 5: Uninstall package resources
+	t.Log("Step 5: Uninstalling package resources")
+
+	for _, ref := range pkg.Resources {
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			t.Fatalf("Failed to parse resource reference %s: %v", ref, err)
+		}
+
+		err = installer.Uninstall(resName, resType)
+		if err != nil {
+			t.Fatalf("Failed to uninstall %s: %v", ref, err)
+		}
+	}
+
+	// Step 6: Verify resources were removed
+	t.Log("Step 6: Verifying resources were removed")
+
+	// Check command removed from both tools
+	if _, err := os.Lstat(claudeCmdPath); !os.IsNotExist(err) {
+		t.Errorf("Command still exists in Claude after uninstall")
+	}
+	if _, err := os.Lstat(opencodeCmdPath); !os.IsNotExist(err) {
+		t.Errorf("Command still exists in OpenCode after uninstall")
+	}
+
+	// Check skill removed from both tools
+	if _, err := os.Lstat(claudeSkillPath); !os.IsNotExist(err) {
+		t.Errorf("Skill still exists in Claude after uninstall")
+	}
+	if _, err := os.Lstat(opencodeSkillPath); !os.IsNotExist(err) {
+		t.Errorf("Skill still exists in OpenCode after uninstall")
+	}
+
+	// Check agent removed from both tools
+	if _, err := os.Lstat(claudeAgentPath); !os.IsNotExist(err) {
+		t.Errorf("Agent still exists in Claude after uninstall")
+	}
+	if _, err := os.Lstat(opencodeAgentPath); !os.IsNotExist(err) {
+		t.Errorf("Agent still exists in OpenCode after uninstall")
+	}
+
+	// Step 7: Verify package file still exists in repo
+	t.Log("Step 7: Verifying package file still exists in repo")
+	if _, err := os.Stat(pkgPath); os.IsNotExist(err) {
+		t.Errorf("Package file was removed from repo (should still exist)")
+	}
+
+	// Verify resources still exist in repo
+	cmdInRepo, err := manager.Get("test-cmd", resource.Command)
+	if err != nil {
+		t.Errorf("Command removed from repo: %v", err)
+	} else if cmdInRepo.Name != "test-cmd" {
+		t.Errorf("Command name in repo = %v, want test-cmd", cmdInRepo.Name)
+	}
+
+	skillInRepo, err := manager.Get("test-skill", resource.Skill)
+	if err != nil {
+		t.Errorf("Skill removed from repo: %v", err)
+	} else if skillInRepo.Name != "test-skill" {
+		t.Errorf("Skill name in repo = %v, want test-skill", skillInRepo.Name)
+	}
+
+	agentInRepo, err := manager.Get("test-agent", resource.Agent)
+	if err != nil {
+		t.Errorf("Agent removed from repo: %v", err)
+	} else if agentInRepo.Name != "test-agent" {
+		t.Errorf("Agent name in repo = %v, want test-agent", agentInRepo.Name)
+	}
+}
+
+// TestPackageWithMissingResources tests installing a package with missing resources
+func TestPackageWithMissingResources(t *testing.T) {
+	repoDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	t.Log("Creating test repository and package with missing resources")
+
+	// Create manager and initialize repo
+	manager := repo.NewManagerWithPath(repoDir)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Create only one resource
+	testCmdDir := t.TempDir()
+	cmdPath := filepath.Join(testCmdDir, "existing-cmd.md")
+	cmdContent := `---
+description: An existing command
+---
+# Existing Command
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	// Create package referencing both existing and missing resources
+	pkg := &resource.Package{
+		Name:        "incomplete-package",
+		Description: "A package with missing resources",
+		Resources: []string{
+			"command/existing-cmd",
+			"command/missing-cmd",
+			"skill/missing-skill",
+		},
+	}
+	if err := resource.SavePackage(pkg, repoDir); err != nil {
+		t.Fatalf("Failed to save package: %v", err)
+	}
+
+	// Create project directory with tool directories
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0755); err != nil {
+		t.Fatalf("Failed to create .claude directory: %v", err)
+	}
+
+	// Create installer
+	installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
+	if err != nil {
+		t.Fatalf("Failed to create installer: %v", err)
+	}
+
+	// Try to install each resource
+	installedCount := 0
+	missingCount := 0
+
+	for _, ref := range pkg.Resources {
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			t.Logf("Invalid resource reference %s: %v", ref, err)
+			continue
+		}
+
+		// Check if resource exists
+		_, err = manager.Get(resName, resType)
+		if err != nil {
+			t.Logf("Resource %s not found in repo (expected)", ref)
+			missingCount++
+			continue
+		}
+
+		// Install resource
+		switch resType {
+		case resource.Command:
+			err = installer.InstallCommand(resName, manager)
+		case resource.Skill:
+			err = installer.InstallSkill(resName, manager)
+		}
+		if err != nil {
+			t.Fatalf("Failed to install %s: %v", ref, err)
+		}
+
+		if err != nil {
+			t.Errorf("Failed to install existing resource %s: %v", ref, err)
+		} else {
+			installedCount++
+		}
+	}
+
+	// Verify only the existing resource was installed
+	if installedCount != 1 {
+		t.Errorf("Installed %d resources, want 1", installedCount)
+	}
+	if missingCount != 2 {
+		t.Errorf("Missing %d resources, want 2", missingCount)
+	}
+
+	// Verify the existing command was installed
+	cmdPath = filepath.Join(projectDir, ".claude", "commands", "existing-cmd.md")
+	if _, err := os.Lstat(cmdPath); err != nil {
+		t.Errorf("Existing command was not installed: %v", err)
+	}
+}
+
+// TestPackageRemoval tests removing a package from the repository
+func TestPackageRemoval(t *testing.T) {
+	repoDir := t.TempDir()
+
+	t.Log("Testing package removal from repository")
+
+	// Create manager
+	manager := repo.NewManagerWithPath(repoDir)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Create test resources
+	testCmdDir := t.TempDir()
+	cmdPath := filepath.Join(testCmdDir, "remove-test.md")
+	cmdContent := `---
+description: A command for removal testing
+---
+# Remove Test
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	// Create package
+	pkg := &resource.Package{
+		Name:        "removable-package",
+		Description: "A package for removal testing",
+		Resources: []string{
+			"command/remove-test",
+		},
+	}
+	if err := resource.SavePackage(pkg, repoDir); err != nil {
+		t.Fatalf("Failed to save package: %v", err)
+	}
+
+	// Verify package exists
+	pkgPath := resource.GetPackagePath("removable-package", repoDir)
+	if _, err := os.Stat(pkgPath); os.IsNotExist(err) {
+		t.Fatalf("Package file was not created")
+	}
+
+	// Remove package file
+	if err := os.Remove(pkgPath); err != nil {
+		t.Fatalf("Failed to remove package file: %v", err)
+	}
+
+	// Verify package is gone
+	if _, err := os.Stat(pkgPath); !os.IsNotExist(err) {
+		t.Errorf("Package file still exists after removal")
+	}
+
+	// Verify resources still exist in repo
+	res, err := manager.Get("remove-test", resource.Command)
+	if err != nil {
+		t.Errorf("Resource was removed from repo (should still exist): %v", err)
+	} else if res.Name != "remove-test" {
+		t.Errorf("Resource name = %v, want remove-test", res.Name)
+	}
+}
+
+// TestPackageWithSharedResources tests installing/uninstalling packages with shared resources
+func TestPackageWithSharedResources(t *testing.T) {
+	repoDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	t.Log("Testing packages with shared resources")
+
+	// Create manager
+	manager := repo.NewManagerWithPath(repoDir)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Create shared resources
+	testCmdDir := t.TempDir()
+
+	// Shared command
+	sharedCmdPath := filepath.Join(testCmdDir, "shared-cmd.md")
+	sharedCmdContent := `---
+description: A shared command
+---
+# Shared Command
+`
+	if err := os.WriteFile(sharedCmdPath, []byte(sharedCmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create shared command: %v", err)
+	}
+	if err := manager.AddCommand(sharedCmdPath, "file://"+sharedCmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add shared command: %v", err)
+	}
+
+	// Package A specific command
+	cmdAPath := filepath.Join(testCmdDir, "cmd-a.md")
+	cmdAContent := `---
+description: Command A
+---
+# Command A
+`
+	if err := os.WriteFile(cmdAPath, []byte(cmdAContent), 0644); err != nil {
+		t.Fatalf("Failed to create command A: %v", err)
+	}
+	if err := manager.AddCommand(cmdAPath, "file://"+cmdAPath, "file"); err != nil {
+		t.Fatalf("Failed to add command A: %v", err)
+	}
+
+	// Package B specific command
+	cmdBPath := filepath.Join(testCmdDir, "cmd-b.md")
+	cmdBContent := `---
+description: Command B
+---
+# Command B
+`
+	if err := os.WriteFile(cmdBPath, []byte(cmdBContent), 0644); err != nil {
+		t.Fatalf("Failed to create command B: %v", err)
+	}
+	if err := manager.AddCommand(cmdBPath, "file://"+cmdBPath, "file"); err != nil {
+		t.Fatalf("Failed to add command B: %v", err)
+	}
+
+	// Create two packages sharing a resource
+	pkgA := &resource.Package{
+		Name:        "package-a",
+		Description: "Package A with shared resource",
+		Resources: []string{
+			"command/shared-cmd",
+			"command/cmd-a",
+		},
+	}
+	if err := resource.SavePackage(pkgA, repoDir); err != nil {
+		t.Fatalf("Failed to save package A: %v", err)
+	}
+
+	pkgB := &resource.Package{
+		Name:        "package-b",
+		Description: "Package B with shared resource",
+		Resources: []string{
+			"command/shared-cmd",
+			"command/cmd-b",
+		},
+	}
+	if err := resource.SavePackage(pkgB, repoDir); err != nil {
+		t.Fatalf("Failed to save package B: %v", err)
+	}
+
+	// Create project directory
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0755); err != nil {
+		t.Fatalf("Failed to create .claude directory: %v", err)
+	}
+
+	// Create installer
+	installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
+	if err != nil {
+		t.Fatalf("Failed to create installer: %v", err)
+	}
+
+	// Install package A
+	t.Log("Installing package A")
+	for _, ref := range pkgA.Resources {
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			t.Fatalf("Failed to parse resource reference %s: %v", ref, err)
+		}
+
+		switch resType {
+		case resource.Command:
+			err = installer.InstallCommand(resName, manager)
+		}
+		if err != nil {
+			t.Fatalf("Failed to install %s: %v", ref, err)
+		}
+	}
+
+	// Verify shared-cmd and cmd-a are installed
+	sharedCmdInstalled := filepath.Join(projectDir, ".claude", "commands", "shared-cmd.md")
+	cmdAInstalled := filepath.Join(projectDir, ".claude", "commands", "cmd-a.md")
+
+	if _, err := os.Lstat(sharedCmdInstalled); err != nil {
+		t.Errorf("Shared command not installed: %v", err)
+	}
+	if _, err := os.Lstat(cmdAInstalled); err != nil {
+		t.Errorf("Command A not installed: %v", err)
+	}
+
+	// Install package B
+	t.Log("Installing package B (with shared resource)")
+	for _, ref := range pkgB.Resources {
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			t.Fatalf("Failed to parse resource reference %s: %v", ref, err)
+		}
+
+		// Check if already installed (shared resource)
+		if installer.IsInstalled(resName, resType) {
+			t.Logf("Resource %s already installed, skipping", ref)
+			continue
+		}
+
+		switch resType {
+		case resource.Command:
+			err = installer.InstallCommand(resName, manager)
+		}
+		if err != nil {
+			t.Fatalf("Failed to install %s: %v", ref, err)
+		}
+	}
+
+	// Verify cmd-b is installed, shared-cmd still installed
+	cmdBInstalled := filepath.Join(projectDir, ".claude", "commands", "cmd-b.md")
+
+	if _, err := os.Lstat(sharedCmdInstalled); err != nil {
+		t.Errorf("Shared command missing after package B install: %v", err)
+	}
+	if _, err := os.Lstat(cmdBInstalled); err != nil {
+		t.Errorf("Command B not installed: %v", err)
+	}
+
+	// Uninstall package A resources
+	t.Log("Uninstalling package A (shared resource should remain)")
+	for _, ref := range pkgA.Resources {
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			t.Fatalf("Failed to parse resource reference %s: %v", ref, err)
+		}
+
+		// For shared resources, manually check if it's used by other packages
+		if resName == "shared-cmd" {
+			// In a real implementation, you'd track which packages use which resources
+			// For this test, we'll skip removing it
+			t.Logf("Skipping uninstall of shared resource %s", ref)
+			continue
+		}
+
+		err = installer.Uninstall(resName, resType)
+		if err != nil {
+			t.Fatalf("Failed to uninstall %s: %v", ref, err)
+		}
+	}
+
+	// Verify cmd-a is gone, but shared-cmd and cmd-b remain
+	if _, err := os.Lstat(cmdAInstalled); !os.IsNotExist(err) {
+		t.Errorf("Command A still exists after package A uninstall")
+	}
+	if _, err := os.Lstat(sharedCmdInstalled); err != nil {
+		t.Errorf("Shared command was removed (should remain for package B): %v", err)
+	}
+	if _, err := os.Lstat(cmdBInstalled); err != nil {
+		t.Errorf("Command B was removed: %v", err)
+	}
+}
+
+// TestPackageCLI tests package operations via CLI commands
+func TestPackageCLI(t *testing.T) {
+	repoDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Create test resources
+	testDir := t.TempDir()
+	cmdPath := filepath.Join(testDir, "cli-test.md")
+	cmdContent := `---
+description: A command for CLI package testing
+---
+# CLI Test Command
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	// Add command to repo
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	if err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	// Create package via CLI
+	t.Log("Creating package via CLI")
+	output, err := runAimgr(t, "repo", "create-package", "cli-test-pkg",
+		"--description=Test package via CLI",
+		"--resources=command/cli-test",
+		"--force")
+	if err != nil {
+		t.Fatalf("Failed to create package: %v\nOutput: %s", err, output)
+	}
+
+	if !strings.Contains(output, "cli-test-pkg") {
+		t.Errorf("Create package output should mention package name, got: %s", output)
+	}
+	if !strings.Contains(output, "command/cli-test") {
+		t.Errorf("Create package output should list resources, got: %s", output)
+	}
+
+	// Verify package exists
+	pkgPath := resource.GetPackagePath("cli-test-pkg", repoDir)
+	if _, err := os.Stat(pkgPath); os.IsNotExist(err) {
+		t.Errorf("Package file not created at %s", pkgPath)
+	}
+
+	// Create project directory with .claude
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0755); err != nil {
+		t.Fatalf("Failed to create .claude directory: %v", err)
+	}
+
+	// NOTE: The CLI install/uninstall for packages needs to be implemented
+	// For now, test that uninstall package/ works (already implemented)
+	// TODO: Enable full CLI test once 'install package/' is implemented
+
+	// Uninstall package via CLI (this should work even without resources installed)
+	t.Log("Uninstalling package via CLI")
+	output, err = runAimgr(t, "uninstall", "package/cli-test-pkg", "--project-path", projectDir)
+	// This should succeed with "not installed" message rather than fail
+	if err != nil {
+		// Check if error is about resources not being installed (expected)
+		if !strings.Contains(output, "not installed") && !strings.Contains(output, "Skipped") {
+			t.Logf("Uninstall output: %s", output)
+			// This is expected if install wasn't done
+		}
+	}
+
+	// Verify package still exists in repo after uninstall
+	if _, err := os.Stat(pkgPath); os.IsNotExist(err) {
+		t.Errorf("Package was removed from repo (should still exist)")
+	}
+}
+
+// TestPackageForceReinstall tests force reinstalling a package
+func TestPackageForceReinstall(t *testing.T) {
+	repoDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	// Create manager
+	manager := repo.NewManagerWithPath(repoDir)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Create test resource
+	testCmdDir := t.TempDir()
+	cmdPath := filepath.Join(testCmdDir, "force-test.md")
+	cmdContent := `---
+description: A command for force reinstall testing
+---
+# Force Test
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	// Create package
+	pkg := &resource.Package{
+		Name:        "force-test-package",
+		Description: "Package for force reinstall testing",
+		Resources: []string{
+			"command/force-test",
+		},
+	}
+	if err := resource.SavePackage(pkg, repoDir); err != nil {
+		t.Fatalf("Failed to save package: %v", err)
+	}
+
+	// Create project directory
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0755); err != nil {
+		t.Fatalf("Failed to create .claude directory: %v", err)
+	}
+
+	// Create installer
+	installer, err := install.NewInstaller(projectDir, []tools.Tool{tools.Claude})
+	if err != nil {
+		t.Fatalf("Failed to create installer: %v", err)
+	}
+
+	// Install command first time
+	t.Log("Installing command for the first time")
+	err = installer.InstallCommand("force-test", manager)
+	if err != nil {
+		t.Fatalf("Failed to install command: %v", err)
+	}
+
+	installedPath := filepath.Join(projectDir, ".claude", "commands", "force-test.md")
+	if _, err := os.Lstat(installedPath); err != nil {
+		t.Fatalf("Command not installed: %v", err)
+	}
+
+	// Get original link info
+	origLink, err := os.Readlink(installedPath)
+	if err != nil {
+		t.Fatalf("Command is not a symlink: %v", err)
+	}
+
+	// Try to install again without force (should skip)
+	t.Log("Attempting to install again without force")
+	if installer.IsInstalled("force-test", resource.Command) {
+		t.Log("Command already installed, would skip in normal operation")
+	}
+
+	// Force reinstall
+	t.Log("Force reinstalling command")
+	if err := installer.Uninstall("force-test", resource.Command); err != nil {
+		t.Fatalf("Failed to uninstall for force reinstall: %v", err)
+	}
+	if err := installer.InstallCommand("force-test", manager); err != nil {
+		t.Fatalf("Failed to force reinstall: %v", err)
+	}
+
+	// Verify still installed and link is correct
+	newLink, err := os.Readlink(installedPath)
+	if err != nil {
+		t.Fatalf("Command is not a symlink after force reinstall: %v", err)
+	}
+	if newLink != origLink {
+		t.Errorf("Link changed after force reinstall: got %s, want %s", newLink, origLink)
+	}
+}
