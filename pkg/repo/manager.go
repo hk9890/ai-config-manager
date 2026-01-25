@@ -65,6 +65,12 @@ func (m *Manager) Init() error {
 		return fmt.Errorf("failed to create agents directory: %w", err)
 	}
 
+	// Create packages subdirectory
+	packagesPath := filepath.Join(m.repoPath, "packages")
+	if err := os.MkdirAll(packagesPath, 0755); err != nil {
+		return fmt.Errorf("failed to create packages directory: %w", err)
+	}
+
 	return nil
 }
 
@@ -213,6 +219,88 @@ func (m *Manager) AddAgentWithRef(sourcePath, sourceURL, sourceType, ref string)
 	}
 
 	return nil
+}
+
+// AddPackage adds a package resource to the repository.
+// Metadata is automatically saved to .metadata/packages/<name>-metadata.json
+func (m *Manager) AddPackage(sourcePath, sourceURL, sourceType string) error {
+	return m.AddPackageWithRef(sourcePath, sourceURL, sourceType, "")
+}
+
+// AddPackageWithRef adds a package resource to the repository with a specified Git ref.
+// Metadata is automatically saved to .metadata/packages/<name>-metadata.json
+func (m *Manager) AddPackageWithRef(sourcePath, sourceURL, sourceType, ref string) error {
+	// Ensure repo is initialized
+	if err := m.Init(); err != nil {
+		return err
+	}
+
+	// Validate and load the package
+	pkg, err := resource.LoadPackage(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to load package: %w", err)
+	}
+
+	// Check for conflicts
+	destPath := resource.GetPackagePath(pkg.Name, m.repoPath)
+	if _, err := os.Stat(destPath); err == nil {
+		return fmt.Errorf("package '%s' already exists in repository", pkg.Name)
+	}
+
+	// Validate resource references and warn about missing resources
+	missingResources := m.validatePackageResources(pkg)
+	if len(missingResources) > 0 {
+		fmt.Fprintf(os.Stderr, "Warning: Package '%s' references %d missing resource(s):\n", pkg.Name, len(missingResources))
+		for _, ref := range missingResources {
+			fmt.Fprintf(os.Stderr, "  - %s\n", ref)
+		}
+	}
+
+	// Copy the file
+	if err := copyFile(sourcePath, destPath); err != nil {
+		return fmt.Errorf("failed to copy package: %w", err)
+	}
+
+	// Create and save metadata
+	now := time.Now()
+	pkgMeta := &metadata.PackageMetadata{
+		Name:          pkg.Name,
+		SourceType:    sourceType,
+		SourceURL:     sourceURL,
+		SourceRef:     ref,
+		FirstAdded:    now,
+		LastUpdated:   now,
+		ResourceCount: len(pkg.Resources),
+	}
+	if err := metadata.SavePackageMetadata(pkgMeta, m.repoPath); err != nil {
+		return fmt.Errorf("failed to save metadata: %w", err)
+	}
+
+	return nil
+}
+
+// validatePackageResources checks if all referenced resources exist in the repository.
+// Returns a slice of missing resource references.
+func (m *Manager) validatePackageResources(pkg *resource.Package) []string {
+	var missing []string
+
+	for _, ref := range pkg.Resources {
+		// Parse the resource reference
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			// Invalid reference format
+			missing = append(missing, ref)
+			continue
+		}
+
+		// Check if resource exists
+		resPath := m.GetPath(resName, resType)
+		if _, err := os.Stat(resPath); os.IsNotExist(err) {
+			missing = append(missing, ref)
+		}
+	}
+
+	return missing
 }
 
 // List lists all resources, optionally filtered by type
@@ -493,17 +581,25 @@ type ImportError struct {
 
 // BulkImportResult contains the results of a bulk import operation
 type BulkImportResult struct {
-	Added   []string      // Successfully added resources
-	Skipped []string      // Skipped due to conflicts
-	Failed  []ImportError // Failed imports with reasons
+	Added        []string      // Successfully added resources
+	Skipped      []string      // Skipped due to conflicts
+	Failed       []ImportError // Failed imports with reasons
+	CommandCount int           // Number of commands imported
+	SkillCount   int           // Number of skills imported
+	AgentCount   int           // Number of agents imported
+	PackageCount int           // Number of packages imported
 }
 
 // AddBulk imports multiple resources at once
 func (m *Manager) AddBulk(sources []string, opts BulkImportOptions) (*BulkImportResult, error) {
 	result := &BulkImportResult{
-		Added:   []string{},
-		Skipped: []string{},
-		Failed:  []ImportError{},
+		Added:        []string{},
+		Skipped:      []string{},
+		Failed:       []ImportError{},
+		CommandCount: 0,
+		SkillCount:   0,
+		AgentCount:   0,
+		PackageCount: 0,
 	}
 
 	// Ensure repo is initialized (even for dry run, to check paths)
@@ -528,6 +624,11 @@ func (m *Manager) AddBulk(sources []string, opts BulkImportOptions) (*BulkImport
 
 // importResource imports a single resource (helper for AddBulk)
 func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, result *BulkImportResult) error {
+	// Check if it's a package file
+	if strings.HasSuffix(sourcePath, ".package.json") {
+		return m.importPackage(sourcePath, opts, result)
+	}
+
 	// Detect resource type
 	resourceType, err := resource.DetectType(sourcePath)
 	if err != nil {
@@ -628,6 +729,110 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 			})
 			return err
 		}
+
+		// Increment resource type counter
+		switch resourceType {
+		case resource.Command:
+			result.CommandCount++
+		case resource.Skill:
+			result.SkillCount++
+		case resource.Agent:
+			result.AgentCount++
+		}
+	}
+
+	result.Added = append(result.Added, sourcePath)
+	return nil
+}
+
+// importPackage imports a single package (helper for AddBulk)
+func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, result *BulkImportResult) error {
+	// Load the package to get its name
+	pkg, err := resource.LoadPackage(sourcePath)
+	if err != nil {
+		result.Failed = append(result.Failed, ImportError{
+			Path:    sourcePath,
+			Message: fmt.Sprintf("failed to load package: %v", err),
+		})
+		return err
+	}
+
+	// Check if package already exists
+	destPath := resource.GetPackagePath(pkg.Name, m.repoPath)
+	_, statErr := os.Stat(destPath)
+	exists := statErr == nil
+
+	if exists {
+		if opts.Force {
+			// Force mode: remove existing and continue
+			if !opts.DryRun {
+				// Remove package file
+				if err := os.Remove(destPath); err != nil {
+					result.Failed = append(result.Failed, ImportError{
+						Path:    sourcePath,
+						Message: fmt.Sprintf("failed to remove existing package: %v", err),
+					})
+					return err
+				}
+				// Remove metadata file
+				metadataPath := metadata.GetPackageMetadataPath(pkg.Name, m.repoPath)
+				if _, err := os.Stat(metadataPath); err == nil {
+					if err := os.Remove(metadataPath); err != nil {
+						result.Failed = append(result.Failed, ImportError{
+							Path:    sourcePath,
+							Message: fmt.Sprintf("failed to remove metadata: %v", err),
+						})
+						return err
+					}
+				}
+			}
+		} else if opts.SkipExisting {
+			// Skip mode: skip this package
+			result.Skipped = append(result.Skipped, sourcePath)
+			return nil
+		} else {
+			// Default mode: fail on conflict
+			err := fmt.Errorf("package '%s' already exists in repository", pkg.Name)
+			result.Failed = append(result.Failed, ImportError{
+				Path:    sourcePath,
+				Message: err.Error(),
+			})
+			return err
+		}
+	}
+
+	// Import the package (unless dry run)
+	if !opts.DryRun {
+		// Determine source URL and type
+		var sourceURL, sourceType, ref string
+
+		// Use provided source info if available, otherwise fall back to file://
+		if opts.SourceURL != "" && opts.SourceType != "" {
+			sourceURL = opts.SourceURL
+			sourceType = opts.SourceType
+			ref = opts.Ref
+		} else {
+			// Fall back to file:// for local sources
+			absPath, err := filepath.Abs(sourcePath)
+			if err != nil {
+				absPath = sourcePath
+			}
+			sourceURL = "file://" + absPath
+			sourceType = "file"
+			ref = ""
+		}
+
+		err = m.AddPackageWithRef(sourcePath, sourceURL, sourceType, ref)
+		if err != nil {
+			result.Failed = append(result.Failed, ImportError{
+				Path:    sourcePath,
+				Message: err.Error(),
+			})
+			return err
+		}
+
+		// Increment package counter
+		result.PackageCount++
 	}
 
 	result.Added = append(result.Added, sourcePath)
