@@ -63,48 +63,29 @@ Examples:
 		var results []UpdateResult
 		var ctx UpdateContext
 
+		// Build list of resources to update
+		var toUpdate []string
 		if len(args) == 0 {
-			// Count total resources for progress tracking
-			totalCount := 0
+			// Update all resources - build list of all resources
 			typeFilter := resource.Skill
 			skills, _ := manager.List(&typeFilter)
-			totalCount += len(skills)
+			for _, res := range skills {
+				toUpdate = append(toUpdate, fmt.Sprintf("skill/%s", res.Name))
+			}
 
 			typeFilter = resource.Command
 			commands, _ := manager.List(&typeFilter)
-			totalCount += len(commands)
+			for _, res := range commands {
+				toUpdate = append(toUpdate, fmt.Sprintf("command/%s", res.Name))
+			}
 
 			typeFilter = resource.Agent
 			agents, _ := manager.List(&typeFilter)
-			totalCount += len(agents)
-
-			ctx.Total = totalCount
-
-			if totalCount > 0 {
-				fmt.Printf("Updating %d resources...\n\n", totalCount)
+			for _, res := range agents {
+				toUpdate = append(toUpdate, fmt.Sprintf("agent/%s", res.Name))
 			}
-
-			// Update all resources
-			skillResults, err := updateResourceTypeWithProgress(manager, resource.Skill, "", &ctx)
-			if err != nil {
-				return err
-			}
-			results = append(results, skillResults...)
-
-			commandResults, err := updateResourceTypeWithProgress(manager, resource.Command, "", &ctx)
-			if err != nil {
-				return err
-			}
-			results = append(results, commandResults...)
-
-			agentResults, err := updateResourceTypeWithProgress(manager, resource.Agent, "", &ctx)
-			if err != nil {
-				return err
-			}
-			results = append(results, agentResults...)
 		} else {
 			// Update by patterns
-			var toUpdate []string
 			for _, pattern := range args {
 				matches, err := ExpandPattern(manager, pattern)
 				if err != nil {
@@ -115,23 +96,85 @@ Examples:
 
 			// Remove duplicates
 			toUpdate = uniqueStrings(toUpdate)
+		}
 
-			ctx.Total = len(toUpdate)
+		ctx.Total = len(toUpdate)
 
-			if len(toUpdate) > 0 {
-				fmt.Printf("Updating %d resources...\n\n", len(toUpdate))
+		if len(toUpdate) > 0 {
+			fmt.Printf("Updating %d resources...\n\n", len(toUpdate))
+		}
+
+		// Group resources by source for batched updates
+		gitSources, localSources, err := groupResourcesBySource(manager, toUpdate)
+		if err != nil {
+			return err
+		}
+
+		// Process Git sources with batching
+		for sourceURL, resources := range gitSources {
+			if len(resources) > 1 {
+				fmt.Printf("Batch: Updating %d resources from %s\n\n", len(resources), sourceURL)
+			}
+			batchResults := updateBatchFromGitSource(manager, sourceURL, resources, &ctx)
+			results = append(results, batchResults...)
+		}
+
+		// Process local/file sources individually (no batching)
+		for _, res := range localSources {
+			ctx.Current++
+
+			// Show progress counter
+			fmt.Printf("[%d/%d] %s '%s'\n", ctx.Current, ctx.Total, res.resourceType, res.name)
+
+			result := UpdateResult{
+				Name:    res.name,
+				Type:    res.resourceType,
+				Success: false,
+				Skipped: false,
 			}
 
-			// Update each resource
-			for _, tu := range toUpdate {
-				resType, name, err := ParseResourceArg(tu)
-				if err != nil {
-					return err
-				}
-				ctx.Current++
-				result := updateSingleResourceWithProgress(manager, name, resType, &ctx)
+			// Dry run mode - just report what would be done
+			if updateDryRunFlag {
+				result.Success = true
+				result.Message = fmt.Sprintf("Would update from %s (%s)", res.metadata.SourceURL, res.metadata.SourceType)
+				fmt.Printf("  ↓ %s\n\n", result.Message)
 				results = append(results, result)
+				continue
 			}
+
+			// Show operation type
+			fmt.Printf("  ↓ Updating from local source...\n")
+
+			// Update from local source
+			skipped, updateErr := updateFromLocalSource(manager, res.name, res.resourceType, res.metadata)
+			if skipped {
+				result.Skipped = true
+				result.Message = updateErr.Error()
+				fmt.Printf("  ⊘ %s\n\n", result.Message)
+				results = append(results, result)
+				continue
+			}
+
+			if updateErr != nil {
+				result.Message = updateErr.Error()
+				fmt.Printf("  ✗ %s\n\n", result.Message)
+				results = append(results, result)
+				continue
+			}
+
+			// Update LastUpdated timestamp
+			res.metadata.LastUpdated = time.Now()
+			if err := metadata.Save(res.metadata, manager.GetRepoPath()); err != nil {
+				result.Message = fmt.Sprintf("Updated but failed to save metadata: %v", err)
+				fmt.Printf("  ✗ %s\n\n", result.Message)
+				results = append(results, result)
+				continue
+			}
+
+			result.Success = true
+			result.Message = "Updated successfully"
+			fmt.Printf("  ✓ %s\n\n", result.Message)
+			results = append(results, result)
 		}
 
 		// Display summary
@@ -360,8 +403,13 @@ func updateBatchFromGitSource(manager *repo.Manager, sourceURL string, resources
 		searchPath = filepath.Join(tempDir, parsed.Subpath)
 	}
 
+	// Show cloning message (once for the whole batch)
+	if !updateDryRunFlag && len(resources) > 0 {
+		fmt.Printf("  ↓ Cloning from %s... (updating %d resources)\n\n", sourceURL, len(resources))
+	}
+
 	// Update each resource in the batch
-	for i, res := range resources {
+	for _, res := range resources {
 		ctx.Current++
 
 		// Show progress counter
@@ -381,11 +429,6 @@ func updateBatchFromGitSource(manager *repo.Manager, sourceURL string, resources
 			fmt.Printf("  ↓ %s\n\n", result.Message)
 			results = append(results, result)
 			continue
-		}
-
-		// Show operation type (only for first resource in batch)
-		if i == 0 {
-			fmt.Printf("  ↓ Cloning from %s...\n", sourceURL)
 		}
 
 		// Find and update the specific resource
