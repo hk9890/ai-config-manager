@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/olekukonko/tablewriter"
@@ -17,56 +18,72 @@ var formatFlag string
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
-	Use:   "list [command|skill|agent]",
+	Use:   "list [pattern]",
 	Short: "List resources in the repository",
-	Long: `List all resources in the aimgr repository, optionally filtered by type.
+	Long: `List all resources in the aimgr repository, optionally filtered by pattern.
+
+Patterns support wildcards (* for multiple characters, ? for single character) and optional type prefixes.
 
 Examples:
   aimgr repo list                    # List all resources
-  aimgr repo list command            # List only commands
-  aimgr repo list skill              # List only skills
-  aimgr repo list agent              # List only agents
+  aimgr repo list skill/*            # List all skills
+  aimgr repo list command/test*      # List commands starting with "test"
+  aimgr repo list *pdf*              # List all resources with "pdf" in name
+  aimgr repo list agent/code-*       # List agents starting with "code-"
   aimgr repo list --format=json      # Output as JSON
   aimgr repo list --format=yaml      # Output as YAML`,
-	Args:              cobra.MaximumNArgs(1),
-	ValidArgsFunction: completeResourceTypes,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Parse optional type filter
-		var resourceType *resource.ResourceType
-		if len(args) == 1 {
-			typeStr := args[0]
-			switch typeStr {
-			case "command":
-				t := resource.Command
-				resourceType = &t
-			case "skill":
-				t := resource.Skill
-				resourceType = &t
-			case "agent":
-				t := resource.Agent
-				resourceType = &t
-			default:
-				return fmt.Errorf("invalid resource type: %s (must be 'command', 'skill', or 'agent')", typeStr)
-			}
-		}
-
-		// Create manager and list resources
+		// Create manager
 		manager, err := repo.NewManager()
 		if err != nil {
 			return err
 		}
 
-		resources, err := manager.List(resourceType)
-		if err != nil {
-			return fmt.Errorf("failed to list resources: %w", err)
+		var resources []resource.Resource
+
+		if len(args) == 0 {
+			// List all resources (no filter)
+			resources, err = manager.List(nil)
+			if err != nil {
+				return fmt.Errorf("failed to list resources: %w", err)
+			}
+		} else {
+			// Parse pattern
+			matcher, err := pattern.NewMatcher(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid pattern '%s': %w", args[0], err)
+			}
+
+			// Get resource type filter if pattern specifies it
+			resourceType, _, _ := pattern.ParsePattern(args[0])
+			var typeFilter *resource.ResourceType
+			if resourceType != "" {
+				typeFilter = &resourceType
+			}
+
+			// List resources with optional type filter
+			resources, err = manager.List(typeFilter)
+			if err != nil {
+				return fmt.Errorf("failed to list resources: %w", err)
+			}
+
+			// Apply pattern matching
+			var filtered []resource.Resource
+			for _, res := range resources {
+				if matcher.Match(&res) {
+					filtered = append(filtered, res)
+				}
+			}
+			resources = filtered
 		}
 
-		// Handle empty repository
+		// Handle empty results
 		if len(resources) == 0 {
-			if resourceType != nil {
-				fmt.Printf("No %s resources found in repository.\n", *resourceType)
-			} else {
+			if len(args) == 0 {
 				fmt.Println("No resources found in repository.")
+			} else {
+				fmt.Printf("No resources matching pattern '%s' found in repository.\n", args[0])
 			}
 			fmt.Println("\nAdd resources with: aimgr repo add command <file>, aimgr repo add skill <folder>, or aimgr repo add agent <file>")
 			return nil
