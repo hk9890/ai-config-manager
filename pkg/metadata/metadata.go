@@ -101,3 +101,85 @@ func GetMetadataPath(name string, resourceType resource.ResourceType, repoPath s
 
 	return filepath.Join(repoPath, ".metadata", typeDir, filename)
 }
+
+// SavePackageMetadata writes package metadata to a JSON file in the .metadata/packages/ directory.
+func SavePackageMetadata(metadata *PackageMetadata, repoPath string) error {
+	if metadata == nil {
+		return fmt.Errorf("metadata cannot be nil")
+	}
+
+	metadataPath := GetPackageMetadataPath(metadata.Name, repoPath)
+
+	// Create parent directory if it doesn't exist
+	dir := filepath.Dir(metadataPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create metadata directory: %w", err)
+	}
+
+	// Marshal to JSON with pretty printing
+	data, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(metadataPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write metadata file: %w", err)
+	}
+
+	return nil
+}
+
+// LoadPackageMetadata reads package metadata from a JSON file in the .metadata/packages/ directory.
+func LoadPackageMetadata(name, repoPath string) (*PackageMetadata, error) {
+	metadataPath := GetPackageMetadataPath(name, repoPath)
+
+	// Read file
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("metadata file not found: %s", metadataPath)
+		}
+		return nil, fmt.Errorf("failed to read metadata file: %w", err)
+	}
+
+	// Unmarshal JSON
+	var metadata PackageMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+	}
+
+	return &metadata, nil
+}
+
+// CreatePackageMetadata creates a new PackageMetadata with timestamps set.
+func CreatePackageMetadata(name, sourceType, sourceURL string, resourceCount int) *PackageMetadata {
+	now := time.Now()
+	return &PackageMetadata{
+		Name:          name,
+		SourceType:    sourceType,
+		SourceURL:     sourceURL,
+		FirstAdded:    now,
+		LastUpdated:   now,
+		ResourceCount: resourceCount,
+	}
+}
+
+// GetPackageMetadataPath returns the path to the metadata file for a package.
+// Pattern: <repoPath>/.metadata/packages/<name>-metadata.json
+func GetPackageMetadataPath(name, repoPath string) string {
+	filename := fmt.Sprintf("%s-metadata.json", name)
+	return filepath.Join(repoPath, ".metadata", "packages", filename)
+}
+
+// PackageMetadata tracks source information and timestamps for a package.
+type PackageMetadata struct {
+	Name           string    `json:"name"`
+	SourceType     string    `json:"source_type"`
+	SourceURL      string    `json:"source_url,omitempty"`
+	SourceRef      string    `json:"source_ref,omitempty"`
+	FirstAdded     time.Time `json:"first_added"`
+	LastUpdated    time.Time `json:"last_updated"`
+	ResourceCount  int       `json:"resource_count"`
+	OriginalFormat string    `json:"original_format,omitempty"`
+}
