@@ -116,6 +116,43 @@ All packages follow this JSON format:
   - Valid types: `command`, `skill`, `agent`
   - All resources must exist in the repository
 
+## Auto-Import Packages
+
+Packages are automatically discovered and imported when using `aimgr repo add` with folders or repositories:
+
+```bash
+# Import all resources including packages from a repository
+aimgr repo add gh:myorg/ai-resources
+
+# Import only packages using filters
+aimgr repo add gh:myorg/resources --filter "package/*"
+aimgr repo add ./my-resources/ --filter "package/*"
+
+# Import packages matching a pattern
+aimgr repo add gh:myorg/resources --filter "package/web-*"
+aimgr repo add ./resources/ --filter "package/*-tools"
+```
+
+**How Auto-Discovery Works:**
+
+Packages are discovered from `packages/*.package.json` files in:
+- Repository root (`packages/` directory)
+- Any subdirectory containing a `packages/` folder
+- Recursive search with common exclusions (node_modules, .git, etc.)
+
+**Example:**
+```bash
+# Discover and import all resources including packages
+aimgr repo add gh:myorg/ai-resources
+
+# Output:
+# Found: 5 commands, 3 skills, 2 agents, 2 packages
+# ✓ Added package 'web-dev-tools'
+# ✓ Added package 'testing-suite'
+# ✓ Added command 'build'
+# ...
+```
+
 ## Using These Examples
 
 ### Create Package from Example
@@ -176,7 +213,10 @@ aimgr repo remove package/web-dev-tools --with-resources
 ### Example Workflow
 
 ```bash
-# 1. Add resources to repository
+# 1. Add resources to repository (or use auto-import)
+aimgr repo add ~/my-resources/  # Auto-discovers all resources including packages
+
+# Or add resources individually
 aimgr repo add ~/my-commands/build.md
 aimgr repo add ~/my-skills/typescript-helper
 aimgr repo add ~/my-agents/reviewer.md
@@ -202,6 +242,8 @@ aimgr list
 4. **Version Resources**: Consider versioning resources if you create multiple package versions
 5. **Document Usage**: Add documentation for how to use the packaged resources together
 6. **Test Before Sharing**: Always test packages before sharing with your team
+7. **Use Auto-Import for Bulk Operations**: When adding many packages at once, use `aimgr repo add` with filters for efficiency
+8. **Organize Package Files**: Store packages in a `packages/` directory for automatic discovery
 
 ## See Also
 

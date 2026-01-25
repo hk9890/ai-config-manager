@@ -315,9 +315,21 @@ if matcher.MatchName("pdf-processing") {
 **Pattern Features:**
 - Supports standard glob operators: `*`, `?`, `[abc]`, `{a,b}`
 - Optional type prefix: `type/pattern` or just `pattern`
-- Type filtering: `skill/*` only matches skills
+- Type filtering: `skill/*` only matches skills, `package/*` only matches packages
 - Cross-type matching: `*test*` matches across all types
 - Exact matching: No wildcards = exact name match
+
+**Package Filtering Examples:**
+```go
+// Match all packages
+matcher, _ := pattern.NewMatcher("package/*")
+
+// Match specific package pattern
+matcher, _ := pattern.NewMatcher("package/web-*")
+
+// Match packages with "tools" in name
+matcher, _ := pattern.NewMatcher("package/*tools*")
+```
 
 ## Version Information
 Version is embedded at build time via ldflags in Makefile:
@@ -644,12 +656,249 @@ aimgr repo add ~/project/.claude
 # Filter specific resource types
 aimgr repo add ~/.opencode --filter "skill/*"
 aimgr repo add ~/project/.claude --filter "agent/*"
+aimgr repo add gh:owner/repo --filter "package/*"
 ```
 
 This imports:
 - Commands from `.opencode/commands/*.md` or `.claude/commands/*.md`
 - Skills from `.opencode/skills/*/SKILL.md` or `.claude/skills/*/SKILL.md`
 - Agents from `.opencode/agents/*.md` or `.claude/agents/*.md`
+- Packages from `packages/*.package.json`
+
+### Marketplace Format
+
+Claude plugin marketplaces are defined using a `marketplace.json` file that declares a collection of plugins. aimgr can import these marketplaces and automatically generate packages.
+
+#### File Structure
+
+Marketplace files are typically located at:
+- `.claude-plugin/marketplace.json` (Claude plugin convention)
+- Any custom location (specified during import)
+
+#### Marketplace JSON Format
+
+```json
+{
+  "name": "marketplace-name",
+  "version": "1.0.0",
+  "description": "Human-readable description of the marketplace",
+  "owner": {
+    "name": "Organization Name",
+    "email": "contact@example.com"
+  },
+  "plugins": [
+    {
+      "name": "plugin-name",
+      "description": "Plugin description",
+      "source": "./plugins/plugin-name",
+      "category": "development",
+      "version": "1.0.0",
+      "author": {
+        "name": "Author Name",
+        "email": "author@example.com"
+      }
+    }
+  ]
+}
+```
+
+**Required Fields:**
+
+Marketplace level:
+- **name** (string, required): Marketplace name
+- **description** (string, required): Marketplace description
+- **plugins** ([]Plugin, required): Array of plugin definitions
+
+Plugin level:
+- **name** (string, required): Plugin name (becomes package name)
+- **description** (string, required): Plugin description
+- **source** (string, required): Relative path to plugin resources
+
+**Optional Fields:**
+
+Marketplace level:
+- **version** (string): Marketplace version (semver)
+- **owner** (Author): Marketplace owner information
+
+Plugin level:
+- **category** (string): Plugin category (e.g., "development", "testing", "documentation")
+- **version** (string): Plugin version (semver)
+- **author** (Author): Plugin author information
+
+Author object:
+- **name** (string): Name
+- **email** (string): Email address
+
+#### Code Structure
+
+The marketplace format is represented by structs in `pkg/marketplace/parser.go`:
+
+```go
+type MarketplaceConfig struct {
+    Name        string   `json:"name"`
+    Version     string   `json:"version,omitempty"`
+    Description string   `json:"description"`
+    Owner       *Author  `json:"owner,omitempty"`
+    Plugins     []Plugin `json:"plugins"`
+}
+
+type Plugin struct {
+    Name        string  `json:"name"`
+    Description string  `json:"description"`
+    Source      string  `json:"source"`
+    Category    string  `json:"category,omitempty"`
+    Version     string  `json:"version,omitempty"`
+    Author      *Author `json:"author,omitempty"`
+}
+
+type Author struct {
+    Name  string `json:"name"`
+    Email string `json:"email,omitempty"`
+}
+```
+
+**Parsing:**
+```go
+import "github.com/hk9890/ai-config-manager/pkg/marketplace"
+
+// Parse marketplace file
+config, err := marketplace.ParseMarketplace("path/to/marketplace.json")
+if err != nil {
+    return err
+}
+
+// Access marketplace data
+fmt.Println("Marketplace:", config.Name)
+for _, plugin := range config.Plugins {
+    fmt.Printf("Plugin: %s (%s)\n", plugin.Name, plugin.Description)
+}
+```
+
+**Generating packages:**
+```go
+import "github.com/hk9890/ai-config-manager/pkg/marketplace"
+
+// Generate aimgr packages from marketplace
+basePath := "/path/to/marketplace/directory"
+packages, err := marketplace.GeneratePackages(config, basePath)
+if err != nil {
+    return err
+}
+
+// Each plugin becomes a package
+for _, pkg := range packages {
+    fmt.Printf("Package: %s (%d resources)\n", pkg.Name, len(pkg.Resources))
+}
+```
+
+#### Resource Discovery
+
+When importing a marketplace plugin, aimgr searches for resources in standard locations within the plugin's source directory:
+
+**Commands:**
+1. `commands/*.md`
+2. `.claude/commands/*.md`
+3. `.opencode/commands/*.md`
+
+**Skills:**
+1. `skills/*/SKILL.md`
+2. `.claude/skills/*/SKILL.md`
+3. `.opencode/skills/*/SKILL.md`
+
+**Agents:**
+1. `agents/*.md`
+2. `.claude/agents/*.md`
+3. `.opencode/agents/*.md`
+
+All discovered resources are imported into the repository and referenced in the generated package.
+
+#### Package Generation
+
+For each plugin in the marketplace:
+
+1. **Resource Discovery**: Scan plugin source directory for resources
+2. **Resource Import**: Copy resources to repository
+3. **Package Creation**: Create package JSON file
+4. **Metadata Tracking**: Save package metadata
+
+Generated package structure:
+```json
+{
+  "name": "plugin-name",
+  "description": "Plugin description from marketplace",
+  "resources": [
+    "command/build",
+    "skill/typescript-helper",
+    "agent/code-reviewer"
+  ]
+}
+```
+
+Package metadata structure:
+```json
+{
+  "name": "plugin-name",
+  "source_type": "marketplace",
+  "source_url": "file:///path/to/marketplace.json",
+  "first_added": "2026-01-25T12:00:00Z",
+  "last_updated": "2026-01-25T12:00:00Z",
+  "resource_count": 3,
+  "original_format": "claude-plugin"
+}
+```
+
+#### CLI Commands
+
+**Import marketplace:**
+```bash
+# Import from local path
+aimgr marketplace import ~/.claude-plugin/marketplace.json
+
+# Import from GitHub (requires gh CLI)
+aimgr marketplace import gh:owner/repo/.claude-plugin/marketplace.json
+
+# With options
+aimgr marketplace import marketplace.json --dry-run     # Preview
+aimgr marketplace import marketplace.json --force       # Overwrite
+aimgr marketplace import marketplace.json --filter "web-*"  # Filter plugins
+```
+
+**Import workflow:**
+1. Parse `marketplace.json`
+2. Filter plugins (if `--filter` specified)
+3. For each plugin:
+   - Discover resources in plugin source directory
+   - Import resources to repository
+   - Create package with resource references
+   - Save package metadata
+4. Display summary
+
+#### Testing
+
+Test files for marketplace functionality:
+- `pkg/marketplace/parser_test.go` - Marketplace parsing tests
+- `pkg/marketplace/generator_test.go` - Package generation tests
+
+**Example test:**
+```go
+func TestParseMarketplace(t *testing.T) {
+    config, err := marketplace.ParseMarketplace("testdata/marketplace.json")
+    if err != nil {
+        t.Fatalf("Failed to parse: %v", err)
+    }
+    
+    if config.Name != "expected-name" {
+        t.Errorf("Expected name %q, got %q", "expected-name", config.Name)
+    }
+}
+```
+
+#### Format Examples
+
+See [examples/marketplace/](examples/marketplace/) for complete examples:
+- `marketplace.json` - Full marketplace with multiple plugins
+- `minimal-marketplace.json` - Minimal required fields
+- `plugin-structure/` - Example plugin directory structure
 
 ## When Making Changes
 1. Run `make fmt` before committing

@@ -230,7 +230,7 @@ aimgr repo add ~/.claude/agents/code-reviewer.md
 
 #### Auto-Discovery from Folders and Repositories
 
-Auto-discover and add all resources (commands, skills, agents) from a folder or GitHub repository:
+Auto-discover and add all resources (commands, skills, agents, packages) from a folder or GitHub repository:
 
 ```bash
 # From local folders
@@ -252,11 +252,12 @@ aimgr repo add ./test/ --dry-run            # Preview without importing
 aimgr repo add gh:owner/repo --filter "skill/*"     # Only add skills
 aimgr repo add ./resources/ --filter "skill/pdf*"   # Skills starting with "pdf"
 aimgr repo add ~/.claude/ --filter "*test*"         # Resources with "test" in name
+aimgr repo add gh:owner/repo --filter "package/*"   # Only add packages
 
 # Example output:
 # Importing from: /home/user/.opencode
 # 
-# Found: 5 commands, 3 skills, 2 agents
+# Found: 5 commands, 3 skills, 2 agents, 1 package
 # 
 # ✓ Added command 'test-command'
 # ✓ Added command 'debug-helper'
@@ -264,15 +265,17 @@ aimgr repo add ~/.claude/ --filter "*test*"         # Resources with "test" in n
 # ✓ Added skill 'pdf-processing'
 # ...
 # ✓ Added agent 'code-reviewer'
+# ✓ Added package 'web-dev-tools'
 # 
-# Summary: 10 added, 0 skipped, 0 failed
+# Summary: 11 added, 0 skipped, 0 failed
 ```
 
 **How Auto-Discovery Works:**
 
-- Searches recursively in the folder for commands (*.md), skills (*/SKILL.md), and agents (*.md)
+- Searches recursively in the folder for commands (*.md), skills (*/SKILL.md), agents (*.md), and packages (*.package.json)
 - Automatically detects resource types and validates them
 - Handles Claude (`.claude/`), OpenCode (`.opencode/`), and GitHub Copilot (`.github/`) structures
+- Discovers packages from `packages/*.package.json` files
 - Skips common directories like `node_modules`, `.git`, etc.
 - Supports filtering with glob patterns via `--filter` flag
 
@@ -568,6 +571,10 @@ When adding resources from GitHub or Git URLs, `aimgr` automatically searches fo
 3. `.opencode/agents/`
 4. Recursive search for `.md` files with agent frontmatter
 
+**Packages** are searched in:
+1. `packages/` directory
+2. Recursive search for `*.package.json` files
+
 **Interactive Selection:**
 - If a single resource is found, it's added automatically
 - If multiple resources are found, you'll be prompted to select one
@@ -607,6 +614,9 @@ aimgr repo add ./resources/ --filter "*test*"
 
 # Add commands and agents only (no skills)
 aimgr repo add ~/.opencode/ --filter "command/*" --filter "agent/*"
+
+# Add only packages from a repository
+aimgr repo add gh:owner/repo --filter "package/*"
 ```
 
 **Installing resources with patterns:**
@@ -724,7 +734,7 @@ aimgr repo add <source> --dry-run                     # Preview without importin
 - `owner/repo` - Shorthand for GitHub (infers `gh:` prefix)
 
 **Pattern Filtering:**
-- `--filter "type/*"` - Match specific resource type (skill/*, command/*, agent/*)
+- `--filter "type/*"` - Match specific resource type (skill/*, command/*, agent/*, package/*)
 - `--filter "pattern"` - Match resources by name pattern
 - `--filter "*test*"` - Match any resource with "test" in name
 
@@ -1504,6 +1514,215 @@ aimgr install package/test-tools
 aimgr repo create-package docs-tools \
   --description="Documentation toolkit" \
   --resources="skill/markdown-formatter,agent/doc-writer,command/doc-gen"
+```
+
+## Marketplace Import
+
+Import entire Claude plugin marketplaces to quickly bootstrap your repository with curated collections of resources. Each plugin in the marketplace becomes an aimgr package containing all discovered resources.
+
+### What is Marketplace Import?
+
+Claude plugin marketplaces use a `marketplace.json` file to define collections of plugins with commands, skills, and agents. The marketplace import feature:
+
+- **Parses** Claude marketplace.json files
+- **Discovers** resources in each plugin's source directory
+- **Creates** aimgr packages for each plugin
+- **Imports** all resources into your repository
+- **Tracks** metadata for future updates
+
+This makes it easy to import entire plugin ecosystems in one command.
+
+### Basic Usage
+
+```bash
+# Import from local marketplace
+aimgr marketplace import ~/.claude-plugin/marketplace.json
+
+# Import from GitHub (requires gh CLI)
+aimgr marketplace import gh:anthropics/claude-code/.claude-plugin/marketplace.json
+
+# Preview without importing
+aimgr marketplace import <path> --dry-run
+```
+
+### Command Options
+
+**Flags:**
+- `--dry-run`: Preview what would be imported without making changes
+- `--force, -f`: Overwrite existing packages and resources
+- `--filter <pattern>`: Import only plugins matching the glob pattern
+- `--source-url <url>`: Override source URL for metadata tracking
+
+**Examples:**
+
+```bash
+# Import specific plugins only
+aimgr marketplace import marketplace.json --filter "code-*"
+
+# Force overwrite existing packages
+aimgr marketplace import marketplace.json --force
+
+# Specify source URL for metadata
+aimgr marketplace import ./marketplace.json \
+  --source-url "gh:myorg/plugins"
+```
+
+### How It Works
+
+When you import a marketplace:
+
+1. **Parse**: Reads the marketplace.json file
+2. **Filter**: Applies optional pattern filters to select specific plugins
+3. **Discover**: For each plugin, searches for resources in standard locations:
+   - Commands: `commands/*.md`, `.claude/commands/*.md`
+   - Skills: `skills/*/SKILL.md`, `.claude/skills/*/SKILL.md`
+   - Agents: `agents/*.md`, `.claude/agents/*.md`
+4. **Import**: Copies all discovered resources into your repository
+5. **Package**: Creates an aimgr package for each plugin
+6. **Track**: Saves metadata for future updates
+
+### Marketplace Format
+
+A Claude marketplace.json file has this structure:
+
+```json
+{
+  "name": "my-marketplace",
+  "version": "1.0.0",
+  "description": "Collection of useful plugins",
+  "owner": {
+    "name": "Organization Name",
+    "email": "contact@example.com"
+  },
+  "plugins": [
+    {
+      "name": "web-dev-tools",
+      "description": "Web development toolkit",
+      "source": "./plugins/web-dev-tools",
+      "category": "development",
+      "version": "1.0.0",
+      "author": {
+        "name": "Developer Name",
+        "email": "dev@example.com"
+      }
+    },
+    {
+      "name": "testing-suite",
+      "description": "Complete testing toolkit",
+      "source": "./plugins/testing-suite",
+      "category": "testing"
+    }
+  ]
+}
+```
+
+**Required fields:**
+- `name`: Marketplace name
+- `description`: Marketplace description
+- `plugins`: Array of plugin definitions
+
+**Plugin fields:**
+- `name` (required): Plugin name (becomes package name)
+- `description` (required): Plugin description
+- `source` (required): Relative path to plugin resources
+- `category` (optional): Plugin category
+- `version` (optional): Plugin version
+- `author` (optional): Plugin author info
+
+See [examples/marketplace/](examples/marketplace/) for complete examples.
+
+### Use Cases
+
+**1. Organization Plugin Distribution:**
+```bash
+# Create marketplace for your organization's plugins
+# Distribute marketplace.json to team members
+# They import with one command:
+aimgr marketplace import gh:myorg/plugins/.claude-plugin/marketplace.json
+
+# All plugins become packages they can install:
+aimgr install package/web-dev-tools
+aimgr install package/testing-suite
+```
+
+**2. Public Plugin Collections:**
+```bash
+# Import community plugin collections
+aimgr marketplace import gh:community/awesome-claude-plugins/marketplace.json
+
+# Browse imported packages
+aimgr repo list package
+
+# Install what you need
+aimgr install package/pdf-tools package/git-helpers
+```
+
+**3. Project Bootstrapping:**
+```bash
+# Create project-specific marketplace
+# Import during project setup
+aimgr marketplace import ./project-plugins/marketplace.json
+
+# All project resources available immediately
+aimgr install package/backend-tools package/frontend-tools
+```
+
+### Metadata and Updates
+
+Imported packages and resources are tracked with metadata:
+
+```bash
+# View package metadata
+aimgr repo show package/web-dev-tools
+
+# Update all marketplace-imported resources
+aimgr repo update
+
+# Update specific package resources
+aimgr repo update skill/typescript-helper
+```
+
+Metadata includes:
+- Source URL (marketplace location)
+- Original format (claude-plugin)
+- Import timestamp
+- Resource count
+
+### Package Management After Import
+
+After importing, packages work like regular aimgr packages:
+
+```bash
+# Install marketplace package
+aimgr install package/web-dev-tools
+
+# List packages
+aimgr repo list package
+
+# Remove package (keeps resources)
+aimgr repo remove package/web-dev-tools
+
+# Remove package and resources
+aimgr repo remove package/web-dev-tools --with-resources
+
+# Uninstall from project
+aimgr uninstall package/web-dev-tools
+```
+
+### Pattern Filtering
+
+Use glob patterns to import specific plugins:
+
+```bash
+# Import only web-related plugins
+aimgr marketplace import marketplace.json --filter "web-*"
+
+# Import testing plugins
+aimgr marketplace import marketplace.json --filter "*-test"
+
+# Import multiple patterns (run multiple commands)
+aimgr marketplace import marketplace.json --filter "code-*"
+aimgr marketplace import marketplace.json --filter "dev-*"
 ```
 
 ## Commands
