@@ -8,6 +8,8 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 - 🔗 **Symlink-based Installation**: Install resources in projects without duplication
 - 🤖 **Multi-Tool Support**: Works with Claude Code, OpenCode, and GitHub Copilot
 - 🤖 **Agent Support**: Manage AI agents with specialized roles and capabilities
+- ⚡ **Workspace Caching**: Git repositories cached for 10-50x faster subsequent updates
+- 🧹 **Cache Management**: `repo prune` command to clean up unused Git caches
 - ✅ **Format Validation**: Automatic validation of command, skill, and agent formats
 - 🎯 **Type Safety**: Strong validation following agentskills.io and Claude Code specifications
 - 🗂️ **Organized Storage**: Clean separation between commands, skills, and agents
@@ -1091,14 +1093,22 @@ aimgr repo update --dry-run
 aimgr repo update --force
 ```
 
+**Workspace Caching:**
+Git repositories are cached in `.workspace/` for efficient reuse:
+- **First update**: Full git clone (creates cache)
+- **Subsequent updates**: Git pull only (10-50x faster)
+- Caches automatically shared across resources from the same source
+- Dramatically improves performance for bulk updates
+
 **How it works:**
 1. Reads source information from resource metadata (stored in `.metadata/` directory)
 2. Fetches latest version from original source (GitHub, local path, etc.)
-3. Updates the repository copy
-4. Preserves existing symlinks to projects
+3. Uses cached Git repository if available (much faster)
+4. Updates the repository copy
+5. Preserves existing symlinks to projects
 
 **Supported sources:**
-- **GitHub**: Re-clones and updates from repository
+- **GitHub**: Uses workspace cache for fast updates
 - **Local**: Copies latest version from local path
 - **File**: Re-copies from original file location
 
@@ -1112,6 +1122,44 @@ Resources added from GitHub or other sources automatically store metadata includ
 **Flags:**
 - `--dry-run`: Preview what would be updated without making changes
 - `--force`: Force update even if local changes detected
+
+### `aimgr repo prune`
+
+Remove unreferenced Git repository caches from `.workspace/` to free disk space.
+
+```bash
+# Remove unreferenced caches (with confirmation)
+aimgr repo prune
+
+# Preview what would be removed
+aimgr repo prune --dry-run
+
+# Force remove without confirmation
+aimgr repo prune --force
+```
+
+**What gets pruned:**
+- Git repository caches in `.workspace/` not used by any current resources
+- Cached repositories from removed or outdated resources
+- Orphaned caches from failed operations
+
+**What is NOT pruned:**
+- Caches referenced by currently installed resources
+- Local file sources (not cached in `.workspace/`)
+- Resource files themselves (only Git caches are removed)
+
+**When to run prune:**
+- After removing many resources from the repository
+- When `.workspace/` directory grows too large
+- As periodic maintenance to reclaim disk space
+- After changing Git source URLs for resources
+
+**Output:**
+Shows detailed list of unreferenced caches with sizes before removal.
+
+**Flags:**
+- `--dry-run`: Preview what would be removed without removing
+- `--force`: Skip confirmation prompt
 
 ## Resource Formats
 

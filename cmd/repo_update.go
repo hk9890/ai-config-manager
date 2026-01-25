@@ -44,6 +44,13 @@ var repoUpdateCmd = &cobra.Command{
 Updates can refresh resources from GitHub repositories, local paths, or file sources.
 The source information is retrieved from the resource metadata.
 
+Workspace Caching: Git repositories are cached in .workspace/ for faster subsequent
+updates. The first update clones the full repository, while subsequent updates only
+pull changes. This dramatically improves performance:
+  - First update: Full git clone (slower)
+  - Subsequent updates: Git pull only (10-50x faster)
+  - Cached repos are reused across all resources from the same source
+
 Performance: Resources from the same Git repository are batched together for efficient
 updates. This means a single git clone operation is shared across multiple resources
 from the same source, significantly improving update speed for bulk operations.

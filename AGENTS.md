@@ -225,10 +225,48 @@ opts := repo.BulkImportOptions{
 result, err := mgr.AddBulk(paths, opts)
 ```
 
+**Workspace Caching**: Git repositories are cached in `.workspace/` directory for
+efficient reuse across updates:
+- First update: Full git clone (creates cache)
+- Subsequent updates: Git pull only (10-50x faster)
+- Automatic cache management with SHA256 hash-based storage
+- Shared across all resources from the same source repository
+
 **Update Performance**: The `repo update` command automatically batches resources from
 the same Git repository, cloning each unique source only once. This optimization
 significantly improves update speed for bulk operations (e.g., 39 resources from one
 repository = 1 clone instead of 39).
+
+**Workspace Directory Structure**:
+```
+~/.local/share/ai-config/repo/
+├── .workspace/                   # Git repository cache
+│   ├── <hash-1>/                 # Cached repository 1 (by URL hash)
+│   │   ├── .git/
+│   │   ├── commands/
+│   │   └── skills/
+│   ├── <hash-2>/                 # Cached repository 2
+│   │   └── ...
+│   └── .cache-metadata.json      # Cache metadata (URLs, timestamps, refs)
+├── .metadata/                    # Resource metadata
+├── commands/                     # Command resources
+├── skills/                       # Skill resources
+└── agents/                       # Agent resources
+```
+
+**Cache Management**:
+```bash
+# Remove unreferenced caches to free disk space
+aimgr repo prune
+
+# Preview what would be removed
+aimgr repo prune --dry-run
+
+# Force remove without confirmation
+aimgr repo prune --force
+```
+
+Run `repo prune` after removing many resources or when `.workspace/` grows too large.
 
 ### Tool Detection
 ```go

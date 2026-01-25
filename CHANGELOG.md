@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.6.0] - 2026-01-25
 
 ### Added
+- **Workspace caching for Git repositories**
+  - Git repositories are now cached in `.workspace/` directory for reuse across updates
+  - First update clones the full repository, subsequent updates only pull changes
+  - Dramatically improves update performance: subsequent updates 10-50x faster
+  - Caches are automatically managed and shared across resources from the same source
+  - Each repository is stored by SHA256 hash of normalized URL for collision-free storage
+  - Cache metadata tracked in `.cache-metadata.json` for quick lookups
+- **`aimgr repo prune` command**
+  - Removes Git repository caches from `.workspace/` that are no longer referenced
+  - Frees disk space from outdated or unused Git clones
+  - Shows detailed list of caches to be removed with sizes
+  - Interactive confirmation with `--force` and `--dry-run` options
+  - Run after removing many resources to reclaim disk space
 - **Progress output for `repo update` command**
   - Shows total resource count at start (e.g., "Updating 15 resources...")
   - Displays `[N/M]` counter for each resource being updated

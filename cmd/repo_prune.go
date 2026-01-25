@@ -32,9 +32,28 @@ var repoPruneCmd = &cobra.Command{
 	Short: "Remove unreferenced workspace caches",
 	Long: `Remove Git repositories from .workspace/ that are not referenced by any installed resources.
 
-This command scans all resource metadata to find Git sources currently in use,
-then removes any cached repositories in .workspace/ that are no longer referenced.
-This helps free up disk space from outdated or unused Git clones.
+What gets pruned:
+  - Git repository clones in .workspace/ that are not used by any current resources
+  - Cached repositories from removed or outdated resources
+  - Orphaned caches from failed operations
+
+What is NOT pruned:
+  - Caches referenced by currently installed resources
+  - Local file sources (not cached in .workspace/)
+  - Resource files themselves (only Git caches are removed)
+
+When to run prune:
+  - After removing many resources from the repository
+  - When .workspace/ directory grows too large
+  - As periodic maintenance to reclaim disk space
+  - After changing Git source URLs for resources
+
+How it works:
+  1. Scans all resource metadata to build list of referenced Git URLs
+  2. Compares against cached repositories in .workspace/
+  3. Identifies unreferenced caches (not used by any resource)
+  4. Removes unreferenced caches and frees disk space
+  5. Updates cache metadata (.cache-metadata.json)
 
 Examples:
   aimgr repo prune                # Scan and remove unreferenced caches (with confirmation)
