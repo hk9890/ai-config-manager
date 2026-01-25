@@ -6,6 +6,7 @@
 //   - Uninstalling package resources
 //   - Handling missing resources gracefully
 //   - Managing shared resources between packages
+//   - Removing packages with and without the --with-resources flag
 //   - Testing CLI commands for package operations
 //   - Testing force reinstall scenarios
 package test
@@ -806,4 +807,183 @@ description: A command for force reinstall testing
 	if newLink != origLink {
 		t.Errorf("Link changed after force reinstall: got %s, want %s", newLink, origLink)
 	}
+}
+
+// TestPackageRemovalWithResources tests removing a package with the --with-resources flag
+func TestPackageRemovalWithResources(t *testing.T) {
+	tests := []struct {
+		name              string
+		withResources     bool
+		wantPackageGone   bool
+		wantResourcesGone bool
+	}{
+		{
+			name:              "remove package only (keep resources)",
+			withResources:     false,
+			wantPackageGone:   true,
+			wantResourcesGone: false,
+		},
+		{
+			name:              "remove package with resources",
+			withResources:     true,
+			wantPackageGone:   true,
+			wantResourcesGone: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoDir := t.TempDir()
+
+			// Create manager
+			manager := repo.NewManagerWithPath(repoDir)
+			if err := manager.Init(); err != nil {
+				t.Fatalf("Failed to initialize repo: %v", err)
+			}
+
+			// Create test resources
+			testDir := t.TempDir()
+
+			// Create command
+			cmdPath := filepath.Join(testDir, "pkg-remove-cmd.md")
+			cmdContent := `---
+description: Command for package removal testing
+---
+# Package Removal Command
+`
+			if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+				t.Fatalf("Failed to create test command: %v", err)
+			}
+			if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
+				t.Fatalf("Failed to add command: %v", err)
+			}
+
+			// Create skill
+			skillDir := filepath.Join(testDir, "pkg-remove-skill")
+			if err := os.MkdirAll(filepath.Join(skillDir, "scripts"), 0755); err != nil {
+				t.Fatalf("Failed to create skill directory: %v", err)
+			}
+			skillMdPath := filepath.Join(skillDir, "SKILL.md")
+			skillContent := `---
+name: pkg-remove-skill
+description: Skill for package removal testing
+---
+# Package Removal Skill
+`
+			if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
+				t.Fatalf("Failed to create SKILL.md: %v", err)
+			}
+			if err := manager.AddSkill(skillDir, "file://"+skillDir, "file"); err != nil {
+				t.Fatalf("Failed to add skill: %v", err)
+			}
+
+			// Create agent
+			agentPath := filepath.Join(testDir, "pkg-remove-agent.md")
+			agentContent := `---
+description: Agent for package removal testing
+---
+# Package Removal Agent
+`
+			if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
+				t.Fatalf("Failed to create test agent: %v", err)
+			}
+			if err := manager.AddAgent(agentPath, "file://"+agentPath, "file"); err != nil {
+				t.Fatalf("Failed to add agent: %v", err)
+			}
+
+			// Create package
+			pkg := &resource.Package{
+				Name:        "removal-test-pkg",
+				Description: "Package for removal testing",
+				Resources: []string{
+					"command/pkg-remove-cmd",
+					"skill/pkg-remove-skill",
+					"agent/pkg-remove-agent",
+				},
+			}
+			if err := resource.SavePackage(pkg, repoDir); err != nil {
+				t.Fatalf("Failed to save package: %v", err)
+			}
+
+			// Verify package and resources exist before removal
+			pkgPath := resource.GetPackagePath("removal-test-pkg", repoDir)
+			if _, err := os.Stat(pkgPath); os.IsNotExist(err) {
+				t.Fatalf("Package file was not created")
+			}
+
+			cmdRepoPath := filepath.Join(repoDir, "commands", "pkg-remove-cmd.md")
+			skillRepoPath := filepath.Join(repoDir, "skills", "pkg-remove-skill")
+			agentRepoPath := filepath.Join(repoDir, "agents", "pkg-remove-agent.md")
+
+			if _, err := os.Stat(cmdRepoPath); os.IsNotExist(err) {
+				t.Fatalf("Command not in repo: %v", err)
+			}
+			if _, err := os.Stat(skillRepoPath); os.IsNotExist(err) {
+				t.Fatalf("Skill not in repo: %v", err)
+			}
+			if _, err := os.Stat(agentRepoPath); os.IsNotExist(err) {
+				t.Fatalf("Agent not in repo: %v", err)
+			}
+
+			// Remove package
+			t.Logf("Removing package (withResources=%v)", tt.withResources)
+			if tt.withResources {
+				// Remove package and its resources
+				for _, ref := range pkg.Resources {
+					resType, resName, err := resource.ParseResourceReference(ref)
+					if err != nil {
+						t.Fatalf("Failed to parse resource reference %s: %v", ref, err)
+					}
+					if err := manager.Remove(resName, resType); err != nil {
+						t.Fatalf("Failed to remove resource %s: %v", ref, err)
+					}
+				}
+			}
+
+			// Remove package file
+			if err := os.Remove(pkgPath); err != nil {
+				t.Fatalf("Failed to remove package file: %v", err)
+			}
+
+			// Verify package is gone
+			if _, err := os.Stat(pkgPath); !os.IsNotExist(err) {
+				t.Errorf("Package file still exists after removal")
+			}
+
+			// Verify resources state based on withResources flag
+			cmdExists := fileExists(cmdRepoPath)
+			skillExists := fileExists(skillRepoPath)
+			agentExists := fileExists(agentRepoPath)
+
+			if tt.wantResourcesGone {
+				// Resources should be removed
+				if cmdExists {
+					t.Errorf("Command still exists in repo (should be removed)")
+				}
+				if skillExists {
+					t.Errorf("Skill still exists in repo (should be removed)")
+				}
+				if agentExists {
+					t.Errorf("Agent still exists in repo (should be removed)")
+				}
+			} else {
+				// Resources should remain
+				if !cmdExists {
+					t.Errorf("Command removed from repo (should remain)")
+				}
+				if !skillExists {
+					t.Errorf("Skill removed from repo (should remain)")
+				}
+				if !agentExists {
+					t.Errorf("Agent removed from repo (should remain)")
+				}
+			}
+		})
+	}
+}
+
+// fileExists is a helper to check if a file or directory exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
