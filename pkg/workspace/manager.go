@@ -291,18 +291,66 @@ func (m *Manager) GetOrClone(url string, ref string) (string, error) {
 //   - Ref doesn't exist: error returned
 //   - Uncommitted changes: stashed before update, restored after
 func (m *Manager) Update(url string, ref string) error {
-	// TODO: Implement Update
-	// 1. Normalize URL
-	// 2. Compute cache hash
-	// 3. Verify cache exists
-	// 4. Check for uncommitted changes
-	// 5. Stash changes if present
-	// 6. Fetch from remote
-	// 7. Checkout ref
-	// 8. Pull if branch, otherwise just checkout
-	// 9. Restore stashed changes if any
-	// 10. Update metadata
-	return fmt.Errorf("not implemented")
+	// Validate inputs
+	if url == "" {
+		return fmt.Errorf("url cannot be empty")
+	}
+	if ref == "" {
+		return fmt.Errorf("ref cannot be empty")
+	}
+
+	// Get cache path
+	cachePath := m.getCachePath(url)
+
+	// Verify cache exists
+	if !m.isValidCache(cachePath) {
+		return fmt.Errorf("cache does not exist for URL: %s (use GetOrClone first)", url)
+	}
+
+	// Check for uncommitted changes
+	hasChanges, err := m.hasUncommittedChanges(cachePath)
+	if err != nil {
+		return fmt.Errorf("failed to check for uncommitted changes: %w", err)
+	}
+
+	// Stash changes if present
+	stashed := false
+	if hasChanges {
+		if err := m.stashChanges(cachePath); err != nil {
+			return fmt.Errorf("failed to stash uncommitted changes: %w", err)
+		}
+		stashed = true
+	}
+
+	// Fetch latest refs from remote
+	if err := m.fetchRepo(cachePath); err != nil {
+		return fmt.Errorf("failed to fetch from remote: %w", err)
+	}
+
+	// Reset to origin state to handle conflicts
+	// This ensures a clean update by discarding local commits
+	if err := m.resetToOrigin(cachePath, ref); err != nil {
+		// If reset fails, try just checking out
+		if checkoutErr := m.checkoutRef(cachePath, ref); checkoutErr != nil {
+			return fmt.Errorf("failed to update ref: reset failed (%v), checkout failed (%v)", err, checkoutErr)
+		}
+	}
+
+	// Restore stashed changes if any
+	if stashed {
+		if err := m.popStash(cachePath); err != nil {
+			// Log warning but don't fail - the update itself succeeded
+			fmt.Fprintf(os.Stderr, "warning: failed to restore stashed changes: %v\n", err)
+		}
+	}
+
+	// Update metadata
+	if err := m.updateMetadataEntry(url, ref, "update"); err != nil {
+		// Log warning but don't fail - metadata is optional
+		fmt.Fprintf(os.Stderr, "warning: failed to update metadata: %v\n", err)
+	}
+
+	return nil
 }
 
 // ListCached returns all cached repository URLs.
@@ -560,5 +608,63 @@ func (m *Manager) fetchRepo(cachePath string) error {
 	if err != nil {
 		return fmt.Errorf("git fetch failed: %w\nOutput: %s", err, string(output))
 	}
+	return nil
+}
+
+// hasUncommittedChanges checks if the repository has uncommitted changes.
+func (m *Manager) hasUncommittedChanges(cachePath string) (bool, error) {
+	cmd := exec.Command("git", "-C", cachePath, "status", "--porcelain")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("git status failed: %w\nOutput: %s", err, string(output))
+	}
+	// If output is non-empty, there are uncommitted changes
+	return len(strings.TrimSpace(string(output))) > 0, nil
+}
+
+// stashChanges stashes uncommitted changes in the repository.
+func (m *Manager) stashChanges(cachePath string) error {
+	cmd := exec.Command("git", "-C", cachePath, "stash", "push", "-m", "workspace cache auto-stash")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git stash failed: %w\nOutput: %s", err, string(output))
+	}
+	return nil
+}
+
+// popStash restores stashed changes in the repository.
+func (m *Manager) popStash(cachePath string) error {
+	cmd := exec.Command("git", "-C", cachePath, "stash", "pop")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git stash pop failed: %w\nOutput: %s", err, string(output))
+	}
+	return nil
+}
+
+// resetToOrigin resets the repository to the origin state for the specified ref.
+// This handles both branches and tags/commits.
+func (m *Manager) resetToOrigin(cachePath string, ref string) error {
+	// First, try to determine if this is a branch by checking remote branches
+	checkBranchCmd := exec.Command("git", "-C", cachePath, "show-ref", "--verify", "--quiet", fmt.Sprintf("refs/remotes/origin/%s", ref))
+	isBranch := checkBranchCmd.Run() == nil
+
+	if isBranch {
+		// For branches, checkout and reset to origin
+		if err := m.checkoutRef(cachePath, ref); err != nil {
+			return err
+		}
+		cmd := exec.Command("git", "-C", cachePath, "reset", "--hard", fmt.Sprintf("origin/%s", ref))
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git reset failed: %w\nOutput: %s", err, string(output))
+		}
+	} else {
+		// For tags/commits, just checkout
+		if err := m.checkoutRef(cachePath, ref); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

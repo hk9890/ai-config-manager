@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -440,5 +441,120 @@ func TestGetOrClone_EmptyInputs(t *testing.T) {
 				t.Errorf("GetOrClone() error = %v; wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// TestUpdate_EmptyInputs tests error handling for empty inputs
+func TestUpdate_EmptyInputs(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr, _ := NewManager(tmpDir)
+
+	tests := []struct {
+		name    string
+		url     string
+		ref     string
+		wantErr bool
+	}{
+		{
+			name:    "empty URL",
+			url:     "",
+			ref:     "main",
+			wantErr: true,
+		},
+		{
+			name:    "empty ref",
+			url:     "https://github.com/test/repo",
+			ref:     "",
+			wantErr: true,
+		},
+		{
+			name:    "both empty",
+			url:     "",
+			ref:     "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := mgr.Update(tt.url, tt.ref)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Update() error = %v; wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestUpdate_CacheNotExists tests error when cache doesn't exist
+func TestUpdate_CacheNotExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr, _ := NewManager(tmpDir)
+	mgr.Init()
+
+	// Try to update a repo that was never cloned
+	err := mgr.Update("https://github.com/test/repo", "main")
+	if err == nil {
+		t.Errorf("Update should fail when cache doesn't exist")
+	}
+
+	// Error should mention using GetOrClone first
+	if !strings.Contains(err.Error(), "GetOrClone") {
+		t.Errorf("Error should suggest using GetOrClone first, got: %v", err)
+	}
+}
+
+// TestUpdate_Integration tests Update with a real Git repository
+// This test requires network access and git to be installed
+func TestUpdate_Integration(t *testing.T) {
+	// Skip in short mode or if git is not available
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	// Check if git is available
+	if err := exec.Command("git", "--version").Run(); err != nil {
+		t.Skip("git not available, skipping integration test")
+	}
+
+	tmpDir := t.TempDir()
+	mgr, err := NewManager(tmpDir)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Use a small, stable public repository for testing
+	testURL := "https://github.com/hk9890/ai-config-manager-test-repo"
+	testRef := "main"
+
+	// First clone the repo
+	cachePath, err := mgr.GetOrClone(testURL, testRef)
+	if err != nil {
+		t.Skipf("GetOrClone failed (test repo may not exist): %v", err)
+	}
+
+	// Now update it
+	if err := mgr.Update(testURL, testRef); err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	// Verify cache still exists and is valid
+	if !mgr.isValidCache(cachePath) {
+		t.Errorf("cache is not valid after update: %s", cachePath)
+	}
+
+	// Verify metadata was updated
+	metadata, err := mgr.loadMetadata()
+	if err != nil {
+		t.Fatalf("loadMetadata failed: %v", err)
+	}
+
+	hash := computeHash(testURL)
+	entry, exists := metadata.Caches[hash]
+	if !exists {
+		t.Errorf("metadata entry not found after update")
+	}
+
+	if entry.LastUpdated.IsZero() {
+		t.Errorf("metadata LastUpdated not set")
 	}
 }
