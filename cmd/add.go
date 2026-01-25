@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/discovery"
+	"github.com/hk9890/ai-config-manager/pkg/marketplace"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -31,7 +32,8 @@ var addCmd = &cobra.Command{
 	Long: `Add resources to the aimgr repository.
 
 This command auto-discovers and imports all resources (commands, skills, agents, packages)
-from the specified source location.
+from the specified source location. It also automatically detects and imports marketplace.json
+files if present.
 
 Source Formats:
   Local folders:
@@ -49,6 +51,7 @@ Commands are single .md files with YAML frontmatter.
 Skills are directories containing a SKILL.md file.
 Agents are single .md files with YAML frontmatter.
 Packages are .package.json files in the packages/ directory.
+Marketplace files (marketplace.json) are automatically discovered and converted to packages.
 
 Examples:
   # Add all resources from local folder
@@ -393,10 +396,16 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		return fmt.Errorf("failed to discover packages: %w", err)
 	}
 
+	// Discover marketplace.json
+	marketplaceConfig, marketplacePath, err := marketplace.DiscoverMarketplace(localPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to parse marketplace: %w", err)
+	}
+
 	// Check if any resources found
 	totalResources := len(commands) + len(skills) + len(agents) + len(packages)
-	if totalResources == 0 {
-		return fmt.Errorf("no resources found in: %s\nExpected commands (*.md), skills (*/SKILL.md), agents (*.md), or packages (*.package.json)", localPath)
+	if totalResources == 0 && marketplaceConfig == nil {
+		return fmt.Errorf("no resources found in: %s\nExpected commands (*.md), skills (*/SKILL.md), agents (*.md), packages (*.package.json), or marketplace.json", localPath)
 	}
 
 	// Print header
@@ -434,14 +443,39 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		// Show filtered counts
 		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages", origCommandCount, origSkillCount, origAgentCount, origPackageCount)
 		if filteredTotal < totalResources {
-			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filter)
+			fmt.Printf(" (filtered to %d matching '%s')\n", filteredTotal, filter)
 		} else {
-			fmt.Println()
 			fmt.Println()
 		}
 	} else {
-		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n\n", len(commands), len(skills), len(agents), len(packages))
+		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n", len(commands), len(skills), len(agents), len(packages))
 	}
+
+	// Display marketplace info if found
+	var marketplacePackages []*marketplace.PackageInfo
+	if marketplaceConfig != nil {
+		relPath := strings.TrimPrefix(marketplacePath, absPath)
+		if relPath == "" {
+			relPath = "marketplace.json"
+		} else {
+			relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
+		}
+		fmt.Printf("Found marketplace: %s (%d plugins)\n", relPath, len(marketplaceConfig.Plugins))
+
+		// Generate packages from marketplace
+		fmt.Println("\nGenerating packages from marketplace:")
+		basePath := filepath.Dir(marketplacePath)
+		marketplacePackages, err = marketplace.GeneratePackages(marketplaceConfig, basePath)
+		if err != nil {
+			return fmt.Errorf("failed to generate packages from marketplace: %w", err)
+		}
+
+		for _, pkgInfo := range marketplacePackages {
+			fmt.Printf("  ✓ %s (%d resources)\n", pkgInfo.Package.Name, len(pkgInfo.Package.Resources))
+		}
+	}
+
+	fmt.Println()
 
 	// Collect all resource paths
 	var allPaths []string
@@ -478,6 +512,23 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		}
 	}
 
+	// Add resources from marketplace-generated packages
+	for _, pkgInfo := range marketplacePackages {
+		// Import resources for this package
+		for _, resRef := range pkgInfo.Package.Resources {
+			resType, resName, err := resource.ParseResourceReference(resRef)
+			if err != nil {
+				continue // Skip invalid references
+			}
+
+			// Find the resource file in the plugin source directory
+			resPath, err := findResourceInPath(pkgInfo.SourcePath, resType, resName)
+			if err == nil {
+				allPaths = append(allPaths, resPath)
+			}
+		}
+	}
+
 	// Import using bulk add
 	opts := repo.BulkImportOptions{
 		Force:        forceFlag,
@@ -490,6 +541,17 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		// Print partial results before error
 		printImportResults(result)
 		return err
+	}
+
+	// Save marketplace-generated packages if not in dry-run mode
+	if !dryRunFlag {
+		for _, pkgInfo := range marketplacePackages {
+			// Save package to repository
+			if err := resource.SavePackage(pkgInfo.Package, manager.GetRepoPath()); err != nil {
+				fmt.Printf("⚠ Warning: Failed to save package %s: %v\n", pkgInfo.Package.Name, err)
+				continue
+			}
+		}
 	}
 
 	// Print results
@@ -544,10 +606,16 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		return fmt.Errorf("failed to discover packages: %w", err)
 	}
 
+	// Discover marketplace.json
+	marketplaceConfig, marketplacePath, err := marketplace.DiscoverMarketplace(searchPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to parse marketplace: %w", err)
+	}
+
 	// Check if any resources found
 	totalResources := len(commands) + len(skills) + len(agents) + len(packages)
-	if totalResources == 0 {
-		return fmt.Errorf("no resources found in repository: %s", parsed.URL)
+	if totalResources == 0 && marketplaceConfig == nil {
+		return fmt.Errorf("no resources found in repository: %s\nExpected commands (*.md), skills (*/SKILL.md), agents (*.md), packages (*.package.json), or marketplace.json", parsed.URL)
 	}
 
 	// Print header
@@ -590,14 +658,39 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		// Show filtered counts
 		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages", origCommandCount, origSkillCount, origAgentCount, origPackageCount)
 		if filteredTotal < totalResources {
-			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filter)
+			fmt.Printf(" (filtered to %d matching '%s')\n", filteredTotal, filter)
 		} else {
-			fmt.Println()
 			fmt.Println()
 		}
 	} else {
-		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n\n", len(commands), len(skills), len(agents), len(packages))
+		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n", len(commands), len(skills), len(agents), len(packages))
 	}
+
+	// Display marketplace info if found
+	var marketplacePackages []*marketplace.PackageInfo
+	if marketplaceConfig != nil {
+		relPath := strings.TrimPrefix(marketplacePath, searchPath)
+		if relPath == "" {
+			relPath = "marketplace.json"
+		} else {
+			relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
+		}
+		fmt.Printf("Found marketplace: %s (%d plugins)\n", relPath, len(marketplaceConfig.Plugins))
+
+		// Generate packages from marketplace
+		fmt.Println("\nGenerating packages from marketplace:")
+		basePath := filepath.Dir(marketplacePath)
+		marketplacePackages, err = marketplace.GeneratePackages(marketplaceConfig, basePath)
+		if err != nil {
+			return fmt.Errorf("failed to generate packages from marketplace: %w", err)
+		}
+
+		for _, pkgInfo := range marketplacePackages {
+			fmt.Printf("  ✓ %s (%d resources)\n", pkgInfo.Package.Name, len(pkgInfo.Package.Resources))
+		}
+	}
+
+	fmt.Println()
 
 	// Collect all resource paths
 	var allPaths []string
@@ -634,6 +727,23 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		}
 	}
 
+	// Add resources from marketplace-generated packages
+	for _, pkgInfo := range marketplacePackages {
+		// Import resources for this package
+		for _, resRef := range pkgInfo.Package.Resources {
+			resType, resName, err := resource.ParseResourceReference(resRef)
+			if err != nil {
+				continue // Skip invalid references
+			}
+
+			// Find the resource file in the plugin source directory
+			resPath, err := findResourceInPath(pkgInfo.SourcePath, resType, resName)
+			if err == nil {
+				allPaths = append(allPaths, resPath)
+			}
+		}
+	}
+
 	// Determine source type
 	sourceType := "github"
 	if parsed.Type == source.GitURL {
@@ -655,6 +765,17 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		// Print partial results before error
 		printImportResults(result)
 		return err
+	}
+
+	// Save marketplace-generated packages if not in dry-run mode
+	if !dryRunFlag {
+		for _, pkgInfo := range marketplacePackages {
+			// Save package to repository
+			if err := resource.SavePackage(pkgInfo.Package, manager.GetRepoPath()); err != nil {
+				fmt.Printf("⚠ Warning: Failed to save package %s: %v\n", pkgInfo.Package.Name, err)
+				continue
+			}
+		}
 	}
 
 	// Print results
@@ -845,6 +966,54 @@ func findPackageFile(searchPath, name string) (string, error) {
 	}
 
 	return packageFile, nil
+}
+
+// findResourceInPath finds the source file for a resource in the specified directory.
+// This is used for marketplace-discovered resources.
+func findResourceInPath(sourcePath string, resType resource.ResourceType, resName string) (string, error) {
+	var candidatePaths []string
+
+	switch resType {
+	case resource.Command:
+		// Check standard locations
+		candidatePaths = []string{
+			filepath.Join(sourcePath, "commands", resName+".md"),
+			filepath.Join(sourcePath, ".claude", "commands", resName+".md"),
+			filepath.Join(sourcePath, ".opencode", "commands", resName+".md"),
+		}
+	case resource.Skill:
+		// Check standard locations (skills use directory path, not SKILL.md path)
+		candidatePaths = []string{
+			filepath.Join(sourcePath, "skills", resName),
+			filepath.Join(sourcePath, ".claude", "skills", resName),
+			filepath.Join(sourcePath, ".opencode", "skills", resName),
+		}
+	case resource.Agent:
+		// Check standard locations
+		candidatePaths = []string{
+			filepath.Join(sourcePath, "agents", resName+".md"),
+			filepath.Join(sourcePath, ".claude", "agents", resName+".md"),
+			filepath.Join(sourcePath, ".opencode", "agents", resName+".md"),
+		}
+	}
+
+	// Try each candidate path
+	for _, path := range candidatePaths {
+		if resType == resource.Skill {
+			// For skills, check if directory exists with SKILL.md
+			skillMdPath := filepath.Join(path, "SKILL.md")
+			if _, err := os.Stat(skillMdPath); err == nil {
+				return path, nil
+			}
+		} else {
+			// For commands and agents, check if file exists
+			if _, err := os.Stat(path); err == nil {
+				return path, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("source file not found for %s/%s", resType, resName)
 }
 
 // determineSourceInfo determines the source type and URL from a parsed source and local path
