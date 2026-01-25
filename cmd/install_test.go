@@ -276,15 +276,15 @@ func TestExpandPattern_AllSkills(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Expand "skill/*" pattern
-	matches, err := expandPattern(mgr, "skill/*")
+	matches, err := ExpandPattern(mgr, "skill/*")
 	if err != nil {
-		t.Fatalf("expandPattern failed: %v", err)
+		t.Fatalf("ExpandPattern failed: %v", err)
 	}
 
 	// Should match all 4 skills
 	expectedCount := 4
 	if len(matches) != expectedCount {
-		t.Errorf("expandPattern(skill/*) returned %d matches, want %d", len(matches), expectedCount)
+		t.Errorf("ExpandPattern(skill/*) returned %d matches, want %d", len(matches), expectedCount)
 	}
 
 	// Verify all matches start with "skill/"
@@ -302,15 +302,15 @@ func TestExpandPattern_PrefixMatch(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Expand "skill/pdf*" pattern
-	matches, err := expandPattern(mgr, "skill/pdf*")
+	matches, err := ExpandPattern(mgr, "skill/pdf*")
 	if err != nil {
-		t.Fatalf("expandPattern failed: %v", err)
+		t.Fatalf("ExpandPattern failed: %v", err)
 	}
 
 	// Should match 2 skills (pdf-processing, pdf-extraction)
 	expectedCount := 2
 	if len(matches) != expectedCount {
-		t.Errorf("expandPattern(skill/pdf*) returned %d matches, want %d", len(matches), expectedCount)
+		t.Errorf("ExpandPattern(skill/pdf*) returned %d matches, want %d", len(matches), expectedCount)
 	}
 
 	// Verify matches
@@ -332,15 +332,15 @@ func TestExpandPattern_AllTypes(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Expand "*test*" pattern (matches across all types)
-	matches, err := expandPattern(mgr, "*test*")
+	matches, err := ExpandPattern(mgr, "*test*")
 	if err != nil {
-		t.Fatalf("expandPattern failed: %v", err)
+		t.Fatalf("ExpandPattern failed: %v", err)
 	}
 
 	// Should match: test-command, test-skill, test-agent
 	expectedCount := 3
 	if len(matches) != expectedCount {
-		t.Errorf("expandPattern(*test*) returned %d matches, want %d", len(matches), expectedCount)
+		t.Errorf("ExpandPattern(*test*) returned %d matches, want %d", len(matches), expectedCount)
 		for _, m := range matches {
 			t.Logf("  match: %s", m)
 		}
@@ -354,17 +354,17 @@ func TestExpandPattern_ExactName(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Expand exact name (no pattern)
-	matches, err := expandPattern(mgr, "skill/pdf-processing")
+	matches, err := ExpandPattern(mgr, "skill/pdf-processing")
 	if err != nil {
-		t.Fatalf("expandPattern failed: %v", err)
+		t.Fatalf("ExpandPattern failed: %v", err)
 	}
 
 	// Should return the exact name
 	if len(matches) != 1 {
-		t.Fatalf("expandPattern(skill/pdf-processing) returned %d matches, want 1", len(matches))
+		t.Fatalf("ExpandPattern(skill/pdf-processing) returned %d matches, want 1", len(matches))
 	}
 	if matches[0] != "skill/pdf-processing" {
-		t.Errorf("expandPattern(skill/pdf-processing) = %q, want 'skill/pdf-processing'", matches[0])
+		t.Errorf("ExpandPattern(skill/pdf-processing) = %q, want 'skill/pdf-processing'", matches[0])
 	}
 }
 
@@ -375,14 +375,14 @@ func TestExpandPattern_NoMatch(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Expand pattern with no matches
-	matches, err := expandPattern(mgr, "skill/nomatch*")
+	matches, err := ExpandPattern(mgr, "skill/nomatch*")
 	if err != nil {
-		t.Fatalf("expandPattern failed: %v", err)
+		t.Fatalf("ExpandPattern failed: %v", err)
 	}
 
 	// Should return empty slice
 	if len(matches) != 0 {
-		t.Errorf("expandPattern(skill/nomatch*) returned %d matches, want 0", len(matches))
+		t.Errorf("ExpandPattern(skill/nomatch*) returned %d matches, want 0", len(matches))
 	}
 }
 
@@ -393,9 +393,9 @@ func TestExpandPattern_InvalidPattern(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Test invalid glob pattern
-	_, err := expandPattern(mgr, "skill/[unclosed")
+	_, err := ExpandPattern(mgr, "skill/[unclosed")
 	if err == nil {
-		t.Error("expandPattern([unclosed) should return error for invalid glob")
+		t.Error("ExpandPattern([unclosed) should return error for invalid glob")
 	}
 }
 
@@ -406,14 +406,14 @@ func TestExpandPattern_EmptyPattern(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Empty pattern should be treated as non-pattern
-	matches, err := expandPattern(mgr, "skill/")
+	matches, err := ExpandPattern(mgr, "skill/")
 	if err != nil {
-		t.Fatalf("expandPattern failed: %v", err)
+		t.Fatalf("ExpandPattern failed: %v", err)
 	}
 
 	// Should return the arg as-is (will fail later in validation)
 	if len(matches) != 1 || matches[0] != "skill/" {
-		t.Errorf("expandPattern(skill/) = %v, want [skill/]", matches)
+		t.Errorf("ExpandPattern(skill/) = %v, want [skill/]", matches)
 	}
 }
 
@@ -430,22 +430,22 @@ func TestProcessInstall_WithPatternExpansion(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Test expanding and verifying we get correct resource types back
-	matches, err := expandPattern(mgr, "skill/pdf*")
+	matches, err := ExpandPattern(mgr, "skill/pdf*")
 	if err != nil {
-		t.Fatalf("expandPattern failed: %v", err)
+		t.Fatalf("ExpandPattern failed: %v", err)
 	}
 
 	// Verify each match can be parsed correctly
 	for _, match := range matches {
-		resourceType, name, err := parseResourceArg(match)
+		resourceType, name, err := ParseResourceArg(match)
 		if err != nil {
-			t.Errorf("parseResourceArg(%q) failed: %v", match, err)
+			t.Errorf("ParseResourceArg(%q) failed: %v", match, err)
 		}
 		if resourceType != resource.Skill {
-			t.Errorf("parseResourceArg(%q) type = %v, want %v", match, resourceType, resource.Skill)
+			t.Errorf("ParseResourceArg(%q) type = %v, want %v", match, resourceType, resource.Skill)
 		}
 		if !strings.HasPrefix(name, "pdf") {
-			t.Errorf("parseResourceArg(%q) name = %q, doesn't start with 'pdf'", match, name)
+			t.Errorf("ParseResourceArg(%q) name = %q, doesn't start with 'pdf'", match, name)
 		}
 	}
 }
@@ -457,15 +457,15 @@ func TestInstallPattern_MultipleTypes(t *testing.T) {
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	// Test pattern that matches multiple resource types
-	matches, err := expandPattern(mgr, "*review*")
+	matches, err := ExpandPattern(mgr, "*review*")
 	if err != nil {
-		t.Fatalf("expandPattern failed: %v", err)
+		t.Fatalf("ExpandPattern failed: %v", err)
 	}
 
 	// Should match: review-command, code-reviewer (agent)
 	expectedCount := 2
 	if len(matches) != expectedCount {
-		t.Errorf("expandPattern(*review*) returned %d matches, want %d", len(matches), expectedCount)
+		t.Errorf("ExpandPattern(*review*) returned %d matches, want %d", len(matches), expectedCount)
 		for _, m := range matches {
 			t.Logf("  match: %s", m)
 		}
@@ -474,16 +474,16 @@ func TestInstallPattern_MultipleTypes(t *testing.T) {
 	// Verify we got different types
 	types := make(map[resource.ResourceType]bool)
 	for _, match := range matches {
-		resourceType, _, err := parseResourceArg(match)
+		resourceType, _, err := ParseResourceArg(match)
 		if err != nil {
-			t.Errorf("parseResourceArg(%q) failed: %v", match, err)
+			t.Errorf("ParseResourceArg(%q) failed: %v", match, err)
 			continue
 		}
 		types[resourceType] = true
 	}
 
 	if len(types) < 2 {
-		t.Errorf("expandPattern(*review*) matched %d types, want at least 2", len(types))
+		t.Errorf("ExpandPattern(*review*) matched %d types, want at least 2", len(types))
 	}
 }
 
@@ -527,22 +527,22 @@ func TestInstallPattern_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matches, err := expandPattern(mgr, tt.pattern)
+			matches, err := ExpandPattern(mgr, tt.pattern)
 
 			if tt.expectError {
 				if err == nil {
-					t.Errorf("expandPattern(%q) expected error, got nil", tt.pattern)
+					t.Errorf("ExpandPattern(%q) expected error, got nil", tt.pattern)
 				}
 				return
 			}
 
 			if err != nil {
-				t.Errorf("expandPattern(%q) unexpected error: %v", tt.pattern, err)
+				t.Errorf("ExpandPattern(%q) unexpected error: %v", tt.pattern, err)
 				return
 			}
 
 			if len(matches) != tt.expectedCount {
-				t.Errorf("expandPattern(%q) returned %d matches, want %d", tt.pattern, len(matches), tt.expectedCount)
+				t.Errorf("ExpandPattern(%q) returned %d matches, want %d", tt.pattern, len(matches), tt.expectedCount)
 				for _, m := range matches {
 					t.Logf("  match: %s", m)
 				}
@@ -634,9 +634,9 @@ func TestExpandPattern_SpecialCharacters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matches, err := expandPattern(mgr, tt.pattern)
+			matches, err := ExpandPattern(mgr, tt.pattern)
 			if err != nil {
-				t.Fatalf("expandPattern(%q) failed: %v", tt.pattern, err)
+				t.Fatalf("ExpandPattern(%q) failed: %v", tt.pattern, err)
 			}
 
 			matchMap := make(map[string]bool)
@@ -647,14 +647,14 @@ func TestExpandPattern_SpecialCharacters(t *testing.T) {
 			// Check expected matches
 			for _, expected := range tt.shouldMatch {
 				if !matchMap[expected] {
-					t.Errorf("expandPattern(%q) missing expected match %q", tt.pattern, expected)
+					t.Errorf("ExpandPattern(%q) missing expected match %q", tt.pattern, expected)
 				}
 			}
 
 			// Check unexpected matches
 			for _, unexpected := range tt.shouldntMatch {
 				if matchMap[unexpected] {
-					t.Errorf("expandPattern(%q) unexpectedly matched %q", tt.pattern, unexpected)
+					t.Errorf("ExpandPattern(%q) unexpectedly matched %q", tt.pattern, unexpected)
 				}
 			}
 		})

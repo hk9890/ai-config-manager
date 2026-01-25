@@ -51,48 +51,6 @@ func parseTargetFlag(targetFlag string) ([]tools.Tool, error) {
 	return targets, nil
 }
 
-// expandPattern expands a pattern to matching resources from repository.
-// If the argument is not a pattern, returns it as-is in a single-element slice.
-// Returns a slice of resource arguments in "type/name" format.
-func expandPattern(mgr *repo.Manager, resourceArg string) ([]string, error) {
-	// Parse pattern
-	resourceType, _, isPattern := pattern.ParsePattern(resourceArg)
-	if !isPattern {
-		// Not a pattern, return as-is
-		return []string{resourceArg}, nil
-	}
-
-	// Create matcher
-	matcher, err := pattern.NewMatcher(resourceArg)
-	if err != nil {
-		return nil, fmt.Errorf("invalid pattern '%s': %w", resourceArg, err)
-	}
-
-	// List resources from repository
-	var resources []resource.Resource
-	if resourceType != "" {
-		// Specific type filter
-		resources, err = mgr.List(&resourceType)
-	} else {
-		// All types
-		resources, err = mgr.List(nil)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to list resources: %w", err)
-	}
-
-	// Filter by pattern
-	var matches []string
-	for _, res := range resources {
-		if matcher.Match(&res) {
-			// Return in "type/name" format
-			matches = append(matches, fmt.Sprintf("%s/%s", res.Type, res.Name))
-		}
-	}
-
-	return matches, nil
-}
-
 // installCmd represents the install command
 var installCmd = &cobra.Command{
 	Use:   "install <resource>...",
@@ -201,7 +159,7 @@ Examples:
 		// Expand patterns in arguments
 		var expandedArgs []string
 		for _, arg := range args {
-			matches, err := expandPattern(manager, arg)
+			matches, err := ExpandPattern(manager, arg)
 			if err != nil {
 				return fmt.Errorf("failed to expand pattern '%s': %w", arg, err)
 			}
@@ -247,7 +205,7 @@ Examples:
 // processInstall processes installing a single resource
 func processInstall(arg string, installer *install.Installer, manager *repo.Manager) installResult {
 	// Parse resource argument
-	resourceType, name, err := parseResourceArg(arg)
+	resourceType, name, err := ParseResourceArg(arg)
 	if err != nil {
 		return installResult{
 			name:    arg,
