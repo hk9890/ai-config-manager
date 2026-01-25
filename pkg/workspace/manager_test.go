@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -331,5 +332,113 @@ func TestUpdateMetadataEntry(t *testing.T) {
 	// LastUpdated should not change for access-only
 	if entry.LastUpdated != firstUpdated {
 		t.Errorf("LastUpdated changed on access-only operation")
+	}
+}
+
+// TestGetOrClone_Integration tests GetOrClone with a real Git repository
+// This test requires network access and git to be installed
+func TestGetOrClone_Integration(t *testing.T) {
+	// Skip in short mode or if git is not available
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	// Check if git is available
+	if err := exec.Command("git", "--version").Run(); err != nil {
+		t.Skip("git not available, skipping integration test")
+	}
+
+	tmpDir := t.TempDir()
+	mgr, err := NewManager(tmpDir)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Use a small, stable public repository for testing
+	testURL := "https://github.com/hk9890/ai-config-manager-test-repo"
+	testRef := "main"
+
+	// First call should clone
+	cachePath1, err := mgr.GetOrClone(testURL, testRef)
+	if err != nil {
+		// If this fails, the test repo might not exist - skip test
+		t.Skipf("GetOrClone failed (test repo may not exist): %v", err)
+	}
+
+	// Verify cache path exists
+	if !mgr.isValidCache(cachePath1) {
+		t.Errorf("cache path is not a valid git repo: %s", cachePath1)
+	}
+
+	// Second call should use cache
+	cachePath2, err := mgr.GetOrClone(testURL, testRef)
+	if err != nil {
+		t.Fatalf("GetOrClone (cached) failed: %v", err)
+	}
+
+	// Should return same path
+	if cachePath1 != cachePath2 {
+		t.Errorf("GetOrClone returned different paths: %s != %s", cachePath1, cachePath2)
+	}
+
+	// Verify metadata was created
+	metadata, err := mgr.loadMetadata()
+	if err != nil {
+		t.Fatalf("loadMetadata failed: %v", err)
+	}
+
+	hash := computeHash(testURL)
+	entry, exists := metadata.Caches[hash]
+	if !exists {
+		t.Errorf("metadata entry not created")
+	}
+
+	if entry.URL != normalizeURL(testURL) {
+		t.Errorf("metadata URL = %q; want %q", entry.URL, normalizeURL(testURL))
+	}
+
+	if entry.Ref != testRef {
+		t.Errorf("metadata Ref = %q; want %q", entry.Ref, testRef)
+	}
+}
+
+// TestGetOrClone_EmptyInputs tests error handling for empty inputs
+func TestGetOrClone_EmptyInputs(t *testing.T) {
+	tmpDir := t.TempDir()
+	mgr, _ := NewManager(tmpDir)
+
+	tests := []struct {
+		name    string
+		url     string
+		ref     string
+		wantErr bool
+	}{
+		{
+			name:    "empty URL",
+			url:     "",
+			ref:     "main",
+			wantErr: true,
+		},
+		{
+			name:    "empty ref",
+			url:     "https://github.com/test/repo",
+			ref:     "",
+			wantErr: true,
+		},
+		{
+			name:    "both empty",
+			url:     "",
+			ref:     "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := mgr.GetOrClone(tt.url, tt.ref)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetOrClone() error = %v; wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

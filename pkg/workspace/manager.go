@@ -142,6 +142,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -207,16 +208,67 @@ func (m *Manager) Init() error {
 //   - Invalid URL: error returned before any filesystem operations
 //   - Ref not found: error returned with helpful message
 func (m *Manager) GetOrClone(url string, ref string) (string, error) {
-	// TODO: Implement GetOrClone
-	// 1. Normalize URL
-	// 2. Compute cache hash
-	// 3. Check if cache exists and is valid
-	// 4. If corrupted, remove and fall through to clone
-	// 5. If exists, fetch and checkout ref
-	// 6. If doesn't exist, clone with ref
-	// 7. Update metadata
-	// 8. Return cache path
-	return "", fmt.Errorf("not implemented")
+	// Ensure workspace is initialized
+	if err := m.Init(); err != nil {
+		return "", err
+	}
+
+	// Validate inputs
+	if url == "" {
+		return "", fmt.Errorf("url cannot be empty")
+	}
+	if ref == "" {
+		return "", fmt.Errorf("ref cannot be empty")
+	}
+
+	// Get cache path
+	cachePath := m.getCachePath(url)
+
+	// Check if cache exists and is valid
+	if m.isValidCache(cachePath) {
+		// Cache exists - ensure correct ref is checked out
+		if err := m.checkoutRef(cachePath, ref); err != nil {
+			// If checkout fails, try to recover by fetching
+			if fetchErr := m.fetchRepo(cachePath); fetchErr != nil {
+				// Fetch failed - cache may be corrupted, remove and re-clone
+				if removeErr := os.RemoveAll(cachePath); removeErr != nil {
+					return "", fmt.Errorf("failed to remove corrupted cache: %w", removeErr)
+				}
+				// Fall through to clone
+			} else {
+				// Fetch succeeded, try checkout again
+				if err := m.checkoutRef(cachePath, ref); err != nil {
+					return "", fmt.Errorf("failed to checkout ref after fetch: %w", err)
+				}
+				// Success - update metadata and return
+				if err := m.updateMetadataEntry(url, ref, "access"); err != nil {
+					// Log warning but don't fail - metadata is optional
+					fmt.Fprintf(os.Stderr, "warning: failed to update metadata: %v\n", err)
+				}
+				return cachePath, nil
+			}
+		} else {
+			// Checkout succeeded - update metadata and return
+			if err := m.updateMetadataEntry(url, ref, "access"); err != nil {
+				// Log warning but don't fail - metadata is optional
+				fmt.Fprintf(os.Stderr, "warning: failed to update metadata: %v\n", err)
+			}
+			return cachePath, nil
+		}
+	}
+
+	// Cache doesn't exist or was removed due to corruption - clone it
+	if err := m.cloneRepo(url, cachePath, ref); err != nil {
+		return "", fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	// Update metadata
+	if err := m.updateMetadataEntry(url, ref, "clone"); err != nil {
+		// Log warning but don't fail - metadata is optional
+		fmt.Fprintf(os.Stderr, "warning: failed to update metadata: %v\n", err)
+	}
+
+	return cachePath, nil
 }
 
 // Update pulls the latest changes for a cached repository.
@@ -463,4 +515,50 @@ func (m *Manager) updateMetadataEntry(url string, ref string, updateType string)
 	metadata.Caches[hash] = entry
 
 	return m.saveMetadata(metadata)
+}
+
+// cloneRepo clones a Git repository to the specified cache path.
+// Unlike pkg/source/git.go's CloneRepo, this does a full clone (not shallow)
+// to support ref switching.
+func (m *Manager) cloneRepo(url string, cachePath string, ref string) error {
+	// Build git clone command (full clone for ref switching)
+	args := []string{"clone"}
+
+	// Add branch/tag reference if specified (optimization)
+	if ref != "" {
+		args = append(args, "--branch", ref)
+	}
+
+	args = append(args, url, cachePath)
+
+	// Execute git clone
+	cmd := exec.Command("git", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Clean up partial clone on failure
+		_ = os.RemoveAll(cachePath)
+		return fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
+// checkoutRef checks out the specified ref in a Git repository.
+func (m *Manager) checkoutRef(cachePath string, ref string) error {
+	cmd := exec.Command("git", "-C", cachePath, "checkout", ref)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git checkout failed: %w\nOutput: %s", err, string(output))
+	}
+	return nil
+}
+
+// fetchRepo fetches the latest refs from the remote repository.
+func (m *Manager) fetchRepo(cachePath string) error {
+	cmd := exec.Command("git", "-C", cachePath, "fetch", "--all")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git fetch failed: %w\nOutput: %s", err, string(output))
+	}
+	return nil
 }
