@@ -515,6 +515,7 @@ description: Test command %s
 	t.Logf("Grouping verification successful: %d Git sources (batched), %d local sources (not batched)",
 		gitSourceCount, localSourceCount)
 }
+
 // TestCLIUpdateBatching_LocalSources tests the CLI update with local sources (no batching)
 func TestCLIUpdateBatching_LocalSources(t *testing.T) {
 	repoDir := t.TempDir()
