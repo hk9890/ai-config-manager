@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
@@ -15,6 +16,7 @@ import (
 )
 
 var formatFlag string
+var typeFlag string
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
@@ -25,11 +27,12 @@ var listCmd = &cobra.Command{
 Patterns support wildcards (* for multiple characters, ? for single character) and optional type prefixes.
 
 Examples:
-  aimgr repo list                    # List all resources
+  aimgr repo list                    # List all resources and packages
   aimgr repo list skill/*            # List all skills
   aimgr repo list command/test*      # List commands starting with "test"
   aimgr repo list *pdf*              # List all resources with "pdf" in name
   aimgr repo list agent/code-*       # List agents starting with "code-"
+  aimgr repo list --type=package     # List only packages
   aimgr repo list --format=json      # Output as JSON
   aimgr repo list --format=yaml      # Output as YAML`,
 	Args: cobra.MaximumNArgs(1),
@@ -38,6 +41,31 @@ Examples:
 		manager, err := repo.NewManager()
 		if err != nil {
 			return err
+		}
+
+		// Check if user wants only packages
+		if typeFlag == "package" {
+			packages, err := manager.ListPackages()
+			if err != nil {
+				return fmt.Errorf("failed to list packages: %w", err)
+			}
+
+			if len(packages) == 0 {
+				fmt.Println("No packages found in repository.")
+				return nil
+			}
+
+			// Format output based on --format flag
+			switch formatFlag {
+			case "json":
+				return outputPackagesJSON(packages)
+			case "yaml":
+				return outputPackagesYAML(packages)
+			case "table":
+				return outputPackagesTable(packages)
+			default:
+				return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", formatFlag)
+			}
 		}
 
 		var resources []resource.Resource
@@ -78,10 +106,19 @@ Examples:
 			resources = filtered
 		}
 
+		// Get packages (if not using pattern and not filtered by type)
+		var packages []repo.PackageInfo
+		if len(args) == 0 && typeFlag == "" {
+			packages, err = manager.ListPackages()
+			if err != nil {
+				return fmt.Errorf("failed to list packages: %w", err)
+			}
+		}
+
 		// Handle empty results
-		if len(resources) == 0 {
+		if len(resources) == 0 && len(packages) == 0 {
 			if len(args) == 0 {
-				fmt.Println("No resources found in repository.")
+				fmt.Println("No resources or packages found in repository.")
 			} else {
 				fmt.Printf("No resources matching pattern '%s' found in repository.\n", args[0])
 			}
@@ -92,19 +129,19 @@ Examples:
 		// Format output based on --format flag
 		switch formatFlag {
 		case "json":
-			return outputJSON(resources)
+			return outputWithPackagesJSON(resources, packages)
 		case "yaml":
-			return outputYAML(resources)
+			return outputWithPackagesYAML(resources, packages)
 		case "table":
-			return outputTable(resources)
+			return outputWithPackagesTable(resources, packages)
 		default:
 			return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", formatFlag)
 		}
 	},
 }
 
-func outputTable(resources []resource.Resource) error {
-	// Group by type
+func outputWithPackagesTable(resources []resource.Resource, packages []repo.PackageInfo) error {
+	// Group resources by type
 	commands := []resource.Resource{}
 	skills := []resource.Resource{}
 	agents := []resource.Resource{}
@@ -118,6 +155,11 @@ func outputTable(resources []resource.Resource) error {
 			agents = append(agents, res)
 		}
 	}
+
+	// Sort packages alphabetically by name
+	sort.Slice(packages, func(i, j int) bool {
+		return packages[i].Name < packages[j].Name
+	})
 
 	// Create table with new API
 	table := tablewriter.NewWriter(os.Stdout)
@@ -161,7 +203,80 @@ func outputTable(resources []resource.Resource) error {
 		}
 	}
 
+	// Add empty row between agents and packages if both exist
+	if len(agents) > 0 && len(packages) > 0 {
+		if err := table.Append("", "", ""); err != nil {
+			return fmt.Errorf("failed to add separator: %w", err)
+		}
+	}
+
+	// Add packages
+	for _, pkg := range packages {
+		desc := truncateString(pkg.Description, 50)
+		countStr := fmt.Sprintf("%d resources", pkg.ResourceCount)
+		fullDesc := fmt.Sprintf("%s    %s", countStr, desc)
+		if err := table.Append("package", pkg.Name, fullDesc); err != nil {
+			return fmt.Errorf("failed to add row: %w", err)
+		}
+	}
+
 	return table.Render()
+}
+
+func outputPackagesTable(packages []repo.PackageInfo) error {
+	// Sort packages alphabetically by name
+	sort.Slice(packages, func(i, j int) bool {
+		return packages[i].Name < packages[j].Name
+	})
+
+	// Create table
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header("Name", "Resources", "Description")
+
+	for _, pkg := range packages {
+		desc := truncateString(pkg.Description, 60)
+		if err := table.Append(pkg.Name, fmt.Sprintf("%d", pkg.ResourceCount), desc); err != nil {
+			return fmt.Errorf("failed to add row: %w", err)
+		}
+	}
+
+	return table.Render()
+}
+
+func outputWithPackagesJSON(resources []resource.Resource, packages []repo.PackageInfo) error {
+	output := map[string]interface{}{
+		"resources": resources,
+		"packages":  packages,
+	}
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+func outputPackagesJSON(packages []repo.PackageInfo) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(packages)
+}
+
+func outputWithPackagesYAML(resources []resource.Resource, packages []repo.PackageInfo) error {
+	output := map[string]interface{}{
+		"resources": resources,
+		"packages":  packages,
+	}
+	encoder := yaml.NewEncoder(os.Stdout)
+	defer encoder.Close()
+	return encoder.Encode(output)
+}
+
+func outputPackagesYAML(packages []repo.PackageInfo) error {
+	encoder := yaml.NewEncoder(os.Stdout)
+	defer encoder.Close()
+	return encoder.Encode(packages)
+}
+
+func outputTable(resources []resource.Resource) error {
+	return outputWithPackagesTable(resources, nil)
 }
 
 func outputJSON(resources []resource.Resource) error {
@@ -188,4 +303,5 @@ func truncateString(s string, maxLen int) string {
 func init() {
 	repoCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVar(&formatFlag, "format", "table", "Output format (table|json|yaml)")
+	listCmd.Flags().StringVar(&typeFlag, "type", "", "Filter by type (command|skill|agent|package)")
 }

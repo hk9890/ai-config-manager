@@ -297,6 +297,50 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 	return resources, nil
 }
 
+// PackageInfo represents package information for listing
+type PackageInfo struct {
+	Name          string
+	Description   string
+	ResourceCount int
+}
+
+// ListPackages lists all packages in the repository
+func (m *Manager) ListPackages() ([]PackageInfo, error) {
+	var packages []PackageInfo
+
+	packagesPath := filepath.Join(m.repoPath, "packages")
+	if _, err := os.Stat(packagesPath); err != nil {
+		// Packages directory doesn't exist, return empty list
+		return packages, nil
+	}
+
+	entries, err := os.ReadDir(packagesPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read packages directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".package.json") {
+			continue
+		}
+
+		pkgPath := filepath.Join(packagesPath, entry.Name())
+		pkg, err := resource.LoadPackage(pkgPath)
+		if err != nil {
+			// Skip invalid packages
+			continue
+		}
+
+		packages = append(packages, PackageInfo{
+			Name:          pkg.Name,
+			Description:   pkg.Description,
+			ResourceCount: len(pkg.Resources),
+		})
+	}
+
+	return packages, nil
+}
+
 // Get retrieves a specific resource by name and type
 func (m *Manager) Get(name string, resourceType resource.ResourceType) (*resource.Resource, error) {
 	path := m.GetPath(name, resourceType)
