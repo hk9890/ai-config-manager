@@ -1,0 +1,9 @@
+# Basic ai.package.yaml
+# Simple list of resources to install in this project
+
+resources:
+  - skill/pdf-processing
+  - skill/typescript-helper
+  - command/test
+  - command/build
+  - agent/code-reviewer

@@ -1,0 +1,15 @@
+# ai.package.yaml with custom install targets
+# Override default targets to install to specific AI tools
+
+resources:
+  - skill/web-development
+  - skill/testing-helper
+  - command/deploy
+  - agent/qa-tester
+  - package/web-tools
+
+# Optional: specify which AI tools to install to
+# If not specified, uses defaults from ~/.config/aimgr/aimgr.yaml
+targets:
+  - claude
+  - opencode

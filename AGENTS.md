@@ -906,3 +906,215 @@ See [examples/marketplace/](examples/marketplace/) for complete examples:
 3. Add tests for new functionality
 4. Update documentation if adding user-facing features
 5. Follow existing code patterns and conventions
+
+### Project Manifests (ai.package.yaml)
+
+Similar to npm's `package.json`, the `ai.package.yaml` file allows you to declare project dependencies for AI resources. This makes it easy to share projects with consistent AI tooling and manage resources declaratively.
+
+#### File Structure
+
+The manifest file is placed in your project root:
+- **Location**: `./ai.package.yaml` (current directory)
+- **Format**: YAML
+- **Optional**: Projects can work without this file
+
+#### YAML Format
+
+```yaml
+# ai.package.yaml
+resources:
+  - skill/pdf-processing
+  - skill/typescript-helper
+  - command/test
+  - command/build
+  - agent/code-reviewer
+  - package/web-tools
+
+# Optional: override default install targets
+targets:
+  - claude
+  - opencode
+```
+
+**Fields:**
+
+- **resources** ([]string, required): Array of resource references in `type/name` format
+  - Format: `type/name` where type is `command`, `skill`, `agent`, or `package`
+  - Examples: `skill/pdf-processing`, `command/test`, `agent/code-reviewer`, `package/web-tools`
+  - Uses the same format as CLI commands throughout aimgr
+
+- **targets** ([]string, optional): Override default install targets
+  - Valid values: `claude`, `opencode`, `copilot`
+  - If not specified, uses defaults from `~/.config/aimgr/aimgr.yaml`
+  - Allows per-project tool preferences
+
+#### Workflows
+
+**Initialize a new project:**
+```bash
+cd my-project
+aimgr install skill/pdf-processing
+# Installs skill and adds it to ai.package.yaml (creates file if needed)
+```
+
+**Install all dependencies:**
+```bash
+cd existing-project
+aimgr install
+# Reads ai.package.yaml and installs all listed resources
+```
+
+**Install without saving:**
+```bash
+aimgr install skill/temporary-test --no-save
+# Installs skill but doesn't add to ai.package.yaml
+```
+
+**Install specific resource:**
+```bash
+aimgr install command/build
+# Installs command and adds it to ai.package.yaml automatically
+```
+
+#### CLI Commands
+
+**Install from manifest:**
+```bash
+# Installs all resources from ai.package.yaml
+aimgr install
+```
+
+**Install with auto-save (default):**
+```bash
+# Installs and adds to ai.package.yaml
+aimgr install skill/test
+```
+
+**Install without saving:**
+```bash
+# Installs but skips ai.package.yaml update
+aimgr install skill/test --no-save
+```
+
+#### Format Examples
+
+**Minimal manifest:**
+```yaml
+resources:
+  - skill/pdf-processing
+```
+
+**Basic project:**
+```yaml
+resources:
+  - skill/web-development
+  - skill/testing-helper
+  - command/test
+  - command/build
+  - agent/code-reviewer
+```
+
+**With custom targets:**
+```yaml
+resources:
+  - skill/typescript-helper
+  - command/deploy
+  - package/web-tools
+
+targets:
+  - claude
+  - opencode
+```
+
+**Full example:**
+```yaml
+# Complete development environment
+resources:
+  # Skills for development
+  - skill/typescript-helper
+  - skill/react-helper
+  - skill/testing-helper
+  
+  # Commands for automation
+  - command/test
+  - command/build
+  - command/deploy
+  
+  # Agents for quality
+  - agent/code-reviewer
+  - agent/qa-tester
+  
+  # Package bundles
+  - package/web-tools
+
+# Install to both Claude and OpenCode
+targets:
+  - claude
+  - opencode
+```
+
+#### Code Structure
+
+The manifest format is handled by the `pkg/manifest/` package:
+
+```go
+type Manifest struct {
+    Resources []string `yaml:"resources"`           // Resource references (type/name)
+    Targets   []string `yaml:"targets,omitempty"`   // Optional install targets
+}
+```
+
+**Loading manifests:**
+```go
+import "github.com/hk9890/ai-config-manager/pkg/manifest"
+
+// Load from file
+m, err := manifest.Load("ai.package.yaml")
+
+// Check if file exists
+exists := manifest.Exists("ai.package.yaml")
+```
+
+**Creating/updating manifests:**
+```go
+m := &manifest.Manifest{
+    Resources: []string{"skill/test", "command/build"},
+    Targets:   []string{"claude"},
+}
+
+// Save to file
+err := m.Save("ai.package.yaml")
+
+// Add a resource
+err = m.Add("skill/new-skill")
+
+// Remove a resource
+err = m.Remove("skill/old-skill")
+```
+
+#### Best Practices
+
+1. **Version control**: Commit `ai.package.yaml` to your repository
+2. **Team consistency**: Everyone on the team gets the same AI resources
+3. **Simple resources list**: Use plain `type/name` format for clarity
+4. **Override targets when needed**: Set project-specific tool preferences
+5. **Use packages**: Group related resources into packages for reuse
+6. **Keep it minimal**: Only include resources actually used in the project
+
+#### Comparison with npm
+
+| npm | aimgr |
+|-----|-------|
+| `package.json` | `ai.package.yaml` |
+| `npm install` | `aimgr install` |
+| `npm install <package>` | `aimgr install skill/name` |
+| `npm install --no-save` | `aimgr install --no-save` |
+| `dependencies` array | `resources` array |
+
+#### Notes
+
+- **Version 1**: Simple format with just resources and targets
+- **Extensible**: Future versions may add versioning, constraints, etc.
+- **Backward compatible**: Optional file, projects work without it
+- **No validation at parse time**: Resource existence checked at install time
+

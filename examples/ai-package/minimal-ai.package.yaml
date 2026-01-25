@@ -1,0 +1,5 @@
+# Minimal ai.package.yaml
+# Just one resource
+
+resources:
+  - skill/pdf-processing
