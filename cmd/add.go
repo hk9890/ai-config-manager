@@ -30,7 +30,7 @@ var addCmd = &cobra.Command{
 	Short: "Add resources to the repository",
 	Long: `Add resources to the aimgr repository.
 
-This command auto-discovers and imports all resources (commands, skills, agents)
+This command auto-discovers and imports all resources (commands, skills, agents, packages)
 from the specified source location.
 
 Source Formats:
@@ -48,6 +48,7 @@ Source Formats:
 Commands are single .md files with YAML frontmatter.
 Skills are directories containing a SKILL.md file.
 Agents are single .md files with YAML frontmatter.
+Packages are .package.json files in the packages/ directory.
 
 Examples:
   # Add all resources from local folder
@@ -234,16 +235,16 @@ func addAgentFile(filePath string, res *resource.Resource, manager *repo.Manager
 
 // applyFilter filters discovered resources based on a pattern.
 // Returns filtered slices and a boolean indicating if filtering was applied.
-func applyFilter(filterPattern string, commands, skills, agents []*resource.Resource) ([]*resource.Resource, []*resource.Resource, []*resource.Resource, error) {
+func applyFilter(filterPattern string, commands, skills, agents []*resource.Resource, packages []*resource.Package) ([]*resource.Resource, []*resource.Resource, []*resource.Resource, []*resource.Package, error) {
 	if filterPattern == "" {
 		// No filter, return all resources
-		return commands, skills, agents, nil
+		return commands, skills, agents, packages, nil
 	}
 
 	// Parse the pattern
 	matcher, err := pattern.NewMatcher(filterPattern)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid filter pattern: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("invalid filter pattern: %w", err)
 	}
 
 	// If not a pattern (exact name), try to match by name across all types
@@ -252,6 +253,7 @@ func applyFilter(filterPattern string, commands, skills, agents []*resource.Reso
 		var filteredCommands []*resource.Resource
 		var filteredSkills []*resource.Resource
 		var filteredAgents []*resource.Resource
+		var filteredPackages []*resource.Package
 
 		// Get the resource type filter (if specified)
 		resourceType := matcher.GetResourceType()
@@ -283,13 +285,25 @@ func applyFilter(filterPattern string, commands, skills, agents []*resource.Reso
 			}
 		}
 
-		return filteredCommands, filteredSkills, filteredAgents, nil
+		// Check packages (if no type filter or type is package)
+		if resourceType == "" || resourceType == resource.PackageType {
+			for _, pkg := range packages {
+				// Create a temporary Resource for matching
+				tempRes := &resource.Resource{Type: resource.PackageType, Name: pkg.Name}
+				if pkg.Name == filterPattern || matcher.Match(tempRes) {
+					filteredPackages = append(filteredPackages, pkg)
+				}
+			}
+		}
+
+		return filteredCommands, filteredSkills, filteredAgents, filteredPackages, nil
 	}
 
 	// Pattern matching - filter each resource type
 	var filteredCommands []*resource.Resource
 	var filteredSkills []*resource.Resource
 	var filteredAgents []*resource.Resource
+	var filteredPackages []*resource.Package
 
 	// Get the resource type filter (if specified)
 	resourceType := matcher.GetResourceType()
@@ -321,7 +335,18 @@ func applyFilter(filterPattern string, commands, skills, agents []*resource.Reso
 		}
 	}
 
-	return filteredCommands, filteredSkills, filteredAgents, nil
+	// Filter packages (if no type filter or type is package)
+	if resourceType == "" || resourceType == resource.PackageType {
+		for _, pkg := range packages {
+			// Create a temporary Resource for matching
+			tempRes := &resource.Resource{Type: resource.PackageType, Name: pkg.Name}
+			if matcher.Match(tempRes) {
+				filteredPackages = append(filteredPackages, pkg)
+			}
+		}
+	}
+
+	return filteredCommands, filteredSkills, filteredAgents, filteredPackages, nil
 }
 
 // addBulkFromLocal handles bulk add from a local folder or single file
@@ -363,10 +388,15 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		return fmt.Errorf("failed to discover agents: %w", err)
 	}
 
+	packages, err := discovery.DiscoverPackages(localPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to discover packages: %w", err)
+	}
+
 	// Check if any resources found
-	totalResources := len(commands) + len(skills) + len(agents)
+	totalResources := len(commands) + len(skills) + len(agents) + len(packages)
 	if totalResources == 0 {
-		return fmt.Errorf("no resources found in: %s\nExpected commands (*.md), skills (*/SKILL.md), or agents (*.md)", localPath)
+		return fmt.Errorf("no resources found in: %s\nExpected commands (*.md), skills (*/SKILL.md), agents (*.md), or packages (*.package.json)", localPath)
 	}
 
 	// Print header
@@ -384,24 +414,25 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 	origCommandCount := len(commands)
 	origSkillCount := len(skills)
 	origAgentCount := len(agents)
+	origPackageCount := len(packages)
 
 	// Apply filter if specified
 	if filter != "" {
 		var err error
-		commands, skills, agents, err = applyFilter(filter, commands, skills, agents)
+		commands, skills, agents, packages, err = applyFilter(filter, commands, skills, agents, packages)
 		if err != nil {
 			return err
 		}
 
 		// Check if filter matched any resources
-		filteredTotal := len(commands) + len(skills) + len(agents)
+		filteredTotal := len(commands) + len(skills) + len(agents) + len(packages)
 		if filteredTotal == 0 {
 			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filter, totalResources)
 			return nil
 		}
 
 		// Show filtered counts
-		fmt.Printf("Found: %d commands, %d skills, %d agents", origCommandCount, origSkillCount, origAgentCount)
+		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages", origCommandCount, origSkillCount, origAgentCount, origPackageCount)
 		if filteredTotal < totalResources {
 			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filter)
 		} else {
@@ -409,7 +440,7 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 			fmt.Println()
 		}
 	} else {
-		fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commands), len(skills), len(agents))
+		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n\n", len(commands), len(skills), len(agents), len(packages))
 	}
 
 	// Collect all resource paths
@@ -436,6 +467,14 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		agentPath, err := findAgentFile(localPath, agent.Name)
 		if err == nil {
 			allPaths = append(allPaths, agentPath)
+		}
+	}
+
+	// Add packages
+	for _, pkg := range packages {
+		pkgPath, err := findPackageFile(localPath, pkg.Name)
+		if err == nil {
+			allPaths = append(allPaths, pkgPath)
 		}
 	}
 
@@ -500,8 +539,13 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		return fmt.Errorf("failed to discover agents: %w", err)
 	}
 
+	packages, err := discovery.DiscoverPackages(searchPath, "")
+	if err != nil {
+		return fmt.Errorf("failed to discover packages: %w", err)
+	}
+
 	// Check if any resources found
-	totalResources := len(commands) + len(skills) + len(agents)
+	totalResources := len(commands) + len(skills) + len(agents) + len(packages)
 	if totalResources == 0 {
 		return fmt.Errorf("no resources found in repository: %s", parsed.URL)
 	}
@@ -526,24 +570,25 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 	origCommandCount := len(commands)
 	origSkillCount := len(skills)
 	origAgentCount := len(agents)
+	origPackageCount := len(packages)
 
 	// Apply filter if specified
 	if filter != "" {
 		var err error
-		commands, skills, agents, err = applyFilter(filter, commands, skills, agents)
+		commands, skills, agents, packages, err = applyFilter(filter, commands, skills, agents, packages)
 		if err != nil {
 			return err
 		}
 
 		// Check if filter matched any resources
-		filteredTotal := len(commands) + len(skills) + len(agents)
+		filteredTotal := len(commands) + len(skills) + len(agents) + len(packages)
 		if filteredTotal == 0 {
 			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filter, totalResources)
 			return nil
 		}
 
 		// Show filtered counts
-		fmt.Printf("Found: %d commands, %d skills, %d agents", origCommandCount, origSkillCount, origAgentCount)
+		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages", origCommandCount, origSkillCount, origAgentCount, origPackageCount)
 		if filteredTotal < totalResources {
 			fmt.Printf(" (filtered to %d matching '%s')\n\n", filteredTotal, filter)
 		} else {
@@ -551,7 +596,7 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 			fmt.Println()
 		}
 	} else {
-		fmt.Printf("Found: %d commands, %d skills, %d agents\n\n", len(commands), len(skills), len(agents))
+		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n\n", len(commands), len(skills), len(agents), len(packages))
 	}
 
 	// Collect all resource paths
@@ -578,6 +623,14 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		agentPath, err := findAgentFile(searchPath, agent.Name)
 		if err == nil {
 			allPaths = append(allPaths, agentPath)
+		}
+	}
+
+	// Add packages
+	for _, pkg := range packages {
+		pkgPath, err := findPackageFile(searchPath, pkg.Name)
+		if err == nil {
+			allPaths = append(allPaths, pkgPath)
 		}
 	}
 
@@ -769,6 +822,31 @@ func findAgentFile(searchPath, name string) (string, error) {
 	return found, nil
 }
 
+// findPackageFile finds the actual file path for a package by name
+func findPackageFile(searchPath, name string) (string, error) {
+	// Packages are always in packages/ subdirectory
+	packagesDir := filepath.Join(searchPath, "packages")
+	packageFile := filepath.Join(packagesDir, fmt.Sprintf("%s.package.json", name))
+
+	// Check if file exists
+	if _, err := os.Stat(packageFile); err != nil {
+		return "", fmt.Errorf("package file not found for: %s", name)
+	}
+
+	// Verify it's a valid package
+	pkg, err := resource.LoadPackage(packageFile)
+	if err != nil {
+		return "", fmt.Errorf("invalid package file: %w", err)
+	}
+
+	// Verify name matches
+	if pkg.Name != name {
+		return "", fmt.Errorf("package name mismatch: expected %s, got %s", name, pkg.Name)
+	}
+
+	return packageFile, nil
+}
+
 // determineSourceInfo determines the source type and URL from a parsed source and local path
 func determineSourceInfo(parsed *source.ParsedSource, localPath string) (string, string, error) {
 	switch parsed.Type {
@@ -857,6 +935,9 @@ func printImportResults(result *repo.BulkImportResult) {
 				resourceType = "command"
 			}
 			name = name[:len(name)-3] // Remove .md
+		} else if strings.HasSuffix(path, ".package.json") {
+			resourceType = "package"
+			name = strings.TrimSuffix(name, ".package.json")
 		} else {
 			resourceType = "skill"
 		}
@@ -869,6 +950,8 @@ func printImportResults(result *repo.BulkImportResult) {
 		name := filepath.Base(path)
 		if filepath.Ext(path) == ".md" {
 			name = name[:len(name)-3]
+		} else if strings.HasSuffix(path, ".package.json") {
+			name = strings.TrimSuffix(name, ".package.json")
 		}
 		fmt.Printf("⊘ Skipped '%s' (already exists)\n", name)
 	}
@@ -878,6 +961,8 @@ func printImportResults(result *repo.BulkImportResult) {
 		name := filepath.Base(fail.Path)
 		if filepath.Ext(fail.Path) == ".md" {
 			name = name[:len(name)-3]
+		} else if strings.HasSuffix(fail.Path, ".package.json") {
+			name = strings.TrimSuffix(name, ".package.json")
 		}
 		fmt.Printf("✗ Failed '%s': %s\n", name, fail.Message)
 	}

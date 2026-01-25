@@ -16,6 +16,8 @@ const (
 	Skill ResourceType = "skill"
 	// Agent represents an agent resource (folder with AGENT.md)
 	Agent ResourceType = "agent"
+	// PackageType represents a package resource (JSON file with resource references)
+	PackageType ResourceType = "package"
 )
 
 // Resource represents an AI resource (command or skill)
