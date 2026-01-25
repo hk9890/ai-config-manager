@@ -10,6 +10,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -18,61 +19,69 @@ var (
 	pruneDryRunFlag bool
 )
 
-// OrphanedMetadata represents metadata with a non-existent source path
-type OrphanedMetadata struct {
-	Name       string
-	Type       resource.ResourceType
-	SourceURL  string
-	SourceType string
-	FilePath   string
+// CachedRepo represents a cached repository to be pruned
+type CachedRepo struct {
+	URL  string
+	Path string
+	Size int64 // Size in bytes
 }
 
 // repoPruneCmd represents the prune command
 var repoPruneCmd = &cobra.Command{
 	Use:   "prune",
-	Short: "Remove orphaned metadata entries",
-	Long: `Remove metadata entries for resources whose source paths no longer exist.
+	Short: "Remove unreferenced workspace caches",
+	Long: `Remove Git repositories from .workspace/ that are not referenced by any installed resources.
 
-This command scans all metadata files and identifies entries where the source
-path (for local/file sources) no longer exists on disk. Orphaned metadata is
-typically created when source files are moved or deleted outside of aimgr.
+This command scans all resource metadata to find Git sources currently in use,
+then removes any cached repositories in .workspace/ that are no longer referenced.
+This helps free up disk space from outdated or unused Git clones.
 
 Examples:
-  aimgr repo prune                # Scan and remove orphaned metadata (with confirmation)
-  aimgr repo prune --dry-run      # Preview orphaned entries without removing
-  aimgr repo prune --force        # Remove orphaned metadata without confirmation`,
+  aimgr repo prune                # Scan and remove unreferenced caches (with confirmation)
+  aimgr repo prune --dry-run      # Preview what would be removed without removing
+  aimgr repo prune --force        # Remove without confirmation prompt`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager, err := repo.NewManager()
 		if err != nil {
 			return err
 		}
 
-		// Find orphaned metadata
-		orphaned, err := findOrphanedMetadata(manager)
+		// Create workspace manager
+		workspaceManager, err := workspace.NewManager(manager.GetRepoPath())
 		if err != nil {
 			return err
 		}
 
-		// If no orphaned metadata found
-		if len(orphaned) == 0 {
-			fmt.Println("No orphaned metadata found.")
+		// Find unreferenced cached repos
+		unreferenced, err := findUnreferencedCaches(manager, workspaceManager)
+		if err != nil {
+			return err
+		}
+
+		// If no unreferenced caches found
+		if len(unreferenced) == 0 {
+			fmt.Println("No unreferenced workspace caches found.")
 			return nil
 		}
 
-		// Display orphaned entries
-		displayOrphanedMetadata(orphaned)
+		// Display unreferenced caches
+		totalSize := displayUnreferencedCaches(unreferenced)
 
 		// Dry run mode - just display, don't remove
 		if pruneDryRunFlag {
-			fmt.Printf("\n[DRY RUN] Would remove %d orphaned metadata %s\n",
-				len(orphaned), pluralize("entry", "entries", len(orphaned)))
+			fmt.Printf("\n[DRY RUN] Would remove %d cached %s, freeing %s\n",
+				len(unreferenced),
+				pluralize("repository", "repositories", len(unreferenced)),
+				formatSize(totalSize))
 			return nil
 		}
 
 		// Confirmation prompt (unless --force)
 		if !pruneForceFlag {
-			fmt.Printf("\nRemove %d orphaned metadata %s? [y/N] ",
-				len(orphaned), pluralize("entry", "entries", len(orphaned)))
+			fmt.Printf("\nRemove %d cached %s? This will free %s. [y/N] ",
+				len(unreferenced),
+				pluralize("repository", "repositories", len(unreferenced)),
+				formatSize(totalSize))
 
 			reader := bufio.NewReader(os.Stdin)
 			response, err := reader.ReadString('\n')
@@ -87,12 +96,14 @@ Examples:
 			}
 		}
 
-		// Remove orphaned metadata
-		removed, failed := removeOrphanedMetadata(orphaned)
+		// Remove unreferenced caches
+		removed, failed, freedSize := removeUnreferencedCaches(workspaceManager, unreferenced)
 
 		// Display summary
-		fmt.Printf("\n✓ Removed %d orphaned metadata %s",
-			removed, pluralize("entry", "entries", removed))
+		fmt.Printf("\n✓ Removed %d cached %s, freed %s",
+			removed,
+			pluralize("repository", "repositories", removed),
+			formatSize(freedSize))
 		if failed > 0 {
 			fmt.Printf(" (%d failed)", failed)
 		}
@@ -105,15 +116,68 @@ Examples:
 func init() {
 	repoCmd.AddCommand(repoPruneCmd)
 	repoPruneCmd.Flags().BoolVar(&pruneForceFlag, "force", false, "Skip confirmation prompt")
-	repoPruneCmd.Flags().BoolVar(&pruneDryRunFlag, "dry-run", false, "Preview orphaned metadata without removing")
+	repoPruneCmd.Flags().BoolVar(&pruneDryRunFlag, "dry-run", false, "Preview what would be removed without removing")
 }
 
-// findOrphanedMetadata scans all metadata and returns entries with non-existent sources
-func findOrphanedMetadata(manager *repo.Manager) ([]OrphanedMetadata, error) {
-	var orphaned []OrphanedMetadata
+// findUnreferencedCaches finds all cached repos that are not referenced by any resource metadata
+func findUnreferencedCaches(manager *repo.Manager, workspaceManager *workspace.Manager) ([]CachedRepo, error) {
+	// Get all cached URLs
+	cachedURLs, err := workspaceManager.ListCached()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list cached repositories: %w", err)
+	}
 
+	// If no caches, nothing to prune
+	if len(cachedURLs) == 0 {
+		return []CachedRepo{}, nil
+	}
+
+	// Collect all referenced Git URLs from metadata
+	referencedURLs, err := collectReferencedGitURLs(manager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect referenced URLs: %w", err)
+	}
+
+	// Build set of referenced URLs (normalized) for fast lookup
+	referencedSet := make(map[string]bool)
+	for _, url := range referencedURLs {
+		referencedSet[normalizeURL(url)] = true
+	}
+
+	// Find unreferenced caches
+	var unreferenced []CachedRepo
+	workspaceDir := filepath.Join(manager.GetRepoPath(), ".workspace")
+
+	for _, cachedURL := range cachedURLs {
+		normalized := normalizeURL(cachedURL)
+		if !referencedSet[normalized] {
+			// This cache is not referenced - calculate its path and size
+			hash := workspace.ComputeHash(normalized)
+			cachePath := filepath.Join(workspaceDir, hash)
+
+			size, err := getDirSize(cachePath)
+			if err != nil {
+				// If we can't calculate size, use 0
+				size = 0
+			}
+
+			unreferenced = append(unreferenced, CachedRepo{
+				URL:  normalized,
+				Path: cachePath,
+				Size: size,
+			})
+		}
+	}
+
+	return unreferenced, nil
+}
+
+// collectReferencedGitURLs collects all Git URLs from resource metadata
+func collectReferencedGitURLs(manager *repo.Manager) ([]string, error) {
 	repoPath := manager.GetRepoPath()
 	metadataDir := filepath.Join(repoPath, ".metadata")
+
+	var gitURLs []string
 
 	// Check all resource types
 	resourceTypes := []resource.ResourceType{resource.Command, resource.Skill, resource.Agent}
@@ -137,7 +201,7 @@ func findOrphanedMetadata(manager *repo.Manager) ([]OrphanedMetadata, error) {
 				continue
 			}
 
-			// Extract resource name from filename (remove "-metadata.json")
+			// Extract resource name from filename
 			name := strings.TrimSuffix(entry.Name(), "-metadata.json")
 
 			// Load metadata
@@ -147,62 +211,95 @@ func findOrphanedMetadata(manager *repo.Manager) ([]OrphanedMetadata, error) {
 				continue
 			}
 
-			// Check if source path exists
-			if isOrphaned(meta) {
-				orphaned = append(orphaned, OrphanedMetadata{
-					Name:       meta.Name,
-					Type:       meta.Type,
-					SourceURL:  meta.SourceURL,
-					SourceType: meta.SourceType,
-					FilePath:   filepath.Join(typeDir, entry.Name()),
-				})
+			// Only collect Git source URLs
+			if isGitSource(meta.SourceType) {
+				gitURLs = append(gitURLs, meta.SourceURL)
 			}
 		}
 	}
 
-	return orphaned, nil
+	return gitURLs, nil
 }
 
-// isOrphaned checks if a metadata entry's source path no longer exists
-func isOrphaned(meta *metadata.ResourceMetadata) bool {
-	// Only check local and file sources (git sources are transient)
-	if meta.SourceType != "local" && meta.SourceType != "file" {
-		return false
-	}
-
-	// Extract local path from source URL
-	localPath := meta.SourceURL
-	if strings.HasPrefix(localPath, "file://") {
-		localPath = filepath.Clean(localPath[7:]) // Remove "file://" prefix
-	}
-
-	// Check if path exists
-	_, err := os.Stat(localPath)
-	return os.IsNotExist(err)
+// isGitSource checks if a source type is a Git source
+func isGitSource(sourceType string) bool {
+	return sourceType == "github" || sourceType == "git-url" || sourceType == "gitlab"
 }
 
-// displayOrphanedMetadata displays a list of orphaned metadata entries
-func displayOrphanedMetadata(orphaned []OrphanedMetadata) {
-	fmt.Printf("Found %d orphaned metadata %s:\n\n",
-		len(orphaned), pluralize("entry", "entries", len(orphaned)))
-
-	for _, item := range orphaned {
-		fmt.Printf("  • %s '%s'\n", item.Type, item.Name)
-		fmt.Printf("    Source: %s (%s)\n", item.SourceURL, item.SourceType)
+// normalizeURL normalizes a Git URL for consistent comparison
+func normalizeURL(url string) string {
+	normalized := strings.TrimSpace(url)
+	normalized = strings.ToLower(normalized)
+	// Strip .git and / in a loop to handle cases like "/.git" or ".git/"
+	for {
+		oldNormalized := normalized
+		normalized = strings.TrimSuffix(normalized, "/")
+		normalized = strings.TrimSuffix(normalized, ".git")
+		if normalized == oldNormalized {
+			break
+		}
 	}
+	return normalized
 }
 
-// removeOrphanedMetadata removes orphaned metadata files and returns counts
-func removeOrphanedMetadata(orphaned []OrphanedMetadata) (removed int, failed int) {
-	for _, item := range orphaned {
-		if err := os.Remove(item.FilePath); err != nil {
-			fmt.Printf("✗ Failed to remove metadata for %s '%s': %v\n", item.Type, item.Name, err)
+// getDirSize calculates the total size of a directory in bytes
+func getDirSize(path string) (int64, error) {
+	var size int64
+
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+
+	return size, err
+}
+
+// displayUnreferencedCaches displays the list of unreferenced caches and returns total size
+func displayUnreferencedCaches(unreferenced []CachedRepo) int64 {
+	fmt.Printf("Found %d unreferenced cached %s:\n\n",
+		len(unreferenced),
+		pluralize("repository", "repositories", len(unreferenced)))
+
+	var totalSize int64
+	for _, cache := range unreferenced {
+		totalSize += cache.Size
+		fmt.Printf("  • %s (%s)\n", cache.URL, formatSize(cache.Size))
+	}
+
+	return totalSize
+}
+
+// removeUnreferencedCaches removes unreferenced caches and returns counts
+func removeUnreferencedCaches(workspaceManager *workspace.Manager, unreferenced []CachedRepo) (removed int, failed int, freedSize int64) {
+	for _, cache := range unreferenced {
+		if err := workspaceManager.Remove(cache.URL); err != nil {
+			fmt.Printf("✗ Failed to remove cache for %s: %v\n", cache.URL, err)
 			failed++
 		} else {
 			removed++
+			freedSize += cache.Size
 		}
 	}
-	return removed, failed
+	return removed, failed, freedSize
+}
+
+// formatSize formats a byte size as a human-readable string
+func formatSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 // pluralize returns singular or plural form based on count

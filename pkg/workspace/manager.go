@@ -366,13 +366,52 @@ func (m *Manager) Update(url string, ref string) error {
 //
 // Note: May be slow for large caches without metadata file.
 func (m *Manager) ListCached() ([]string, error) {
-	// TODO: Implement ListCached
-	// 1. Try to read .cache-metadata.json
-	// 2. If exists, return URLs from metadata
-	// 3. If not, scan .workspace directory
-	// 4. For each subdirectory, verify it's a valid git repo
-	// 5. Return list of URLs (may need to reconstruct from git remote)
-	return nil, fmt.Errorf("not implemented")
+	// Try to load metadata first (fast path)
+	metadata, err := m.loadMetadata()
+	if err == nil && metadata != nil && len(metadata.Caches) > 0 {
+		// Return URLs from metadata
+		urls := make([]string, 0, len(metadata.Caches))
+		for _, entry := range metadata.Caches {
+			urls = append(urls, entry.URL)
+		}
+		return urls, nil
+	}
+
+	// Fallback: scan workspace directory
+	entries, err := os.ReadDir(m.workspaceDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// No workspace directory means no caches
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to read workspace directory: %w", err)
+	}
+
+	var urls []string
+	for _, entry := range entries {
+		// Skip files and hidden directories (like .cache-metadata.json)
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		cachePath := filepath.Join(m.workspaceDir, entry.Name())
+
+		// Verify it's a valid git repository
+		if !m.isValidCache(cachePath) {
+			continue
+		}
+
+		// Get the remote URL from git config
+		url, err := m.getRemoteURL(cachePath)
+		if err != nil {
+			// Skip caches where we can't determine the URL
+			continue
+		}
+
+		urls = append(urls, normalizeURL(url))
+	}
+
+	return urls, nil
 }
 
 // Prune removes cached repositories that are not referenced by any resources.
@@ -395,14 +434,42 @@ func (m *Manager) ListCached() ([]string, error) {
 //   - Dry-run mode available (future enhancement)
 //   - Logs removals for audit trail
 func (m *Manager) Prune(referencedURLs []string) ([]string, error) {
-	// TODO: Implement Prune
-	// 1. Get list of all cached URLs
-	// 2. Normalize referenced URLs
-	// 3. Find caches not in referenced set
-	// 4. Remove each unreferenced cache
-	// 5. Update metadata
-	// 6. Return list of removed URLs
-	return nil, fmt.Errorf("not implemented")
+	// Get list of all cached URLs
+	cachedURLs, err := m.ListCached()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list cached repositories: %w", err)
+	}
+
+	// Normalize referenced URLs and build a set for fast lookup
+	referencedSet := make(map[string]bool)
+	for _, url := range referencedURLs {
+		normalized := normalizeURL(url)
+		if normalized != "" {
+			referencedSet[normalized] = true
+		}
+	}
+
+	// Find unreferenced caches
+	var unreferenced []string
+	for _, cachedURL := range cachedURLs {
+		normalized := normalizeURL(cachedURL)
+		if !referencedSet[normalized] {
+			unreferenced = append(unreferenced, normalized)
+		}
+	}
+
+	// Remove each unreferenced cache
+	var removed []string
+	for _, url := range unreferenced {
+		if err := m.Remove(url); err != nil {
+			// Log error but continue with other removals
+			fmt.Fprintf(os.Stderr, "warning: failed to remove cache for %s: %v\n", url, err)
+			continue
+		}
+		removed = append(removed, url)
+	}
+
+	return removed, nil
 }
 
 // Remove deletes a specific cached repository.
@@ -423,14 +490,55 @@ func (m *Manager) Prune(referencedURLs []string) ([]string, error) {
 //   - Acquires lock before removal to prevent concurrent access
 //   - Validates hash before removal (sanity check)
 func (m *Manager) Remove(url string) error {
-	// TODO: Implement Remove
-	// 1. Normalize URL
-	// 2. Compute cache hash
-	// 3. Acquire lock on cache directory
-	// 4. Remove cache directory
-	// 5. Update metadata
-	// 6. Release lock
-	return fmt.Errorf("not implemented")
+	// Normalize URL
+	normalized := normalizeURL(url)
+	if normalized == "" {
+		return fmt.Errorf("invalid URL: %s", url)
+	}
+
+	// Get cache path
+	cachePath := m.getCachePath(normalized)
+
+	// Check if cache exists
+	if _, err := os.Stat(cachePath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("cache does not exist for URL: %s", normalized)
+		}
+		return fmt.Errorf("failed to stat cache directory: %w", err)
+	}
+
+	// Remove cache directory
+	if err := os.RemoveAll(cachePath); err != nil {
+		return fmt.Errorf("failed to remove cache directory: %w", err)
+	}
+
+	// Update metadata
+	metadata, err := m.loadMetadata()
+	if err != nil {
+		// If we can't load metadata, just log warning (removal succeeded)
+		fmt.Fprintf(os.Stderr, "warning: failed to load metadata: %v\n", err)
+		return nil
+	}
+
+	hash := computeHash(normalized)
+	delete(metadata.Caches, hash)
+
+	if err := m.saveMetadata(metadata); err != nil {
+		// Log warning but don't fail (removal succeeded)
+		fmt.Fprintf(os.Stderr, "warning: failed to update metadata: %v\n", err)
+	}
+
+	return nil
+}
+
+// getRemoteURL retrieves the remote URL from a Git repository.
+func (m *Manager) getRemoteURL(cachePath string) (string, error) {
+	cmd := exec.Command("git", "-C", cachePath, "config", "--get", "remote.origin.url")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get remote URL: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 // normalizeURL normalizes a Git URL for consistent hashing.
@@ -466,6 +574,12 @@ func computeHash(url string) string {
 	normalized := normalizeURL(url)
 	hash := sha256.Sum256([]byte(normalized))
 	return hex.EncodeToString(hash[:])
+}
+
+// ComputeHash computes the SHA256 hash of a normalized URL (exported version).
+// Returns the hash as a lowercase hexadecimal string.
+func ComputeHash(url string) string {
+	return computeHash(url)
 }
 
 // getCachePath returns the filesystem path for a cached repository.

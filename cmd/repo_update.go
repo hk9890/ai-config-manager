@@ -11,6 +11,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/source"
+	"github.com/hk9890/ai-config-manager/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -260,7 +261,7 @@ func updateSingleResourceWithProgress(manager *repo.Manager, name string, resour
 	// Show operation type
 	switch meta.SourceType {
 	case "github", "git-url", "gitlab":
-		fmt.Printf("  ↓ Cloning from %s...\n", meta.SourceURL)
+		fmt.Printf("  ↓ Updating cached repo from %s...\n", meta.SourceURL)
 	case "local", "file":
 		fmt.Printf("  ↓ Updating from local source...\n")
 	}
@@ -318,22 +319,35 @@ func updateFromGitSource(manager *repo.Manager, name string, resourceType resour
 		return fmt.Errorf("failed to parse source URL: %w", err)
 	}
 
-	// Clone repository to temp directory
+	// Get clone URL
 	cloneURL, err := source.GetCloneURL(parsed)
 	if err != nil {
 		return fmt.Errorf("failed to get clone URL: %w", err)
 	}
 
-	tempDir, err := source.CloneRepo(cloneURL, parsed.Ref)
+	// Create workspace manager
+	workspaceManager, err := workspace.NewManager(manager.GetRepoPath())
 	if err != nil {
-		return fmt.Errorf("git clone failed: %w", err)
+		return fmt.Errorf("failed to create workspace manager: %w", err)
 	}
-	defer source.CleanupTempDir(tempDir)
 
-	// Discover resources in the cloned repo
-	searchPath := tempDir
+	// Get or clone repository using workspace cache
+	cachePath, err := workspaceManager.GetOrClone(cloneURL, parsed.Ref)
+	if err != nil {
+		return fmt.Errorf("failed to get cached repository: %w", err)
+	}
+
+	// Update cached repository to latest
+	if err := workspaceManager.Update(cloneURL, parsed.Ref); err != nil {
+		// If update fails, log warning but continue with existing cache
+		// This handles cases like network failures where cache is still usable
+		fmt.Fprintf(os.Stderr, "warning: failed to update cached repo (using existing cache): %v\n", err)
+	}
+
+	// Discover resources in the cached repo
+	searchPath := cachePath
 	if parsed.Subpath != "" {
-		searchPath = filepath.Join(tempDir, parsed.Subpath)
+		searchPath = filepath.Join(cachePath, parsed.Subpath)
 	}
 
 	// Find and update the specific resource
@@ -385,31 +399,58 @@ func updateBatchFromGitSource(manager *repo.Manager, sourceURL string, resources
 		return results
 	}
 
-	tempDir, err := source.CloneRepo(cloneURL, parsed.Ref)
+	// Create workspace manager
+	workspaceManager, err := workspace.NewManager(manager.GetRepoPath())
 	if err != nil {
-		// If clone fails, all resources in batch fail
+		// If workspace manager creation fails, all resources in batch fail
 		for _, res := range resources {
 			results = append(results, UpdateResult{
 				Name:    res.name,
 				Type:    res.resourceType,
 				Success: false,
 				Skipped: false,
-				Message: fmt.Sprintf("git clone failed: %v", err),
+				Message: fmt.Sprintf("failed to create workspace manager: %v", err),
 			})
 		}
 		return results
 	}
-	defer source.CleanupTempDir(tempDir)
 
-	// Determine search path
-	searchPath := tempDir
-	if parsed.Subpath != "" {
-		searchPath = filepath.Join(tempDir, parsed.Subpath)
+	// Get or clone repository using workspace cache
+	cachePath, err := workspaceManager.GetOrClone(cloneURL, parsed.Ref)
+	if err != nil {
+		// If cache retrieval fails, all resources in batch fail
+		for _, res := range resources {
+			results = append(results, UpdateResult{
+				Name:    res.name,
+				Type:    res.resourceType,
+				Success: false,
+				Skipped: false,
+				Message: fmt.Sprintf("failed to get cached repository: %v", err),
+			})
+		}
+		return results
 	}
 
-	// Show cloning message (once for the whole batch)
+	// Update cached repository to latest
+	updateErr := workspaceManager.Update(cloneURL, parsed.Ref)
+	if updateErr != nil {
+		// If update fails, log warning but continue with existing cache
+		fmt.Fprintf(os.Stderr, "warning: failed to update cached repo (using existing cache): %v\n", updateErr)
+	}
+
+	// Determine search path
+	searchPath := cachePath
+	if parsed.Subpath != "" {
+		searchPath = filepath.Join(cachePath, parsed.Subpath)
+	}
+
+	// Show update message (once for the whole batch)
 	if !updateDryRunFlag && len(resources) > 0 {
-		fmt.Printf("  ↓ Cloning from %s... (updating %d resources)\n\n", sourceURL, len(resources))
+		if updateErr == nil {
+			fmt.Printf("  ↓ Updating cached repo from %s... (refreshing %d resources)\n\n", sourceURL, len(resources))
+		} else {
+			fmt.Printf("  ↓ Using cached repo from %s... (refreshing %d resources)\n\n", sourceURL, len(resources))
+		}
 	}
 
 	// Update each resource in the batch
@@ -436,20 +477,20 @@ func updateBatchFromGitSource(manager *repo.Manager, sourceURL string, resources
 		}
 
 		// Find and update the specific resource
-		var updateErr error
+		var resourceUpdateErr error
 		switch res.resourceType {
 		case resource.Command:
-			updateErr = updateCommandFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
+			resourceUpdateErr = updateCommandFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
 		case resource.Skill:
-			updateErr = updateSkillFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
+			resourceUpdateErr = updateSkillFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
 		case resource.Agent:
-			updateErr = updateAgentFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
+			resourceUpdateErr = updateAgentFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
 		default:
-			updateErr = fmt.Errorf("unsupported resource type: %s", res.resourceType)
+			resourceUpdateErr = fmt.Errorf("unsupported resource type: %s", res.resourceType)
 		}
 
-		if updateErr != nil {
-			result.Message = updateErr.Error()
+		if resourceUpdateErr != nil {
+			result.Message = resourceUpdateErr.Error()
 			fmt.Printf("  ✗ %s\n\n", result.Message)
 			results = append(results, result)
 			continue

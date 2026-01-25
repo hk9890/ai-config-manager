@@ -558,3 +558,229 @@ func TestUpdate_Integration(t *testing.T) {
 		t.Errorf("metadata LastUpdated not set")
 	}
 }
+
+// TestListCached_Empty verifies ListCached with no caches
+func TestListCached_Empty(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	tempDir := t.TempDir()
+	mgr, err := NewManager(tempDir)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Initialize workspace
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// List caches (should be empty)
+	urls, err := mgr.ListCached()
+	if err != nil {
+		t.Fatalf("ListCached failed: %v", err)
+	}
+
+	if len(urls) != 0 {
+		t.Errorf("expected 0 cached URLs, got %d", len(urls))
+	}
+}
+
+// TestListCached_WithCaches verifies ListCached returns cached URLs
+func TestListCached_WithCaches(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	// Check if git is available
+	if err := exec.Command("git", "--version").Run(); err != nil {
+		t.Skip("git not available")
+	}
+
+	tempDir := t.TempDir()
+	mgr, err := NewManager(tempDir)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Use the test repository
+	testURL := "https://github.com/hk9890/ai-config-manager-test-repo"
+
+	// Clone to cache
+	_, err = mgr.GetOrClone(testURL, "main")
+	if err != nil {
+		t.Skipf("GetOrClone failed (test repo may not exist): %v", err)
+	}
+
+	// List caches
+	urls, err := mgr.ListCached()
+	if err != nil {
+		t.Fatalf("ListCached failed: %v", err)
+	}
+
+	if len(urls) != 1 {
+		t.Fatalf("expected 1 cached URL, got %d", len(urls))
+	}
+
+	// Verify URL matches (normalized)
+	expectedURL := normalizeURL(testURL)
+	if urls[0] != expectedURL {
+		t.Errorf("expected URL %s, got %s", expectedURL, urls[0])
+	}
+}
+
+// TestRemove verifies removing a cached repository
+func TestRemove(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	// Check if git is available
+	if err := exec.Command("git", "--version").Run(); err != nil {
+		t.Skip("git not available")
+	}
+
+	tempDir := t.TempDir()
+	mgr, err := NewManager(tempDir)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Use the test repository
+	testURL := "https://github.com/hk9890/ai-config-manager-test-repo"
+
+	// Clone to cache
+	cachePath, err := mgr.GetOrClone(testURL, "main")
+	if err != nil {
+		t.Skipf("GetOrClone failed (test repo may not exist): %v", err)
+	}
+
+	// Verify cache exists
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		t.Fatalf("cache directory should exist after GetOrClone")
+	}
+
+	// Remove cache
+	if err := mgr.Remove(testURL); err != nil {
+		t.Fatalf("Remove failed: %v", err)
+	}
+
+	// Verify cache was removed
+	if _, err := os.Stat(cachePath); !os.IsNotExist(err) {
+		t.Errorf("cache directory should be removed after Remove")
+	}
+
+	// Verify metadata was updated
+	urls, err := mgr.ListCached()
+	if err != nil {
+		t.Fatalf("ListCached failed: %v", err)
+	}
+
+	if len(urls) != 0 {
+		t.Errorf("expected 0 cached URLs after removal, got %d", len(urls))
+	}
+}
+
+// TestRemove_NonExistent verifies removing a non-existent cache returns error
+func TestRemove_NonExistent(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr, err := NewManager(tempDir)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Try to remove non-existent cache
+	err = mgr.Remove("https://github.com/nonexistent/repo")
+	if err == nil {
+		t.Error("Remove should return error for non-existent cache")
+	}
+}
+
+// TestPrune verifies pruning unreferenced caches
+func TestPrune(t *testing.T) {
+	// This is a unit test that doesn't need real Git repos
+	tempDir := t.TempDir()
+	mgr, err := NewManager(tempDir)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	// Create fake cache directories manually
+	workspaceDir := filepath.Join(tempDir, ".workspace")
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	testURL1 := "https://github.com/test/repo1"
+	testURL2 := "https://github.com/test/repo2"
+
+	hash1 := computeHash(testURL1)
+	hash2 := computeHash(testURL2)
+
+	cache1 := filepath.Join(workspaceDir, hash1)
+	cache2 := filepath.Join(workspaceDir, hash2)
+
+	// Create fake .git directories
+	if err := os.MkdirAll(filepath.Join(cache1, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cache2, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create metadata pointing to both repos
+	metadata := &CacheMetadata{
+		Version: "1.0",
+		Caches: map[string]CacheEntry{
+			hash1: {
+				URL: normalizeURL(testURL1),
+				Ref: "main",
+			},
+			hash2: {
+				URL: normalizeURL(testURL2),
+				Ref: "main",
+			},
+		},
+	}
+	if err := mgr.saveMetadata(metadata); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify both caches exist
+	urls, err := mgr.ListCached()
+	if err != nil {
+		t.Fatalf("ListCached failed: %v", err)
+	}
+	if len(urls) != 2 {
+		t.Fatalf("expected 2 cached URLs, got %d", len(urls))
+	}
+
+	// Prune with only URL1 referenced
+	removed, err := mgr.Prune([]string{testURL1})
+	if err != nil {
+		t.Fatalf("Prune failed: %v", err)
+	}
+
+	// Verify URL2 was removed
+	if len(removed) != 1 {
+		t.Fatalf("expected 1 removed URL, got %d", len(removed))
+	}
+
+	normalizedURL2 := normalizeURL(testURL2)
+	if removed[0] != normalizedURL2 {
+		t.Errorf("expected removed URL %s, got %s", normalizedURL2, removed[0])
+	}
+
+	// Verify only URL1 remains cached
+	urls, err = mgr.ListCached()
+	if err != nil {
+		t.Fatalf("ListCached failed: %v", err)
+	}
+	if len(urls) != 1 {
+		t.Errorf("expected 1 cached URL after prune, got %d", len(urls))
+	}
+	if urls[0] != normalizeURL(testURL1) {
+		t.Errorf("expected remaining URL %s, got %s", normalizeURL(testURL1), urls[0])
+	}
+}

@@ -9,17 +9,236 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/workspace"
 )
 
-func TestFindOrphanedMetadata(t *testing.T) {
+func TestFindUnreferencedCaches_NoWorkspace(t *testing.T) {
 	// Create temp directory for test repo
 	tempDir := t.TempDir()
 
-	// Create repo structure
-	metadataDir := filepath.Join(tempDir, ".metadata")
-	commandsDir := filepath.Join(metadataDir, "commands")
-	skillsDir := filepath.Join(metadataDir, "skills")
-	agentsDir := filepath.Join(metadataDir, "agents")
+	// Create repo manager
+	manager := repo.NewManagerWithPath(tempDir)
+
+	// Create workspace manager
+	workspaceManager, err := workspace.NewManager(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Find unreferenced caches (should return empty list, not error)
+	unreferenced, err := findUnreferencedCaches(manager, workspaceManager)
+	if err != nil {
+		t.Fatalf("findUnreferencedCaches failed: %v", err)
+	}
+
+	if len(unreferenced) != 0 {
+		t.Errorf("Expected 0 unreferenced caches, got %d", len(unreferenced))
+	}
+}
+
+func TestFindUnreferencedCaches_NoCaches(t *testing.T) {
+	// Create temp directory for test repo
+	tempDir := t.TempDir()
+
+	// Create workspace directory (but empty)
+	workspaceDir := filepath.Join(tempDir, ".workspace")
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create repo manager
+	manager := repo.NewManagerWithPath(tempDir)
+
+	// Create workspace manager
+	workspaceManager, err := workspace.NewManager(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Find unreferenced caches
+	unreferenced, err := findUnreferencedCaches(manager, workspaceManager)
+	if err != nil {
+		t.Fatalf("findUnreferencedCaches failed: %v", err)
+	}
+
+	if len(unreferenced) != 0 {
+		t.Errorf("Expected 0 unreferenced caches, got %d", len(unreferenced))
+	}
+}
+
+func TestFindUnreferencedCaches_AllReferenced(t *testing.T) {
+	// Create temp directory for test repo
+	tempDir := t.TempDir()
+
+	// Create metadata directory
+	metadataDir := filepath.Join(tempDir, ".metadata", "commands")
+	if err := os.MkdirAll(metadataDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create workspace directory
+	workspaceDir := filepath.Join(tempDir, ".workspace")
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// URL to cache
+	testURL := "https://github.com/test/repo"
+
+	// Create a fake cached repo
+	hash := workspace.ComputeHash(testURL)
+	cachePath := filepath.Join(workspaceDir, hash)
+	if err := os.MkdirAll(filepath.Join(cachePath, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create workspace metadata pointing to this URL
+	meta := &metadata.ResourceMetadata{
+		Name:           "test-command",
+		Type:           resource.Command,
+		SourceType:     "github",
+		SourceURL:      testURL,
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(meta, tempDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create workspace manager and add cache metadata
+	workspaceManager, err := workspace.NewManager(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Manually create cache metadata so ListCached works
+	metadataPath := filepath.Join(workspaceDir, ".cache-metadata.json")
+	metadataJSON := `{"version":"1.0","caches":{"` + hash + `":{"url":"` + normalizeURL(testURL) + `","last_accessed":"2026-01-01T00:00:00Z","last_updated":"2026-01-01T00:00:00Z","ref":"main"}}}`
+	if err := os.WriteFile(metadataPath, []byte(metadataJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create repo manager
+	manager := repo.NewManagerWithPath(tempDir)
+
+	// Find unreferenced caches (should be empty - cache is referenced)
+	unreferenced, err := findUnreferencedCaches(manager, workspaceManager)
+	if err != nil {
+		t.Fatalf("findUnreferencedCaches failed: %v", err)
+	}
+
+	if len(unreferenced) != 0 {
+		t.Errorf("Expected 0 unreferenced caches (cache is referenced), got %d", len(unreferenced))
+	}
+}
+
+func TestFindUnreferencedCaches_WithUnreferenced(t *testing.T) {
+	// Create temp directory for test repo
+	tempDir := t.TempDir()
+
+	// Create metadata directory
+	metadataDir := filepath.Join(tempDir, ".metadata", "commands")
+	if err := os.MkdirAll(metadataDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create workspace directory
+	workspaceDir := filepath.Join(tempDir, ".workspace")
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create two cached repos
+	referencedURL := "https://github.com/test/referenced"
+	unreferencedURL := "https://github.com/test/unreferenced"
+
+	referencedHash := workspace.ComputeHash(referencedURL)
+	unreferencedHash := workspace.ComputeHash(unreferencedURL)
+
+	// Create fake cached repos
+	referencedPath := filepath.Join(workspaceDir, referencedHash)
+	unreferencedPath := filepath.Join(workspaceDir, unreferencedHash)
+
+	if err := os.MkdirAll(filepath.Join(referencedPath, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(unreferencedPath, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add some content to unreferenced cache for size testing
+	if err := os.WriteFile(filepath.Join(unreferencedPath, "README.md"), []byte("test content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create metadata only for the referenced repo
+	meta := &metadata.ResourceMetadata{
+		Name:           "test-command",
+		Type:           resource.Command,
+		SourceType:     "github",
+		SourceURL:      referencedURL,
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(meta, tempDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create workspace manager and add cache metadata for both repos
+	workspaceManager, err := workspace.NewManager(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create cache metadata
+	metadataPath := filepath.Join(workspaceDir, ".cache-metadata.json")
+	metadataJSON := `{"version":"1.0","caches":{
+		"` + referencedHash + `":{"url":"` + normalizeURL(referencedURL) + `","last_accessed":"2026-01-01T00:00:00Z","last_updated":"2026-01-01T00:00:00Z","ref":"main"},
+		"` + unreferencedHash + `":{"url":"` + normalizeURL(unreferencedURL) + `","last_accessed":"2026-01-01T00:00:00Z","last_updated":"2026-01-01T00:00:00Z","ref":"main"}
+	}}`
+	if err := os.WriteFile(metadataPath, []byte(metadataJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create repo manager
+	manager := repo.NewManagerWithPath(tempDir)
+
+	// Find unreferenced caches
+	unreferenced, err := findUnreferencedCaches(manager, workspaceManager)
+	if err != nil {
+		t.Fatalf("findUnreferencedCaches failed: %v", err)
+	}
+
+	// Should find exactly one unreferenced cache
+	if len(unreferenced) != 1 {
+		t.Fatalf("Expected 1 unreferenced cache, got %d", len(unreferenced))
+	}
+
+	// Verify it's the correct one
+	if unreferenced[0].URL != normalizeURL(unreferencedURL) {
+		t.Errorf("Expected unreferenced URL %s, got %s", normalizeURL(unreferencedURL), unreferenced[0].URL)
+	}
+
+	// Verify size is calculated
+	if unreferenced[0].Size == 0 {
+		t.Error("Expected non-zero size for unreferenced cache")
+	}
+
+	// Verify path is correct
+	expectedPath := filepath.Join(workspaceDir, unreferencedHash)
+	if unreferenced[0].Path != expectedPath {
+		t.Errorf("Expected path %s, got %s", expectedPath, unreferenced[0].Path)
+	}
+}
+
+func TestCollectReferencedGitURLs(t *testing.T) {
+	// Create temp directory for test repo
+	tempDir := t.TempDir()
+
+	// Create metadata directories
+	commandsDir := filepath.Join(tempDir, ".metadata", "commands")
+	skillsDir := filepath.Join(tempDir, ".metadata", "skills")
+	agentsDir := filepath.Join(tempDir, ".metadata", "agents")
 
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatal(err)
@@ -31,260 +250,192 @@ func TestFindOrphanedMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a valid source file
-	validSourcePath := filepath.Join(tempDir, "valid-command.md")
-	if err := os.WriteFile(validSourcePath, []byte("test"), 0644); err != nil {
-		t.Fatal(err)
+	// Create metadata with various source types
+	metas := []metadata.ResourceMetadata{
+		{
+			Name:           "git-command",
+			Type:           resource.Command,
+			SourceType:     "github",
+			SourceURL:      "https://github.com/test/repo1",
+			FirstInstalled: time.Now(),
+			LastUpdated:    time.Now(),
+		},
+		{
+			Name:           "local-command",
+			Type:           resource.Command,
+			SourceType:     "local",
+			SourceURL:      "/path/to/local",
+			FirstInstalled: time.Now(),
+			LastUpdated:    time.Now(),
+		},
+		{
+			Name:           "git-skill",
+			Type:           resource.Skill,
+			SourceType:     "git-url",
+			SourceURL:      "https://example.com/repo.git",
+			FirstInstalled: time.Now(),
+			LastUpdated:    time.Now(),
+		},
+		{
+			Name:           "git-agent",
+			Type:           resource.Agent,
+			SourceType:     "gitlab",
+			SourceURL:      "https://gitlab.com/test/repo",
+			FirstInstalled: time.Now(),
+			LastUpdated:    time.Now(),
+		},
 	}
 
-	// Create metadata for command with valid source (should NOT be orphaned)
-	validMeta := &metadata.ResourceMetadata{
-		Name:           "valid-command",
-		Type:           resource.Command,
-		SourceType:     "local",
-		SourceURL:      validSourcePath,
-		FirstInstalled: time.Now(),
-		LastUpdated:    time.Now(),
-	}
-	if err := metadata.Save(validMeta, tempDir); err != nil {
-		t.Fatal(err)
+	for _, meta := range metas {
+		m := meta // Create copy for pointer
+		if err := metadata.Save(&m, tempDir); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	// Create metadata for command with non-existent source (should be orphaned)
-	orphanedMeta := &metadata.ResourceMetadata{
-		Name:           "orphaned-command",
-		Type:           resource.Command,
-		SourceType:     "local",
-		SourceURL:      filepath.Join(tempDir, "non-existent.md"),
-		FirstInstalled: time.Now(),
-		LastUpdated:    time.Now(),
-	}
-	if err := metadata.Save(orphanedMeta, tempDir); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create metadata for git source (should NOT be checked)
-	gitMeta := &metadata.ResourceMetadata{
-		Name:           "git-command",
-		Type:           resource.Command,
-		SourceType:     "github",
-		SourceURL:      "github.com/user/repo/commands/test.md",
-		FirstInstalled: time.Now(),
-		LastUpdated:    time.Now(),
-	}
-	if err := metadata.Save(gitMeta, tempDir); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create metadata with file:// URL scheme
-	orphanedFileURL := &metadata.ResourceMetadata{
-		Name:           "orphaned-file-url",
-		Type:           resource.Skill,
-		SourceType:     "file",
-		SourceURL:      "file://" + filepath.Join(tempDir, "missing-skill"),
-		FirstInstalled: time.Now(),
-		LastUpdated:    time.Now(),
-	}
-	if err := metadata.Save(orphanedFileURL, tempDir); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create manager with temp repo path
+	// Create repo manager
 	manager := repo.NewManagerWithPath(tempDir)
 
-	// Find orphaned metadata
-	orphaned, err := findOrphanedMetadata(manager)
+	// Collect referenced Git URLs
+	urls, err := collectReferencedGitURLs(manager)
 	if err != nil {
-		t.Fatalf("findOrphanedMetadata failed: %v", err)
+		t.Fatalf("collectReferencedGitURLs failed: %v", err)
 	}
 
-	// Verify results
-	if len(orphaned) != 2 {
-		t.Errorf("Expected 2 orphaned entries, got %d", len(orphaned))
-		for _, o := range orphaned {
-			t.Logf("Found orphaned: %s %s", o.Type, o.Name)
-		}
+	// Should find 3 Git URLs (not the local one)
+	if len(urls) != 3 {
+		t.Fatalf("Expected 3 Git URLs, got %d: %v", len(urls), urls)
 	}
 
-	// Check that specific entries are in the orphaned list
-	foundOrphanedCommand := false
-	foundOrphanedFileURL := false
-	for _, o := range orphaned {
-		if o.Name == "orphaned-command" && o.Type == resource.Command {
-			foundOrphanedCommand = true
-		}
-		if o.Name == "orphaned-file-url" && o.Type == resource.Skill {
-			foundOrphanedFileURL = true
-		}
-		// Ensure valid-command and git-command are NOT in orphaned list
-		if o.Name == "valid-command" || o.Name == "git-command" {
-			t.Errorf("Non-orphaned entry %s should not be in orphaned list", o.Name)
+	// Verify URLs are correct
+	expectedURLs := map[string]bool{
+		"https://github.com/test/repo1": false,
+		"https://example.com/repo.git":  false,
+		"https://gitlab.com/test/repo":  false,
+	}
+
+	for _, url := range urls {
+		if _, exists := expectedURLs[url]; exists {
+			expectedURLs[url] = true
+		} else {
+			t.Errorf("Unexpected URL found: %s", url)
 		}
 	}
 
-	if !foundOrphanedCommand {
-		t.Error("orphaned-command should be in orphaned list")
-	}
-	if !foundOrphanedFileURL {
-		t.Error("orphaned-file-url should be in orphaned list")
+	for url, found := range expectedURLs {
+		if !found {
+			t.Errorf("Expected URL not found: %s", url)
+		}
 	}
 }
 
-func TestIsOrphaned(t *testing.T) {
-	// Create temp directory for test files
-	tempDir := t.TempDir()
-
-	// Create a valid file
-	validPath := filepath.Join(tempDir, "exists.md")
-	if err := os.WriteFile(validPath, []byte("test"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
+func TestIsGitSource(t *testing.T) {
 	tests := []struct {
-		name     string
-		meta     *metadata.ResourceMetadata
-		expected bool
+		sourceType string
+		expected   bool
 	}{
-		{
-			name: "local source exists",
-			meta: &metadata.ResourceMetadata{
-				SourceType: "local",
-				SourceURL:  validPath,
-			},
-			expected: false,
-		},
-		{
-			name: "local source missing",
-			meta: &metadata.ResourceMetadata{
-				SourceType: "local",
-				SourceURL:  filepath.Join(tempDir, "missing.md"),
-			},
-			expected: true,
-		},
-		{
-			name: "file URL exists",
-			meta: &metadata.ResourceMetadata{
-				SourceType: "file",
-				SourceURL:  "file://" + validPath,
-			},
-			expected: false,
-		},
-		{
-			name: "file URL missing",
-			meta: &metadata.ResourceMetadata{
-				SourceType: "file",
-				SourceURL:  "file://" + filepath.Join(tempDir, "missing.md"),
-			},
-			expected: true,
-		},
-		{
-			name: "github source (not checked)",
-			meta: &metadata.ResourceMetadata{
-				SourceType: "github",
-				SourceURL:  "github.com/user/repo",
-			},
-			expected: false,
-		},
-		{
-			name: "git-url source (not checked)",
-			meta: &metadata.ResourceMetadata{
-				SourceType: "git-url",
-				SourceURL:  "https://example.com/repo.git",
-			},
-			expected: false,
-		},
+		{"github", true},
+		{"git-url", true},
+		{"gitlab", true},
+		{"local", false},
+		{"file", false},
+		{"", false},
+		{"unknown", false},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isOrphaned(tt.meta)
+		t.Run(tt.sourceType, func(t *testing.T) {
+			result := isGitSource(tt.sourceType)
 			if result != tt.expected {
-				t.Errorf("isOrphaned() = %v, expected %v for %s", result, tt.expected, tt.name)
+				t.Errorf("isGitSource(%q) = %v, expected %v", tt.sourceType, result, tt.expected)
 			}
 		})
 	}
 }
 
-func TestRemoveOrphanedMetadata(t *testing.T) {
-	// Create temp directory
-	tempDir := t.TempDir()
-
-	// Create test metadata files
-	file1 := filepath.Join(tempDir, "orphan1.json")
-	file2 := filepath.Join(tempDir, "orphan2.json")
-
-	if err := os.WriteFile(file1, []byte("{}"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(file2, []byte("{}"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	orphaned := []OrphanedMetadata{
-		{
-			Name:     "orphan1",
-			Type:     resource.Command,
-			FilePath: file1,
-		},
-		{
-			Name:     "orphan2",
-			Type:     resource.Skill,
-			FilePath: file2,
-		},
+func TestNormalizeURL(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"https://github.com/test/repo", "https://github.com/test/repo"},
+		{"https://github.com/test/repo.git", "https://github.com/test/repo"},
+		{"https://github.com/test/repo/", "https://github.com/test/repo"},
+		{"https://github.com/test/repo.git/", "https://github.com/test/repo"},
+		{"https://GitHub.com/Test/Repo", "https://github.com/test/repo"},
+		{"  https://github.com/test/repo  ", "https://github.com/test/repo"},
+		{"https://github.com/test/repo/.git", "https://github.com/test/repo"}, // .git stripped
 	}
 
-	// Remove orphaned metadata
-	removed, failed := removeOrphanedMetadata(orphaned)
-
-	// Check counts
-	if removed != 2 {
-		t.Errorf("Expected 2 removed, got %d", removed)
-	}
-	if failed != 0 {
-		t.Errorf("Expected 0 failed, got %d", failed)
-	}
-
-	// Verify files are deleted
-	if _, err := os.Stat(file1); !os.IsNotExist(err) {
-		t.Error("file1 should be deleted")
-	}
-	if _, err := os.Stat(file2); !os.IsNotExist(err) {
-		t.Error("file2 should be deleted")
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := normalizeURL(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeURL(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
 	}
 }
 
-func TestRemoveOrphanedMetadata_PartialFailure(t *testing.T) {
-	// Create temp directory
+func TestGetDirSize(t *testing.T) {
+	// Create temp directory with some files
 	tempDir := t.TempDir()
 
-	// Create one valid file
-	validFile := filepath.Join(tempDir, "valid.json")
-	if err := os.WriteFile(validFile, []byte("{}"), 0644); err != nil {
+	// Create test files
+	file1 := filepath.Join(tempDir, "file1.txt")
+	file2 := filepath.Join(tempDir, "file2.txt")
+	subDir := filepath.Join(tempDir, "subdir")
+	file3 := filepath.Join(subDir, "file3.txt")
+
+	if err := os.WriteFile(file1, []byte("12345"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file2, []byte("1234567890"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file3, []byte("123"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	orphaned := []OrphanedMetadata{
-		{
-			Name:     "valid",
-			Type:     resource.Command,
-			FilePath: validFile,
-		},
-		{
-			Name:     "non-existent",
-			Type:     resource.Skill,
-			FilePath: filepath.Join(tempDir, "non-existent.json"),
-		},
+	// Calculate size
+	size, err := getDirSize(tempDir)
+	if err != nil {
+		t.Fatalf("getDirSize failed: %v", err)
 	}
 
-	// Remove orphaned metadata
-	removed, failed := removeOrphanedMetadata(orphaned)
-
-	// Check counts - one should succeed, one should fail
-	if removed != 1 {
-		t.Errorf("Expected 1 removed, got %d", removed)
+	// Expected: 5 + 10 + 3 = 18 bytes
+	expected := int64(18)
+	if size != expected {
+		t.Errorf("Expected size %d, got %d", expected, size)
 	}
-	if failed != 1 {
-		t.Errorf("Expected 1 failed, got %d", failed)
+}
+
+func TestFormatSize(t *testing.T) {
+	tests := []struct {
+		bytes    int64
+		expected string
+	}{
+		{0, "0 B"},
+		{100, "100 B"},
+		{1023, "1023 B"},
+		{1024, "1.0 KB"},
+		{1536, "1.5 KB"},
+		{1048576, "1.0 MB"},
+		{1572864, "1.5 MB"},
+		{1073741824, "1.0 GB"},
+		{1099511627776, "1.0 TB"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := formatSize(tt.bytes)
+			if result != tt.expected {
+				t.Errorf("formatSize(%d) = %q, expected %q", tt.bytes, result, tt.expected)
+			}
+		})
 	}
 }
 
@@ -295,10 +446,10 @@ func TestPluralize(t *testing.T) {
 		count    int
 		expected string
 	}{
-		{"entry", "entries", 0, "entries"},
-		{"entry", "entries", 1, "entry"},
-		{"entry", "entries", 2, "entries"},
-		{"entry", "entries", 100, "entries"},
+		{"repository", "repositories", 0, "repositories"},
+		{"repository", "repositories", 1, "repository"},
+		{"repository", "repositories", 2, "repositories"},
+		{"repository", "repositories", 100, "repositories"},
 		{"file", "files", 1, "file"},
 		{"file", "files", 5, "files"},
 	}
