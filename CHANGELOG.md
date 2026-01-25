@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-01-25
+
+### Added
+- **Package System**
+  - New package resource type for bundling multiple resources together
+  - Packages are JSON files that reference commands, skills, and agents
+  - Install all resources in a package with a single command: `aimgr install package/web-tools`
+  - Package discovery with `aimgr repo add` auto-discovers `*.package.json` files
+  - Create packages with `aimgr repo create-package` command
+  - Pattern matching support: `package/*`, `package/web-*`
+  - Integrated into all core commands (list, install, uninstall, repo commands)
+  
+- **Marketplace Import**
+  - Import Claude plugin marketplaces with `aimgr marketplace import` command
+  - Auto-discovers resources from plugin directories (commands, skills, agents)
+  - Generates aimgr packages from marketplace plugins automatically
+  - Supports local paths and GitHub URLs (e.g., `gh:owner/repo/.claude-plugin/marketplace.json`)
+  - Resource discovery searches standard locations: `commands/`, `skills/`, `agents/`, `.claude/`, `.opencode/`
+  - Filter plugins during import with `--filter` flag
+  - `--dry-run` and `--force` options for safe imports
+  
+- **Project Manifests (ai.package.yaml)**
+  - New `ai.package.yaml` manifest file for declarative project dependencies (similar to npm's package.json)
+  - Zero-argument install: `aimgr install` reads manifest and installs all resources
+  - Auto-save by default: `aimgr install skill/test` adds to manifest automatically
+  - `--no-save` flag to skip manifest updates
+  - `aimgr init` command creates new manifest file
+  - Optional `targets` field to override default install targets per-project
+  - Enables consistent AI tooling across team members
+  
+- **Auto-Discovery Enhancements**
+  - `aimgr repo add` now discovers packages from `packages/` directory
+  - Marketplace auto-discovery: finds `marketplace.json` files in `.claude-plugin/` directories
+  - Filter support: `--filter "package/*"` or `--filter "web-*"` to selectively import
+  - Works with local paths, Git URLs, and GitHub shortcuts
+
+### Changed
+- **Install Command Improvements**
+  - Zero-argument mode: `aimgr install` reads `ai.package.yaml` if present
+  - Auto-save behavior: resources automatically added to manifest (disable with `--no-save`)
+  - Supports installing packages: `aimgr install package/web-tools`
+  - Better error messages when manifest not found
+  
+- **Repository Management**
+  - `repo add` now supports package discovery alongside commands, skills, and agents
+  - Enhanced bulk import with marketplace and package support
+  - Improved resource counting and progress reporting
+
+### Documentation
+- Added comprehensive Package System section to AGENTS.md
+- Added Marketplace Format documentation with examples
+- Added Project Manifests section with workflows and best practices
+- Updated README with package and manifest examples
+- Added marketplace example files in `examples/marketplace/`
+- Added ai.package.yaml examples in `examples/ai-package/`
+
+### Testing
+- Added 28 integration tests for ai.package.yaml workflows (975 lines)
+- Added 18 integration tests for marketplace import (853 lines)
+- Added 15 integration tests for package auto-import (838 lines)
+- Added 11 unit tests for marketplace parser (714 lines)
+- Added 22 unit tests for marketplace generator (893 lines)
+- Added 13 unit tests for package discovery (528 lines)
+- Added 11 unit tests for manifest package (485 lines)
+- All tests pass with comprehensive edge case coverage
+
+### Fixed
+- Package filter support in pattern matcher now handles `package/*` patterns correctly
+- Autocomplete support for package resources in install command
+
+
 ## [1.6.0] - 2026-01-25
 
 ### Added
@@ -191,3 +262,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.0.0]: https://github.com/hk9890/ai-config-manager/releases/tag/v1.0.0
 
 [1.5.0]: https://github.com/hk9890/ai-config-manager/compare/v1.4.0...v1.5.0
+[1.8.0]: https://github.com/hk9890/ai-config-manager/compare/v1.7.0...v1.8.0
