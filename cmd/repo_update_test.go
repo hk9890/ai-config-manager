@@ -204,3 +204,354 @@ func TestDisplayUpdateSummary_Empty(t *testing.T) {
 	results := []UpdateResult{}
 	displayUpdateSummary(results)
 }
+
+func TestRepoUpdateCmd_ExactPattern(t *testing.T) {
+	// Create a temporary repo with test resources
+	repoDir := t.TempDir()
+	manager := repo.NewManagerWithPath(repoDir)
+
+	// Create test commands
+	sourceDir := t.TempDir()
+	cmd1Path := filepath.Join(sourceDir, "cmd1.md")
+	cmd1Content := `---
+description: Test command 1
+version: "1.0.0"
+---
+# Command 1
+`
+	if err := os.WriteFile(cmd1Path, []byte(cmd1Content), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	cmd2Path := filepath.Join(sourceDir, "cmd2.md")
+	cmd2Content := `---
+description: Test command 2
+version: "1.0.0"
+---
+# Command 2
+`
+	if err := os.WriteFile(cmd2Path, []byte(cmd2Content), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	// Add commands to repo
+	if err := manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file"); err != nil {
+		t.Fatalf("Failed to add cmd1: %v", err)
+	}
+	if err := manager.AddCommand(cmd2Path, "file://"+cmd2Path, "file"); err != nil {
+		t.Fatalf("Failed to add cmd2: %v", err)
+	}
+
+	// Update cmd1 source file
+	updatedCmd1 := `---
+description: Updated command 1
+version: "2.0.0"
+---
+# Updated Command 1
+`
+	if err := os.WriteFile(cmd1Path, []byte(updatedCmd1), 0644); err != nil {
+		t.Fatalf("Failed to update cmd1: %v", err)
+	}
+
+	// Test updating with exact pattern
+	var toUpdate []string
+	matches, err := ExpandPattern(manager, "command/cmd1")
+	if err != nil {
+		t.Fatalf("Failed to expand pattern: %v", err)
+	}
+	toUpdate = append(toUpdate, matches...)
+
+	if len(toUpdate) != 1 {
+		t.Errorf("Expected 1 match, got %d", len(toUpdate))
+	}
+	if len(toUpdate) > 0 && toUpdate[0] != "command/cmd1" {
+		t.Errorf("Expected 'command/cmd1', got '%s'", toUpdate[0])
+	}
+
+	// Update the resource
+	resType, name, err := ParseResourceArg(toUpdate[0])
+	if err != nil {
+		t.Fatalf("Failed to parse resource arg: %v", err)
+	}
+	result := updateSingleResource(manager, name, resType)
+
+	if !result.Success {
+		t.Errorf("Expected successful update, got: %s", result.Message)
+	}
+
+	// Verify the resource was updated
+	updatedRes, err := resource.LoadCommand(filepath.Join(repoDir, "commands", "cmd1.md"))
+	if err != nil {
+		t.Fatalf("Failed to load updated command: %v", err)
+	}
+
+	if updatedRes.Version != "2.0.0" {
+		t.Errorf("Expected version '2.0.0', got '%s'", updatedRes.Version)
+	}
+}
+
+func TestRepoUpdateCmd_WildcardPattern(t *testing.T) {
+	// Create a temporary repo with test resources
+	repoDir := t.TempDir()
+	manager := repo.NewManagerWithPath(repoDir)
+
+	// Create test commands
+	sourceDir := t.TempDir()
+	testCmd1Path := filepath.Join(sourceDir, "test-cmd1.md")
+	testCmd1Content := `---
+description: Test command 1
+---
+# Test Command 1
+`
+	if err := os.WriteFile(testCmd1Path, []byte(testCmd1Content), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	testCmd2Path := filepath.Join(sourceDir, "test-cmd2.md")
+	testCmd2Content := `---
+description: Test command 2
+---
+# Test Command 2
+`
+	if err := os.WriteFile(testCmd2Path, []byte(testCmd2Content), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	prodCmdPath := filepath.Join(sourceDir, "prod-cmd.md")
+	prodCmdContent := `---
+description: Production command
+---
+# Production Command
+`
+	if err := os.WriteFile(prodCmdPath, []byte(prodCmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create prod command: %v", err)
+	}
+
+	// Add commands to repo
+	if err := manager.AddCommand(testCmd1Path, "file://"+testCmd1Path, "file"); err != nil {
+		t.Fatalf("Failed to add test-cmd1: %v", err)
+	}
+	if err := manager.AddCommand(testCmd2Path, "file://"+testCmd2Path, "file"); err != nil {
+		t.Fatalf("Failed to add test-cmd2: %v", err)
+	}
+	if err := manager.AddCommand(prodCmdPath, "file://"+prodCmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add prod-cmd: %v", err)
+	}
+
+	// Test updating with wildcard pattern
+	matches, err := ExpandPattern(manager, "command/test*")
+	if err != nil {
+		t.Fatalf("Failed to expand pattern: %v", err)
+	}
+
+	if len(matches) != 2 {
+		t.Errorf("Expected 2 matches, got %d: %v", len(matches), matches)
+	}
+
+	// Verify the matched resources
+	matchedNames := make(map[string]bool)
+	for _, match := range matches {
+		_, name, err := ParseResourceArg(match)
+		if err != nil {
+			t.Fatalf("Failed to parse resource arg: %v", err)
+		}
+		matchedNames[name] = true
+	}
+
+	if !matchedNames["test-cmd1"] {
+		t.Error("Expected 'test-cmd1' in matches")
+	}
+	if !matchedNames["test-cmd2"] {
+		t.Error("Expected 'test-cmd2' in matches")
+	}
+	if matchedNames["prod-cmd"] {
+		t.Error("Did not expect 'prod-cmd' in matches")
+	}
+}
+
+func TestRepoUpdateCmd_TypeFilter(t *testing.T) {
+	// Create a temporary repo with test resources
+	repoDir := t.TempDir()
+	manager := repo.NewManagerWithPath(repoDir)
+
+	// Create test skill
+	skillDir := filepath.Join(t.TempDir(), "test-skill")
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("Failed to create skill dir: %v", err)
+	}
+
+	skillPath := filepath.Join(skillDir, "SKILL.md")
+	skillContent := `---
+description: Test skill
+---
+# Test Skill
+`
+	if err := os.WriteFile(skillPath, []byte(skillContent), 0644); err != nil {
+		t.Fatalf("Failed to create skill file: %v", err)
+	}
+
+	// Create test command
+	cmdPath := filepath.Join(t.TempDir(), "test-cmd.md")
+	cmdContent := `---
+description: Test command
+---
+# Test Command
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create command file: %v", err)
+	}
+
+	// Add resources to repo
+	if err := manager.AddSkill(skillDir, "file://"+skillDir, "file"); err != nil {
+		t.Fatalf("Failed to add skill: %v", err)
+	}
+	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	// Test updating with type filter
+	matches, err := ExpandPattern(manager, "skill/*")
+	if err != nil {
+		t.Fatalf("Failed to expand pattern: %v", err)
+	}
+
+	if len(matches) != 1 {
+		t.Errorf("Expected 1 match, got %d: %v", len(matches), matches)
+	}
+
+	if len(matches) > 0 {
+		resType, name, err := ParseResourceArg(matches[0])
+		if err != nil {
+			t.Fatalf("Failed to parse resource arg: %v", err)
+		}
+
+		if resType != resource.Skill {
+			t.Errorf("Expected resource type 'skill', got '%s'", resType)
+		}
+		if name != "test-skill" {
+			t.Errorf("Expected name 'test-skill', got '%s'", name)
+		}
+	}
+}
+
+func TestRepoUpdateCmd_MultiplePatterns(t *testing.T) {
+	// Create a temporary repo with test resources
+	repoDir := t.TempDir()
+	manager := repo.NewManagerWithPath(repoDir)
+
+	// Create test command
+	cmdPath := filepath.Join(t.TempDir(), "cmd1.md")
+	cmdContent := `---
+description: Test command
+---
+# Test Command
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create command: %v", err)
+	}
+
+	// Create test agent
+	agentPath := filepath.Join(t.TempDir(), "agent1.md")
+	agentContent := `---
+description: Test agent
+---
+# Test Agent
+`
+	if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
+		t.Fatalf("Failed to create agent: %v", err)
+	}
+
+	// Add resources to repo
+	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+	if err := manager.AddAgent(agentPath, "file://"+agentPath, "file"); err != nil {
+		t.Fatalf("Failed to add agent: %v", err)
+	}
+
+	// Test with multiple patterns
+	var toUpdate []string
+	for _, pattern := range []string{"command/*", "agent/*"} {
+		matches, err := ExpandPattern(manager, pattern)
+		if err != nil {
+			t.Fatalf("Failed to expand pattern '%s': %v", pattern, err)
+		}
+		toUpdate = append(toUpdate, matches...)
+	}
+
+	if len(toUpdate) != 2 {
+		t.Errorf("Expected 2 matches, got %d: %v", len(toUpdate), toUpdate)
+	}
+
+	// Verify we have one command and one agent
+	foundCommand := false
+	foundAgent := false
+	for _, match := range toUpdate {
+		resType, _, err := ParseResourceArg(match)
+		if err != nil {
+			t.Fatalf("Failed to parse resource arg: %v", err)
+		}
+		if resType == resource.Command {
+			foundCommand = true
+		}
+		if resType == resource.Agent {
+			foundAgent = true
+		}
+	}
+
+	if !foundCommand {
+		t.Error("Expected to find command in matches")
+	}
+	if !foundAgent {
+		t.Error("Expected to find agent in matches")
+	}
+}
+
+func TestRepoUpdateCmd_DuplicatePatterns(t *testing.T) {
+	// Create a temporary repo with test resources
+	repoDir := t.TempDir()
+	manager := repo.NewManagerWithPath(repoDir)
+
+	// Create test command
+	cmdPath := filepath.Join(t.TempDir(), "test-cmd.md")
+	cmdContent := `---
+description: Test command
+---
+# Test Command
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create command: %v", err)
+	}
+
+	// Add command to repo
+	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	// Test with duplicate patterns
+	var toUpdate []string
+	for _, pattern := range []string{"command/test-cmd", "command/test*", "command/*"} {
+		matches, err := ExpandPattern(manager, pattern)
+		if err != nil {
+			t.Fatalf("Failed to expand pattern '%s': %v", pattern, err)
+		}
+		toUpdate = append(toUpdate, matches...)
+	}
+
+	// Before deduplication, should have 3 entries
+	if len(toUpdate) != 3 {
+		t.Errorf("Expected 3 matches before dedup, got %d", len(toUpdate))
+	}
+
+	// Remove duplicates
+	toUpdate = uniqueStrings(toUpdate)
+
+	// After deduplication, should have 1 entry
+	if len(toUpdate) != 1 {
+		t.Errorf("Expected 1 match after dedup, got %d: %v", len(toUpdate), toUpdate)
+	}
+
+	if toUpdate[0] != "command/test-cmd" {
+		t.Errorf("Expected 'command/test-cmd', got '%s'", toUpdate[0])
+	}
+}

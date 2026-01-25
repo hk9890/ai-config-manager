@@ -28,24 +28,27 @@ type UpdateResult struct {
 	Message string
 }
 
-// repoUpdateCmd represents the update command group
+// repoUpdateCmd represents the update command
 var repoUpdateCmd = &cobra.Command{
-	Use:   "update",
+	Use:   "update [pattern]...",
 	Short: "Update resources from their original sources",
 	Long: `Update resources from their original sources.
 
 Updates can refresh resources from GitHub repositories, local paths, or file sources.
 The source information is retrieved from the resource metadata.
 
+Patterns support wildcards (* and ?) and can filter by type using 'type/pattern' format.
+If no patterns are provided, all resources are updated.
+
 Examples:
   aimgr repo update                    # Update all resources
-  aimgr repo update skill my-skill     # Update specific skill
-  aimgr repo update command my-cmd     # Update specific command
-  aimgr repo update agent my-agent     # Update specific agent
+  aimgr repo update skill/my-skill     # Update specific skill
+  aimgr repo update skill/*            # Update all skills
+  aimgr repo update command/test*      # Update commands starting with 'test'
+  aimgr repo update skill/* agent/*    # Update all skills and agents
   aimgr repo update --dry-run          # Preview what would be updated
   aimgr repo update --force            # Force update even with local changes`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Update all resources (skills, commands, agents)
 		manager, err := repo.NewManager()
 		if err != nil {
 			return err
@@ -53,26 +56,49 @@ Examples:
 
 		var results []UpdateResult
 
-		// Update skills
-		skillResults, err := updateResourceType(manager, resource.Skill, "")
-		if err != nil {
-			return err
-		}
-		results = append(results, skillResults...)
+		if len(args) == 0 {
+			// Update all resources (current behavior)
+			skillResults, err := updateResourceType(manager, resource.Skill, "")
+			if err != nil {
+				return err
+			}
+			results = append(results, skillResults...)
 
-		// Update commands
-		commandResults, err := updateResourceType(manager, resource.Command, "")
-		if err != nil {
-			return err
-		}
-		results = append(results, commandResults...)
+			commandResults, err := updateResourceType(manager, resource.Command, "")
+			if err != nil {
+				return err
+			}
+			results = append(results, commandResults...)
 
-		// Update agents
-		agentResults, err := updateResourceType(manager, resource.Agent, "")
-		if err != nil {
-			return err
+			agentResults, err := updateResourceType(manager, resource.Agent, "")
+			if err != nil {
+				return err
+			}
+			results = append(results, agentResults...)
+		} else {
+			// Update by patterns
+			var toUpdate []string
+			for _, pattern := range args {
+				matches, err := ExpandPattern(manager, pattern)
+				if err != nil {
+					return err
+				}
+				toUpdate = append(toUpdate, matches...)
+			}
+
+			// Remove duplicates
+			toUpdate = uniqueStrings(toUpdate)
+
+			// Update each resource
+			for _, tu := range toUpdate {
+				resType, name, err := ParseResourceArg(tu)
+				if err != nil {
+					return err
+				}
+				result := updateSingleResource(manager, name, resType)
+				results = append(results, result)
+			}
 		}
-		results = append(results, agentResults...)
 
 		// Display summary
 		displayUpdateSummary(results)
@@ -81,125 +107,12 @@ Examples:
 	},
 }
 
-// repoUpdateSkillCmd handles updating skills
-var repoUpdateSkillCmd = &cobra.Command{
-	Use:   "skill [name]",
-	Short: "Update skill(s) from their original source",
-	Long: `Update a specific skill or all skills from their original sources.
-
-If a skill name is provided, only that skill is updated.
-If no name is provided, all skills are updated.
-
-Examples:
-  aimgr repo update skill my-skill     # Update specific skill
-  aimgr repo update skill              # Update all skills
-  aimgr repo update skill my-skill --dry-run`,
-	Args:              cobra.MaximumNArgs(1),
-	ValidArgsFunction: completeSkillNames,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		manager, err := repo.NewManager()
-		if err != nil {
-			return err
-		}
-
-		var name string
-		if len(args) > 0 {
-			name = args[0]
-		}
-
-		results, err := updateResourceType(manager, resource.Skill, name)
-		if err != nil {
-			return err
-		}
-
-		displayUpdateSummary(results)
-		return nil
-	},
-}
-
-// repoUpdateCommandCmd handles updating commands
-var repoUpdateCommandCmd = &cobra.Command{
-	Use:   "command [name]",
-	Short: "Update command(s) from their original source",
-	Long: `Update a specific command or all commands from their original sources.
-
-If a command name is provided, only that command is updated.
-If no name is provided, all commands are updated.
-
-Examples:
-  aimgr repo update command my-cmd     # Update specific command
-  aimgr repo update command            # Update all commands
-  aimgr repo update command my-cmd --dry-run`,
-	Args:              cobra.MaximumNArgs(1),
-	ValidArgsFunction: completeCommandNames,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		manager, err := repo.NewManager()
-		if err != nil {
-			return err
-		}
-
-		var name string
-		if len(args) > 0 {
-			name = args[0]
-		}
-
-		results, err := updateResourceType(manager, resource.Command, name)
-		if err != nil {
-			return err
-		}
-
-		displayUpdateSummary(results)
-		return nil
-	},
-}
-
-// repoUpdateAgentCmd handles updating agents
-var repoUpdateAgentCmd = &cobra.Command{
-	Use:   "agent [name]",
-	Short: "Update agent(s) from their original source",
-	Long: `Update a specific agent or all agents from their original sources.
-
-If an agent name is provided, only that agent is updated.
-If no name is provided, all agents are updated.
-
-Examples:
-  aimgr repo update agent my-agent     # Update specific agent
-  aimgr repo update agent              # Update all agents
-  aimgr repo update agent my-agent --dry-run`,
-	Args:              cobra.MaximumNArgs(1),
-	ValidArgsFunction: completeAgentNames,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		manager, err := repo.NewManager()
-		if err != nil {
-			return err
-		}
-
-		var name string
-		if len(args) > 0 {
-			name = args[0]
-		}
-
-		results, err := updateResourceType(manager, resource.Agent, name)
-		if err != nil {
-			return err
-		}
-
-		displayUpdateSummary(results)
-		return nil
-	},
-}
-
 func init() {
 	repoCmd.AddCommand(repoUpdateCmd)
-	repoUpdateCmd.AddCommand(repoUpdateSkillCmd)
-	repoUpdateCmd.AddCommand(repoUpdateCommandCmd)
-	repoUpdateCmd.AddCommand(repoUpdateAgentCmd)
 
-	// Add flags to all update commands
-	for _, cmd := range []*cobra.Command{repoUpdateCmd, repoUpdateSkillCmd, repoUpdateCommandCmd, repoUpdateAgentCmd} {
-		cmd.Flags().BoolVar(&updateForceFlag, "force", false, "Force update, overwriting local changes")
-		cmd.Flags().BoolVar(&updateDryRunFlag, "dry-run", false, "Preview updates without making changes")
-	}
+	// Add flags to update command
+	repoUpdateCmd.Flags().BoolVar(&updateForceFlag, "force", false, "Force update, overwriting local changes")
+	repoUpdateCmd.Flags().BoolVar(&updateDryRunFlag, "dry-run", false, "Preview updates without making changes")
 }
 
 // updateResourceType updates all resources of a specific type or a specific resource by name
