@@ -382,6 +382,38 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 		}
 	}
 
+	// List packages if no filter or filter is PackageType
+	if resourceType == nil || *resourceType == resource.PackageType {
+		packagesPath := filepath.Join(m.repoPath, "packages")
+		if _, err := os.Stat(packagesPath); err == nil {
+			entries, err := os.ReadDir(packagesPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read packages directory: %w", err)
+			}
+
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".package.json") {
+					continue
+				}
+
+				packagePath := filepath.Join(packagesPath, entry.Name())
+				pkg, err := resource.LoadPackage(packagePath)
+				if err != nil {
+					// Skip invalid packages
+					continue
+				}
+				// Convert Package to Resource format
+				res := resource.Resource{
+					Name:        pkg.Name,
+					Type:        resource.PackageType,
+					Description: pkg.Description,
+					Path:        packagePath,
+				}
+				resources = append(resources, res)
+			}
+		}
+	}
+
 	return resources, nil
 }
 

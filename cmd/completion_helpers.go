@@ -188,7 +188,7 @@ func completeInstallResources(cmd *cobra.Command, args []string, toComplete stri
 	// If this is the first argument (or continuing after previous args)
 	// If toComplete doesn't contain a slash, suggest type prefixes
 	if !strings.Contains(toComplete, "/") {
-		prefixes := []string{"skill/", "command/", "agent/"}
+		prefixes := []string{"skill/", "command/", "agent/", "package/"}
 		var matches []string
 		for _, prefix := range prefixes {
 			if strings.HasPrefix(prefix, toComplete) {
@@ -216,6 +216,8 @@ func completeInstallResources(cmd *cobra.Command, args []string, toComplete stri
 		resourceType = resource.Command
 	case "agent", "agents":
 		resourceType = resource.Agent
+	case "package", "packages":
+		resourceType = resource.PackageType
 	default:
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
