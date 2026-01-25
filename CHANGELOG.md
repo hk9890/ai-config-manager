@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-01-25
+
+### Added
+- **Progress output for `repo update` command**
+  - Shows total resource count at start (e.g., "Updating 15 resources...")
+  - Displays `[N/M]` counter for each resource being updated
+  - Shows operation type during execution ("Cloning from..." or "Updating from local source...")
+  - Provides immediate inline feedback with status symbols (✓, ✗, ⊘)
+  - No more silent pauses during long git clone operations
+  - Works with all update modes (all/pattern/single resource) and `--dry-run` flag
+
+### Changed
+- **Standardized pattern syntax across all commands**
+  - All commands now use `type/pattern` syntax (e.g., `skill/pdf*`, `command/test-*`)
+  - Consistent pattern matching with glob support (`*`, `?`, `[abc]`, `{a,b}`)
+  - Applies to: `repo list`, `repo show`, `repo update`, `repo remove`, `list`, `uninstall`
+  - Backward compatible: bare names still work (e.g., `my-skill` → searches all types)
+  - Type prefix required for ambiguity: `skill/my-skill` vs `command/my-skill`
+
+### Improved
+- Created shared pattern expansion utility for consistent behavior across commands
+- Refactored command implementations to use centralized pattern matching logic
+- Enhanced user experience with real-time feedback during long operations
+
+### Fixed
+- Updated integration tests to use new pattern syntax
+- Ensured all commands handle pattern matching consistently
+
 ## [1.5.0] - 2026-01-24
 
 ### Added
