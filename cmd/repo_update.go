@@ -43,6 +43,10 @@ var repoUpdateCmd = &cobra.Command{
 Updates can refresh resources from GitHub repositories, local paths, or file sources.
 The source information is retrieved from the resource metadata.
 
+Performance: Resources from the same Git repository are batched together for efficient
+updates. This means a single git clone operation is shared across multiple resources
+from the same source, significantly improving update speed for bulk operations.
+
 Patterns support wildcards (* and ?) and can filter by type using 'type/pattern' format.
 If no patterns are provided, all resources are updated.
 

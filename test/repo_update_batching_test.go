@@ -515,3 +515,61 @@ description: Test command %s
 	t.Logf("Grouping verification successful: %d Git sources (batched), %d local sources (not batched)",
 		gitSourceCount, localSourceCount)
 }
+// TestCLIUpdateBatching_LocalSources tests the CLI update with local sources (no batching)
+func TestCLIUpdateBatching_LocalSources(t *testing.T) {
+	repoDir := t.TempDir()
+	testDir := t.TempDir()
+
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Create three local commands
+	for i := 1; i <= 3; i++ {
+		cmdPath := filepath.Join(testDir, fmt.Sprintf("local-%d.md", i))
+		content := fmt.Sprintf(`---
+description: Local command %d
+version: "1.0.0"
+---
+# Local Command %d
+`, i, i)
+		if err := os.WriteFile(cmdPath, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create command: %v", err)
+		}
+
+		_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+		if err != nil {
+			t.Fatalf("Failed to add command: %v", err)
+		}
+	}
+
+	// Update source files
+	for i := 1; i <= 3; i++ {
+		cmdPath := filepath.Join(testDir, fmt.Sprintf("local-%d.md", i))
+		content := fmt.Sprintf(`---
+description: Local command %d updated
+version: "2.0.0"
+---
+# Updated
+`, i)
+		if err := os.WriteFile(cmdPath, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to update file: %v", err)
+		}
+	}
+
+	// Update all commands
+	output, err := runAimgr(t, "repo", "update", "command/local-1", "command/local-2", "command/local-3")
+	if err != nil {
+		t.Fatalf("Failed to update: %v\nOutput: %s", err, output)
+	}
+
+	t.Logf("Update output:\n%s", output)
+
+	// Verify no batching for local sources
+	if strings.Contains(output, "Batch:") {
+		t.Errorf("Local sources should not be batched")
+	}
+
+	// Verify all updated
+	if !strings.Contains(output, "3 updated") {
+		t.Errorf("Expected '3 updated' in summary")
+	}
+}

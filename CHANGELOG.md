@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Type prefix required for ambiguity: `skill/my-skill` vs `command/my-skill`
 
 ### Improved
+- **Optimized `repo update` with Git repository batching**
+  - Resources from the same Git repository now share a single clone operation
+  - Dramatically improves update speed for bulk operations from the same source
+  - Example: Updating 39 skills from one repository now requires 1 clone instead of 39
+  - Batching is automatic and requires no user configuration
+  - Batch progress displayed as "Batch: Updating N resources from <url>"
 - Created shared pattern expansion utility for consistent behavior across commands
 - Refactored command implementations to use centralized pattern matching logic
 - Enhanced user experience with real-time feedback during long operations

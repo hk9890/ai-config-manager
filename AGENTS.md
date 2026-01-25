@@ -225,6 +225,11 @@ opts := repo.BulkImportOptions{
 result, err := mgr.AddBulk(paths, opts)
 ```
 
+**Update Performance**: The `repo update` command automatically batches resources from
+the same Git repository, cloning each unique source only once. This optimization
+significantly improves update speed for bulk operations (e.g., 39 resources from one
+repository = 1 clone instead of 39).
+
 ### Tool Detection
 ```go
 tool, err := tools.ParseTool("claude")  // Returns tools.Claude
