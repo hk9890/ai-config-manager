@@ -28,6 +28,12 @@ type UpdateResult struct {
 	Message string
 }
 
+// UpdateContext tracks progress during update operations
+type UpdateContext struct {
+	Current int
+	Total   int
+}
+
 // repoUpdateCmd represents the update command
 var repoUpdateCmd = &cobra.Command{
 	Use:   "update [pattern]...",
@@ -55,22 +61,43 @@ Examples:
 		}
 
 		var results []UpdateResult
+		var ctx UpdateContext
 
 		if len(args) == 0 {
-			// Update all resources (current behavior)
-			skillResults, err := updateResourceType(manager, resource.Skill, "")
+			// Count total resources for progress tracking
+			totalCount := 0
+			typeFilter := resource.Skill
+			skills, _ := manager.List(&typeFilter)
+			totalCount += len(skills)
+
+			typeFilter = resource.Command
+			commands, _ := manager.List(&typeFilter)
+			totalCount += len(commands)
+
+			typeFilter = resource.Agent
+			agents, _ := manager.List(&typeFilter)
+			totalCount += len(agents)
+
+			ctx.Total = totalCount
+
+			if totalCount > 0 {
+				fmt.Printf("Updating %d resources...\n\n", totalCount)
+			}
+
+			// Update all resources
+			skillResults, err := updateResourceTypeWithProgress(manager, resource.Skill, "", &ctx)
 			if err != nil {
 				return err
 			}
 			results = append(results, skillResults...)
 
-			commandResults, err := updateResourceType(manager, resource.Command, "")
+			commandResults, err := updateResourceTypeWithProgress(manager, resource.Command, "", &ctx)
 			if err != nil {
 				return err
 			}
 			results = append(results, commandResults...)
 
-			agentResults, err := updateResourceType(manager, resource.Agent, "")
+			agentResults, err := updateResourceTypeWithProgress(manager, resource.Agent, "", &ctx)
 			if err != nil {
 				return err
 			}
@@ -89,13 +116,20 @@ Examples:
 			// Remove duplicates
 			toUpdate = uniqueStrings(toUpdate)
 
+			ctx.Total = len(toUpdate)
+
+			if len(toUpdate) > 0 {
+				fmt.Printf("Updating %d resources...\n\n", len(toUpdate))
+			}
+
 			// Update each resource
 			for _, tu := range toUpdate {
 				resType, name, err := ParseResourceArg(tu)
 				if err != nil {
 					return err
 				}
-				result := updateSingleResource(manager, name, resType)
+				ctx.Current++
+				result := updateSingleResourceWithProgress(manager, name, resType, &ctx)
 				results = append(results, result)
 			}
 		}
@@ -115,13 +149,14 @@ func init() {
 	repoUpdateCmd.Flags().BoolVar(&updateDryRunFlag, "dry-run", false, "Preview updates without making changes")
 }
 
-// updateResourceType updates all resources of a specific type or a specific resource by name
-func updateResourceType(manager *repo.Manager, resourceType resource.ResourceType, name string) ([]UpdateResult, error) {
+// updateResourceTypeWithProgress updates all resources of a specific type with progress tracking
+func updateResourceTypeWithProgress(manager *repo.Manager, resourceType resource.ResourceType, name string, ctx *UpdateContext) ([]UpdateResult, error) {
 	var results []UpdateResult
 
 	if name != "" {
 		// Update specific resource
-		result := updateSingleResource(manager, name, resourceType)
+		ctx.Current++
+		result := updateSingleResourceWithProgress(manager, name, resourceType, ctx)
 		results = append(results, result)
 	} else {
 		// Update all resources of this type
@@ -132,7 +167,8 @@ func updateResourceType(manager *repo.Manager, resourceType resource.ResourceTyp
 		}
 
 		for _, res := range resources {
-			result := updateSingleResource(manager, res.Name, resourceType)
+			ctx.Current++
+			result := updateSingleResourceWithProgress(manager, res.Name, resourceType, ctx)
 			results = append(results, result)
 		}
 	}
@@ -140,8 +176,17 @@ func updateResourceType(manager *repo.Manager, resourceType resource.ResourceTyp
 	return results, nil
 }
 
-// updateSingleResource updates a single resource from its original source
-func updateSingleResource(manager *repo.Manager, name string, resourceType resource.ResourceType) UpdateResult {
+// updateResourceType updates all resources of a specific type or a specific resource by name
+func updateResourceType(manager *repo.Manager, resourceType resource.ResourceType, name string) ([]UpdateResult, error) {
+	ctx := &UpdateContext{Total: 1}
+	return updateResourceTypeWithProgress(manager, resourceType, name, ctx)
+}
+
+// updateSingleResourceWithProgress updates a single resource with progress display
+func updateSingleResourceWithProgress(manager *repo.Manager, name string, resourceType resource.ResourceType, ctx *UpdateContext) UpdateResult {
+	// Show progress counter
+	fmt.Printf("[%d/%d] %s '%s'\n", ctx.Current, ctx.Total, resourceType, name)
+
 	result := UpdateResult{
 		Name:    name,
 		Type:    resourceType,
@@ -153,6 +198,7 @@ func updateSingleResource(manager *repo.Manager, name string, resourceType resou
 	meta, err := manager.GetMetadata(name, resourceType)
 	if err != nil {
 		result.Message = fmt.Sprintf("Metadata not found: %v", err)
+		fmt.Printf("  ✗ %s\n\n", result.Message)
 		return result
 	}
 
@@ -160,7 +206,16 @@ func updateSingleResource(manager *repo.Manager, name string, resourceType resou
 	if updateDryRunFlag {
 		result.Success = true
 		result.Message = fmt.Sprintf("Would update from %s (%s)", meta.SourceURL, meta.SourceType)
+		fmt.Printf("  ↓ %s\n\n", result.Message)
 		return result
+	}
+
+	// Show operation type
+	switch meta.SourceType {
+	case "github", "git-url", "gitlab":
+		fmt.Printf("  ↓ Cloning from %s...\n", meta.SourceURL)
+	case "local", "file":
+		fmt.Printf("  ↓ Updating from local source...\n")
 	}
 
 	// Update based on source type
@@ -172,16 +227,19 @@ func updateSingleResource(manager *repo.Manager, name string, resourceType resou
 		if skipped {
 			result.Skipped = true
 			result.Message = updateErr.Error()
+			fmt.Printf("  ⊘ %s\n\n", result.Message)
 			return result
 		}
 		err = updateErr
 	default:
 		result.Message = fmt.Sprintf("Unknown source type: %s", meta.SourceType)
+		fmt.Printf("  ✗ %s\n\n", result.Message)
 		return result
 	}
 
 	if err != nil {
 		result.Message = err.Error()
+		fmt.Printf("  ✗ %s\n\n", result.Message)
 		return result
 	}
 
@@ -189,12 +247,20 @@ func updateSingleResource(manager *repo.Manager, name string, resourceType resou
 	meta.LastUpdated = time.Now()
 	if err := metadata.Save(meta, manager.GetRepoPath()); err != nil {
 		result.Message = fmt.Sprintf("Updated but failed to save metadata: %v", err)
+		fmt.Printf("  ✗ %s\n\n", result.Message)
 		return result
 	}
 
 	result.Success = true
 	result.Message = "Updated successfully"
+	fmt.Printf("  ✓ %s\n\n", result.Message)
 	return result
+}
+
+// updateSingleResource updates a single resource from its original source
+func updateSingleResource(manager *repo.Manager, name string, resourceType resource.ResourceType) UpdateResult {
+	ctx := &UpdateContext{Current: 1, Total: 1}
+	return updateSingleResourceWithProgress(manager, name, resourceType, ctx)
 }
 
 // updateFromGitSource updates a resource from a GitHub or Git source
@@ -333,26 +399,18 @@ func displayUpdateSummary(results []UpdateResult) {
 	failCount := 0
 	skipCount := 0
 
-	// Display individual results
+	// Count results (don't display individual results - already shown inline)
 	for _, result := range results {
 		if result.Success {
-			if updateDryRunFlag {
-				fmt.Printf("✓ [DRY RUN] %s '%s': %s\n", result.Type, result.Name, result.Message)
-			} else {
-				fmt.Printf("✓ %s '%s': %s\n", result.Type, result.Name, result.Message)
-			}
 			successCount++
 		} else if result.Skipped {
-			fmt.Printf("⊘ %s '%s': %s\n", result.Type, result.Name, result.Message)
 			skipCount++
 		} else {
-			fmt.Printf("✗ %s '%s': %s\n", result.Type, result.Name, result.Message)
 			failCount++
 		}
 	}
 
 	// Display summary
-	fmt.Println()
 	if updateDryRunFlag {
 		fmt.Printf("Summary (dry run): %d would be updated, %d would fail, %d would be skipped\n", successCount, failCount, skipCount)
 	} else {
