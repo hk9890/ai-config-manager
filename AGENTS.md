@@ -682,6 +682,9 @@ Marketplace files are typically located at:
 
 #### Marketplace JSON Format
 
+aimgr supports two marketplace JSON formats:
+
+**Traditional Format** (description at top level):
 ```json
 {
   "name": "marketplace-name",
@@ -691,19 +694,23 @@ Marketplace files are typically located at:
     "name": "Organization Name",
     "email": "contact@example.com"
   },
-  "plugins": [
-    {
-      "name": "plugin-name",
-      "description": "Plugin description",
-      "source": "./plugins/plugin-name",
-      "category": "development",
-      "version": "1.0.0",
-      "author": {
-        "name": "Author Name",
-        "email": "author@example.com"
-      }
-    }
-  ]
+  "plugins": [...]
+}
+```
+
+**Anthropics Format** (description in metadata):
+```json
+{
+  "name": "marketplace-name",
+  "owner": {
+    "name": "Organization Name",
+    "email": "contact@example.com"
+  },
+  "metadata": {
+    "description": "Human-readable description",
+    "version": "1.0.0"
+  },
+  "plugins": [...]
 }
 ```
 
@@ -711,7 +718,6 @@ Marketplace files are typically located at:
 
 Marketplace level:
 - **name** (string, required): Marketplace name
-- **description** (string, required): Marketplace description
 - **plugins** ([]Plugin, required): Array of plugin definitions
 
 Plugin level:
@@ -722,8 +728,10 @@ Plugin level:
 **Optional Fields:**
 
 Marketplace level:
-- **version** (string): Marketplace version (semver)
+- **description** (string): Marketplace description (can be at top level or in metadata)
+- **version** (string): Marketplace version (can be at top level or in metadata)
 - **owner** (Author): Marketplace owner information
+- **metadata** (Metadata): Metadata container (Anthropics format)
 
 Plugin level:
 - **category** (string): Plugin category (e.g., "development", "testing", "documentation")
@@ -734,17 +742,33 @@ Author object:
 - **name** (string): Name
 - **email** (string): Email address
 
+Metadata object:
+- **description** (string): Description (Anthropics format)
+- **version** (string): Version (Anthropics format)
+
 #### Code Structure
 
 The marketplace format is represented by structs in `pkg/marketplace/parser.go`:
 
 ```go
 type MarketplaceConfig struct {
-    Name        string   `json:"name"`
-    Version     string   `json:"version,omitempty"`
-    Description string   `json:"description"`
-    Owner       *Author  `json:"owner,omitempty"`
-    Plugins     []Plugin `json:"plugins"`
+    Name        string    `json:"name"`
+    Version     string    `json:"version,omitempty"`
+    Description string    `json:"description,omitempty"`
+    Owner       *Author   `json:"owner,omitempty"`
+    Metadata    *Metadata `json:"metadata,omitempty"`
+    Plugins     []Plugin  `json:"plugins"`
+}
+
+// GetDescription returns description from either top-level or metadata
+func (c *MarketplaceConfig) GetDescription() string
+
+// GetVersion returns version from either top-level or metadata
+func (c *MarketplaceConfig) GetVersion() string
+
+type Metadata struct {
+    Description string `json:"description,omitempty"`
+    Version     string `json:"version,omitempty"`
 }
 
 type Plugin struct {
@@ -761,6 +785,7 @@ type Author struct {
     Email string `json:"email,omitempty"`
 }
 ```
+
 
 **Parsing:**
 ```go

@@ -524,6 +524,7 @@ func TestMarketplaceImportConflicts(t *testing.T) {
 }
 
 // TestMarketplaceImportInvalidJSON tests handling of invalid marketplace.json
+// TestMarketplaceImportInvalidJSON tests handling of invalid marketplace.json
 func TestMarketplaceImportInvalidJSON(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -543,14 +544,7 @@ func TestMarketplaceImportInvalidJSON(t *testing.T) {
 			}`,
 			expectedError: "marketplace name is required",
 		},
-		{
-			name: "missing description",
-			content: `{
-				"name": "test-marketplace",
-				"plugins": []
-			}`,
-			expectedError: "marketplace description is required",
-		},
+		// NOTE: description is now optional (can be in metadata or top-level)
 		{
 			name: "plugin missing name",
 			content: `{

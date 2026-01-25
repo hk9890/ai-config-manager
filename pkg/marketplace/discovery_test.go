@@ -158,7 +158,7 @@ func TestDiscoverMarketplace(t *testing.T) {
 				return dir
 			},
 			expectFound: true,
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name: "works with subpath",

@@ -264,41 +264,7 @@ func TestParseMarketplace(t *testing.T) {
 			},
 			wantError:    true,
 			errorMessage: "marketplace name is required",
-		},
-		{
-			name: "missing description field",
-			setup: func(t *testing.T) string {
-				tmpDir := t.TempDir()
-				marketplaceFile := filepath.Join(tmpDir, "marketplace.json")
-				content := `{"name": "test-marketplace", "plugins": []}`
-				if err := os.WriteFile(marketplaceFile, []byte(content), 0644); err != nil {
-					t.Fatal(err)
-				}
-				return marketplaceFile
-			},
-			wantError:    true,
-			errorMessage: "marketplace description is required",
-		},
-		{
-			name: "empty description field",
-			setup: func(t *testing.T) string {
-				tmpDir := t.TempDir()
-				marketplaceFile := filepath.Join(tmpDir, "marketplace.json")
-				config := MarketplaceConfig{
-					Name:        "test-marketplace",
-					Description: "",
-					Plugins:     []Plugin{},
-				}
-				data, _ := json.Marshal(config)
-				if err := os.WriteFile(marketplaceFile, data, 0644); err != nil {
-					t.Fatal(err)
-				}
-				return marketplaceFile
-			},
-			wantError:    true,
-			errorMessage: "marketplace description is required",
-		},
-		{
+		}, {
 			name: "plugin missing name",
 			setup: func(t *testing.T) string {
 				tmpDir := t.TempDir()
@@ -495,18 +461,7 @@ func TestValidateMarketplaceConfig(t *testing.T) {
 			},
 			wantError:    true,
 			errorMessage: "marketplace name is required",
-		},
-		{
-			name: "missing description",
-			config: &MarketplaceConfig{
-				Name:        "test",
-				Description: "",
-				Plugins:     []Plugin{},
-			},
-			wantError:    true,
-			errorMessage: "marketplace description is required",
-		},
-		{
+		}, {
 			name: "invalid plugin",
 			config: &MarketplaceConfig{
 				Name:        "test",

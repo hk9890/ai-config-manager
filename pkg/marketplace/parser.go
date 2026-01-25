@@ -8,11 +8,18 @@ import (
 
 // MarketplaceConfig represents a Claude marketplace.json configuration file
 type MarketplaceConfig struct {
-	Name        string   `json:"name"`
-	Version     string   `json:"version,omitempty"`
-	Description string   `json:"description"`
-	Owner       *Author  `json:"owner,omitempty"`
-	Plugins     []Plugin `json:"plugins"`
+	Name        string    `json:"name"`
+	Version     string    `json:"version,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Owner       *Author   `json:"owner,omitempty"`
+	Metadata    *Metadata `json:"metadata,omitempty"`
+	Plugins     []Plugin  `json:"plugins"`
+}
+
+// Metadata represents optional metadata container (Anthropics format)
+type Metadata struct {
+	Description string `json:"description,omitempty"`
+	Version     string `json:"version,omitempty"`
 }
 
 // Plugin represents an individual plugin in the marketplace
@@ -29,6 +36,28 @@ type Plugin struct {
 type Author struct {
 	Name  string `json:"name"`
 	Email string `json:"email,omitempty"`
+}
+
+// GetDescription returns the description from either top-level or metadata
+func (c *MarketplaceConfig) GetDescription() string {
+	if c.Description != "" {
+		return c.Description
+	}
+	if c.Metadata != nil && c.Metadata.Description != "" {
+		return c.Metadata.Description
+	}
+	return ""
+}
+
+// GetVersion returns the version from either top-level or metadata
+func (c *MarketplaceConfig) GetVersion() string {
+	if c.Version != "" {
+		return c.Version
+	}
+	if c.Metadata != nil && c.Metadata.Version != "" {
+		return c.Metadata.Version
+	}
+	return ""
 }
 
 // ParseMarketplace parses a Claude marketplace.json file and validates required fields
@@ -59,9 +88,8 @@ func validateMarketplaceConfig(config *MarketplaceConfig) error {
 		return fmt.Errorf("marketplace name is required")
 	}
 
-	if config.Description == "" {
-		return fmt.Errorf("marketplace description is required")
-	}
+	// Description is optional - can be in metadata or top-level
+	// No validation needed for description
 
 	// Validate each plugin
 	for i, plugin := range config.Plugins {
