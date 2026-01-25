@@ -1,0 +1,40 @@
+{
+  "name": "example-marketplace",
+  "version": "1.0.0",
+  "description": "Example Claude plugin marketplace with multiple plugins",
+  "owner": {
+    "name": "Example Organization",
+    "email": "contact@example.com"
+  },
+  "plugins": [
+    {
+      "name": "web-dev-tools",
+      "description": "Complete web development toolkit with build commands and TypeScript skills",
+      "source": "./plugins/web-dev-tools",
+      "category": "development",
+      "version": "1.2.0",
+      "author": {
+        "name": "Web Team",
+        "email": "web-team@example.com"
+      }
+    },
+    {
+      "name": "testing-suite",
+      "description": "Complete testing toolkit with test commands and QA agent",
+      "source": "./plugins/testing-suite",
+      "category": "testing",
+      "version": "2.0.0",
+      "author": {
+        "name": "QA Team",
+        "email": "qa@example.com"
+      }
+    },
+    {
+      "name": "documentation-helpers",
+      "description": "Documentation generation and formatting tools",
+      "source": "./plugins/documentation-helpers",
+      "category": "documentation",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "minimal-marketplace",
+  "description": "Minimal marketplace example with only required fields",
+  "plugins": [
+    {
+      "name": "simple-plugin",
+      "description": "A simple plugin with minimal configuration",
+      "source": "./plugins/simple-plugin"
+    }
+  ]
+}
