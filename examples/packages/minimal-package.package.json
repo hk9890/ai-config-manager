@@ -1,0 +1,7 @@
+{
+  "name": "minimal-package",
+  "description": "Minimal package with single command resource",
+  "resources": [
+    "command/test"
+  ]
+}

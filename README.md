@@ -900,18 +900,50 @@ aimgr repo sync
 aimgr repo sync --skip-existing  # Keep local changes
 ```
 
+### `aimgr repo create-package`
+
+Create a package from existing resources in the repository.
+
+```bash
+# Create package with description and resources
+aimgr repo create-package web-dev-tools \
+  --description="Web development toolkit" \
+  --resources="command/build,skill/typescript-helper,agent/code-reviewer"
+
+# Create package with multiple resources
+aimgr repo create-package testing-suite \
+  --description="Complete testing toolkit" \
+  --resources="command/test,command/coverage,skill/test-generator"
+
+# Overwrite existing package
+aimgr repo create-package my-tools \
+  --description="Updated tools" \
+  --resources="command/lint,skill/formatter" \
+  --force
+```
+
+**Flags:**
+- `--description`: Package description (required)
+- `--resources`: Comma-separated list of resources in `type/name` format (required)
+- `--force, -f`: Overwrite existing package
+
+**Resource Format:** `type/name` where type is `command`, `skill`, or `agent`
+
+All specified resources must exist in the repository before creating the package.
+
 ### `aimgr repo list`
 
 List resources in the repository.
 
 ```bash
-# List all
+# List all (includes packages)
 aimgr repo list
 
 # Filter by type
 aimgr repo list command
 aimgr repo list skill
 aimgr repo list agent
+aimgr repo list package
 
 # Output formats
 aimgr repo list --format=table  # Default
@@ -921,7 +953,7 @@ aimgr repo list --format=yaml
 
 ### `aimgr install`
 
-Install resources to a project using type/name format.
+Install resources or packages to a project using type/name format.
 
 ```bash
 # Install single resource
@@ -929,23 +961,28 @@ aimgr install skill/pdf-processing
 aimgr install command/test
 aimgr install agent/code-reviewer
 
+# Install package (installs all resources in package)
+aimgr install package/web-dev-tools
+aimgr install package/testing-suite
+
 # Install multiple resources at once
 aimgr install skill/foo skill/bar command/test agent/reviewer
 
 # Custom project path
 aimgr install command/test --project-path ~/my-project
+aimgr install package/my-tools --project-path ~/my-project
 
 # Force reinstall
 aimgr install skill/utils --force
-aimgr install agent/code-reviewer --force
+aimgr install package/my-tools --force
 
 # Install to specific tool(s) - overrides defaults and existing directories
 aimgr install command/test --target claude
-aimgr install skill/utils --target opencode
+aimgr install package/web-dev-tools --target opencode
 aimgr install agent/reviewer --target claude,opencode
 ```
 
-**Resource Format:** `type/name` where type is `skill`, `command`, or `agent`
+**Resource Format:** `type/name` where type is `skill`, `command`, `agent`, or `package`
 
 **Flags:**
 - `--project-path`: Specify project directory (defaults to current directory)
@@ -994,25 +1031,37 @@ Only resources installed via `aimgr install` (symlinks) are shown. Manually copi
 
 ### `aimgr repo remove`
 
-Remove resources from the repository.
+Remove resources or packages from the repository.
 
 ```bash
-# Remove with confirmation
+# Remove resource with confirmation
 aimgr repo remove command <name>
 aimgr repo remove skill <name>
 aimgr repo remove agent <name>
 
+# Remove package (keeps resources by default)
+aimgr repo remove package/my-package
+
+# Remove package and all its resources
+aimgr repo remove package/my-package --with-resources
+
 # Skip confirmation
 aimgr repo remove command test --force
+aimgr repo remove package/old-tools --force
 
 # Alias
 aimgr repo rm command old-test
-aimgr repo rm agent old-reviewer
+aimgr repo rm package/old-package
 ```
+
+**Package Removal:**
+- By default, only the package file is removed (resources are kept)
+- Use `--with-resources` to also remove all referenced resources
+- Confirmation prompt is shown before removing resources
 
 ### `aimgr uninstall`
 
-Uninstall resources from a project (removes symlinks).
+Uninstall resources or packages from a project (removes symlinks).
 
 ```bash
 # Uninstall single resource
@@ -1020,17 +1069,23 @@ aimgr uninstall skill/pdf-processing
 aimgr uninstall command/test
 aimgr uninstall agent/code-reviewer
 
+# Uninstall package (removes all resources in package)
+aimgr uninstall package/web-dev-tools
+aimgr uninstall package/testing-suite
+
 # Uninstall multiple resources at once
 aimgr uninstall skill/foo skill/bar command/test
 
 # Uninstall from specific project
 aimgr uninstall skill/foo --project-path ~/my-project
+aimgr uninstall package/my-tools --project-path ~/my-project
 
 # Force uninstall
 aimgr uninstall command/review --force
+aimgr uninstall package/my-tools --force
 ```
 
-**Resource Format:** `type/name` where type is `skill`, `command`, or `agent`
+**Resource Format:** `type/name` where type is `skill`, `command`, `agent`, or `package`
 
 **Safety:**
 - Only removes symlinks pointing to the aimgr repository
@@ -1279,6 +1334,177 @@ When adding resources from GitHub or Git URLs, `aimgr` automatically searches fo
 - If a single resource is found, it's added automatically
 - If multiple resources are found, you'll be prompted to select one
 - If a specific subpath is provided, exactly one resource should exist at that location
+
+## Packages
+
+Packages allow you to group related resources (commands, skills, agents) together and install them as a unit. This makes it easy to distribute collections of tools or share themed resource sets.
+
+### What Are Packages?
+
+A package is a JSON file that references existing resources in your repository. When you install a package, all its resources are installed together. This is useful for:
+
+- **Themed Collections**: Group resources for specific workflows (e.g., "testing-tools", "documentation-helpers")
+- **Project Templates**: Create reusable resource sets for different project types
+- **Distribution**: Share curated collections of resources with your team
+- **Dependency Management**: Install all needed resources for a task in one command
+
+### Creating Packages
+
+Create a package from existing resources in your repository:
+
+```bash
+# Create a package with description and resources
+aimgr repo create-package web-dev-tools \
+  --description="Web development toolkit" \
+  --resources="command/build,skill/typescript-helper,agent/code-reviewer"
+
+# Create a package with multiple resources
+aimgr repo create-package testing-suite \
+  --description="Complete testing toolkit" \
+  --resources="command/test,command/coverage,skill/test-generator,agent/qa-tester"
+
+# Overwrite existing package
+aimgr repo create-package my-tools \
+  --description="Updated tools collection" \
+  --resources="command/lint,skill/formatter" \
+  --force
+```
+
+**Resource Format**: Resources are specified as `type/name`:
+- `command/name` - Command resource
+- `skill/name` - Skill resource  
+- `agent/name` - Agent resource
+
+All resources must already exist in your repository before creating a package.
+
+### Installing Packages
+
+Install all resources in a package at once:
+
+```bash
+# Install package to current project
+aimgr install package/web-dev-tools
+
+# Install to specific project
+aimgr install package/testing-suite --project-path ~/my-project
+
+# Install to specific tool(s)
+aimgr install package/my-tools --target claude
+aimgr install package/my-tools --target claude,opencode
+```
+
+When you install a package:
+1. Each resource in the package is installed as a symlink
+2. Resources are installed to the appropriate tool directories
+3. If a resource is already installed, it's skipped (unless `--force` is used)
+
+### Uninstalling Packages
+
+Remove all resources from a package:
+
+```bash
+# Uninstall package from current project
+aimgr uninstall package/web-dev-tools
+
+# Uninstall from specific project
+aimgr uninstall package/testing-suite --project-path ~/my-project
+
+# Force uninstall
+aimgr uninstall package/my-tools --force
+```
+
+Uninstalling a package removes all its resource symlinks from the project but keeps the resources in your repository.
+
+### Removing Packages
+
+Remove a package from your repository:
+
+```bash
+# Remove package (keeps resources)
+aimgr repo remove package/web-dev-tools
+
+# Remove package and all its resources
+aimgr repo remove package/web-dev-tools --with-resources
+
+# Force remove without confirmation
+aimgr repo remove package/old-tools --force
+```
+
+**Important**: 
+- By default, removing a package only deletes the package file, not the resources
+- Use `--with-resources` to also remove all referenced resources
+- You'll be prompted for confirmation before removing resources
+
+### Listing Packages
+
+View available packages in your repository:
+
+```bash
+# List all resources (includes packages section)
+aimgr repo list
+
+# List only packages
+aimgr repo list package
+
+# JSON output
+aimgr repo list package --format=json
+```
+
+### Package File Format
+
+Packages are stored as JSON files in `~/.local/share/ai-config/repo/packages/`:
+
+```json
+{
+  "name": "web-dev-tools",
+  "description": "Web development toolkit",
+  "resources": [
+    "command/build",
+    "skill/typescript-helper",
+    "agent/code-reviewer"
+  ]
+}
+```
+
+**Fields:**
+- `name` (string, required): Package name (must match agentskills.io naming rules)
+- `description` (string, required): Human-readable description
+- `resources` (array, required): List of resource references in `type/name` format
+
+See [examples/packages/](examples/packages/) for complete examples.
+
+### Package Use Cases
+
+**1. Project Setup:**
+```bash
+# Create a package for React projects
+aimgr repo create-package react-starter \
+  --description="React development essentials" \
+  --resources="command/dev,command/build,skill/react-helper,agent/react-reviewer"
+
+# Install in new React project
+cd my-react-app
+aimgr install package/react-starter
+```
+
+**2. Testing Workflow:**
+```bash
+# Testing tools package
+aimgr repo create-package test-tools \
+  --description="Complete testing suite" \
+  --resources="command/test,command/coverage,skill/test-generator,agent/qa-tester"
+
+# Install for testing workflow
+aimgr install package/test-tools
+```
+
+**3. Documentation:**
+```bash
+# Documentation helpers
+aimgr repo create-package docs-tools \
+  --description="Documentation toolkit" \
+  --resources="skill/markdown-formatter,agent/doc-writer,command/doc-gen"
+```
 
 ## Commands
 

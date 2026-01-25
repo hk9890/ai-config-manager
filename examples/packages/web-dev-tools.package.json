@@ -1,0 +1,11 @@
+{
+  "name": "web-dev-tools",
+  "description": "Complete web development toolkit with build commands, TypeScript skill, and code review agent",
+  "resources": [
+    "command/build",
+    "command/dev",
+    "skill/typescript-helper",
+    "skill/react-helper",
+    "agent/code-reviewer"
+  ]
+}

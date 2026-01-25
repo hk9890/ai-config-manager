@@ -108,6 +108,60 @@ Examples:
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeInstallResources,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check if installing a package
+		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
+			packageName := strings.TrimPrefix(args[0], "package/")
+			
+			// Get project path
+			projectPath := projectPathFlag
+			if projectPath == "" {
+				var err error
+				projectPath, err = os.Getwd()
+				if err != nil {
+					return fmt.Errorf("failed to get current directory: %w", err)
+				}
+			}
+
+			// Parse target flag
+			explicitTargets, err := parseTargetFlag(installTargetFlag)
+			if err != nil {
+				return err
+			}
+
+			// Create installer
+			var installer *install.Installer
+			if explicitTargets != nil {
+				installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
+			} else {
+				home, err := os.UserHomeDir()
+				if err != nil {
+					return fmt.Errorf("failed to get home directory: %w", err)
+				}
+				cfg, err := config.Load(home)
+				if err != nil {
+					return fmt.Errorf("failed to load config: %w", err)
+				}
+				defaultTargets, err := cfg.GetDefaultTargets()
+				if err != nil {
+					return fmt.Errorf("invalid default targets in config: %w", err)
+				}
+				installer, err = install.NewInstaller(projectPath, defaultTargets)
+			}
+			if err != nil {
+				return fmt.Errorf("failed to create installer: %w", err)
+			}
+
+			// Create repo manager
+			manager, err := repo.NewManager()
+			if err != nil {
+				return fmt.Errorf("failed to create repository manager: %w", err)
+			}
+
+			// Install package
+			return installPackage(packageName, installer, manager)
+		}
+
+
 		// Get project path (current directory or flag)
 		projectPath := projectPathFlag
 		if projectPath == "" {
@@ -346,4 +400,97 @@ func init() {
 	installCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
 	installCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
 	installCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
+}
+
+// installPackage installs all resources from a package
+func installPackage(packageName string, installer *install.Installer, manager *repo.Manager) error {
+	repoPath := manager.GetRepoPath()
+	pkgPath := resource.GetPackagePath(packageName, repoPath)
+
+	// Load package
+	pkg, err := resource.LoadPackage(pkgPath)
+	if err != nil {
+		return fmt.Errorf("package '%s' not found in repository: %w", packageName, err)
+	}
+
+	fmt.Printf("Installing package: %s\n", pkg.Name)
+	fmt.Printf("Description: %s\n\n", pkg.Description)
+
+	installed := 0
+	missing := 0
+	errors := []string{}
+
+	// Install each resource
+	for _, ref := range pkg.Resources {
+		// Parse type/name format
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", ref, err))
+			continue
+		}
+
+		// Check if resource exists in repo
+		_, err = manager.Get(resName, resType)
+		if err != nil {
+			fmt.Printf("  ✗ %s - not found in repo\n", ref)
+			missing++
+			continue
+		}
+
+		// Check if already installed
+		if !installForceFlag && installer.IsInstalled(resName, resType) {
+			fmt.Printf("  ○ %s - already installed, skipping\n", ref)
+			continue
+		}
+
+		// Remove existing if force mode
+		if installForceFlag && installer.IsInstalled(resName, resType) {
+			if err := installer.Uninstall(resName, resType); err != nil {
+				errors = append(errors, fmt.Sprintf("%s: failed to remove existing: %v", ref, err))
+				continue
+			}
+		}
+
+		// Install based on resource type
+		var installErr error
+		switch resType {
+		case resource.Command:
+			installErr = installer.InstallCommand(resName, manager)
+		case resource.Skill:
+			installErr = installer.InstallSkill(resName, manager)
+		case resource.Agent:
+			installErr = installer.InstallAgent(resName, manager)
+		default:
+			errors = append(errors, fmt.Sprintf("%s: unsupported resource type", ref))
+			continue
+		}
+
+		if installErr != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", ref, installErr))
+		} else {
+			fmt.Printf("  ✓ %s\n", ref)
+			installed++
+		}
+	}
+
+	// Print summary
+	fmt.Println()
+	if missing > 0 {
+		fmt.Printf("⚠ Warning: %d resource(s) not found in repo\n", missing)
+	}
+	if len(errors) > 0 {
+		fmt.Println("Errors:")
+		for _, e := range errors {
+			fmt.Printf("  ✗ %s\n", e)
+		}
+	}
+
+	totalResources := len(pkg.Resources)
+	fmt.Printf("Installed %d of %d resources from package '%s'\n", installed, totalResources, pkg.Name)
+
+	if len(errors) > 0 {
+		return fmt.Errorf("package installation completed with errors")
+	}
+
+	return nil
 }

@@ -1,0 +1,11 @@
+{
+  "name": "testing-suite",
+  "description": "Complete testing toolkit with test commands, test generation skill, and QA agent",
+  "resources": [
+    "command/test",
+    "command/coverage",
+    "skill/test-generator",
+    "skill/mock-helper",
+    "agent/qa-tester"
+  ]
+}

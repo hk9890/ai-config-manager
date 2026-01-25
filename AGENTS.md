@@ -337,6 +337,166 @@ Version is embedded at build time via ldflags in Makefile:
 
 ## Resource Format Details
 
+### Package Format
+
+Packages are collections of resources that can be installed together as a unit. They are stored as JSON files in the `packages/` directory.
+
+#### File Structure
+
+Package files are stored as:
+- **Repository**: `~/.local/share/ai-config/repo/packages/<package-name>.package.json`
+- **Metadata**: `~/.local/share/ai-config/repo/.metadata/packages/<package-name>-metadata.json`
+
+Packages are **not** installed directly into projects. Instead, when you install a package, all its referenced resources are installed as symlinks.
+
+#### Package JSON Format
+
+```json
+{
+  "name": "package-name",
+  "description": "Human-readable description of the package",
+  "resources": [
+    "command/command-name",
+    "skill/skill-name",
+    "agent/agent-name"
+  ]
+}
+```
+
+**Fields:**
+
+- **name** (string, required): Package name following agentskills.io naming rules
+  - Lowercase alphanumeric + hyphens only
+  - Cannot start/end with hyphen
+  - No consecutive hyphens (`--`)
+  - 1-64 characters max
+  - Examples: `web-tools`, `testing-suite`, `docs-helpers`
+
+- **description** (string, required): Human-readable description (1-1024 characters)
+
+- **resources** ([]string, required): Array of resource references in `type/name` format
+  - Format: `type/name` where type is `command`, `skill`, or `agent`
+  - Examples: `command/test`, `skill/pdf-processing`, `agent/code-reviewer`
+  - All referenced resources must exist in the repository
+
+#### Format Examples
+
+**Minimal Package:**
+```json
+{
+  "name": "minimal-tools",
+  "description": "Minimal tool collection",
+  "resources": [
+    "command/test"
+  ]
+}
+```
+
+**Web Development Package:**
+```json
+{
+  "name": "web-dev-tools",
+  "description": "Complete web development toolkit",
+  "resources": [
+    "command/build",
+    "command/dev",
+    "skill/typescript-helper",
+    "skill/react-helper",
+    "agent/code-reviewer"
+  ]
+}
+```
+
+**Testing Suite Package:**
+```json
+{
+  "name": "testing-suite",
+  "description": "Complete testing toolkit with commands, skills, and QA agent",
+  "resources": [
+    "command/test",
+    "command/coverage",
+    "skill/test-generator",
+    "skill/mock-helper",
+    "agent/qa-tester"
+  ]
+}
+```
+
+#### Code Structure
+
+The package resource is represented by the `Package` struct in `pkg/resource/package.go`:
+
+```go
+type Package struct {
+    Name        string   `json:"name"`        // Package name
+    Description string   `json:"description"` // Human-readable description
+    Resources   []string `json:"resources"`   // Resource references (type/name)
+}
+```
+
+**Loading packages:**
+```go
+// Load package from file
+pkg, err := resource.LoadPackage("path/to/package.package.json")
+
+// Get package path in repo
+packagePath := resource.GetPackagePath("package-name", repoPath)
+```
+
+**Creating packages:**
+```go
+pkg := &resource.Package{
+    Name:        "web-tools",
+    Description: "Web development tools",
+    Resources:   []string{"command/build", "skill/typescript-helper"},
+}
+
+err := resource.SavePackage(pkg, repoPath)
+```
+
+**Parsing resource references:**
+```go
+// Parse type/name format
+resType, resName, err := resource.ParseResourceReference("command/test")
+// Returns: resource.Command, "test", nil
+```
+
+#### CLI Commands
+
+**Create a package:**
+```bash
+aimgr repo create-package web-tools \
+  --description="Web development tools" \
+  --resources="command/build,skill/typescript-helper"
+```
+
+**Install a package:**
+```bash
+# Installs all resources in the package
+aimgr install package/web-tools
+```
+
+**Uninstall a package:**
+```bash
+# Removes all resource symlinks
+aimgr uninstall package/web-tools
+```
+
+**Remove a package:**
+```bash
+# Remove package only (keeps resources)
+aimgr repo remove package/web-tools
+
+# Remove package and all its resources
+aimgr repo remove package/web-tools --with-resources
+```
+
+**List packages:**
+```bash
+# List all packages in repository
+aimgr repo list package
+```
+
 ### Agent Resource Format
 
 Agents are single `.md` files with YAML frontmatter that define AI agents with specialized roles and capabilities. The codebase supports both OpenCode and Claude Code formats.

@@ -1,0 +1,8 @@
+{
+  "name": "example-toolkit",
+  "description": "Example package demonstrating package system with basic tools",
+  "resources": [
+    "command/test",
+    "skill/pdf-processing"
+  ]
+}
