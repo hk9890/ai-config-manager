@@ -950,6 +950,21 @@ targets:
 
 #### Workflows
 
+
+**Create a new manifest:**
+```bash
+cd my-project
+aimgr init
+# Creates ai.package.yaml with empty resources array
+```
+
+**Or let it be created automatically:**
+```bash
+cd my-project
+aimgr install skill/pdf-processing
+# Installs skill and creates ai.package.yaml automatically
+```
+
 **Initialize a new project:**
 ```bash
 cd my-project
