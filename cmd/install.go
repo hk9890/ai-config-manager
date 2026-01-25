@@ -55,12 +55,13 @@ func parseTargetFlag(targetFlag string) ([]tools.Tool, error) {
 var installCmd = &cobra.Command{
 	Use:   "install <resource>...",
 	Short: "Install resources to a project",
-	Long: `Install one or more resources (commands, skills, or agents) to a project.
+	Long: `Install one or more resources (commands, skills, agents, or packages) to a project.
 
 Resources are specified using the format 'type/name':
   - command/name (or commands/name)
   - skill/name (or skills/name)
   - agent/name (or agents/name)
+  - package/name (or packages/name) - installs all resources in the package
 
 Pattern matching is supported using glob syntax:
   - * matches any sequence of characters
@@ -81,6 +82,9 @@ Supported tools:
 Examples:
   # Install a single skill
   aimgr install skill/pdf-processing
+
+  # Install a package (installs all resources in it)
+  aimgr install package/web-tools
 
   # Install multiple resources at once
   aimgr install skill/foo command/bar agent/reviewer
@@ -111,7 +115,7 @@ Examples:
 		// Check if installing a package
 		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
 			packageName := strings.TrimPrefix(args[0], "package/")
-			
+
 			// Get project path
 			projectPath := projectPathFlag
 			if projectPath == "" {
@@ -160,7 +164,6 @@ Examples:
 			// Install package
 			return installPackage(packageName, installer, manager)
 		}
-
 
 		// Get project path (current directory or flag)
 		projectPath := projectPathFlag
