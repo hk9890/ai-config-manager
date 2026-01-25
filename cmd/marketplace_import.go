@@ -121,12 +121,12 @@ func runMarketplaceImport(cmd *cobra.Command, args []string) error {
 
 	// Generate packages
 	fmt.Println("\nGenerating packages:")
-	packages, err := marketplace.GeneratePackages(filteredMarketplace, basePath)
+	packageInfos, err := marketplace.GeneratePackages(filteredMarketplace, basePath)
 	if err != nil {
 		return fmt.Errorf("failed to generate packages: %w", err)
 	}
 
-	if len(packages) == 0 {
+	if len(packageInfos) == 0 {
 		fmt.Println("No packages generated (plugins may have no resources)")
 		return nil
 	}
@@ -158,8 +158,11 @@ func runMarketplaceImport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Import packages and resources
-	for _, pkg := range packages {
-		if err := importPackage(manager, pkg, basePath, sourceURL, stats); err != nil {
+	for _, pkgInfo := range packageInfos {
+		pkg := pkgInfo.Package
+		pluginSourcePath := pkgInfo.SourcePath
+
+		if err := importPackage(manager, pkg, pluginSourcePath, sourceURL, stats); err != nil {
 			errorMsg := fmt.Sprintf("  ✗ %s: %v", pkg.Name, err)
 			fmt.Println(errorMsg)
 			stats.errors = append(stats.errors, errorMsg)
@@ -225,8 +228,9 @@ func filterPlugins(plugins []marketplace.Plugin, pattern string) ([]marketplace.
 	return filtered, nil
 }
 
-// importPackage imports a single package and its resources
-func importPackage(manager *repo.Manager, pkg *resource.Package, basePath, sourceURL string, stats *importStats) error {
+// importPackage imports a single package and its resources.
+// pluginSourcePath is the absolute path to the plugin's source directory where resources are located.
+func importPackage(manager *repo.Manager, pkg *resource.Package, pluginSourcePath, sourceURL string, stats *importStats) error {
 	// Check if package already exists
 	packagePath := resource.GetPackagePath(pkg.Name, manager.GetRepoPath())
 	_, err := os.Stat(packagePath)
@@ -251,7 +255,7 @@ func importPackage(manager *repo.Manager, pkg *resource.Package, basePath, sourc
 		}
 
 		// Import the resource
-		if err := importResource(manager, resType, resName, basePath, sourceURL, stats); err != nil {
+		if err := importResource(manager, resType, resName, pluginSourcePath, sourceURL, stats); err != nil {
 			if !importForce {
 				return err
 			}
@@ -300,8 +304,9 @@ func importPackage(manager *repo.Manager, pkg *resource.Package, basePath, sourc
 	return nil
 }
 
-// importResource imports a single resource into the repository
-func importResource(manager *repo.Manager, resType resource.ResourceType, resName string, basePath, sourceURL string, stats *importStats) error {
+// importResource imports a single resource into the repository.
+// pluginSourcePath is the absolute path to the plugin's source directory where the resource is located.
+func importResource(manager *repo.Manager, resType resource.ResourceType, resName string, pluginSourcePath, sourceURL string, stats *importStats) error {
 	// Check if resource already exists
 	resourcePath := manager.GetPath(resName, resType)
 	_, err := os.Stat(resourcePath)
@@ -322,8 +327,8 @@ func importResource(manager *repo.Manager, resType resource.ResourceType, resNam
 		}
 	}
 
-	// Find the resource source file in basePath
-	sourcePath, err := findResourceSource(basePath, resType, resName)
+	// Find the resource source file in plugin source directory
+	sourcePath, err := findResourceSource(pluginSourcePath, resType, resName)
 	if err != nil {
 		return fmt.Errorf("resource %s/%s not found in plugin source: %w", resType, resName, err)
 	}
@@ -353,31 +358,32 @@ func importResource(manager *repo.Manager, resType resource.ResourceType, resNam
 	return nil
 }
 
-// findResourceSource finds the source file for a resource in the base path
-func findResourceSource(basePath string, resType resource.ResourceType, resName string) (string, error) {
+// findResourceSource finds the source file for a resource in the plugin source directory.
+// pluginSourcePath is the absolute path to the plugin's source directory.
+func findResourceSource(pluginSourcePath string, resType resource.ResourceType, resName string) (string, error) {
 	var candidatePaths []string
 
 	switch resType {
 	case resource.Command:
 		// Check standard locations
 		candidatePaths = []string{
-			filepath.Join(basePath, "commands", resName+".md"),
-			filepath.Join(basePath, ".claude", "commands", resName+".md"),
-			filepath.Join(basePath, ".opencode", "commands", resName+".md"),
+			filepath.Join(pluginSourcePath, "commands", resName+".md"),
+			filepath.Join(pluginSourcePath, ".claude", "commands", resName+".md"),
+			filepath.Join(pluginSourcePath, ".opencode", "commands", resName+".md"),
 		}
 	case resource.Skill:
 		// Check standard locations
 		candidatePaths = []string{
-			filepath.Join(basePath, "skills", resName, "SKILL.md"),
-			filepath.Join(basePath, ".claude", "skills", resName, "SKILL.md"),
-			filepath.Join(basePath, ".opencode", "skills", resName, "SKILL.md"),
+			filepath.Join(pluginSourcePath, "skills", resName, "SKILL.md"),
+			filepath.Join(pluginSourcePath, ".claude", "skills", resName, "SKILL.md"),
+			filepath.Join(pluginSourcePath, ".opencode", "skills", resName, "SKILL.md"),
 		}
 	case resource.Agent:
 		// Check standard locations
 		candidatePaths = []string{
-			filepath.Join(basePath, "agents", resName+".md"),
-			filepath.Join(basePath, ".claude", "agents", resName+".md"),
-			filepath.Join(basePath, ".opencode", "agents", resName+".md"),
+			filepath.Join(pluginSourcePath, "agents", resName+".md"),
+			filepath.Join(pluginSourcePath, ".claude", "agents", resName+".md"),
+			filepath.Join(pluginSourcePath, ".opencode", "agents", resName+".md"),
 		}
 	}
 

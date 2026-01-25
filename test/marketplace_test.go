@@ -92,11 +92,11 @@ func TestMarketplaceImportCompleteWorkflow(t *testing.T) {
 	// Verify package names are sanitized
 	expectedPackageNames := []string{"web-tools", "testing-suite", "code-helpers"}
 	for i, pkg := range packages {
-		if pkg.Name != expectedPackageNames[i] {
-			t.Errorf("Package %d name = %v, want %v", i, pkg.Name, expectedPackageNames[i])
+		if pkg.Package.Name != expectedPackageNames[i] {
+			t.Errorf("Package %d name = %v, want %v", i, pkg.Package.Name, expectedPackageNames[i])
 		}
-		if len(pkg.Resources) == 0 {
-			t.Errorf("Package %s has no resources", pkg.Name)
+		if len(pkg.Package.Resources) == 0 {
+			t.Errorf("Package %s has no resources", pkg.Package.Name)
 		}
 	}
 
@@ -184,9 +184,9 @@ func TestMarketplaceImportCompleteWorkflow(t *testing.T) {
 
 	// Step 4: Save packages
 	t.Log("Step 4: Saving packages to repository")
-	for _, pkg := range packages {
-		if err := resource.SavePackage(pkg, repoDir); err != nil {
-			t.Fatalf("Failed to save package %s: %v", pkg.Name, err)
+	for _, pkgInfo := range packages {
+		if err := resource.SavePackage(pkgInfo.Package, repoDir); err != nil {
+			t.Fatalf("Failed to save package %s: %v", pkgInfo.Package.Name, err)
 		}
 	}
 
@@ -398,14 +398,14 @@ func TestMarketplaceImportWithFilter(t *testing.T) {
 	}
 
 	for _, pkg := range packages {
-		if !strings.HasPrefix(pkg.Name, "code-") {
-			t.Errorf("Package %s should not be included (doesn't match filter)", pkg.Name)
+		if !strings.HasPrefix(pkg.Package.Name, "code-") {
+			t.Errorf("Package %s should not be included (doesn't match filter)", pkg.Package.Name)
 		}
 	}
 
 	// Verify test-runner was not included
 	for _, pkg := range packages {
-		if pkg.Name == "test-runner" {
+		if pkg.Package.Name == "test-runner" {
 			t.Error("test-runner should not be included (doesn't match filter)")
 		}
 	}
@@ -484,7 +484,7 @@ func TestMarketplaceImportConflicts(t *testing.T) {
 			}
 
 			// Save package first time
-			if err := resource.SavePackage(packages[0], repoDir); err != nil {
+			if err := resource.SavePackage(packages[0].Package, repoDir); err != nil {
 				t.Fatalf("Failed to save package first time: %v", err)
 			}
 
@@ -500,7 +500,7 @@ func TestMarketplaceImportConflicts(t *testing.T) {
 				if err := os.Remove(pkgPath); err != nil {
 					t.Fatalf("Failed to remove existing package: %v", err)
 				}
-				if err := resource.SavePackage(packages[0], repoDir); err != nil {
+				if err := resource.SavePackage(packages[0].Package, repoDir); err != nil {
 					t.Fatalf("Failed to save package with force: %v", err)
 				}
 			} else {
@@ -684,7 +684,7 @@ func TestMarketplaceImportResourceReferences(t *testing.T) {
 	pkg := packages[0]
 
 	// Verify all resource references follow "type/name" format
-	for _, ref := range pkg.Resources {
+	for _, ref := range pkg.Package.Resources {
 		parts := strings.Split(ref, "/")
 		if len(parts) != 2 {
 			t.Errorf("Invalid resource reference format: %s (expected type/name)", ref)

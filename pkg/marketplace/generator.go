@@ -11,6 +11,12 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
+// PackageInfo contains a generated package and its source directory
+type PackageInfo struct {
+	Package    *resource.Package
+	SourcePath string // Absolute path to plugin source directory
+}
+
 // GeneratePackages generates aimgr packages from marketplace plugin entries.
 // It discovers resources in each plugin's source directory and creates a package
 // for each plugin with resource references in type/name format.
@@ -18,8 +24,8 @@ import (
 // basePath is the directory containing the marketplace.json file (used to resolve
 // relative plugin source paths).
 //
-// Returns an array of generated packages. Plugins with no resources are skipped.
-func GeneratePackages(marketplace *MarketplaceConfig, basePath string) ([]*resource.Package, error) {
+// Returns an array of generated package info. Plugins with no resources are skipped.
+func GeneratePackages(marketplace *MarketplaceConfig, basePath string) ([]*PackageInfo, error) {
 	if marketplace == nil {
 		return nil, fmt.Errorf("marketplace config cannot be nil")
 	}
@@ -35,7 +41,7 @@ func GeneratePackages(marketplace *MarketplaceConfig, basePath string) ([]*resou
 		return nil, fmt.Errorf("basePath is not a directory: %s", basePath)
 	}
 
-	var packages []*resource.Package
+	var packages []*PackageInfo
 
 	for i, plugin := range marketplace.Plugins {
 		// Resolve plugin source path (relative to basePath)
@@ -81,7 +87,13 @@ func GeneratePackages(marketplace *MarketplaceConfig, basePath string) ([]*resou
 			Resources:   buildResourceReferences(resources),
 		}
 
-		packages = append(packages, pkg)
+		// Store package info with source path
+		pkgInfo := &PackageInfo{
+			Package:    pkg,
+			SourcePath: sourcePath,
+		}
+
+		packages = append(packages, pkgInfo)
 	}
 
 	return packages, nil

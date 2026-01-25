@@ -17,7 +17,7 @@ func TestGeneratePackages(t *testing.T) {
 		wantCount    int
 		wantError    bool
 		errorMessage string
-		validate     func(t *testing.T, packages []*resource.Package)
+		validate     func(t *testing.T, packages []*PackageInfo)
 	}{
 		{
 			name: "single plugin with command",
@@ -57,18 +57,19 @@ This is a test command.
 			},
 			wantCount: 1,
 			wantError: false,
-			validate: func(t *testing.T, packages []*resource.Package) {
-				if packages[0].Name != "test-plugin" {
-					t.Errorf("Package name = %v, want test-plugin", packages[0].Name)
+			validate: func(t *testing.T, packages []*PackageInfo) {
+				pkg := packages[0].Package
+				if pkg.Name != "test-plugin" {
+					t.Errorf("Package name = %v, want test-plugin", pkg.Name)
 				}
-				if packages[0].Description != "A test plugin" {
-					t.Errorf("Package description = %v, want 'A test plugin'", packages[0].Description)
+				if pkg.Description != "A test plugin" {
+					t.Errorf("Package description = %v, want 'A test plugin'", pkg.Description)
 				}
-				if len(packages[0].Resources) != 1 {
-					t.Fatalf("Resources length = %v, want 1", len(packages[0].Resources))
+				if len(pkg.Resources) != 1 {
+					t.Fatalf("Resources length = %v, want 1", len(pkg.Resources))
 				}
-				if packages[0].Resources[0] != "command/test-command" {
-					t.Errorf("Resource = %v, want command/test-command", packages[0].Resources[0])
+				if pkg.Resources[0] != "command/test-command" {
+					t.Errorf("Resource = %v, want command/test-command", pkg.Resources[0])
 				}
 			},
 		},
@@ -110,15 +111,15 @@ This is a test skill.
 			},
 			wantCount: 1,
 			wantError: false,
-			validate: func(t *testing.T, packages []*resource.Package) {
-				if packages[0].Name != "skill-plugin" {
-					t.Errorf("Package name = %v, want skill-plugin", packages[0].Name)
+			validate: func(t *testing.T, packages []*PackageInfo) {
+				if packages[0].Package.Name != "skill-plugin" {
+					t.Errorf("Package name = %v, want skill-plugin", packages[0].Package.Name)
 				}
-				if len(packages[0].Resources) != 1 {
-					t.Fatalf("Resources length = %v, want 1", len(packages[0].Resources))
+				if len(packages[0].Package.Resources) != 1 {
+					t.Fatalf("Resources length = %v, want 1", len(packages[0].Package.Resources))
 				}
-				if packages[0].Resources[0] != "skill/test-skill" {
-					t.Errorf("Resource = %v, want skill/test-skill", packages[0].Resources[0])
+				if packages[0].Package.Resources[0] != "skill/test-skill" {
+					t.Errorf("Resource = %v, want skill/test-skill", packages[0].Package.Resources[0])
 				}
 			},
 		},
@@ -160,15 +161,15 @@ This is a test agent.
 			},
 			wantCount: 1,
 			wantError: false,
-			validate: func(t *testing.T, packages []*resource.Package) {
-				if packages[0].Name != "agent-plugin" {
-					t.Errorf("Package name = %v, want agent-plugin", packages[0].Name)
+			validate: func(t *testing.T, packages []*PackageInfo) {
+				if packages[0].Package.Name != "agent-plugin" {
+					t.Errorf("Package name = %v, want agent-plugin", packages[0].Package.Name)
 				}
-				if len(packages[0].Resources) != 1 {
-					t.Fatalf("Resources length = %v, want 1", len(packages[0].Resources))
+				if len(packages[0].Package.Resources) != 1 {
+					t.Fatalf("Resources length = %v, want 1", len(packages[0].Package.Resources))
 				}
-				if packages[0].Resources[0] != "agent/test-agent" {
-					t.Errorf("Resource = %v, want agent/test-agent", packages[0].Resources[0])
+				if packages[0].Package.Resources[0] != "agent/test-agent" {
+					t.Errorf("Resource = %v, want agent/test-agent", packages[0].Package.Resources[0])
 				}
 			},
 		},
@@ -224,15 +225,15 @@ This is a test agent.
 			},
 			wantCount: 1,
 			wantError: false,
-			validate: func(t *testing.T, packages []*resource.Package) {
-				if len(packages[0].Resources) != 3 {
-					t.Errorf("Resources length = %v, want 3", len(packages[0].Resources))
+			validate: func(t *testing.T, packages []*PackageInfo) {
+				if len(packages[0].Package.Resources) != 3 {
+					t.Errorf("Resources length = %v, want 3", len(packages[0].Package.Resources))
 				}
 				// Check that we have one of each type
 				hasCommand := false
 				hasSkill := false
 				hasAgent := false
-				for _, res := range packages[0].Resources {
+				for _, res := range packages[0].Package.Resources {
 					if strings.HasPrefix(res, "command/") {
 						hasCommand = true
 					}
@@ -296,12 +297,12 @@ This is a test agent.
 			},
 			wantCount: 2,
 			wantError: false,
-			validate: func(t *testing.T, packages []*resource.Package) {
-				if packages[0].Name != "plugin-1" {
-					t.Errorf("Package[0] name = %v, want plugin-1", packages[0].Name)
+			validate: func(t *testing.T, packages []*PackageInfo) {
+				if packages[0].Package.Name != "plugin-1" {
+					t.Errorf("Package[0] name = %v, want plugin-1", packages[0].Package.Name)
 				}
-				if packages[1].Name != "plugin-2" {
-					t.Errorf("Package[1] name = %v, want plugin-2", packages[1].Name)
+				if packages[1].Package.Name != "plugin-2" {
+					t.Errorf("Package[1] name = %v, want plugin-2", packages[1].Package.Name)
 				}
 			},
 		},
@@ -417,9 +418,9 @@ This is a test agent.
 			},
 			wantCount: 1,
 			wantError: false,
-			validate: func(t *testing.T, packages []*resource.Package) {
-				if len(packages[0].Resources) != 1 {
-					t.Errorf("Resources length = %v, want 1", len(packages[0].Resources))
+			validate: func(t *testing.T, packages []*PackageInfo) {
+				if len(packages[0].Package.Resources) != 1 {
+					t.Errorf("Resources length = %v, want 1", len(packages[0].Package.Resources))
 				}
 			},
 		},
@@ -856,7 +857,8 @@ func TestGeneratePackages_Integration(t *testing.T) {
 		t.Fatalf("Expected 1 package, got %d", len(packages))
 	}
 
-	pkg := packages[0]
+	pkgInfo := packages[0]
+	pkg := pkgInfo.Package
 	if pkg.Name != "web-tools" {
 		t.Errorf("Package name = %v, want web-tools", pkg.Name)
 	}
