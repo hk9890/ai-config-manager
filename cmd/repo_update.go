@@ -302,6 +302,130 @@ func updateFromGitSource(manager *repo.Manager, name string, resourceType resour
 	}
 }
 
+// updateBatchFromGitSource updates multiple resources from a single Git clone
+func updateBatchFromGitSource(manager *repo.Manager, sourceURL string, resources []resourceInfo, ctx *UpdateContext) []UpdateResult {
+	var results []UpdateResult
+
+	// Parse the source URL
+	parsed, err := source.ParseSource(sourceURL)
+	if err != nil {
+		// If clone fails, all resources in batch fail
+		for _, res := range resources {
+			results = append(results, UpdateResult{
+				Name:    res.name,
+				Type:    res.resourceType,
+				Success: false,
+				Skipped: false,
+				Message: fmt.Sprintf("failed to parse source URL: %v", err),
+			})
+		}
+		return results
+	}
+
+	// Clone repository to temp directory
+	cloneURL, err := source.GetCloneURL(parsed)
+	if err != nil {
+		// If clone fails, all resources in batch fail
+		for _, res := range resources {
+			results = append(results, UpdateResult{
+				Name:    res.name,
+				Type:    res.resourceType,
+				Success: false,
+				Skipped: false,
+				Message: fmt.Sprintf("failed to get clone URL: %v", err),
+			})
+		}
+		return results
+	}
+
+	tempDir, err := source.CloneRepo(cloneURL, parsed.Ref)
+	if err != nil {
+		// If clone fails, all resources in batch fail
+		for _, res := range resources {
+			results = append(results, UpdateResult{
+				Name:    res.name,
+				Type:    res.resourceType,
+				Success: false,
+				Skipped: false,
+				Message: fmt.Sprintf("git clone failed: %v", err),
+			})
+		}
+		return results
+	}
+	defer source.CleanupTempDir(tempDir)
+
+	// Determine search path
+	searchPath := tempDir
+	if parsed.Subpath != "" {
+		searchPath = filepath.Join(tempDir, parsed.Subpath)
+	}
+
+	// Update each resource in the batch
+	for i, res := range resources {
+		ctx.Current++
+
+		// Show progress counter
+		fmt.Printf("[%d/%d] %s '%s'\n", ctx.Current, ctx.Total, res.resourceType, res.name)
+
+		result := UpdateResult{
+			Name:    res.name,
+			Type:    res.resourceType,
+			Success: false,
+			Skipped: false,
+		}
+
+		// Dry run mode - just report what would be done
+		if updateDryRunFlag {
+			result.Success = true
+			result.Message = fmt.Sprintf("Would update from %s (%s)", sourceURL, res.metadata.SourceType)
+			fmt.Printf("  ↓ %s\n\n", result.Message)
+			results = append(results, result)
+			continue
+		}
+
+		// Show operation type (only for first resource in batch)
+		if i == 0 {
+			fmt.Printf("  ↓ Cloning from %s...\n", sourceURL)
+		}
+
+		// Find and update the specific resource
+		var updateErr error
+		switch res.resourceType {
+		case resource.Command:
+			updateErr = updateCommandFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
+		case resource.Skill:
+			updateErr = updateSkillFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
+		case resource.Agent:
+			updateErr = updateAgentFromClone(manager, res.name, searchPath, sourceURL, res.metadata.SourceType)
+		default:
+			updateErr = fmt.Errorf("unsupported resource type: %s", res.resourceType)
+		}
+
+		if updateErr != nil {
+			result.Message = updateErr.Error()
+			fmt.Printf("  ✗ %s\n\n", result.Message)
+			results = append(results, result)
+			continue
+		}
+
+		// Update LastUpdated timestamp
+		res.metadata.LastUpdated = time.Now()
+		if err := metadata.Save(res.metadata, manager.GetRepoPath()); err != nil {
+			result.Message = fmt.Sprintf("Updated but failed to save metadata: %v", err)
+			fmt.Printf("  ✗ %s\n\n", result.Message)
+			results = append(results, result)
+			continue
+		}
+
+		result.Success = true
+		result.Message = "Updated successfully"
+		fmt.Printf("  ✓ %s\n\n", result.Message)
+		results = append(results, result)
+	}
+
+	return results
+}
+
 // updateFromLocalSource updates a resource from a local source
 // Returns (skipped bool, error) where skipped=true indicates the source path is missing
 func updateFromLocalSource(manager *repo.Manager, name string, resourceType resource.ResourceType, meta *metadata.ResourceMetadata) (bool, error) {
