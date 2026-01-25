@@ -587,13 +587,14 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		sourceType = "git-url"
 	}
 
-	// Import using bulk add with original source URL
+	// Import using bulk add with original source URL and ref
 	opts := repo.BulkImportOptions{
 		Force:        forceFlag,
 		SkipExisting: skipExistingFlag,
 		DryRun:       dryRunFlag,
 		SourceURL:    parsed.URL,
 		SourceType:   sourceType,
+		Ref:          parsed.Ref,
 	}
 
 	result, err := manager.AddBulk(allPaths, opts)

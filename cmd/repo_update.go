@@ -326,6 +326,12 @@ func updateFromGitSource(manager *repo.Manager, name string, resourceType resour
 		return fmt.Errorf("failed to parse source URL: %w", err)
 	}
 
+	// Get ref from metadata, default to "main" if empty
+	ref := meta.Ref
+	if ref == "" {
+		ref = "main"
+	}
+
 	// Get clone URL
 	cloneURL, err := source.GetCloneURL(parsed)
 	if err != nil {
@@ -339,13 +345,13 @@ func updateFromGitSource(manager *repo.Manager, name string, resourceType resour
 	}
 
 	// Get or clone repository using workspace cache
-	cachePath, err := workspaceManager.GetOrClone(cloneURL, parsed.Ref)
+	cachePath, err := workspaceManager.GetOrClone(cloneURL, ref)
 	if err != nil {
 		return fmt.Errorf("failed to get cached repository: %w", err)
 	}
 
 	// Update cached repository to latest
-	if err := workspaceManager.Update(cloneURL, parsed.Ref); err != nil {
+	if err := workspaceManager.Update(cloneURL, ref); err != nil {
 		// If update fails, log warning but continue with existing cache
 		// This handles cases like network failures where cache is still usable
 		fmt.Fprintf(os.Stderr, "warning: failed to update cached repo (using existing cache): %v\n", err)
@@ -390,6 +396,13 @@ func updateBatchFromGitSource(manager *repo.Manager, sourceURL string, resources
 		return results
 	}
 
+	// Get ref from first resource's metadata, default to "main" if empty
+	// All resources in batch should have the same ref (grouped by source URL)
+	ref := "main"
+	if len(resources) > 0 && resources[0].metadata.Ref != "" {
+		ref = resources[0].metadata.Ref
+	}
+
 	// Clone repository to temp directory
 	cloneURL, err := source.GetCloneURL(parsed)
 	if err != nil {
@@ -423,7 +436,7 @@ func updateBatchFromGitSource(manager *repo.Manager, sourceURL string, resources
 	}
 
 	// Get or clone repository using workspace cache
-	cachePath, err := workspaceManager.GetOrClone(cloneURL, parsed.Ref)
+	cachePath, err := workspaceManager.GetOrClone(cloneURL, ref)
 	if err != nil {
 		// If cache retrieval fails, all resources in batch fail
 		for _, res := range resources {
@@ -439,7 +452,7 @@ func updateBatchFromGitSource(manager *repo.Manager, sourceURL string, resources
 	}
 
 	// Update cached repository to latest
-	updateErr := workspaceManager.Update(cloneURL, parsed.Ref)
+	updateErr := workspaceManager.Update(cloneURL, ref)
 	if updateErr != nil {
 		// If update fails, log warning but continue with existing cache
 		fmt.Fprintf(os.Stderr, "warning: failed to update cached repo (using existing cache): %v\n", updateErr)

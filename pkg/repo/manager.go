@@ -71,6 +71,12 @@ func (m *Manager) Init() error {
 // AddCommand adds a command resource to the repository.
 // Metadata is automatically saved to .metadata/commands/<name>-metadata.json
 func (m *Manager) AddCommand(sourcePath, sourceURL, sourceType string) error {
+	return m.AddCommandWithRef(sourcePath, sourceURL, sourceType, "")
+}
+
+// AddCommandWithRef adds a command resource to the repository with a specified Git ref.
+// Metadata is automatically saved to .metadata/commands/<name>-metadata.json
+func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -100,6 +106,7 @@ func (m *Manager) AddCommand(sourcePath, sourceURL, sourceType string) error {
 		Type:           resource.Command,
 		SourceType:     sourceType,
 		SourceURL:      sourceURL,
+		Ref:            ref,
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
@@ -113,6 +120,12 @@ func (m *Manager) AddCommand(sourcePath, sourceURL, sourceType string) error {
 // AddSkill adds a skill resource to the repository.
 // Metadata is automatically saved to .metadata/skills/<name>-metadata.json
 func (m *Manager) AddSkill(sourcePath, sourceURL, sourceType string) error {
+	return m.AddSkillWithRef(sourcePath, sourceURL, sourceType, "")
+}
+
+// AddSkillWithRef adds a skill resource to the repository with a specified Git ref.
+// Metadata is automatically saved to .metadata/skills/<name>-metadata.json
+func (m *Manager) AddSkillWithRef(sourcePath, sourceURL, sourceType, ref string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -142,6 +155,7 @@ func (m *Manager) AddSkill(sourcePath, sourceURL, sourceType string) error {
 		Type:           resource.Skill,
 		SourceType:     sourceType,
 		SourceURL:      sourceURL,
+		Ref:            ref,
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
@@ -155,6 +169,12 @@ func (m *Manager) AddSkill(sourcePath, sourceURL, sourceType string) error {
 // AddAgent adds an agent resource to the repository.
 // Metadata is automatically saved to .metadata/agents/<name>-metadata.json
 func (m *Manager) AddAgent(sourcePath, sourceURL, sourceType string) error {
+	return m.AddAgentWithRef(sourcePath, sourceURL, sourceType, "")
+}
+
+// AddAgentWithRef adds an agent resource to the repository with a specified Git ref.
+// Metadata is automatically saved to .metadata/agents/<name>-metadata.json
+func (m *Manager) AddAgentWithRef(sourcePath, sourceURL, sourceType, ref string) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -184,6 +204,7 @@ func (m *Manager) AddAgent(sourcePath, sourceURL, sourceType string) error {
 		Type:           resource.Agent,
 		SourceType:     sourceType,
 		SourceURL:      sourceURL,
+		Ref:            ref,
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
@@ -417,6 +438,7 @@ type BulkImportOptions struct {
 	DryRun       bool   // Preview only, don't actually import
 	SourceURL    string // Original source URL (for Git sources)
 	SourceType   string // Source type (github, git-url, file, local)
+	Ref          string // Git ref (branch/tag/commit), defaults to "main" if empty
 }
 
 // ImportError represents an error during resource import
@@ -528,12 +550,13 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 	// Import the resource (unless dry run)
 	if !opts.DryRun {
 		// Determine source URL and type
-		var sourceURL, sourceType string
+		var sourceURL, sourceType, ref string
 
 		// Use provided source info if available, otherwise fall back to file://
 		if opts.SourceURL != "" && opts.SourceType != "" {
 			sourceURL = opts.SourceURL
 			sourceType = opts.SourceType
+			ref = opts.Ref
 		} else {
 			// Fall back to file:// for local sources
 			absPath, err := filepath.Abs(sourcePath)
@@ -542,15 +565,16 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 			}
 			sourceURL = "file://" + absPath
 			sourceType = "file"
+			ref = ""
 		}
 
 		switch resourceType {
 		case resource.Command:
-			err = m.AddCommand(sourcePath, sourceURL, sourceType)
+			err = m.AddCommandWithRef(sourcePath, sourceURL, sourceType, ref)
 		case resource.Skill:
-			err = m.AddSkill(sourcePath, sourceURL, sourceType)
+			err = m.AddSkillWithRef(sourcePath, sourceURL, sourceType, ref)
 		case resource.Agent:
-			err = m.AddAgent(sourcePath, sourceURL, sourceType)
+			err = m.AddAgentWithRef(sourcePath, sourceURL, sourceType, ref)
 		}
 
 		if err != nil {

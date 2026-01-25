@@ -22,6 +22,7 @@ type ResourceMetadata struct {
 	Type           resource.ResourceType `json:"type"`            // Resource type (command, skill, agent)
 	SourceType     string                `json:"source_type"`     // Source type: "github", "local", "file"
 	SourceURL      string                `json:"source_url"`      // Source URL or file path
+	Ref            string                `json:"ref,omitempty"`   // Git ref (branch/tag/commit), defaults to "main" if empty
 	FirstInstalled time.Time             `json:"first_installed"` // When resource was first added
 	LastUpdated    time.Time             `json:"last_updated"`    // When resource was last updated
 }
