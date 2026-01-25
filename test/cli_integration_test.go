@@ -134,8 +134,8 @@ license: MIT
 		t.Fatalf("Failed to add command: %v", err)
 	}
 
-	// Test: aimgr repo show command show-test
-	output, err := runAimgr(t, "repo", "show", "command", "show-test")
+	// Test: aimgr repo show command/show-test
+	output, err := runAimgr(t, "repo", "show", "command/show-test")
 	if err != nil {
 		t.Fatalf("Failed to show command: %v\nOutput: %s", err, output)
 	}
@@ -190,8 +190,8 @@ license: Apache-2.0
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addOutput)
 	}
 
-	// Test: aimgr repo show skill show-skill
-	output, err := runAimgr(t, "repo", "show", "skill", "show-skill")
+	// Test: aimgr repo show skill/show-skill
+	output, err := runAimgr(t, "repo", "show", "skill/show-skill")
 	if err != nil {
 		t.Fatalf("Failed to show skill: %v\nOutput: %s", err, output)
 	}
@@ -238,8 +238,8 @@ version: "1.5.0"
 		t.Fatalf("Failed to add agent: %v", err)
 	}
 
-	// Test: aimgr repo show agent show-agent
-	output, err := runAimgr(t, "repo", "show", "agent", "show-agent")
+	// Test: aimgr repo show agent/show-agent
+	output, err := runAimgr(t, "repo", "show", "agent/show-agent")
 	if err != nil {
 		t.Fatalf("Failed to show agent: %v\nOutput: %s", err, output)
 	}
@@ -294,14 +294,14 @@ version: "2.0.0"
 		t.Fatalf("Failed to update test command: %v", err)
 	}
 
-	// Test: aimgr repo update command update-test
-	output, err := runAimgr(t, "repo", "update", "command", "update-test")
+	// Test: aimgr repo update command/update-test
+	output, err := runAimgr(t, "repo", "update", "command/update-test")
 	if err != nil {
 		t.Fatalf("Failed to update command: %v\nOutput: %s", err, output)
 	}
 
 	// Verify the resource was updated
-	showOutput, err := runAimgr(t, "repo", "show", "command", "update-test")
+	showOutput, err := runAimgr(t, "repo", "show", "command/update-test")
 	if err != nil {
 		t.Fatalf("Failed to show updated command: %v", err)
 	}
@@ -646,7 +646,7 @@ description: Metadata test command
 	}
 
 	// Show the command to check metadata
-	output, err := runAimgr(t, "repo", "show", "command", "metadata-test")
+	output, err := runAimgr(t, "repo", "show", "command/metadata-test")
 	if err != nil {
 		t.Fatalf("Failed to show command: %v\nOutput: %s", err, output)
 	}
@@ -695,7 +695,7 @@ description: Original
 	}
 
 	// Get initial metadata
-	output1, err := runAimgr(t, "repo", "show", "command", "meta-update-test")
+	output1, err := runAimgr(t, "repo", "show", "command/meta-update-test")
 	if err != nil {
 		t.Fatalf("Failed to show command: %v", err)
 	}
@@ -710,13 +710,13 @@ description: Updated
 		t.Fatalf("Failed to update test command: %v", err)
 	}
 
-	_, err = runAimgr(t, "repo", "update", "command", "meta-update-test")
+	_, err = runAimgr(t, "repo", "update", "command/meta-update-test")
 	if err != nil {
 		t.Fatalf("Failed to update command: %v", err)
 	}
 
 	// Get updated metadata
-	output2, err := runAimgr(t, "repo", "show", "command", "meta-update-test")
+	output2, err := runAimgr(t, "repo", "show", "command/meta-update-test")
 	if err != nil {
 		t.Fatalf("Failed to show updated command: %v", err)
 	}
@@ -760,7 +760,7 @@ description: Remove test
 	// Note: We cannot easily verify metadata file location in CLI tests
 	// because the CLI uses XDG data home, not a custom repo path.
 	// We'll verify that the show command works before removal.
-	showOutput, err := runAimgr(t, "repo", "show", "command", "meta-remove-test")
+	showOutput, err := runAimgr(t, "repo", "show", "command/meta-remove-test")
 	if err != nil {
 		t.Fatalf("Failed to show command before removal: %v", err)
 	}
@@ -769,13 +769,13 @@ description: Remove test
 	}
 
 	// Remove the command (use --force to skip confirmation)
-	removeOutput, err := runAimgr(t, "repo", "remove", "command", "meta-remove-test", "--force")
+	removeOutput, err := runAimgr(t, "repo", "remove", "command/meta-remove-test", "--force")
 	if err != nil {
 		t.Fatalf("Failed to remove command: %v\nOutput: %s", err, removeOutput)
 	}
 
 	// Verify the command is gone by trying to show it (should fail)
-	_, err = runAimgr(t, "repo", "show", "command", "meta-remove-test")
+	_, err = runAimgr(t, "repo", "show", "command/meta-remove-test")
 	if err == nil {
 		t.Error("Command should not exist after removal")
 	}
