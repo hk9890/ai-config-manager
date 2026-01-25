@@ -85,6 +85,36 @@ Examples:
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeResourceArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check if uninstalling a package
+		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
+			packageName := strings.TrimPrefix(args[0], "package/")
+
+			// Get project path
+			projectPath := uninstallProjectPathFlag
+			if projectPath == "" {
+				var err error
+				projectPath, err = os.Getwd()
+				if err != nil {
+					return fmt.Errorf("failed to get current directory: %w", err)
+				}
+			}
+
+			// Create installer (auto-detect existing tools)
+			installer, err := install.NewInstaller(projectPath, nil)
+			if err != nil {
+				return fmt.Errorf("failed to create installer: %w", err)
+			}
+
+			// Create repo manager
+			manager, err := repo.NewManager()
+			if err != nil {
+				return fmt.Errorf("failed to create repository manager: %w", err)
+			}
+
+			// Uninstall package
+			return uninstallPackage(packageName, installer, manager)
+		}
+
 		// Get project path (current directory or flag)
 		projectPath := uninstallProjectPathFlag
 		if projectPath == "" {
@@ -423,4 +453,74 @@ func deduplicateStrings(input []string) []string {
 	}
 
 	return result
+}
+
+// uninstallPackage uninstalls all resources from a package
+func uninstallPackage(packageName string, installer *install.Installer, manager *repo.Manager) error {
+	repoPath := manager.GetRepoPath()
+	pkgPath := resource.GetPackagePath(packageName, repoPath)
+
+	// Load package
+	pkg, err := resource.LoadPackage(pkgPath)
+	if err != nil {
+		return fmt.Errorf("package '%s' not found in repository: %w", packageName, err)
+	}
+
+	fmt.Printf("Uninstalling package: %s\n", pkg.Name)
+	if pkg.Description != "" {
+		fmt.Printf("Description: %s\n", pkg.Description)
+	}
+	fmt.Println()
+
+	uninstalled := 0
+	skipped := 0
+	errors := []string{}
+
+	// Uninstall each resource
+	for _, ref := range pkg.Resources {
+		// Parse type/name format
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", ref, err))
+			continue
+		}
+
+		// Check if resource is installed
+		if !installer.IsInstalled(resName, resType) {
+			fmt.Printf("  ○ %s - not installed, skipping\n", ref)
+			skipped++
+			continue
+		}
+
+		// Uninstall the resource
+		err = installer.Uninstall(resName, resType)
+		if err != nil {
+			fmt.Printf("  ✗ %s - failed to uninstall: %v\n", ref, err)
+			errors = append(errors, fmt.Sprintf("%s: %v", ref, err))
+		} else {
+			fmt.Printf("  ✓ %s\n", ref)
+			uninstalled++
+		}
+	}
+
+	// Print summary
+	fmt.Println()
+	if skipped > 0 {
+		fmt.Printf("Skipped %d resource(s) not installed\n", skipped)
+	}
+	if len(errors) > 0 {
+		fmt.Println("Errors:")
+		for _, e := range errors {
+			fmt.Printf("  ✗ %s\n", e)
+		}
+	}
+
+	totalResources := len(pkg.Resources)
+	fmt.Printf("Uninstalled %d of %d resources from package '%s'\n", uninstalled, totalResources, pkg.Name)
+
+	if len(errors) > 0 {
+		return fmt.Errorf("package uninstallation completed with errors")
+	}
+
+	return nil
 }
