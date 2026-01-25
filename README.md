@@ -1518,14 +1518,14 @@ aimgr repo create-package docs-tools \
 
 ## Marketplace Import
 
-Import entire Claude plugin marketplaces to quickly bootstrap your repository with curated collections of resources. Each plugin in the marketplace becomes an aimgr package containing all discovered resources.
+Import Claude plugin marketplaces to quickly bootstrap your repository with curated collections of resources. Marketplace files are automatically discovered and imported when you use `aimgr repo add`.
 
 ### What is Marketplace Import?
 
-Claude plugin marketplaces use a `marketplace.json` file to define collections of plugins with commands, skills, and agents. The marketplace import feature:
+Claude plugin marketplaces use a `marketplace.json` file to define collections of plugins with commands, skills, and agents. When `aimgr repo add` detects a marketplace file, it automatically:
 
-- **Parses** Claude marketplace.json files
-- **Discovers** resources in each plugin's source directory
+- **Parses** the marketplace.json file
+- **Discovers** resources in each plugin's source directory  
 - **Creates** aimgr packages for each plugin
 - **Imports** all resources into your repository
 - **Tracks** metadata for future updates
@@ -1534,49 +1534,66 @@ This makes it easy to import entire plugin ecosystems in one command.
 
 ### Basic Usage
 
-```bash
-# Import from local marketplace
-aimgr marketplace import ~/.claude-plugin/marketplace.json
+The marketplace import feature is integrated into `aimgr repo add`. When you add a directory containing a `marketplace.json` file, it's automatically detected and processed:
 
-# Import from GitHub (requires gh CLI)
-aimgr marketplace import gh:anthropics/claude-code/.claude-plugin/marketplace.json
+```bash
+# Import from local directory with marketplace
+aimgr repo add ~/my-marketplace/
+
+# Import from GitHub repository with marketplace
+aimgr repo add gh:myorg/plugins
 
 # Preview without importing
-aimgr marketplace import <path> --dry-run
+aimgr repo add ~/my-marketplace/ --dry-run
 ```
 
+### Auto-Discovery
+
+`aimgr repo add` automatically searches for marketplace files in standard locations:
+
+**Marketplace Discovery:**
+1. `marketplace.json` in the root directory
+2. `.claude-plugin/marketplace.json` (Claude plugin convention)
+3. Recursive search (max depth 3)
+
+When found, the marketplace is automatically imported along with any other resources in the directory.
+
 ### Command Options
+
+Use the same flags as `aimgr repo add`:
 
 **Flags:**
 - `--dry-run`: Preview what would be imported without making changes
 - `--force, -f`: Overwrite existing packages and resources
 - `--filter <pattern>`: Import only plugins matching the glob pattern
-- `--source-url <url>`: Override source URL for metadata tracking
+- `--skip-existing`: Skip existing resources
 
 **Examples:**
 
 ```bash
+# Import marketplace with all its plugins
+aimgr repo add ~/claude-plugins/
+
 # Import specific plugins only
-aimgr marketplace import marketplace.json --filter "code-*"
+aimgr repo add ~/claude-plugins/ --filter "web-*"
 
 # Force overwrite existing packages
-aimgr marketplace import marketplace.json --force
+aimgr repo add gh:myorg/plugins --force
 
-# Specify source URL for metadata
-aimgr marketplace import ./marketplace.json \
-  --source-url "gh:myorg/plugins"
+# Preview what would be imported
+aimgr repo add ~/marketplace/ --dry-run
 ```
 
 ### How It Works
 
-When you import a marketplace:
+When `aimgr repo add` finds a marketplace:
 
 1. **Parse**: Reads the marketplace.json file
 2. **Filter**: Applies optional pattern filters to select specific plugins
 3. **Discover**: For each plugin, searches for resources in standard locations:
-   - Commands: `commands/*.md`, `.claude/commands/*.md`
-   - Skills: `skills/*/SKILL.md`, `.claude/skills/*/SKILL.md`
-   - Agents: `agents/*.md`, `.claude/agents/*.md`
+   - Commands: `commands/*.md`, `.claude/commands/*.md`, `.opencode/commands/*.md`
+   - Skills: `skills/*/SKILL.md`, `.claude/skills/*/SKILL.md`, `.opencode/skills/*/SKILL.md`
+   - Agents: `agents/*.md`, `.claude/agents/*.md`, `.opencode/agents/*.md`
 4. **Import**: Copies all discovered resources into your repository
 5. **Package**: Creates an aimgr package for each plugin
 6. **Track**: Saves metadata for future updates
@@ -1636,9 +1653,9 @@ See [examples/marketplace/](examples/marketplace/) for complete examples.
 **1. Organization Plugin Distribution:**
 ```bash
 # Create marketplace for your organization's plugins
-# Distribute marketplace.json to team members
+# Distribute repository to team members via GitHub
 # They import with one command:
-aimgr marketplace import gh:myorg/plugins/.claude-plugin/marketplace.json
+aimgr repo add gh:myorg/plugins
 
 # All plugins become packages they can install:
 aimgr install package/web-dev-tools
@@ -1648,7 +1665,7 @@ aimgr install package/testing-suite
 **2. Public Plugin Collections:**
 ```bash
 # Import community plugin collections
-aimgr marketplace import gh:community/awesome-claude-plugins/marketplace.json
+aimgr repo add gh:community/awesome-claude-plugins
 
 # Browse imported packages
 aimgr repo list package
@@ -1659,9 +1676,12 @@ aimgr install package/pdf-tools package/git-helpers
 
 **3. Project Bootstrapping:**
 ```bash
-# Create project-specific marketplace
-# Import during project setup
-aimgr marketplace import ./project-plugins/marketplace.json
+# Clone project with marketplace
+git clone https://github.com/myorg/project
+cd project
+
+# Import project-specific plugins
+aimgr repo add ./.claude-plugin/
 
 # All project resources available immediately
 aimgr install package/backend-tools package/frontend-tools
@@ -1684,13 +1704,13 @@ aimgr repo update skill/typescript-helper
 
 Metadata includes:
 - Source URL (marketplace location)
-- Original format (claude-plugin)
+- Original format (marketplace)
 - Import timestamp
 - Resource count
 
 ### Package Management After Import
 
-After importing, packages work like regular aimgr packages:
+After importing a marketplace, packages work like regular aimgr packages:
 
 ```bash
 # Install marketplace package
@@ -1715,16 +1735,49 @@ Use glob patterns to import specific plugins:
 
 ```bash
 # Import only web-related plugins
-aimgr marketplace import marketplace.json --filter "web-*"
+aimgr repo add ~/marketplace/ --filter "web-*"
 
 # Import testing plugins
-aimgr marketplace import marketplace.json --filter "*-test"
+aimgr repo add gh:myorg/plugins --filter "*-test"
 
-# Import multiple patterns (run multiple commands)
-aimgr marketplace import marketplace.json --filter "code-*"
-aimgr marketplace import marketplace.json --filter "dev-*"
+# Import multiple patterns (multiple commands)
+aimgr repo add ~/marketplace/ --filter "code-*"
+aimgr repo add ~/marketplace/ --filter "dev-*"
 ```
 
+### Integration with repo add
+
+Marketplace import is seamlessly integrated into `aimgr repo add`:
+
+- **Automatic detection**: No special command needed
+- **Works with all sources**: Local paths and GitHub repositories
+- **Same flags**: `--dry-run`, `--force`, `--filter`, `--skip-existing`
+- **Unified workflow**: Import resources and marketplaces together
+- **Preserves structure**: Plugin organization becomes package structure
+
+**Example output:**
+```bash
+$ aimgr repo add ~/my-plugins/ --dry-run
+
+Importing from: /home/user/my-plugins
+  Mode: DRY RUN (preview only)
+
+Found: 4 commands, 2 skills, 2 agents, 0 packages
+Found marketplace: my-plugins/marketplace.json (3 plugins)
+
+Generating packages from marketplace:
+  ✓ web-dev-tools (4 resources)
+  ✓ testing-suite (4 resources)
+  ✓ docs-helpers (2 resources)
+
+✓ Added command 'build'
+✓ Added command 'test'
+✓ Added skill 'typescript-helper'
+✓ Added agent 'code-reviewer'
+...
+
+Summary: 16 added, 0 skipped, 0 failed
+```
 ## Commands
 
 Commands are single `.md` files with YAML frontmatter, following the Claude Code slash command format.

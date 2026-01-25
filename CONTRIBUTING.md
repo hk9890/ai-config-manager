@@ -74,18 +74,51 @@ aimgr is a CLI tool built with Go that manages AI resources (commands and skills
 ai-config-manager/
 ├── cmd/                    # CLI command definitions (Cobra)
 │   ├── root.go            # Root command and global flags
-│   ├── add.go             # Add command (with command/skill/agent subcommands)
-│   ├── add_plugin.go      # Add from plugin (bulk)
-│   ├── add_claude.go      # Add from .claude/ (bulk)
-│   ├── add_opencode.go    # Add from .opencode/ (bulk)
+│   ├── add.go             # Add command (auto-discovery from sources)
 │   ├── config.go          # Configuration management
-│   ├── install.go         # Install command (with command/skill/agent subcommands)
-│   ├── list.go            # List resources
-│   └── remove.go          # Remove resources
+│   ├── init.go            # Initialize ai.package.yaml
+│   ├── install.go         # Install resources/packages
+│   ├── list.go            # List repository resources
+│   ├── list_installed.go  # List installed resources in project
+│   ├── remove.go          # Remove resources
+│   ├── uninstall.go       # Uninstall from project
+│   ├── repo.go            # Repo subcommand group
+│   ├── repo_create_package.go  # Create packages
+│   ├── repo_show.go       # Show resource details
+│   ├── repo_sync.go       # Sync from configured sources
+│   ├── repo_update.go     # Update resources from sources
+│   ├── repo_prune.go      # Prune unused caches
+│   ├── repo_verify.go     # Verify repository health
+│   ├── completion.go      # Shell completion
+│   └── *_test.go          # Test files
 │
 ├── pkg/                    # Core packages
 │   ├── config/            # Configuration management
 │   │   └── config.go      # Load/save ~/.config/aimgr/aimgr.yaml
+│   │
+│   ├── discovery/         # Auto-discovery of resources
+│   │   ├── commands.go    # Command auto-discovery
+│   │   ├── skills.go      # Skill auto-discovery
+│   │   ├── agents.go      # Agent auto-discovery
+│   │   ├── packages.go    # Package auto-discovery
+│   │   └── testdata/      # Test fixtures
+│   │
+│   ├── install/           # Installation logic
+│   │   └── installer.go   # Symlink creation, tool detection
+│   │
+│   ├── manifest/          # ai.package.yaml handling
+│   │   └── manifest.go    # Load/save project manifests
+│   │
+│   ├── marketplace/       # Marketplace parsing and generation
+│   │   ├── parser.go      # Parse marketplace.json
+│   │   ├── generator.go   # Generate packages from plugins
+│   │   └── discovery.go   # Auto-discover marketplace files
+│   │
+│   ├── metadata/          # Metadata tracking
+│   │   └── metadata.go    # Resource metadata management
+│   │
+│   ├── pattern/           # Pattern matching
+│   │   └── matcher.go     # Glob pattern matching for resources
 │   │
 │   ├── repo/              # Repository management
 │   │   └── manager.go     # Add/remove/list resources, bulk import
@@ -95,41 +128,36 @@ ai-config-manager/
 │   │   ├── command.go     # Command resource logic
 │   │   ├── skill.go       # Skill resource logic
 │   │   ├── agent.go       # Agent resource logic
-│   │   ├── plugin.go      # Plugin and .claude/.opencode detection
-│   │   ├── metadata.go    # YAML frontmatter parsing
+│   │   ├── package.go     # Package resource logic
 │   │   └── types.go       # Resource types and validation
 │   │
 │   ├── source/            # Source parsing and Git operations
 │   │   ├── parser.go      # Parse source formats (gh:, local:, git:)
 │   │   └── git.go         # Git clone and temp directory management
 │   │
-│   ├── discovery/         # Auto-discovery of resources
-│   │   ├── skills.go      # Skill auto-discovery algorithm
-│   │   ├── commands.go    # Command auto-discovery algorithm
-│   │   ├── agents.go      # Agent auto-discovery algorithm
-│   │   └── testdata/      # Test fixtures for discovery
-│   │
-│   ├── install/           # Installation logic
-│   │   └── installer.go   # Symlink creation, tool detection
-│   │
 │   ├── tools/             # Tool-specific information
 │   │   └── types.go       # Claude/OpenCode/Copilot definitions
 │   │
-│   └── version/           # Version information
-│       └── version.go     # Embedded at build time
+│   ├── version/           # Version information
+│   │   └── version.go     # Embedded at build time
+│   │
+│   └── workspace/         # Workspace caching
+│       └── cache.go       # Git repository caching for updates
 │
 ├── test/                   # Integration tests
 │   ├── integration_test.go       # End-to-end workflow tests
-│   ├── bulk_import_test.go       # Bulk import integration tests
-│   └── github_sources_test.go    # GitHub source integration tests
+│   ├── ai_package_test.go        # ai.package.yaml tests
+│   ├── marketplace_test.go       # Marketplace import tests
+│   ├── package_import_test.go    # Package auto-import tests
+│   └── github_sources_test.go    # GitHub source tests
 │
 ├── examples/               # Example resources
 │   ├── sample-command.md
 │   ├── sample-agent.md
-│   ├── claude-style-agent.md
-│   ├── minimal-agent.md
 │   ├── sample-skill/
-│   └── README.md
+│   ├── marketplace/        # Marketplace examples
+│   ├── packages/           # Package examples
+│   └── ai-package/         # ai.package.yaml examples
 │
 ├── main.go                 # Entry point
 ├── Makefile                # Build automation
@@ -138,7 +166,6 @@ ai-config-manager/
 ├── AGENTS.md               # AI agent quick reference
 └── CONTRIBUTING.md         # This file
 ```
-
 ### Architecture Flow
 
 #### Adding Resources (Local)

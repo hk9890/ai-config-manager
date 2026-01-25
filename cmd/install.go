@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	projectPathFlag   string
-	installForceFlag  bool
-	installTargetFlag string
+	projectPathFlag        string
+	installForceFlag       bool
+	installTargetFlag      string
 	installSaveFlag        bool = true
 	installNoSaveFlag      bool
 	installingFromManifest bool
@@ -635,6 +635,7 @@ func installPackage(packageName string, installer *install.Installer, manager *r
 	return nil
 
 }
+
 // updateManifest adds a resource to ai.package.yaml after successful installation
 func updateManifest(projectPath string, resource string) error {
 	// Skip if --no-save is set, or if not saving, or if installing from manifest

@@ -70,19 +70,24 @@ make clean
 ```
 
 ## Code Style Guidelines
-
 ### Package Structure
 ```
 ai-config-manager/
 ├── cmd/              # Cobra command definitions
 ├── pkg/
 │   ├── config/       # Configuration management
+│   ├── discovery/    # Auto-discovery of resources
 │   ├── install/      # Installation/symlink logic
+│   ├── manifest/     # ai.package.yaml handling
+│   ├── marketplace/  # Marketplace parsing and generation
 │   ├── metadata/     # Metadata tracking and migration
+│   ├── pattern/      # Pattern matching for resources
 │   ├── repo/         # Repository management
-│   ├── resource/     # Resource types (command, skill, agent)
+│   ├── resource/     # Resource types (command, skill, agent, package)
+│   ├── source/       # Source parsing and Git operations
 │   ├── tools/        # Tool-specific info (Claude, OpenCode, Copilot)
-│   └── version/      # Version information
+│   ├── version/      # Version information
+│   └── workspace/    # Workspace caching for Git repos
 ├── test/             # Integration tests
 ├── examples/         # Example resources (commands, skills, agents)
 └── main.go           # Entry point
