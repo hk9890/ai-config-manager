@@ -259,6 +259,22 @@ func completeResourceTypes(cmd *cobra.Command, args []string, toComplete string)
 	return types, cobra.ShellCompDirectiveNoFileComp
 }
 
+// completeInstalledResources provides completion for installed resource patterns
+func completeInstalledResources(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Offer type-based patterns and common wildcards
+	patterns := []string{
+		"skill/*",
+		"command/*",
+		"agent/*",
+		"*",
+	}
+	return patterns, cobra.ShellCompDirectiveNoFileComp
+}
+
 // completeConfigKeys provides completion for config key names
 func completeConfigKeys(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) != 0 {

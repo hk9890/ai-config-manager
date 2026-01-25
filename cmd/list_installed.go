@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/install"
+	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"github.com/olekukonko/tablewriter"
@@ -21,7 +22,7 @@ var (
 
 // listInstalledCmd represents the list command for installed resources
 var listInstalledCmd = &cobra.Command{
-	Use:   "list [command|skill|agent]",
+	Use:   "list [pattern]",
 	Short: "List installed resources in the current directory",
 	Long: `List all resources installed in the current directory (or specified path).
 
@@ -30,35 +31,26 @@ displaying which tools (claude, opencode, copilot) each resource is installed to
 
 Only resources installed via aimgr (symlinks) are shown - manually copied files are excluded.
 
+The optional pattern argument supports glob wildcards (* ? [ ]) and type prefixes:
+  - No pattern: list all installed resources
+  - Type patterns: skill/*, command/*, agent/*
+  - Name patterns: *test*, *debug*, pdf*
+  - Combined: skill/pdf*, command/test-*
+
 Examples:
   aimgr list                         # List all installed resources
-  aimgr list command                 # List only installed commands
-  aimgr list skill                   # List only installed skills
-  aimgr list agent                   # List only installed agents
+  aimgr list skill/*                 # List all installed skills
+  aimgr list command/*               # List all installed commands
+  aimgr list agent/*                 # List all installed agents
+  aimgr list *test*                  # List all resources with "test" in name
+  aimgr list skill/pdf*              # List installed skills starting with "pdf"
+  aimgr list command/test-*          # List installed commands starting with "test-"
   aimgr list --format=json           # Output as JSON
   aimgr list --format=yaml           # Output as YAML
   aimgr list --path ~/project        # List in specific directory`,
 	Args:              cobra.MaximumNArgs(1),
-	ValidArgsFunction: completeResourceTypes,
+	ValidArgsFunction: completeInstalledResources,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Parse optional type filter
-		var resourceType *resource.ResourceType
-		if len(args) == 1 {
-			typeStr := args[0]
-			switch typeStr {
-			case "command":
-				t := resource.Command
-				resourceType = &t
-			case "skill":
-				t := resource.Skill
-				resourceType = &t
-			case "agent":
-				t := resource.Agent
-				resourceType = &t
-			default:
-				return fmt.Errorf("invalid resource type: %s (must be 'command', 'skill', or 'agent')", typeStr)
-			}
-		}
 
 		// Get project path (current directory or flag)
 		projectPath := listInstalledPathFlag
@@ -95,24 +87,33 @@ Examples:
 			return fmt.Errorf("failed to list installed resources: %w", err)
 		}
 
-		// Filter by type if specified
-		if resourceType != nil {
+		// Filter by pattern if specified
+		if len(args) > 0 {
+			patternArg := args[0]
+			matcher, err := pattern.NewMatcher(patternArg)
+			if err != nil {
+				return fmt.Errorf("invalid pattern '%s': %w", patternArg, err)
+			}
+
 			filtered := []resource.Resource{}
 			for _, res := range resources {
-				if res.Type == *resourceType {
+				if matcher.Match(&res) {
 					filtered = append(filtered, res)
 				}
 			}
 			resources = filtered
+
+			// Handle no matches
+			if len(resources) == 0 {
+				fmt.Printf("No installed resources match pattern '%s'.\n", patternArg)
+				fmt.Println("\nInstall resources with: aimgr install <resource>")
+				return nil
+			}
 		}
 
-		// Handle empty results
+		// Handle empty results (no pattern specified)
 		if len(resources) == 0 {
-			if resourceType != nil {
-				fmt.Printf("No %s resources installed in this project.\n", *resourceType)
-			} else {
-				fmt.Println("No resources installed in this project.")
-			}
+			fmt.Println("No resources installed in this project.")
 			fmt.Println("\nInstall resources with: aimgr install <resource>")
 			return nil
 		}
