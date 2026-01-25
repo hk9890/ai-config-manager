@@ -20,6 +20,9 @@ var (
 	projectPathFlag   string
 	installForceFlag  bool
 	installTargetFlag string
+	installSaveFlag        bool = true
+	installNoSaveFlag      bool
+	installingFromManifest bool
 )
 
 // installResult tracks the result of installing a single resource
@@ -257,6 +260,16 @@ Examples:
 			results = append(results, result)
 		}
 
+		// Update manifest for successfully installed resources
+		for _, result := range results {
+			if result.success && !result.skipped {
+				resourceRef := fmt.Sprintf("%s/%s", result.resourceType, result.name)
+				if err := updateManifest(projectPath, resourceRef); err != nil {
+					fmt.Printf("⚠ Warning: failed to update manifest: %v\n", err)
+				}
+			}
+		}
+
 		// Print results
 		printInstallSummary(results)
 
@@ -273,6 +286,9 @@ Examples:
 
 // installFromManifest installs all resources from ai.package.yaml
 func installFromManifest(cmd *cobra.Command) error {
+	installingFromManifest = true
+	defer func() { installingFromManifest = false }()
+
 	// Get project path
 	projectPath := projectPathFlag
 	if projectPath == "" {
@@ -522,6 +538,8 @@ func init() {
 	installCmd.Flags().StringVar(&projectPathFlag, "project-path", "", "Project directory path (default: current directory)")
 	installCmd.Flags().BoolVarP(&installForceFlag, "force", "f", false, "Overwrite existing installation")
 	installCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
+	installCmd.Flags().BoolVar(&installSaveFlag, "save", true, "Save installed resources to ai.package.yaml")
+	installCmd.Flags().BoolVar(&installNoSaveFlag, "no-save", false, "Don't save to ai.package.yaml")
 }
 
 // installPackage installs all resources from a package
@@ -614,5 +632,34 @@ func installPackage(packageName string, installer *install.Installer, manager *r
 		return fmt.Errorf("package installation completed with errors")
 	}
 
+	return nil
+
+}
+// updateManifest adds a resource to ai.package.yaml after successful installation
+func updateManifest(projectPath string, resource string) error {
+	// Skip if --no-save is set, or if not saving, or if installing from manifest
+	if installNoSaveFlag || !installSaveFlag || installingFromManifest {
+		return nil
+	}
+
+	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
+
+	// Load or create manifest
+	m, err := manifest.LoadOrCreate(manifestPath)
+	if err != nil {
+		return fmt.Errorf("failed to load/create manifest: %w", err)
+	}
+
+	// Add resource (will skip if already exists)
+	if err := m.Add(resource); err != nil {
+		return fmt.Errorf("failed to add resource to manifest: %w", err)
+	}
+
+	// Save manifest
+	if err := m.Save(manifestPath); err != nil {
+		return fmt.Errorf("failed to save manifest: %w", err)
+	}
+
+	fmt.Printf("✓ Added to %s\n", manifest.ManifestFileName)
 	return nil
 }
