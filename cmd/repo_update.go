@@ -388,6 +388,63 @@ func updateAgentFromClone(manager *repo.Manager, name, searchPath, sourceURL, so
 	return manager.AddAgent(agentPath, sourceURL, sourceType)
 }
 
+// resourceInfo holds information about a resource for grouping purposes
+type resourceInfo struct {
+	name         string
+	resourceType resource.ResourceType
+	metadata     *metadata.ResourceMetadata
+}
+
+// groupResourcesBySource groups resources by their source URL for Git sources
+// and separates local/file sources that should not be batched.
+//
+// Returns:
+//   - map[string][]resourceInfo: Git sources grouped by URL
+//   - []resourceInfo: Local/file sources (not grouped)
+//   - error: Critical error if grouping fails
+//
+// Resources with missing metadata are skipped gracefully (not treated as errors).
+func groupResourcesBySource(manager *repo.Manager, resources []string) (map[string][]resourceInfo, []resourceInfo, error) {
+	gitSources := make(map[string][]resourceInfo)
+	var localSources []resourceInfo
+
+	for _, resArg := range resources {
+		// Parse the resource argument (format: type/name)
+		resType, name, err := ParseResourceArg(resArg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse resource argument %q: %w", resArg, err)
+		}
+
+		// Load metadata for the resource
+		meta, err := manager.GetMetadata(name, resType)
+		if err != nil {
+			// Skip resources with missing metadata gracefully
+			continue
+		}
+
+		info := resourceInfo{
+			name:         name,
+			resourceType: resType,
+			metadata:     meta,
+		}
+
+		// Group by source type
+		switch meta.SourceType {
+		case "github", "git-url", "gitlab":
+			// Group Git sources by their URL
+			gitSources[meta.SourceURL] = append(gitSources[meta.SourceURL], info)
+		case "local", "file":
+			// Local/file sources are not batched
+			localSources = append(localSources, info)
+		default:
+			// Unknown source types are treated as local (not batched)
+			localSources = append(localSources, info)
+		}
+	}
+
+	return gitSources, localSources, nil
+}
+
 // displayUpdateSummary displays a summary of update operations
 func displayUpdateSummary(results []UpdateResult) {
 	if len(results) == 0 {
