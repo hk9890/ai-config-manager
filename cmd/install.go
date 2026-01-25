@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/config"
 	"github.com/hk9890/ai-config-manager/pkg/install"
+	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -53,9 +55,11 @@ func parseTargetFlag(targetFlag string) ([]tools.Tool, error) {
 
 // installCmd represents the install command
 var installCmd = &cobra.Command{
-	Use:   "install <resource>...",
+	Use:   "install [resource]...",
 	Short: "Install resources to a project",
 	Long: `Install one or more resources (commands, skills, agents, or packages) to a project.
+
+If no resources are specified, installs all resources from ai.package.yaml in the current directory.
 
 Resources are specified using the format 'type/name':
   - command/name (or commands/name)
@@ -72,7 +76,7 @@ Pattern matching is supported using glob syntax:
 Multi-tool behavior:
   - If tool directories exist (.claude, .opencode, .github/skills), installs to ALL of them
   - If no tool directories exist, creates and installs to your default tool
-  - Default tool is configured in ~/.aimgr.yaml (use 'aimgr config set default-tool <tool>')
+  - Default tool is configured in ~/.config/aimgr/aimgr.yaml (use 'aimgr config set default-tool <tool>')
 
 Supported tools:
   - claude:   Claude Code (.claude/commands, .claude/skills, .claude/agents)
@@ -80,6 +84,9 @@ Supported tools:
   - copilot:  GitHub Copilot (.github/skills only - no commands or agents support)
 
 Examples:
+  # Install from ai.package.yaml
+  aimgr install
+
   # Install a single skill
   aimgr install skill/pdf-processing
 
@@ -109,9 +116,14 @@ Examples:
 
   # Install to specific target
   aimgr install skill/utils --target claude`,
-	Args:              cobra.MinimumNArgs(1),
+	Args:              cobra.ArbitraryArgs, // Allow 0 or more args
 	ValidArgsFunction: completeInstallResources,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Handle zero-arg install (from ai.package.yaml)
+		if len(args) == 0 {
+			return installFromManifest(cmd)
+		}
+
 		// Check if installing a package
 		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
 			packageName := strings.TrimPrefix(args[0], "package/")
@@ -257,6 +269,113 @@ Examples:
 
 		return nil
 	},
+}
+
+// installFromManifest installs all resources from ai.package.yaml
+func installFromManifest(cmd *cobra.Command) error {
+	// Get project path
+	projectPath := projectPathFlag
+	if projectPath == "" {
+		var err error
+		projectPath, err = os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+	}
+
+	// Look for ai.package.yaml
+	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
+	if !manifest.Exists(manifestPath) {
+		return fmt.Errorf("no resources specified and %s not found\n\nTo install resources, either:\n  1. Specify resources: aimgr install skill/pdf-processing\n  2. Create %s in current directory", manifest.ManifestFileName, manifest.ManifestFileName)
+	}
+
+	// Load manifest
+	fmt.Printf("Reading %s...\n", manifest.ManifestFileName)
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		return fmt.Errorf("failed to load manifest: %w", err)
+	}
+
+	// Check if manifest has any resources
+	if len(m.Resources) == 0 {
+		fmt.Printf("No resources defined in %s\n", manifest.ManifestFileName)
+		return nil
+	}
+
+	fmt.Printf("Installing %d resources...\n", len(m.Resources))
+
+	// Parse target flag or use manifest targets
+	var targetTools []tools.Tool
+	explicitTargets, err := parseTargetFlag(installTargetFlag)
+	if err != nil {
+		return err
+	}
+
+	if explicitTargets != nil {
+		// Use explicit --target flag
+		targetTools = explicitTargets
+	} else if len(m.Targets) > 0 {
+		// Use manifest targets
+		for _, t := range m.Targets {
+			tool, err := tools.ParseTool(t)
+			if err != nil {
+				return fmt.Errorf("invalid target in manifest '%s': %w", t, err)
+			}
+			targetTools = append(targetTools, tool)
+		}
+	}
+
+	// Create installer
+	var installer *install.Installer
+	if targetTools != nil {
+		installer, err = install.NewInstallerWithTargets(projectPath, targetTools)
+	} else {
+		// Use defaults from config
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get home directory: %w", err)
+		}
+		cfg, err := config.Load(home)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		defaultTargets, err := cfg.GetDefaultTargets()
+		if err != nil {
+			return fmt.Errorf("invalid default targets in config: %w", err)
+		}
+		installer, err = install.NewInstaller(projectPath, defaultTargets)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to create installer: %w", err)
+	}
+
+	// Create repo manager
+	manager, err := repo.NewManager()
+	if err != nil {
+		return fmt.Errorf("failed to create repository manager: %w", err)
+	}
+
+	// Track results
+	var results []installResult
+
+	// Process each resource
+	for _, resourceRef := range m.Resources {
+		result := processInstall(resourceRef, installer, manager)
+		results = append(results, result)
+	}
+
+	// Print results
+	fmt.Println()
+	printInstallSummary(results)
+
+	// Return error if any resource failed
+	for _, result := range results {
+		if !result.success && !result.skipped {
+			return fmt.Errorf("some resources failed to install")
+		}
+	}
+
+	return nil
 }
 
 // processInstall processes installing a single resource
