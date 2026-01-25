@@ -100,6 +100,8 @@ func ParsePattern(arg string) (resource.ResourceType, string, bool) {
 			resourceType = resource.Skill
 		case "agent":
 			resourceType = resource.Agent
+		case "package":
+			resourceType = resource.PackageType
 		default:
 			// If not a valid type, treat the whole thing as a pattern
 			// (e.g., "foo/bar" becomes pattern "foo/bar")

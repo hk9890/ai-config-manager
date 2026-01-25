@@ -132,6 +132,20 @@ func TestParsePattern(t *testing.T) {
 			wantPattern:   "cmd?",
 			wantIsPattern: true,
 		},
+		{
+			name:          "package with pattern",
+			input:         "package/web-*",
+			wantType:      resource.PackageType,
+			wantPattern:   "web-*",
+			wantIsPattern: true,
+		},
+		{
+			name:          "package with exact name",
+			input:         "package/web-tools",
+			wantType:      resource.PackageType,
+			wantPattern:   "web-tools",
+			wantIsPattern: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -322,6 +336,24 @@ func TestMatcher_Match(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name:    "package type filter match",
+			pattern: "package/web-*",
+			resource: &resource.Resource{
+				Name: "web-tools",
+				Type: resource.PackageType,
+			},
+			want: true,
+		},
+		{
+			name:    "package type filter no match - wrong type",
+			pattern: "package/web-*",
+			resource: &resource.Resource{
+				Name: "web-tools",
+				Type: resource.Command,
+			},
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -412,6 +444,11 @@ func TestMatcher_GetResourceType(t *testing.T) {
 			name:     "agent type filter",
 			pattern:  "agent/test*",
 			wantType: resource.Agent,
+		},
+		{
+			name:     "package type filter",
+			pattern:  "package/test*",
+			wantType: resource.PackageType,
 		},
 	}
 
