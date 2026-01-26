@@ -152,11 +152,7 @@ Examples:
 			if explicitTargets != nil {
 				installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
 			} else {
-				home, err := os.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("failed to get home directory: %w", err)
-				}
-				cfg, err := config.Load(home)
+				cfg, err := config.LoadGlobal()
 				if err != nil {
 					return fmt.Errorf("failed to load config: %w", err)
 				}
@@ -203,11 +199,7 @@ Examples:
 			installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
 		} else {
 			// Auto-detect existing tools or use config defaults
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return fmt.Errorf("failed to get home directory: %w", err)
-			}
-			cfg, err := config.Load(home)
+			cfg, err := config.LoadGlobal()
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
@@ -347,11 +339,7 @@ func installFromManifest(cmd *cobra.Command) error {
 		installer, err = install.NewInstallerWithTargets(projectPath, targetTools)
 	} else {
 		// Use defaults from config
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("failed to get home directory: %w", err)
-		}
-		cfg, err := config.Load(home)
+		cfg, err := config.LoadGlobal()
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
