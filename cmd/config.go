@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/config"
+	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -26,11 +27,16 @@ behavior for aimgr commands.`,
 var configGetCmd = &cobra.Command{
 	Use:   "get <key>",
 	Short: "Get a configuration value",
-	Long: `Get a configuration value.
+	Long: `Get a configuration value with precedence handling.
 
 Available keys:
-  install.targets - The default AI tools to install to (recommended)
-  default-tool    - Legacy: first install target (use install.targets instead)
+  install.targets - The default AI tools to install to
+
+Precedence (highest to lowest):
+  1. ai.package.yaml install.targets (current directory)
+  2. ~/.config/aimgr/aimgr.yaml install.targets (global config)
+
+The source of the value is displayed in the output.
 
 Example:
   aimgr config get install.targets`,
@@ -71,39 +77,51 @@ func init() {
 func configGet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 
-	// Support both new and legacy config keys
-	if key != "install.targets" && key != "default-tool" {
-		return fmt.Errorf("unknown config key: %s (available: install.targets, default-tool)", key)
+	// Only support install.targets now
+	if key != "install.targets" {
+		return fmt.Errorf("unknown config key: %s (available: install.targets)", key)
 	}
 
-	// Load global config
-	cfg, err := config.LoadGlobal()
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
-	}
+	// Check for ai.package.yaml in current directory (highest precedence)
+	manifestPath := filepath.Join(".", manifest.ManifestFileName)
+	var targets []string
+	var source string
 
-	// Get config path for display
-	configPath, _ := config.GetConfigPath()
-	fmt.Fprintf(os.Stderr, "Using config file: %s\n", configPath)
-
-	// Handle legacy default-tool key
-	if key == "default-tool" {
-		if len(cfg.Install.Targets) == 0 {
-			fmt.Printf("default-tool: claude\n")
-		} else {
-			fmt.Printf("default-tool: %s\n", cfg.Install.Targets[0])
+	if manifest.Exists(manifestPath) {
+		m, err := manifest.Load(manifestPath)
+		if err != nil {
+			return fmt.Errorf("loading manifest: %w", err)
 		}
-		return nil
+
+		if len(m.Install.Targets) > 0 {
+			targets = m.Install.Targets
+			absManifestPath, _ := filepath.Abs(manifestPath)
+			source = absManifestPath
+		}
 	}
+
+	// Fall back to global config if no manifest or manifest has no targets
+	if source == "" {
+		cfg, err := config.LoadGlobal()
+		if err != nil {
+			return fmt.Errorf("loading config: %w", err)
+		}
+
+		targets = cfg.Install.Targets
+		source, _ = config.GetConfigPath()
+	}
+
+	// Display source
+	fmt.Fprintf(os.Stderr, "Source: %s\n", source)
 
 	// Print value
-	if len(cfg.Install.Targets) == 0 {
+	if len(targets) == 0 {
 		fmt.Printf("install.targets: []\n")
-	} else if len(cfg.Install.Targets) == 1 {
-		fmt.Printf("install.targets: %s\n", cfg.Install.Targets[0])
+	} else if len(targets) == 1 {
+		fmt.Printf("install.targets: %s\n", targets[0])
 	} else {
 		fmt.Printf("install.targets:\n")
-		for _, target := range cfg.Install.Targets {
+		for _, target := range targets {
 			fmt.Printf("  - %s\n", target)
 		}
 	}
