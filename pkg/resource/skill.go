@@ -21,22 +21,22 @@ func LoadSkill(dirPath string) (*Resource, error) {
 	// Validate it's a directory
 	info, err := os.Stat(dirPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to stat directory: %w", err)
+		return nil, WrapLoadError(dirPath, Skill, fmt.Errorf("failed to stat directory: %w", err))
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("skill must be a directory")
+		return nil, WrapLoadError(dirPath, Skill, fmt.Errorf("skill must be a directory"))
 	}
 
 	// Check for SKILL.md
 	skillMdPath := filepath.Join(dirPath, "SKILL.md")
 	if _, err := os.Stat(skillMdPath); err != nil {
-		return nil, fmt.Errorf("directory must contain SKILL.md: %w", err)
+		return nil, WrapLoadError(dirPath, Skill, fmt.Errorf("directory must contain SKILL.md: %w", err))
 	}
 
 	// Parse SKILL.md frontmatter
 	frontmatter, _, err := ParseFrontmatter(skillMdPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse SKILL.md frontmatter: %w", err)
+		return nil, NewValidationError(skillMdPath, "skill", filepath.Base(dirPath), "frontmatter", err)
 	}
 
 	// Extract name from directory
@@ -50,7 +50,8 @@ func LoadSkill(dirPath string) (*Resource, error) {
 
 	// Validate name matches directory name
 	if name != dirName {
-		return nil, fmt.Errorf("skill name '%s' must match directory name '%s'", name, dirName)
+		err := fmt.Errorf("skill name '%s' must match directory name '%s'", name, dirName)
+		return nil, NewValidationError(dirPath, "skill", name, "name", err)
 	}
 
 	// Build resource
@@ -67,7 +68,7 @@ func LoadSkill(dirPath string) (*Resource, error) {
 
 	// Validate
 	if err := resource.Validate(); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
+		return nil, NewValidationError(dirPath, "skill", name, "", err)
 	}
 
 	return resource, nil

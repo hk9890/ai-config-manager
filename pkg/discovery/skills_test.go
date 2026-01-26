@@ -261,7 +261,7 @@ func TestSearchSkillsInDir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			skills := searchSkillsInDir(tt.dirPath)
+			skills, _ := searchSkillsInDir(tt.dirPath)
 			if len(skills) != tt.expectedCount {
 				t.Errorf("searchSkillsInDir(%s) returned %d skills, expected %d",
 					tt.dirPath, len(skills), tt.expectedCount)
@@ -274,7 +274,7 @@ func TestRecursiveSearchSkills_MaxDepth(t *testing.T) {
 	basePath := filepath.Join("testdata", "recursive-test")
 
 	// Test that recursive search respects max depth
-	skills, err := recursiveSearchSkills(basePath, 0)
+	skills, _, err := recursiveSearchSkills(basePath, 0)
 	if err != nil {
 		t.Fatalf("recursiveSearchSkills failed: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestRecursiveSearchSkills_StopsAtMaxDepth(t *testing.T) {
 	// skill3 is at depth 2 (some/nested/skill3), so it should be found
 	basePath := filepath.Join("testdata", "recursive-test")
 
-	skills, err := recursiveSearchSkills(basePath, 4) // Start at depth 4
+	skills, _, err := recursiveSearchSkills(basePath, 4) // Start at depth 4
 	if err != nil {
 		t.Fatalf("recursiveSearchSkills failed: %v", err)
 	}

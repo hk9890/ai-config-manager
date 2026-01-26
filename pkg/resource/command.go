@@ -20,22 +20,22 @@ type CommandResource struct {
 func LoadCommand(filePath string) (*Resource, error) {
 	// Validate it's a .md file
 	if filepath.Ext(filePath) != ".md" {
-		return nil, fmt.Errorf("command must be a .md file")
+		return nil, WrapLoadError(filePath, Command, fmt.Errorf("command must be a .md file"))
 	}
 
 	// Check file exists
 	if _, err := os.Stat(filePath); err != nil {
-		return nil, fmt.Errorf("file does not exist: %w", err)
-	}
-
-	// Parse frontmatter
-	frontmatter, _, err := ParseFrontmatter(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse frontmatter: %w", err)
+		return nil, WrapLoadError(filePath, Command, fmt.Errorf("file does not exist: %w", err))
 	}
 
 	// Extract name from filename (without .md extension)
 	name := strings.TrimSuffix(filepath.Base(filePath), ".md")
+
+	// Parse frontmatter
+	frontmatter, _, err := ParseFrontmatter(filePath)
+	if err != nil {
+		return nil, NewValidationError(filePath, "command", name, "frontmatter", err)
+	}
 
 	// Build resource
 	resource := &Resource{
@@ -51,7 +51,7 @@ func LoadCommand(filePath string) (*Resource, error) {
 
 	// Validate
 	if err := resource.Validate(); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
+		return nil, NewValidationError(filePath, "command", name, "", err)
 	}
 
 	return resource, nil

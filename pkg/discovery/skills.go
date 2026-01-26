@@ -14,9 +14,31 @@ type SkillCandidate struct {
 	Resource *resource.Resource
 }
 
+// DiscoveryError represents an error encountered during resource discovery
+type DiscoveryError struct {
+	Path  string // Path where the error occurred
+	Error error  // The error that occurred
+}
+
+// SkillDiscoveryResult contains discovered skills and any errors encountered
+type SkillDiscoveryResult struct {
+	Skills []*resource.Resource
+	Errors []DiscoveryError
+}
+
 // DiscoverSkills searches for skills following the priority-based algorithm
 // It searches in standard locations first, then falls back to recursive search
 func DiscoverSkills(basePath string, subpath string) ([]*resource.Resource, error) {
+	skills, _, err := DiscoverSkillsWithErrors(basePath, subpath)
+	return skills, err
+}
+
+// DiscoverSkillsWithErrors searches for skills and returns both successful discoveries and errors
+// It searches in standard locations first, then falls back to recursive search
+// Returns successfully discovered skills, any errors encountered, and fatal errors
+func DiscoverSkillsWithErrors(basePath string, subpath string) ([]*resource.Resource, []DiscoveryError, error) {
+	var allErrors []DiscoveryError
+
 	// Build the initial search root
 	searchRoot := basePath
 	if subpath != "" {
@@ -30,8 +52,14 @@ func DiscoverSkills(basePath string, subpath string) ([]*resource.Resource, erro
 	if searchRootErr == nil && searchRootInfo.IsDir() {
 		if isSkillDir(searchRoot) {
 			skill, err := resource.LoadSkill(searchRoot)
-			if err == nil && skill.Name != "" && skill.Description != "" {
-				return []*resource.Resource{skill}, nil
+			if err != nil {
+				// Collect error instead of silently failing
+				allErrors = append(allErrors, DiscoveryError{
+					Path:  searchRoot,
+					Error: err,
+				})
+			} else if skill.Name != "" && skill.Description != "" {
+				return []*resource.Resource{skill}, allErrors, nil
 			}
 		}
 	}
@@ -47,11 +75,11 @@ func DiscoverSkills(basePath string, subpath string) ([]*resource.Resource, erro
 				searchRoot = parentPath
 			} else {
 				// Parent doesn't exist either, this is a real error
-				return nil, fmt.Errorf("base path does not exist: %w", searchRootErr)
+				return nil, allErrors, fmt.Errorf("base path does not exist: %w", searchRootErr)
 			}
 		} else {
 			// Can't fall back, this is a real error
-			return nil, fmt.Errorf("base path does not exist: %w", searchRootErr)
+			return nil, allErrors, fmt.Errorf("base path does not exist: %w", searchRootErr)
 		}
 	}
 
@@ -76,7 +104,9 @@ func DiscoverSkills(basePath string, subpath string) ([]*resource.Resource, erro
 	candidates := make(map[string]*resource.Resource) // Map by name for deduplication
 	for _, location := range priorityLocations {
 		locationPath := filepath.Join(searchRoot, location)
-		if skills := searchSkillsInDir(locationPath); len(skills) > 0 {
+		skills, errs := searchSkillsInDir(locationPath)
+		allErrors = append(allErrors, errs...)
+		if len(skills) > 0 {
 			for _, skill := range skills {
 				// First found wins (deduplication by name)
 				if _, exists := candidates[skill.Name]; !exists {
@@ -88,14 +118,15 @@ func DiscoverSkills(basePath string, subpath string) ([]*resource.Resource, erro
 
 	// If we found skills, return them
 	if len(candidates) > 0 {
-		return mapToSlice(candidates), nil
+		return mapToSlice(candidates), allErrors, nil
 	}
 
 	// Fall back to recursive search (max depth 5)
-	recursiveSkills, err := recursiveSearchSkills(searchRoot, 0)
+	recursiveSkills, recursiveErrs, err := recursiveSearchSkills(searchRoot, 0)
+	allErrors = append(allErrors, recursiveErrs...)
 	if err != nil {
 		// If recursive search fails, just return what we have
-		return mapToSlice(candidates), nil
+		return mapToSlice(candidates), allErrors, nil
 	}
 
 	for _, skill := range recursiveSkills {
@@ -104,7 +135,7 @@ func DiscoverSkills(basePath string, subpath string) ([]*resource.Resource, erro
 		}
 	}
 
-	return mapToSlice(candidates), nil
+	return mapToSlice(candidates), allErrors, nil
 }
 
 // isSkillDir checks if a directory contains a SKILL.md file
@@ -115,20 +146,21 @@ func isSkillDir(path string) bool {
 }
 
 // searchSkillsInDir searches for skills in a specific directory
-// Returns all valid skills found (directories with SKILL.md)
-func searchSkillsInDir(dirPath string) []*resource.Resource {
+// Returns all valid skills found (directories with SKILL.md) and any errors encountered
+func searchSkillsInDir(dirPath string) ([]*resource.Resource, []DiscoveryError) {
 	var skills []*resource.Resource
+	var errors []DiscoveryError
 
 	// Check if directory exists
 	info, err := os.Stat(dirPath)
 	if err != nil || !info.IsDir() {
-		return skills
+		return skills, errors
 	}
 
 	// Read directory entries
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return skills
+		return skills, errors
 	}
 
 	// Check each subdirectory for SKILL.md
@@ -145,7 +177,12 @@ func searchSkillsInDir(dirPath string) []*resource.Resource {
 		// Try to load the skill
 		skill, err := resource.LoadSkill(skillPath)
 		if err != nil {
-			continue // Skip invalid skills
+			// Collect error instead of silently skipping
+			errors = append(errors, DiscoveryError{
+				Path:  skillPath,
+				Error: err,
+			})
+			continue
 		}
 
 		// Skip if name or description is missing
@@ -156,24 +193,26 @@ func searchSkillsInDir(dirPath string) []*resource.Resource {
 		skills = append(skills, skill)
 	}
 
-	return skills
+	return skills, errors
 }
 
 // recursiveSearchSkills performs a recursive directory search for skills
 // Limited to maxDepth (5) to prevent excessive searching
-func recursiveSearchSkills(rootPath string, currentDepth int) ([]*resource.Resource, error) {
+// Returns both discovered skills and any errors encountered
+func recursiveSearchSkills(rootPath string, currentDepth int) ([]*resource.Resource, []DiscoveryError, error) {
 	var skills []*resource.Resource
+	var errors []DiscoveryError
 	const maxDepth = 5
 
 	// Stop if we've reached max depth
 	if currentDepth >= maxDepth {
-		return skills, nil
+		return skills, errors, nil
 	}
 
 	// Read directory entries
 	entries, err := os.ReadDir(rootPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read directory: %w", err)
+		return nil, errors, fmt.Errorf("failed to read directory: %w", err)
 	}
 
 	// Check each entry
@@ -192,7 +231,13 @@ func recursiveSearchSkills(rootPath string, currentDepth int) ([]*resource.Resou
 		// Check if this directory is a skill
 		if isSkillDir(entryPath) {
 			skill, err := resource.LoadSkill(entryPath)
-			if err == nil && skill.Name != "" && skill.Description != "" {
+			if err != nil {
+				// Collect error instead of silently skipping
+				errors = append(errors, DiscoveryError{
+					Path:  entryPath,
+					Error: err,
+				})
+			} else if skill.Name != "" && skill.Description != "" {
 				skills = append(skills, skill)
 			}
 			// Don't recurse into skill directories
@@ -200,13 +245,14 @@ func recursiveSearchSkills(rootPath string, currentDepth int) ([]*resource.Resou
 		}
 
 		// Recurse into subdirectory
-		subSkills, err := recursiveSearchSkills(entryPath, currentDepth+1)
+		subSkills, subErrs, err := recursiveSearchSkills(entryPath, currentDepth+1)
+		errors = append(errors, subErrs...)
 		if err == nil {
 			skills = append(skills, subSkills...)
 		}
 	}
 
-	return skills, nil
+	return skills, errors, nil
 }
 
 // mapToSlice converts a map of resources to a slice

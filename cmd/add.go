@@ -605,13 +605,13 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		searchPath = filepath.Join(cachePath, parsed.Subpath)
 	}
 
-	// Discover all resources
+	// Discover all resources (with error collection)
 	commands, err := discovery.DiscoverCommands(searchPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to discover commands: %w", err)
 	}
 
-	skills, err := discovery.DiscoverSkills(searchPath, "")
+	skills, skillErrors, err := discovery.DiscoverSkillsWithErrors(searchPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to discover skills: %w", err)
 	}
@@ -625,6 +625,10 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 	if err != nil {
 		return fmt.Errorf("failed to discover packages: %w", err)
 	}
+
+	// Collect all discovery errors
+	var discoveryErrors []discovery.DiscoveryError
+	discoveryErrors = append(discoveryErrors, skillErrors...)
 
 	// Discover marketplace.json
 	marketplaceConfig, marketplacePath, err := marketplace.DiscoverMarketplace(searchPath, "")
@@ -797,6 +801,12 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 			}
 		}
 	}
+	// Print discovery errors if any
+	if len(discoveryErrors) > 0 {
+		printDiscoveryErrors(discoveryErrors)
+		fmt.Println()
+	}
+
 
 	// Print results
 	printImportResults(result)
