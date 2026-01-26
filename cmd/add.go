@@ -982,31 +982,48 @@ func findAgentFile(searchPath, name string) (string, error) {
 
 // findPackageFile finds the actual file path for a package by name
 func findPackageFile(searchPath, name string) (string, error) {
-	// Packages are always in packages/ subdirectory
-	packagesDir := filepath.Join(searchPath, "packages")
-	packageFile := filepath.Join(packagesDir, fmt.Sprintf("%s.package.json", name))
+	// Use recursive search to find the package (packages can be nested in subdirectories)
+	var foundPath string
 
-	// Check if file exists
-	if _, err := os.Stat(packageFile); err != nil {
+	err := filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors, continue walking
+		}
+
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+
+		// Check if it's a package file with matching name
+		if strings.HasSuffix(path, ".package.json") {
+			pkg, err := resource.LoadPackage(path)
+			if err == nil && pkg.Name == name {
+				foundPath = path
+				// Use a sentinel error to stop the walk early
+				return fmt.Errorf("found")
+			}
+		}
+
+		return nil
+	})
+
+	// Check if we stopped because we found the package
+	if err != nil && err.Error() == "found" {
+		return foundPath, nil
+	}
+
+	// Check for other walk errors
+	if err != nil && err.Error() != "found" {
+		return "", fmt.Errorf("error searching for package: %w", err)
+	}
+
+	if foundPath == "" {
 		return "", fmt.Errorf("package file not found for: %s", name)
 	}
 
-	// Verify it's a valid package
-	pkg, err := resource.LoadPackage(packageFile)
-	if err != nil {
-		return "", fmt.Errorf("invalid package file: %w", err)
-	}
-
-	// Verify name matches
-	if pkg.Name != name {
-		return "", fmt.Errorf("package name mismatch: expected %s, got %s", name, pkg.Name)
-	}
-
-	return packageFile, nil
+	return foundPath, nil
 }
-
-// findResourceInPath finds the source file for a resource in the specified directory.
-// This is used for marketplace-discovered resources.
 func findResourceInPath(sourcePath string, resType resource.ResourceType, resName string) (string, error) {
 	var candidatePaths []string
 
