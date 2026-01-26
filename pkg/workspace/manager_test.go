@@ -409,28 +409,31 @@ func TestGetOrClone_EmptyInputs(t *testing.T) {
 	mgr, _ := NewManager(tmpDir)
 
 	tests := []struct {
-		name    string
-		url     string
-		ref     string
-		wantErr bool
+		name        string
+		url         string
+		ref         string
+		wantErr     bool
+		checkErrMsg string // Optional: check that error is about validation, not clone failure
 	}{
 		{
-			name:    "empty URL",
-			url:     "",
-			ref:     "main",
-			wantErr: true,
+			name:        "empty URL",
+			url:         "",
+			ref:         "main",
+			wantErr:     true,
+			checkErrMsg: "url cannot be empty",
 		},
 		{
-			name:    "empty ref",
+			name:    "empty ref allowed (attempts clone)",
 			url:     "https://github.com/test/repo",
 			ref:     "",
-			wantErr: true,
+			wantErr: true, // Will fail to clone non-existent repo, but not due to empty ref validation
 		},
 		{
-			name:    "both empty",
-			url:     "",
-			ref:     "",
-			wantErr: true,
+			name:        "both empty",
+			url:         "",
+			ref:         "",
+			wantErr:     true,
+			checkErrMsg: "url cannot be empty",
 		},
 	}
 
@@ -439,6 +442,12 @@ func TestGetOrClone_EmptyInputs(t *testing.T) {
 			_, err := mgr.GetOrClone(tt.url, tt.ref)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetOrClone() error = %v; wantErr %v", err, tt.wantErr)
+			}
+			// If we want to check specific error message (for validation errors)
+			if tt.checkErrMsg != "" && err != nil {
+				if !strings.Contains(err.Error(), tt.checkErrMsg) {
+					t.Errorf("GetOrClone() error = %v; want error containing %q", err, tt.checkErrMsg)
+				}
 			}
 		})
 	}
@@ -462,10 +471,10 @@ func TestUpdate_EmptyInputs(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "empty ref",
+			name:    "empty ref allowed (updates current branch)",
 			url:     "https://github.com/test/repo",
 			ref:     "",
-			wantErr: true,
+			wantErr: true, // Still errors because cache doesn't exist
 		},
 		{
 			name:    "both empty",

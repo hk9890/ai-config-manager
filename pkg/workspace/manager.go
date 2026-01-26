@@ -191,7 +191,7 @@ func (m *Manager) Init() error {
 //
 // Parameters:
 //   - url: Git repository URL (will be normalized)
-//   - ref: Git ref to checkout (branch, tag, or commit hash)
+//   - ref: Git ref to checkout (branch, tag, or commit hash). If empty, uses repository's default branch.
 //
 // Returns:
 //   - string: Absolute path to the cached repository directory
@@ -201,12 +201,14 @@ func (m *Manager) Init() error {
 //   - If cache exists and is valid: checkout ref and return path
 //   - If cache exists but is corrupted: remove and re-clone
 //   - If cache doesn't exist: clone repository
+//   - If ref is empty: uses repository's default branch (main/master)
 //
 // Edge cases handled:
 //   - Corrupted cache (missing .git): detected and re-cloned
 //   - Network failures: error returned, no partial cache created
 //   - Invalid URL: error returned before any filesystem operations
 //   - Ref not found: error returned with helpful message
+//   - Empty ref: defaults to repository's default branch
 func (m *Manager) GetOrClone(url string, ref string) (string, error) {
 	// Ensure workspace is initialized
 	if err := m.Init(); err != nil {
@@ -217,30 +219,39 @@ func (m *Manager) GetOrClone(url string, ref string) (string, error) {
 	if url == "" {
 		return "", fmt.Errorf("url cannot be empty")
 	}
-	if ref == "" {
-		return "", fmt.Errorf("ref cannot be empty")
-	}
+
+	// If ref is empty, use empty string for git clone (which defaults to HEAD)
+	// This will be handled properly in cloneRepo and checkoutRef
 
 	// Get cache path
 	cachePath := m.getCachePath(url)
 
 	// Check if cache exists and is valid
 	if m.isValidCache(cachePath) {
-		// Cache exists - ensure correct ref is checked out
-		if err := m.checkoutRef(cachePath, ref); err != nil {
-			// If checkout fails, try to recover by fetching
-			if fetchErr := m.fetchRepo(cachePath); fetchErr != nil {
-				// Fetch failed - cache may be corrupted, remove and re-clone
-				if removeErr := os.RemoveAll(cachePath); removeErr != nil {
-					return "", fmt.Errorf("failed to remove corrupted cache: %w", removeErr)
+		// Cache exists - ensure correct ref is checked out (only if ref is specified)
+		if ref != "" {
+			if err := m.checkoutRef(cachePath, ref); err != nil {
+				// If checkout fails, try to recover by fetching
+				if fetchErr := m.fetchRepo(cachePath); fetchErr != nil {
+					// Fetch failed - cache may be corrupted, remove and re-clone
+					if removeErr := os.RemoveAll(cachePath); removeErr != nil {
+						return "", fmt.Errorf("failed to remove corrupted cache: %w", removeErr)
+					}
+					// Fall through to clone
+				} else {
+					// Fetch succeeded, try checkout again
+					if err := m.checkoutRef(cachePath, ref); err != nil {
+						return "", fmt.Errorf("failed to checkout ref after fetch: %w", err)
+					}
+					// Success - update metadata and return
+					if err := m.updateMetadataEntry(url, ref, "access"); err != nil {
+						// Log warning but don't fail - metadata is optional
+						fmt.Fprintf(os.Stderr, "warning: failed to update metadata: %v\n", err)
+					}
+					return cachePath, nil
 				}
-				// Fall through to clone
 			} else {
-				// Fetch succeeded, try checkout again
-				if err := m.checkoutRef(cachePath, ref); err != nil {
-					return "", fmt.Errorf("failed to checkout ref after fetch: %w", err)
-				}
-				// Success - update metadata and return
+				// Checkout succeeded - update metadata and return
 				if err := m.updateMetadataEntry(url, ref, "access"); err != nil {
 					// Log warning but don't fail - metadata is optional
 					fmt.Fprintf(os.Stderr, "warning: failed to update metadata: %v\n", err)
@@ -248,7 +259,7 @@ func (m *Manager) GetOrClone(url string, ref string) (string, error) {
 				return cachePath, nil
 			}
 		} else {
-			// Checkout succeeded - update metadata and return
+			// No ref specified, use whatever is currently checked out
 			if err := m.updateMetadataEntry(url, ref, "access"); err != nil {
 				// Log warning but don't fail - metadata is optional
 				fmt.Fprintf(os.Stderr, "warning: failed to update metadata: %v\n", err)
@@ -275,14 +286,14 @@ func (m *Manager) GetOrClone(url string, ref string) (string, error) {
 //
 // Parameters:
 //   - url: Git repository URL (will be normalized)
-//   - ref: Git ref to update to (branch, tag, or commit)
+//   - ref: Git ref to update to (branch, tag, or commit). If empty, uses current branch.
 //
 // Returns:
 //   - error: Non-nil if update fails
 //
 // Behavior:
 //   - Fetches latest refs from remote
-//   - Checks out requested ref
+//   - Checks out requested ref (if specified)
 //   - Updates working tree (git pull for branches, checkout for tags/commits)
 //
 // Edge cases handled:
@@ -290,13 +301,11 @@ func (m *Manager) GetOrClone(url string, ref string) (string, error) {
 //   - Network failure: cache left in last known good state
 //   - Ref doesn't exist: error returned
 //   - Uncommitted changes: stashed before update, restored after
+//   - Empty ref: updates current branch
 func (m *Manager) Update(url string, ref string) error {
 	// Validate inputs
 	if url == "" {
 		return fmt.Errorf("url cannot be empty")
-	}
-	if ref == "" {
-		return fmt.Errorf("ref cannot be empty")
 	}
 
 	// Get cache path
@@ -327,12 +336,19 @@ func (m *Manager) Update(url string, ref string) error {
 		return fmt.Errorf("failed to fetch from remote: %w", err)
 	}
 
-	// Reset to origin state to handle conflicts
+	// Reset to origin state to handle conflicts (only if ref is specified)
 	// This ensures a clean update by discarding local commits
-	if err := m.resetToOrigin(cachePath, ref); err != nil {
-		// If reset fails, try just checking out
-		if checkoutErr := m.checkoutRef(cachePath, ref); checkoutErr != nil {
-			return fmt.Errorf("failed to update ref: reset failed (%v), checkout failed (%v)", err, checkoutErr)
+	if ref != "" {
+		if err := m.resetToOrigin(cachePath, ref); err != nil {
+			// If reset fails, try just checking out
+			if checkoutErr := m.checkoutRef(cachePath, ref); checkoutErr != nil {
+				return fmt.Errorf("failed to update ref: reset failed (%v), checkout failed (%v)", err, checkoutErr)
+			}
+		}
+	} else {
+		// No ref specified, pull current branch
+		if err := m.pullCurrentBranch(cachePath); err != nil {
+			return fmt.Errorf("failed to pull current branch: %w", err)
 		}
 	}
 
@@ -780,5 +796,15 @@ func (m *Manager) resetToOrigin(cachePath string, ref string) error {
 		}
 	}
 
+	return nil
+}
+
+// pullCurrentBranch pulls the latest changes for the currently checked out branch.
+func (m *Manager) pullCurrentBranch(cachePath string) error {
+	cmd := exec.Command("git", "-C", cachePath, "pull")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git pull failed: %w\nOutput: %s", err, string(output))
+	}
 	return nil
 }

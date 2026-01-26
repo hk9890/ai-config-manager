@@ -778,3 +778,80 @@ func TestWorkspaceCacheMetadata(t *testing.T) {
 
 	t.Log("✓ Cache metadata tracking works correctly")
 }
+
+// TestWorkspaceCacheEmptyRef tests that empty ref defaults to repository's default branch
+func TestWorkspaceCacheEmptyRef(t *testing.T) {
+	if !isGitAvailable() {
+		t.Skip("Skipping test: git not available")
+	}
+
+	if !isOnline() {
+		t.Skip("Skipping test: network not available")
+	}
+
+	repoDir := t.TempDir()
+
+	// Create workspace manager
+	workspaceManager, err := workspace.NewManager(repoDir)
+	if err != nil {
+		t.Fatalf("Failed to create workspace manager: %v", err)
+	}
+
+	// Initialize workspace directory
+	if err := workspaceManager.Init(); err != nil {
+		t.Fatalf("Failed to initialize workspace: %v", err)
+	}
+
+	// Use anthropics/skills repository without specifying ref
+	githubURL := "https://github.com/anthropics/skills"
+	parsed, err := source.ParseSource(githubURL)
+	if err != nil {
+		t.Fatalf("Failed to parse source: %v", err)
+	}
+
+	// Verify ref is empty
+	if parsed.Ref != "" {
+		t.Fatalf("Expected empty ref, got: %s", parsed.Ref)
+	}
+
+	// Get clone URL
+	cloneURL, err := source.GetCloneURL(parsed)
+	if err != nil {
+		t.Fatalf("Failed to get clone URL: %v", err)
+	}
+
+	// Get or clone with empty ref
+	cachePath, err := workspaceManager.GetOrClone(cloneURL, parsed.Ref)
+	if err != nil {
+		t.Fatalf("GetOrClone failed with empty ref: %v", err)
+	}
+
+	// Verify cache exists
+	if _, err := os.Stat(cachePath); err != nil {
+		t.Fatalf("Cache directory does not exist: %v", err)
+	}
+
+	// Verify it's a valid git repository
+	gitDir := filepath.Join(cachePath, ".git")
+	if _, err := os.Stat(gitDir); err != nil {
+		t.Fatalf(".git directory does not exist: %v", err)
+	}
+
+	// Verify we can get current branch
+	cmd := exec.Command("git", "-C", cachePath, "rev-parse", "--abbrev-ref", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("Failed to get current branch: %v", err)
+	}
+
+	branch := strings.TrimSpace(string(output))
+	t.Logf("Cloned to default branch: %s", branch)
+
+	// Verify we can read files (spot check for skills directory)
+	skillsDir := filepath.Join(cachePath, "skills")
+	if _, err := os.Stat(skillsDir); err != nil {
+		t.Fatalf("skills directory does not exist: %v", err)
+	}
+
+	t.Logf("Successfully cloned %s with empty ref to: %s", githubURL, cachePath)
+}
