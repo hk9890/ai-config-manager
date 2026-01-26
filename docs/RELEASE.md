@@ -1,5 +1,11 @@
 # Release Process
 
+## Historical Release Notes
+
+Historical release notes from versions v0.3.0 through v1.4.0 have been archived to [`docs/archive/release-notes/`](archive/release-notes/). These manual release notes are preserved for historical reference but are no longer maintained.
+
+Current releases use auto-generated release notes published to [GitHub Releases](https://github.com/hk9890/ai-config-manager/releases).
+
 ## Creating a New Release
 
 1. **Update version** in code if needed
