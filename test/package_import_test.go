@@ -729,8 +729,8 @@ func TestPackageAutoImportDryRun(t *testing.T) {
 	if len(result.Added) != 1 {
 		t.Errorf("Dry-run should show 1 would be added, got %d", len(result.Added))
 	}
-	if result.PackageCount != 0 {
-		t.Errorf("Dry-run should not increment counters, got PackageCount = %d", result.PackageCount)
+	if result.PackageCount != 1 {
+		t.Errorf("Dry-run should count packages, got PackageCount = %d (expected 1)", result.PackageCount)
 	}
 
 	// Verify nothing was actually added

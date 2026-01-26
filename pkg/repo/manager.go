@@ -11,6 +11,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	pkgerrors "github.com/hk9890/ai-config-manager/pkg/errors"
 )
 
 // Manager manages the AI resources repository
@@ -644,8 +645,9 @@ func (m *Manager) AddBulk(sources []string, opts BulkImportOptions) (*BulkImport
 	// Process each source
 	for _, sourcePath := range sources {
 		if err := m.importResource(sourcePath, opts, result); err != nil {
-			// If not skipping existing, fail on first error
-			if !opts.SkipExisting && !opts.Force {
+			// Only stop on fatal errors (internal bugs, system failures)
+			// Continue on validation/resource errors (they're already collected in result)
+			if pkgerrors.IsFatal(err) {
 				return result, err
 			}
 		}
@@ -664,11 +666,13 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 	// Detect resource type
 	resourceType, err := resource.DetectType(sourcePath)
 	if err != nil {
+		// Validation error: invalid resource format
+		typedErr := pkgerrors.Validation(err, "failed to detect resource type")
 		result.Failed = append(result.Failed, ImportError{
 			Path:    sourcePath,
-			Message: err.Error(),
+			Message: typedErr.Error(),
 		})
-		return err
+		return typedErr
 	}
 
 	// Load the resource to get its name
@@ -685,11 +689,13 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 	}
 
 	if err != nil {
+		// Validation error: invalid YAML/frontmatter
+		typedErr := pkgerrors.Validation(err, "failed to load resource")
 		result.Failed = append(result.Failed, ImportError{
 			Path:    sourcePath,
-			Message: fmt.Sprintf("failed to load resource: %v", err),
+			Message: typedErr.Error(),
 		})
-		return err
+		return typedErr
 	}
 
 	// Check if resource already exists
@@ -702,11 +708,14 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 			// Force mode: remove existing and continue
 			if !opts.DryRun {
 				if err := m.Remove(res.Name, resourceType); err != nil {
+					// Could be resource error (permission denied) or fatal (system failure)
+					// Default to resource error for safety
+					typedErr := pkgerrors.Resource(err, "failed to remove existing resource")
 					result.Failed = append(result.Failed, ImportError{
 						Path:    sourcePath,
-						Message: fmt.Sprintf("failed to remove existing resource: %v", err),
+						Message: typedErr.Error(),
 					})
-					return err
+					return typedErr
 				}
 			}
 		} else if opts.SkipExisting {
@@ -715,12 +724,13 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 			return nil
 		} else {
 			// Default mode: fail on conflict
-			err := fmt.Errorf("resource '%s' already exists in repository", res.Name)
+			// Validation error: resource name conflict
+			typedErr := pkgerrors.Validation(fmt.Errorf("resource '%s' already exists in repository", res.Name), "")
 			result.Failed = append(result.Failed, ImportError{
 				Path:    sourcePath,
-				Message: err.Error(),
+				Message: typedErr.Error(),
 			})
-			return err
+			return typedErr
 		}
 	}
 
@@ -755,22 +765,24 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 		}
 
 		if err != nil {
+			// Could be various errors - wrap as validation for now
+			typedErr := pkgerrors.Validation(err, "failed to import resource")
 			result.Failed = append(result.Failed, ImportError{
 				Path:    sourcePath,
-				Message: err.Error(),
+				Message: typedErr.Error(),
 			})
-			return err
+			return typedErr
 		}
+	}
 
-		// Increment resource type counter
-		switch resourceType {
-		case resource.Command:
-			result.CommandCount++
-		case resource.Skill:
-			result.SkillCount++
-		case resource.Agent:
-			result.AgentCount++
-		}
+	// Increment resource type counter (count in both dry-run and real mode)
+	switch resourceType {
+	case resource.Command:
+		result.CommandCount++
+	case resource.Skill:
+		result.SkillCount++
+	case resource.Agent:
+		result.AgentCount++
 	}
 
 	result.Added = append(result.Added, sourcePath)
@@ -782,11 +794,13 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 	// Load the package to get its name
 	pkg, err := resource.LoadPackage(sourcePath)
 	if err != nil {
+		// Validation error: invalid package format
+		typedErr := pkgerrors.Validation(err, "failed to load package")
 		result.Failed = append(result.Failed, ImportError{
 			Path:    sourcePath,
-			Message: fmt.Sprintf("failed to load package: %v", err),
+			Message: typedErr.Error(),
 		})
-		return err
+		return typedErr
 	}
 
 	// Check if package already exists
@@ -800,21 +814,25 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 			if !opts.DryRun {
 				// Remove package file
 				if err := os.Remove(destPath); err != nil {
+					// Resource error: failed to delete file
+					typedErr := pkgerrors.Resource(err, "failed to remove existing package")
 					result.Failed = append(result.Failed, ImportError{
 						Path:    sourcePath,
-						Message: fmt.Sprintf("failed to remove existing package: %v", err),
+						Message: typedErr.Error(),
 					})
-					return err
+					return typedErr
 				}
 				// Remove metadata file
 				metadataPath := metadata.GetPackageMetadataPath(pkg.Name, m.repoPath)
 				if _, err := os.Stat(metadataPath); err == nil {
 					if err := os.Remove(metadataPath); err != nil {
+						// Resource error: failed to delete metadata
+						typedErr := pkgerrors.Resource(err, "failed to remove metadata")
 						result.Failed = append(result.Failed, ImportError{
 							Path:    sourcePath,
-							Message: fmt.Sprintf("failed to remove metadata: %v", err),
+							Message: typedErr.Error(),
 						})
-						return err
+						return typedErr
 					}
 				}
 			}
@@ -824,12 +842,13 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 			return nil
 		} else {
 			// Default mode: fail on conflict
-			err := fmt.Errorf("package '%s' already exists in repository", pkg.Name)
+			// Validation error: package name conflict
+			typedErr := pkgerrors.Validation(fmt.Errorf("package '%s' already exists in repository", pkg.Name), "")
 			result.Failed = append(result.Failed, ImportError{
 				Path:    sourcePath,
-				Message: err.Error(),
+				Message: typedErr.Error(),
 			})
-			return err
+			return typedErr
 		}
 	}
 
@@ -856,16 +875,18 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 
 		err = m.AddPackageWithRef(sourcePath, sourceURL, sourceType, ref)
 		if err != nil {
+			// Could be various errors - wrap as validation for now
+			typedErr := pkgerrors.Validation(err, "failed to import package")
 			result.Failed = append(result.Failed, ImportError{
 				Path:    sourcePath,
-				Message: err.Error(),
+				Message: typedErr.Error(),
 			})
-			return err
+			return typedErr
 		}
-
-		// Increment package counter
-		result.PackageCount++
 	}
+
+	// Increment package counter (count in both dry-run and real mode)
+	result.PackageCount++
 
 	result.Added = append(result.Added, sourcePath)
 	return nil
