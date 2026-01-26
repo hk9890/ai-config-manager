@@ -183,7 +183,52 @@ aimgr install agent <TAB>
 
 The completion dynamically queries your repository, so newly added resources are immediately available for completion!
 
+### Troubleshooting
 
+**Issue: Completion doesn't work when using `./aimgr`**
+
+Shell completion only works for commands in your `$PATH`, not relative paths like `./aimgr`.
+
+**Solution:**
+```bash
+# Make sure aimgr is in your PATH
+make install  # Installs to ~/bin
+
+# Verify ~/bin is in PATH
+echo $PATH | grep -q "$HOME/bin" && echo "✓ ~/bin is in PATH" || echo "✗ ~/bin NOT in PATH"
+
+# If not in PATH, add to ~/.bashrc (or ~/.zshrc)
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Now use without ./
+aimgr install skill/<TAB>  # ✓ Works
+```
+
+**Issue: Completion still not working after setup**
+
+**Solution:**
+```bash
+# Restart your shell
+exec bash  # or: exec zsh
+
+# Verify completion is loaded
+complete -p aimgr  # Bash: should show completion function
+which _aimgr       # Zsh: should show completion function
+```
+
+**Issue: Want to use `./aimgr` during development**
+
+**Solution:**
+```bash
+# Option 1: Use installed version (recommended)
+make install
+aimgr install skill/<TAB>
+
+# Option 2: Create an alias
+alias a='./aimgr'
+a install skill/<TAB>
+```
 
 ## Quick Start
 
