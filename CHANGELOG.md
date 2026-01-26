@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-01-26
+
+### Added
+- **Output Format Options**
+  - New `--format` flag for bulk operation commands: `table` (default), `json`, `yaml`
+  - Structured JSON/YAML output for scripting and automation
+  - Applies to: `repo add`, `repo sync`, `repo update`, `list`
+  - JSON output includes detailed error information for programmatic handling
+  - See `docs/output-formats.md` for comprehensive documentation and examples
+  
+- **Workspace Cache Integration**
+  - `repo add` now uses workspace caching for Git repositories (10-50x faster on reuse)
+  - `repo sync` leverages cached repositories for efficient multi-source sync
+  - First operation clones, subsequent operations reuse cache
+  - Automatic batching: resources from same repository share one cached clone
+  
+- **Enhanced Error Reporting**
+  - Structured error messages with clear categorization
+  - Deduplicated discovery error messages for cleaner output
+  - Better validation error messages for missing/invalid fields
+  - Improved GitHub reference handling (empty ref defaults to default branch)
+
+### Changed
+- Repository commands now provide consistent, structured output across formats
+- Success messages standardized across `repo add`, `repo sync`, `repo update`
+- Git operations automatically use workspace cache when available
+
+### Fixed
+- Added `git pull` to repo sync for cached repositories to ensure up-to-date sources
+- Fixed duplicate discovery error messages during bulk imports
+- Fixed empty ref handling for GitHub repos (now defaults to repository's default branch)
+- Improved workspace cache test reliability
+
+### Documentation
+- Added comprehensive output format documentation (`docs/output-formats.md`)
+- Updated AGENTS.md with output format usage patterns
+- Added JSON parsing examples with jq and Go
+- Documented error structure for programmatic handling
+
+### Testing
+- Added 627 lines of integration tests for output formats
+- Added 344 lines of integration tests for workspace cache in add/sync
+- Added 77 lines of workspace cache tests
+- All tests pass with comprehensive coverage
+
 ## [1.8.0] - 2026-01-25
 
 ### Added
