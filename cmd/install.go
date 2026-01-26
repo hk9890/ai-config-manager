@@ -322,9 +322,9 @@ func installFromManifest(cmd *cobra.Command) error {
 	if explicitTargets != nil {
 		// Use explicit --target flag
 		targetTools = explicitTargets
-	} else if len(m.Targets) > 0 {
+	} else if len(m.Install.Targets) > 0 {
 		// Use manifest targets
-		for _, t := range m.Targets {
+		for _, t := range m.Install.Targets {
 			tool, err := tools.ParseTool(t)
 			if err != nil {
 				return fmt.Errorf("invalid target in manifest '%s': %w", t, err)

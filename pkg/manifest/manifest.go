@@ -16,14 +16,23 @@ const (
 
 // Manifest represents a project's AI resource dependencies
 // Similar to npm's package.json, it declares which resources should be installed
+// InstallConfig holds installation-related configuration  
+type InstallConfig struct {
+	// Targets specifies which AI tools to install to
+	// Valid values: claude, opencode, copilot
+	Targets []string `yaml:"targets"`
+}
+
 type Manifest struct {
 	// Resources is an array of resource references in "type/name" format
 	// Examples: "skill/pdf-processing", "command/test", "agent/code-reviewer"
 	Resources []string `yaml:"resources"`
 
-	// Targets optionally overrides default install targets
-	// Valid values: "claude", "opencode", "copilot"
-	// If not specified, uses defaults from global config
+	// Install configuration for installation targets
+	Install InstallConfig `yaml:"install,omitempty"`
+
+	// Deprecated: Use Install.Targets instead
+	// Kept for backward compatibility when reading old manifests
 	Targets []string `yaml:"targets,omitempty"`
 }
 
@@ -41,6 +50,12 @@ func Load(path string) (*Manifest, error) {
 	var m Manifest
 	if err := yaml.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("failed to parse manifest YAML: %w", err)
+	}
+
+	// Migrate from old format if needed
+	if len(m.Targets) > 0 && len(m.Install.Targets) == 0 {
+		m.Install.Targets = m.Targets
+		m.Targets = nil  // Clear old field
 	}
 
 	// Validate the manifest
@@ -108,11 +123,18 @@ func (m *Manifest) Validate() error {
 		}
 	}
 
-	// Targets are optional
+	// Install targets are optional
 	// If present, validate they're known tools (basic check)
+	for _, target := range m.Install.Targets {
+		if !isValidTarget(target) {
+			return fmt.Errorf("invalid install.targets '%s': must be 'claude', 'opencode', or 'copilot'", target)
+		}
+	}
+	
+	// Also validate old Targets field if present (backward compatibility)
 	for _, target := range m.Targets {
 		if !isValidTarget(target) {
-			return fmt.Errorf("invalid target '%s': must be 'claude', 'opencode', or 'copilot'", target)
+			return fmt.Errorf("invalid targets '%s': must be 'claude', 'opencode', or 'copilot'", target)
 		}
 	}
 

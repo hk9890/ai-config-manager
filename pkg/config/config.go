@@ -16,13 +16,6 @@ const (
 	DefaultConfigFileName = "aimgr.yaml"
 	// OldConfigFileName is the legacy config file name in home directory (ai-repo for migration)
 	OldConfigFileName = ".ai-repo.yaml"
-	// DefaultToolValue is the default tool when not specified (legacy)
-	DefaultToolValue = "claude"
-)
-
-var (
-	// DefaultTargets is the default installation targets when not specified
-	DefaultTargets = []string{"claude"}
 )
 
 // Config represents the application configuration
@@ -33,9 +26,6 @@ type Config struct {
 	// Sync configuration for syncing resources from external sources
 	Sync SyncConfig `yaml:"sync"`
 
-	// DefaultTool is deprecated - use Install.Targets instead
-	// Kept for backward compatibility during migration
-	DefaultTool string `yaml:"default-tool,omitempty"`
 }
 
 // InstallConfig holds installation-related configuration
@@ -84,12 +74,13 @@ func Load(projectPath string) (*Config, error) {
 
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// Return default config if file doesn't exist
-		return &Config{
-			Install: InstallConfig{
-				Targets: DefaultTargets,
-			},
-		}, nil
+		// No config file - return error
+		return nil, fmt.Errorf("no config file found at: %s\n\n" +
+			"Expected format:\n" +
+			"  install:\n" +
+			"    targets:\n" +
+			"      - claude\n" +
+			"      - opencode", configPath)
 	}
 
 	// Read config file
@@ -104,14 +95,15 @@ func Load(projectPath string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
-	// Migrate from old format if needed
-	if err := config.migrate(); err != nil {
-		return nil, fmt.Errorf("migrating config: %w", err)
-	}
-
-	// Apply defaults if not set
+	// Require install.targets
 	if len(config.Install.Targets) == 0 {
-		config.Install.Targets = DefaultTargets
+		return nil, fmt.Errorf("install.targets is required\n\n" +
+			"Expected format:\n" +
+			"  install:\n" +
+			"    targets:\n" +
+			"      - claude\n" +
+			"      - opencode\n\n" +
+			"Config location: %s", configPath)
 	}
 
 	// Validate
@@ -149,11 +141,14 @@ func LoadGlobal() (*Config, error) {
 			fmt.Fprintf(os.Stderr, "   Old config file left intact for safety\n")
 		} else {
 			// No config exists - return default
-			return &Config{
-				Install: InstallConfig{
-					Targets: DefaultTargets,
-				},
-			}, nil
+			// No config exists - return error
+			return nil, fmt.Errorf("no config found\n\n" +
+				"Please create a config file at: %s\n\n" +
+				"Example:\n" +
+				"  install:\n" +
+				"    targets:\n" +
+				"      - claude\n" +
+				"      - opencode", configPath)
 		}
 	}
 
@@ -169,14 +164,15 @@ func LoadGlobal() (*Config, error) {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
-	// Migrate from old format if needed
-	if err := config.migrate(); err != nil {
-		return nil, fmt.Errorf("migrating config: %w", err)
-	}
-
-	// Apply defaults if not set
+	// Require install.targets
 	if len(config.Install.Targets) == 0 {
-		config.Install.Targets = DefaultTargets
+		return nil, fmt.Errorf("install.targets is required\n\n" +
+			"Expected format:\n" +
+			"  install:\n" +
+			"    targets:\n" +
+			"      - claude\n" +
+			"      - opencode\n\n" +
+			"Config location: %s", configPath)
 	}
 
 	// Validate
@@ -209,18 +205,6 @@ func migrateConfig(oldPath, newPath string) error {
 	return nil
 }
 
-// migrate handles migration from old config format (default-tool) to new format (install.targets)
-func (c *Config) migrate() error {
-	// If we have the old default-tool field set, migrate it
-	if c.DefaultTool != "" && len(c.Install.Targets) == 0 {
-		// Migrate single tool to targets array
-		c.Install.Targets = []string{c.DefaultTool}
-		// Clear the old field to avoid confusion
-		c.DefaultTool = ""
-	}
-	return nil
-}
-
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	// Validate install targets
@@ -246,34 +230,15 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate legacy default-tool if present (for backward compatibility)
-	if c.DefaultTool != "" {
-		if _, err := tools.ParseTool(c.DefaultTool); err != nil {
-			return fmt.Errorf("default-tool: %w", err)
-		}
-	}
 
 	return nil
-}
-
-// GetDefaultTool returns the configured default tool (first target)
-// Deprecated: Use GetDefaultTargets() instead
-func (c *Config) GetDefaultTool() (tools.Tool, error) {
-	targets, err := c.GetDefaultTargets()
-	if err != nil {
-		return -1, err
-	}
-	if len(targets) == 0 {
-		return tools.ParseTool(DefaultToolValue)
-	}
-	return targets[0], nil
 }
 
 // GetDefaultTargets returns the configured default installation targets
 func (c *Config) GetDefaultTargets() ([]tools.Tool, error) {
 	targetStrs := c.Install.Targets
 	if len(targetStrs) == 0 {
-		targetStrs = DefaultTargets
+		return nil, fmt.Errorf("install.targets is not configured")
 	}
 
 	targets := make([]tools.Tool, 0, len(targetStrs))
