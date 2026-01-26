@@ -2296,16 +2296,11 @@ If you're upgrading from v0.2.0 or earlier, there are two key changes:
 
 **Migration:** Automatic on first run. The tool will detect your old config file and copy it to the new location. Your old file is left intact for safety.
 
-### Config Format Changed
+### Config Format
 
-The configuration format has changed to support multiple default installation targets:
+The configuration format supports multiple default installation targets:
 
-**Old format:**
-```yaml
-default-tool: claude
-```
-
-**New format:**
+**Format:**
 ```yaml
 install:
   targets: [claude]
@@ -2317,20 +2312,15 @@ install:
   targets: [claude, opencode]
 ```
 
-**Migration:** Automatic. When you run any `aimgr` command, the tool will automatically convert `default-tool` to `install.targets` format. Your config file will be updated to the new format.
-
-### Command Changes
-
-**Old commands:**
+**Commands:**
 ```bash
-aimgr config set default-tool claude
-aimgr config get default-tool
-```
-
-**New commands:**
-```bash
+# Set single target
 aimgr config set install.targets claude
-aimgr config set install.targets claude,opencode  # Multiple tools
+
+# Set multiple targets
+aimgr config set install.targets claude,opencode
+
+# Get current targets
 aimgr config get install.targets
 ```
 
