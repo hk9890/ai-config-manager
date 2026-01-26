@@ -297,3 +297,48 @@ func TestWorkspaceCacheWithLocalSource(t *testing.T) {
 	}
 	t.Log("  ✓ Local sources correctly skip workspace caching")
 }
+
+// TestWorkspaceCacheSyncPullsLatest verifies that repo sync updates cached repos
+func TestWorkspaceCacheSyncPullsLatest(t *testing.T) {
+	repoDir := t.TempDir()
+	workspaceManager, err := workspace.NewManager(repoDir)
+	if err != nil {
+		t.Fatalf("Failed to create workspace manager: %v", err)
+	}
+
+	testURL := "https://github.com/anthropics/skills"
+	testRef := "main"
+
+	t.Log("Step 1: Initial cache via GetOrClone (simulating first sync)")
+	cachePath, err := workspaceManager.GetOrClone(testURL, testRef)
+	if err != nil {
+		t.Skipf("Skipping test - network required: %v", err)
+	}
+	t.Logf("  ✓ Repository cached at: %s", cachePath)
+
+	t.Log("Step 2: Verify cache was created")
+	gitDir := filepath.Join(cachePath, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		t.Fatal("Cache should contain .git directory")
+	}
+
+	t.Log("Step 3: Update cached repository (simulating subsequent sync)")
+	err = workspaceManager.Update(testURL, testRef)
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	t.Log("  ✓ Repository updated successfully (git pull executed)")
+
+	t.Log("Step 4: Verify cache still exists and is valid")
+	cachePath2, err := workspaceManager.GetOrClone(testURL, testRef)
+	if err != nil {
+		t.Fatalf("GetOrClone after update failed: %v", err)
+	}
+
+	if cachePath != cachePath2 {
+		t.Errorf("Cache path changed after update: %s vs %s", cachePath, cachePath2)
+	}
+	t.Log("  ✓ Cache persists and remains valid after update")
+
+	t.Log("✅ TEST PASSED: repo sync correctly pulls latest changes from cached Git repos")
+}

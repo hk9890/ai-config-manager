@@ -599,6 +599,14 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		return fmt.Errorf("failed to get cached repo: %w", err)
 	}
 
+	// Update cached repository to latest changes
+	// This ensures repo sync always pulls the latest code from Git remotes
+	if err := workspaceManager.Update(cloneURL, parsed.Ref); err != nil {
+		// If update fails, log warning but continue with existing cache
+		// This handles cases like network failures where cache is still usable
+		fmt.Fprintf(os.Stderr, "warning: failed to update cached repo (using existing cache): %v\n", err)
+	}
+
 	// Determine search path
 	searchPath := cachePath
 	if parsed.Subpath != "" {
