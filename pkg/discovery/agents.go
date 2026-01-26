@@ -76,10 +76,10 @@ func DiscoverAgents(basePath string, subpath string) ([]*resource.Resource, erro
 		filepath.Join(searchPath, ".opencode", "agents"),
 	}
 
-	// Try priority locations first
+	// Try priority locations first (with recursive search within them)
 	agents := make([]*resource.Resource, 0)
 	for _, location := range priorityLocations {
-		found, err := discoverAgentsInDirectory(location, false)
+		found, err := searchAgentsInDirectory(location, 0)
 		if err != nil {
 			// Log but continue - directory might not exist
 			continue
@@ -98,6 +98,60 @@ func DiscoverAgents(basePath string, subpath string) ([]*resource.Resource, erro
 
 	// Deduplicate by agent name (keep first occurrence)
 	agents = deduplicateAgents(agents)
+
+	return agents, nil
+}
+
+// searchAgentsInDirectory recursively searches for agent .md files within a directory
+// This is used for priority locations to find agents at any depth within that location
+func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, error) {
+	if depth > MaxRecursiveDepth {
+		return nil, nil
+	}
+
+	// Check if directory exists
+	info, err := os.Stat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // Directory doesn't exist, not an error
+		}
+		return nil, fmt.Errorf("failed to stat directory: %w", err)
+	}
+
+	if !info.IsDir() {
+		return nil, fmt.Errorf("path is not a directory: %s", dir)
+	}
+
+	agents := make([]*resource.Resource, 0)
+
+	// Read directory entries
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		entryPath := filepath.Join(dir, entry.Name())
+
+		if entry.IsDir() {
+			// Recursively search subdirectories
+			subAgents, err := searchAgentsInDirectory(entryPath, depth+1)
+			if err == nil {
+				agents = append(agents, subAgents...)
+			}
+			continue
+		}
+
+		// If it's a .md file, try to load as agent
+		if filepath.Ext(entry.Name()) == ".md" {
+			agent, err := resource.LoadAgent(entryPath)
+			if err != nil {
+				// Skip invalid agents
+				continue
+			}
+			agents = append(agents, agent)
+		}
+	}
 
 	return agents, nil
 }

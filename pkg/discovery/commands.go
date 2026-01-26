@@ -65,7 +65,7 @@ func DiscoverCommands(basePath string, subpath string) ([]*resource.Resource, er
 	return deduplicateCommands(commands), nil
 }
 
-// searchPriorityLocations searches standard command directories
+// searchPriorityLocations searches standard command directories RECURSIVELY
 func searchPriorityLocations(basePath string) ([]*resource.Resource, error) {
 	priorityDirs := []string{
 		filepath.Join(basePath, "commands"),
@@ -80,7 +80,8 @@ func searchPriorityLocations(basePath string) ([]*resource.Resource, error) {
 			continue // Directory doesn't exist, skip
 		}
 
-		commands, err := searchDirectory(dir)
+		// Recursively search within priority directory (starting at depth 0)
+		commands, err := searchCommandsInDirectory(dir, 0)
 		if err != nil {
 			// Continue searching other directories even if one fails
 			continue
@@ -90,6 +91,55 @@ func searchPriorityLocations(basePath string) ([]*resource.Resource, error) {
 	}
 
 	return allCommands, nil
+}
+
+// searchCommandsInDirectory recursively searches for command .md files within a directory
+// This is used for priority locations to find commands at any depth within that location
+func searchCommandsInDirectory(dir string, depth int) ([]*resource.Resource, error) {
+	if depth > maxDepth {
+		return nil, nil
+	}
+
+	var commands []*resource.Resource
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		entryPath := filepath.Join(dir, entry.Name())
+
+		if entry.IsDir() {
+			// Recursively search subdirectories
+			subCommands, err := searchCommandsInDirectory(entryPath, depth+1)
+			if err == nil {
+				commands = append(commands, subCommands...)
+			}
+			continue
+		}
+
+		// Check if it's a .md file
+		if filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+
+		// Exclude special files
+		if isExcludedFile(entry.Name()) {
+			continue
+		}
+
+		// Try to load as command
+		cmd, err := resource.LoadCommand(entryPath)
+		if err != nil {
+			// Invalid command file, skip it
+			continue
+		}
+
+		commands = append(commands, cmd)
+	}
+
+	return commands, nil
 }
 
 // recursiveSearchCommands performs a recursive search for command files

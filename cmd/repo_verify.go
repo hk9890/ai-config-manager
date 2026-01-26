@@ -19,6 +19,7 @@ type VerifyResult struct {
 	OrphanedMetadata         []MetadataIssue `json:"orphaned_metadata,omitempty"`
 	MissingSourcePaths       []MetadataIssue `json:"missing_source_paths,omitempty"`
 	TypeMismatches           []TypeMismatch  `json:"type_mismatches,omitempty"`
+	PackagesWithMissingRefs  []PackageIssue  `json:"packages_with_missing_refs,omitempty"`
 	HasErrors                bool            `json:"has_errors"`
 	HasWarnings              bool            `json:"has_warnings"`
 }
@@ -47,6 +48,13 @@ type TypeMismatch struct {
 	MetadataPath string                `json:"metadata_path"`
 }
 
+// PackageIssue represents a package with missing resource references
+type PackageIssue struct {
+	Name             string   `json:"name"`
+	Path             string   `json:"path"`
+	MissingResources []string `json:"missing_resources"`
+}
+
 var (
 	verifyFix  bool
 	verifyJSON bool
@@ -55,14 +63,15 @@ var (
 // repoVerifyCmd represents the repo verify command
 var repoVerifyCmd = &cobra.Command{
 	Use:   "verify",
-	Short: "Check repository metadata consistency",
-	Long: `Check for consistency issues between resources and metadata.
+	Short: "Check repository metadata and package integrity",
+	Long: `Check for consistency issues between resources and metadata, and validate package references.
 
 This command performs the following checks:
   - Resources without metadata (warning)
   - Orphaned metadata files with missing resources (error)
   - Metadata with non-existent source paths (warning)
   - Type mismatches between resource and metadata (error)
+  - Packages with missing resource references (error)
 
 Use --fix to automatically resolve issues:
   - Create missing metadata for resources
@@ -70,7 +79,7 @@ Use --fix to automatically resolve issues:
 
 Exit status:
   0 - No errors found
-  1 - Errors found (orphaned metadata or type mismatches)
+  1 - Errors found (orphaned metadata, type mismatches, or broken package references)
 
 Examples:
   aimgr repo verify              # Check for issues
@@ -201,6 +210,32 @@ func verifyRepository(manager *repo.Manager, fix bool) (*VerifyResult, error) {
 		}
 		result.OrphanedMetadata = orphanedMeta
 		if len(orphanedMeta) > 0 {
+			result.HasErrors = true
+		}
+	}
+
+	// Check 5: Packages with missing resource references
+	packageInfos, err := manager.ListPackages()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list packages: %w", err)
+	}
+
+	for _, pkgInfo := range packageInfos {
+		// Load the full package
+		pkg, err := manager.GetPackage(pkgInfo.Name)
+		if err != nil {
+			// Skip packages that cannot be loaded
+			continue
+		}
+
+		missingRefs := manager.ValidatePackageResources(pkg)
+		if len(missingRefs) > 0 {
+			issue := PackageIssue{
+				Name:             pkg.Name,
+				Path:             resource.GetPackagePath(pkg.Name, repoPath),
+				MissingResources: missingRefs,
+			}
+			result.PackagesWithMissingRefs = append(result.PackagesWithMissingRefs, issue)
 			result.HasErrors = true
 		}
 	}
@@ -341,6 +376,19 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 				mismatch.Name, mismatch.ResourceType, mismatch.MetadataType)
 			fmt.Printf("    Resource: %s\n", mismatch.ResourcePath)
 			fmt.Printf("    Metadata: %s\n", mismatch.MetadataPath)
+		}
+		fmt.Println()
+	}
+
+	// Display packages with missing resource references (error)
+	if len(result.PackagesWithMissingRefs) > 0 {
+		hasIssues = true
+		fmt.Printf("✗ Packages with missing resource references: %d\n", len(result.PackagesWithMissingRefs))
+		for _, issue := range result.PackagesWithMissingRefs {
+			fmt.Printf("  - %s (%d missing):\n", issue.Name, len(issue.MissingResources))
+			for _, ref := range issue.MissingResources {
+				fmt.Printf("    - %s\n", ref)
+			}
 		}
 		fmt.Println()
 	}

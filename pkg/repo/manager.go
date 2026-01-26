@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
+	pkgerrors "github.com/hk9890/ai-config-manager/pkg/errors"
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
-	pkgerrors "github.com/hk9890/ai-config-manager/pkg/errors"
 )
 
 // Manager manages the AI resources repository
@@ -246,15 +246,6 @@ func (m *Manager) AddPackageWithRef(sourcePath, sourceURL, sourceType, ref strin
 	destPath := resource.GetPackagePath(pkg.Name, m.repoPath)
 	if _, err := os.Stat(destPath); err == nil {
 		return fmt.Errorf("package '%s' already exists in repository", pkg.Name)
-	}
-
-	// Validate resource references and warn about missing resources
-	missingResources := m.validatePackageResources(pkg)
-	if len(missingResources) > 0 {
-		fmt.Fprintf(os.Stderr, "Warning: Package '%s' references %d missing resource(s):\n", pkg.Name, len(missingResources))
-		for _, ref := range missingResources {
-			fmt.Fprintf(os.Stderr, "  - %s\n", ref)
-		}
 	}
 
 	// Copy the file
@@ -890,4 +881,16 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 
 	result.Added = append(result.Added, sourcePath)
 	return nil
+}
+
+// ValidatePackageResources checks if all referenced resources exist in the repository.
+// Returns a slice of missing resource references. (Public version for verify command)
+func (m *Manager) ValidatePackageResources(pkg *resource.Package) []string {
+	return m.validatePackageResources(pkg)
+}
+
+// GetPackage loads a package by name from the repository
+func (m *Manager) GetPackage(name string) (*resource.Package, error) {
+	pkgPath := resource.GetPackagePath(name, m.repoPath)
+	return resource.LoadPackage(pkgPath)
 }

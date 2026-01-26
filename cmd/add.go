@@ -571,6 +571,11 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 	// Print results
 	printImportResults(result)
 
+	// Exit with error if there were failures
+	if len(result.Failed) > 0 {
+		return fmt.Errorf("failed to import %d resource(s)", len(result.Failed))
+	}
+
 	return nil
 }
 
@@ -817,6 +822,11 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 
 	// Print results
 	printImportResults(result)
+
+	// Exit with error if there were failures
+	if len(result.Failed) > 0 {
+		return fmt.Errorf("failed to import %d resource(s)", len(result.Failed))
+	}
 
 	return nil
 }
