@@ -661,6 +661,155 @@ aimgr uninstall "skill/legacy-*" "command/deprecated-*"
 - **Empty matches**: If a pattern matches zero resources, a warning is shown
 - **Case-sensitive**: All pattern matching is case-sensitive
 
+## Output Formats
+
+`aimgr` supports multiple output formats for commands that perform bulk operations, making it easy to use both interactively and in automation scripts.
+
+### Available Formats
+
+| Format | Use Case | Flag |
+|--------|----------|------|
+| **table** | Human-readable, interactive use | `--format=table` (default) |
+| **json** | Scripting, automation, CI/CD | `--format=json` |
+| **yaml** | Configuration files, audit logs | `--format=yaml` |
+
+### Table Format (Default)
+
+Provides clean, formatted output with status indicators:
+
+```bash
+$ aimgr repo add ~/my-resources/
+
+┌─────────┬─────────────────────┬─────────┬──────────────────────┐
+│ TYPE    │ NAME                │ STATUS  │ MESSAGE              │
+├─────────┼─────────────────────┼─────────┼──────────────────────┤
+│ skill   │ pdf-processing      │ SUCCESS │ Added to repository  │
+│ skill   │ typescript-helper   │ SUCCESS │ Added to repository  │
+│ command │ test                │ SUCCESS │ Added to repository  │
+│ command │ build               │ SKIPPED │ Already exists       │
+│ agent   │ code-reviewer       │ SUCCESS │ Added to repository  │
+└─────────┴─────────────────────┴─────────┴──────────────────────┘
+
+Summary: 4 added, 0 failed, 1 skipped (5 total)
+```
+
+### JSON Format
+
+Perfect for scripting and automation:
+
+```bash
+$ aimgr repo add ~/my-resources/ --format=json
+{
+  "added": [
+    {
+      "name": "pdf-processing",
+      "type": "skill",
+      "path": "/home/user/.local/share/ai-config/repo/skills/pdf-processing"
+    },
+    {
+      "name": "test",
+      "type": "command",
+      "path": "/home/user/.local/share/ai-config/repo/commands/test.md"
+    }
+  ],
+  "skipped": [],
+  "failed": [],
+  "command_count": 1,
+  "skill_count": 1,
+  "agent_count": 0,
+  "package_count": 0
+}
+```
+
+**Use with jq for powerful filtering:**
+
+```bash
+# Extract only added resource names
+aimgr repo add ~/resources/ --format=json | jq '.added[].name'
+
+# Check for failures in scripts
+if [ $(aimgr repo add ~/resources/ --format=json | jq '.failed | length') -gt 0 ]; then
+  echo "Import failed!"
+  exit 1
+fi
+
+# Get error messages
+aimgr repo add ~/resources/ --format=json | jq '.failed[] | {name, error: .message}'
+```
+
+### YAML Format
+
+Human-readable structured output:
+
+```bash
+$ aimgr repo add ~/my-resources/ --format=yaml
+added:
+  - name: pdf-processing
+    type: skill
+    path: /home/user/.local/share/ai-config/repo/skills/pdf-processing
+  - name: test
+    type: command
+    path: /home/user/.local/share/ai-config/repo/commands/test.md
+skipped: []
+failed: []
+command_count: 1
+skill_count: 1
+agent_count: 0
+package_count: 0
+```
+
+**Save results for auditing:**
+
+```bash
+# Save import log
+aimgr repo add gh:myorg/resources --format=yaml > import-log.yaml
+
+# Review later
+cat import-log.yaml
+```
+
+### Error Reporting
+
+All formats include detailed error reporting:
+
+**Table format** shows errors inline with helpful hints:
+```bash
+Summary: 2 added, 1 failed, 0 skipped (3 total)
+
+⚠ Use --format=json to see detailed error messages
+```
+
+**JSON format** provides complete error details:
+```json
+{
+  "failed": [
+    {
+      "name": "broken-skill",
+      "type": "skill",
+      "path": "/path/to/skills/broken-skill",
+      "message": "missing required field: description"
+    }
+  ]
+}
+```
+
+### Commands Supporting Output Formats
+
+The `--format` flag is available on these commands:
+
+```bash
+# Repository operations
+aimgr repo add <source> --format=json
+aimgr repo sync --format=json
+aimgr repo list --format=json
+aimgr repo update --format=json
+
+# Project operations
+aimgr list --format=json
+```
+
+For comprehensive documentation with scripting examples, see [docs/output-formats.md](docs/output-formats.md).
+
 ## Commands
 
 ### `aimgr config`

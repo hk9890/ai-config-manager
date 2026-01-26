@@ -213,6 +213,172 @@ res, err := resource.LoadSkill("path/to/skill-dir")
 res, err := resource.LoadAgent("path/to/agent.md")
 ```
 
+### Output Formats
+
+Commands that perform bulk operations support multiple output formats via the `--format` flag:
+
+**Table format (default)** - Human-readable output:
+```bash
+$ aimgr repo add ~/resources/
+
+┌─────────┬─────────────────────┬─────────┬──────────────────────┐
+│ TYPE    │ NAME                │ STATUS  │ MESSAGE              │
+├─────────┼─────────────────────┼─────────┼──────────────────────┤
+│ skill   │ pdf-processing      │ SUCCESS │ Added to repository  │
+│ command │ test                │ SUCCESS │ Added to repository  │
+│ agent   │ code-reviewer       │ SKIPPED │ Already exists       │
+└─────────┴─────────────────────┴─────────┴──────────────────────┘
+
+Summary: 2 added, 0 failed, 1 skipped (3 total)
+```
+
+**JSON format** - Structured output for scripting:
+```bash
+$ aimgr repo add ~/resources/ --format=json
+{
+  "added": [
+    {
+      "name": "pdf-processing",
+      "type": "skill",
+      "path": "/home/user/.local/share/ai-config/repo/skills/pdf-processing"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "code-reviewer",
+      "type": "agent",
+      "message": "already exists"
+    }
+  ],
+  "failed": [],
+  "command_count": 1,
+  "skill_count": 1,
+  "agent_count": 0,
+  "package_count": 0
+}
+```
+
+**YAML format** - Human-readable structured output:
+```bash
+$ aimgr repo add ~/resources/ --format=yaml
+added:
+  - name: pdf-processing
+    type: skill
+    path: /home/user/.local/share/ai-config/repo/skills/pdf-processing
+skipped:
+  - name: code-reviewer
+    type: agent
+    message: already exists
+failed: []
+command_count: 1
+skill_count: 1
+agent_count: 0
+package_count: 0
+```
+
+**Parsing JSON output in Go:**
+```go
+import (
+    "encoding/json"
+    "os/exec"
+    
+    "github.com/hk9890/ai-config-manager/pkg/output"
+)
+
+// Execute aimgr with JSON output
+cmd := exec.Command("aimgr", "repo", "add", sourcePath, "--format=json")
+out, err := cmd.Output()
+if err != nil {
+    return fmt.Errorf("failed to run aimgr: %w", err)
+}
+
+// Parse JSON result
+var result output.BulkOperationResult
+if err := json.Unmarshal(out, &result); err != nil {
+    return fmt.Errorf("failed to parse output: %w", err)
+}
+
+// Check for failures
+if len(result.Failed) > 0 {
+    for _, failure := range result.Failed {
+        log.Printf("Failed to add %s (%s): %s", 
+            failure.Name, failure.Type, failure.Message)
+    }
+    return fmt.Errorf("import failed")
+}
+
+// Process successful additions
+for _, res := range result.Added {
+    log.Printf("Added %s (%s) from %s", res.Name, res.Type, res.Path)
+}
+```
+
+**Using jq for filtering:**
+```bash
+# Extract only added resource names
+aimgr repo add ~/resources/ --format=json | jq '.added[].name'
+
+# Count resources by type
+aimgr repo add ~/resources/ --format=json | jq '{
+  skills: .skill_count,
+  commands: .command_count,
+  agents: .agent_count
+}'
+
+# Check for failures in scripts
+if [ $(aimgr repo add ~/resources/ --format=json | jq '.failed | length') -gt 0 ]; then
+  echo "Import failed!"
+  exit 1
+fi
+
+# Get error messages
+aimgr repo add ~/resources/ --format=json | jq '.failed[] | {
+  name: .name,
+  error: .message
+}'
+```
+
+**Error structure for programmatic handling:**
+
+The JSON output includes detailed error information in the `failed` array:
+
+```json
+{
+  "failed": [
+    {
+      "name": "broken-skill",
+      "type": "skill",
+      "path": "/path/to/skills/broken-skill",
+      "message": "missing required field: description"
+    },
+    {
+      "name": "invalid-yaml",
+      "type": "command",
+      "path": "/path/to/commands/invalid-yaml.md",
+      "message": "failed to parse YAML frontmatter: yaml: line 5: mapping values are not allowed"
+    }
+  ]
+}
+```
+
+Common error types:
+- `"missing required field: <field>"` - Resource missing required frontmatter field
+- `"failed to parse YAML frontmatter"` - Invalid YAML syntax
+- `"invalid name format"` - Name doesn't follow agentskills.io rules
+- `"already exists"` - Resource with same name exists (use `--force` to overwrite)
+- `"source not found"` - Path or repository doesn't exist
+
+**Commands supporting --format flag:**
+```bash
+aimgr repo add <source> --format=<table|json|yaml>
+aimgr repo sync --format=<table|json|yaml>
+aimgr repo list --format=<table|json|yaml>
+aimgr repo update --format=<table|json|yaml>
+aimgr list --format=<table|json|yaml>
+```
+
+See [docs/output-formats.md](../docs/output-formats.md) for comprehensive documentation with scripting examples.
+
 ### Repository Operations
 ```go
 mgr, err := repo.NewManager()
