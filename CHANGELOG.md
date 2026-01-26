@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-01-26
+
+### Added
+- **Config Precedence System**
+  - Project-level `ai.package.yaml` `install.targets` now overrides global config
+  - Enables per-project tool configuration without modifying global settings
+  - Provides more granular control over installation targets for different projects
+
+### Changed
+- **Table Format Improvements**
+  - Table format now uses unified `type/name` column instead of separate columns
+  - Cleaner, more compact output for resource listings
+  - Consistent with pattern matching syntax used throughout CLI
+  
+- **Documentation Refactoring**
+  - Split comprehensive documentation from AGENTS.md into specialized files
+  - Restructured AGENTS.md for better clarity and navigation
+  - Created detailed standalone documentation for specific topics
+
+### Fixed
+- **Test Suite Fixes**
+  - Fixed `TestBulkImportConflicts` error handling to match new behavior
+  - Improved test reliability and accuracy
+  
+- **Package Discovery**
+  - Fixed recursive package discovery to support nested directories
+  - Packages now properly discovered at any depth in directory structure
+  
+- **Package Validation**
+  - Fixed various package validation bugs
+  - More robust error checking for package format and content
+  
+- **Bulk Operations**
+  - Improved error handling - continues on validation/resource errors instead of aborting
+  - Better resilience when processing multiple resources with some failures
+  
+- **Dry-Run Mode**
+  - Fixed dry-run mode to correctly count resources in JSON output
+  - Accurate reporting of what would be affected without making changes
+  
+- **Install Command**
+  - Fixed install command to read global config from XDG location
+  - Ensures consistent config loading across all commands
+
+### Documentation
+- **New Comprehensive Guides**
+  - `docs/pattern-matching.md` - Complete pattern matching guide with examples (458 lines)
+  - `docs/workspace-caching.md` - Git repository caching documentation (273 lines)
+  - `docs/resource-formats.md` - Complete resource format specifications (810 lines)
+  - `docs/output-formats.md` - CLI output formats documentation
+  
+- **Documentation Organization**
+  - Historical release notes archived to `docs/archive/release-notes/`
+  - Cleaned up and audited `docs/` folder structure
+  - Improved discoverability of specialized documentation
+
 ## [1.9.0] - 2026-01-26
 
 ### Added

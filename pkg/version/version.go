@@ -5,7 +5,7 @@ import "fmt"
 // Version information - injected at build time
 var (
 	// Version is the semantic version number
-	Version = "1.9.0"
+	Version = "1.10.0"
 	// GitCommit is the git commit hash
 	GitCommit = ""
 	// BuildDate is the build date
