@@ -134,6 +134,50 @@ func TestDetectInstallTargets(t *testing.T) {
 			defaultTools:  []tools.Tool{tools.Claude, tools.OpenCode},
 			expectedTools: []tools.Tool{tools.Claude, tools.OpenCode},
 		},
+		{
+			name: "manifest targets override global config",
+			setupFunc: func(dir string) error {
+				// Create ai.package.yaml with install.targets
+				manifestContent := `resources: []
+install:
+  targets:
+    - opencode
+    - copilot
+`
+				return os.WriteFile(filepath.Join(dir, "ai.package.yaml"), []byte(manifestContent), 0644)
+			},
+			defaultTools:  []tools.Tool{tools.Claude},
+			expectedTools: []tools.Tool{tools.OpenCode, tools.Copilot},
+		},
+		{
+			name: "existing tools override manifest targets",
+			setupFunc: func(dir string) error {
+				// Create .claude directory
+				if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {
+					return err
+				}
+				// Create ai.package.yaml with different targets
+				manifestContent := `resources: []
+install:
+  targets:
+    - opencode
+`
+				return os.WriteFile(filepath.Join(dir, "ai.package.yaml"), []byte(manifestContent), 0644)
+			},
+			defaultTools:  []tools.Tool{tools.Copilot},
+			expectedTools: []tools.Tool{tools.Claude},
+		},
+		{
+			name: "manifest with no targets uses defaults",
+			setupFunc: func(dir string) error {
+				// Create ai.package.yaml without install.targets
+				manifestContent := `resources: []
+`
+				return os.WriteFile(filepath.Join(dir, "ai.package.yaml"), []byte(manifestContent), 0644)
+			},
+			defaultTools:  []tools.Tool{tools.Claude},
+			expectedTools: []tools.Tool{tools.Claude},
+		},
 	}
 
 	for _, tt := range tests {
