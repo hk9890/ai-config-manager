@@ -65,7 +65,7 @@ Shows:
 ## 📚 Documentation
 
 ### New Documentation
-- **`docs/list-command.md`** - Comprehensive guide for the new `list` command
+- **`removed in v1.9.0`** - Comprehensive guide for the new `list` command
 - **`docs/shell-completion-troubleshooting.md`** - Troubleshooting guide for shell completion issues
 - **`dev-completion.sh`** - Development helper script for enabling completion with `./aimgr`
 
