@@ -156,7 +156,7 @@ func FormatBulkResult(result *BulkOperationResult, format Format) error {
 func formatAsTable(result *BulkOperationResult) error {
 	// Create unified table with all resources
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("TYPE", "NAME", "STATUS", "MESSAGE")
+	table.Header("NAME", "STATUS", "MESSAGE")
 
 	// Add all resources to table
 	hasContent := false
@@ -168,7 +168,7 @@ func formatAsTable(result *BulkOperationResult) error {
 		if message == "" {
 			message = "Added to repository"
 		}
-		if err := table.Append(res.Type, res.Name, status, message); err != nil {
+		if err := table.Append(fmt.Sprintf("%s/%s", res.Type, res.Name), status, message); err != nil {
 			return fmt.Errorf("failed to append row: %w", err)
 		}
 		hasContent = true
@@ -181,7 +181,7 @@ func formatAsTable(result *BulkOperationResult) error {
 		if message == "" {
 			message = "Already exists"
 		}
-		if err := table.Append(res.Type, res.Name, status, message); err != nil {
+		if err := table.Append(fmt.Sprintf("%s/%s", res.Type, res.Name), status, message); err != nil {
 			return fmt.Errorf("failed to append row: %w", err)
 		}
 		hasContent = true
@@ -194,7 +194,7 @@ func formatAsTable(result *BulkOperationResult) error {
 		if message == "" {
 			message = "Unknown error"
 		}
-		if err := table.Append(res.Type, res.Name, status, message); err != nil {
+		if err := table.Append(fmt.Sprintf("%s/%s", res.Type, res.Name), status, message); err != nil {
 			return fmt.Errorf("failed to append row: %w", err)
 		}
 		hasContent = true

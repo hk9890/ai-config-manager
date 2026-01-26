@@ -223,20 +223,20 @@ func outputInstalledTable(infos []ResourceInfo) error {
 
 	// Create table with new API
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("Type", "Name", "Targets", "Description")
+	table.Header("Name", "Targets", "Description")
 
 	// Add commands
 	for _, cmd := range commands {
 		desc := truncateString(cmd.Description, 50)
 		targets := strings.Join(cmd.Targets, ", ")
-		if err := table.Append("command", cmd.Name, targets, desc); err != nil {
+		if err := table.Append(fmt.Sprintf("command/%s", cmd.Name), targets, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
 	if len(commands) > 0 && (len(skills) > 0 || len(agents) > 0) {
-		if err := table.Append("", "", "", ""); err != nil {
+		if err := table.Append("", "", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
@@ -245,14 +245,14 @@ func outputInstalledTable(infos []ResourceInfo) error {
 	for _, skill := range skills {
 		desc := truncateString(skill.Description, 50)
 		targets := strings.Join(skill.Targets, ", ")
-		if err := table.Append("skill", skill.Name, targets, desc); err != nil {
+		if err := table.Append(fmt.Sprintf("skill/%s", skill.Name), targets, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between types if skills exist and agents exist
 	if len(skills) > 0 && len(agents) > 0 {
-		if err := table.Append("", "", "", ""); err != nil {
+		if err := table.Append("", "", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
@@ -261,7 +261,7 @@ func outputInstalledTable(infos []ResourceInfo) error {
 	for _, agent := range agents {
 		desc := truncateString(agent.Description, 50)
 		targets := strings.Join(agent.Targets, ", ")
-		if err := table.Append("agent", agent.Name, targets, desc); err != nil {
+		if err := table.Append(fmt.Sprintf("agent/%s", agent.Name), targets, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}

@@ -163,19 +163,19 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 
 	// Create table with new API
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("Type", "Name", "Description")
+	table.Header("Name", "Description")
 
 	// Add commands
 	for _, cmd := range commands {
 		desc := truncateString(cmd.Description, 60)
-		if err := table.Append("command", cmd.Name, desc); err != nil {
+		if err := table.Append(fmt.Sprintf("command/%s", cmd.Name), desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
 	if len(commands) > 0 && (len(skills) > 0 || len(agents) > 0) {
-		if err := table.Append("", "", ""); err != nil {
+		if err := table.Append("", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
@@ -183,14 +183,14 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 	// Add skills
 	for _, skill := range skills {
 		desc := truncateString(skill.Description, 60)
-		if err := table.Append("skill", skill.Name, desc); err != nil {
+		if err := table.Append(fmt.Sprintf("skill/%s", skill.Name), desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between types if skills exist and agents exist
 	if len(skills) > 0 && len(agents) > 0 {
-		if err := table.Append("", "", ""); err != nil {
+		if err := table.Append("", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
@@ -198,14 +198,14 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 	// Add agents
 	for _, agent := range agents {
 		desc := truncateString(agent.Description, 60)
-		if err := table.Append("agent", agent.Name, desc); err != nil {
+		if err := table.Append(fmt.Sprintf("agent/%s", agent.Name), desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between agents and packages if both exist
 	if len(agents) > 0 && len(packages) > 0 {
-		if err := table.Append("", "", ""); err != nil {
+		if err := table.Append("", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
@@ -215,7 +215,7 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 		desc := truncateString(pkg.Description, 50)
 		countStr := fmt.Sprintf("%d resources", pkg.ResourceCount)
 		fullDesc := fmt.Sprintf("%s    %s", countStr, desc)
-		if err := table.Append("package", pkg.Name, fullDesc); err != nil {
+		if err := table.Append(fmt.Sprintf("package/%s", pkg.Name), fullDesc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}

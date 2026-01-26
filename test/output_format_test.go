@@ -47,9 +47,6 @@ This skill tests table output format.
 	}
 
 	// Verify table output structure
-	if !strings.Contains(output, "TYPE") {
-		t.Errorf("Table output should contain TYPE header, got: %s", output)
-	}
 	if !strings.Contains(output, "NAME") {
 		t.Errorf("Table output should contain NAME header, got: %s", output)
 	}
@@ -60,15 +57,12 @@ This skill tests table output format.
 		t.Errorf("Table output should contain MESSAGE header, got: %s", output)
 	}
 
-	// Verify resource appears in table
-	if !strings.Contains(output, "output-test-skill") {
-		t.Errorf("Table should show resource name, got: %s", output)
+	// Verify resource appears in table with type/name format
+	if !strings.Contains(output, "skill/output-test-skill") {
+		t.Errorf("Table should show resource in type/name format (skill/output-test-skill), got: %s", output)
 	}
 	if !strings.Contains(output, "SUCCESS") {
 		t.Errorf("Table should show SUCCESS status, got: %s", output)
-	}
-	if !strings.Contains(output, "skill") {
-		t.Errorf("Table should show resource type, got: %s", output)
 	}
 
 	// Verify summary line
