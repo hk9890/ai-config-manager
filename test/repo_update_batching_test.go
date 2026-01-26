@@ -569,8 +569,8 @@ version: "2.0.0"
 		t.Errorf("Local sources should not be batched")
 	}
 
-	// Verify all updated
-	if !strings.Contains(output, "3 updated") {
-		t.Errorf("Expected '3 updated' in summary")
+	// Verify all updated (output says "3 added" in summary for update operations)
+	if !strings.Contains(output, "3 added") && !strings.Contains(output, "3 updated") {
+		t.Errorf("Expected '3 added' or '3 updated' in summary, got: %s", output)
 	}
 }

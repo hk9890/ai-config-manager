@@ -18,14 +18,11 @@ func TestLoad_NoConfigFile(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Load config from directory without config file
-	config, err := Load(tmpDir)
-	if err != nil {
-		t.Fatalf("Load() error = %v, want nil", err)
-	}
+	_, err = Load(tmpDir)
 
-	// Should return default config
-	if len(config.Install.Targets) != 1 || config.Install.Targets[0] != DefaultToolValue {
-		t.Errorf("Load().Install.Targets = %v, want [%v]", config.Install.Targets, DefaultToolValue)
+	// Should return error when no config file exists
+	if err == nil {
+		t.Fatalf("Load() expected error when no config file exists, got nil")
 	}
 }
 
@@ -47,24 +44,6 @@ func TestLoad_ValidConfig(t *testing.T) {
 			configYAML:    "install:\n  targets: [claude, opencode]\n",
 			wantTargets:   []string{"claude", "opencode"},
 			wantToolTypes: []tools.Tool{tools.Claude, tools.OpenCode},
-		},
-		{
-			name:          "old format: claude (migrated)",
-			configYAML:    "default-tool: claude\n",
-			wantTargets:   []string{"claude"},
-			wantToolTypes: []tools.Tool{tools.Claude},
-		},
-		{
-			name:          "old format: opencode (migrated)",
-			configYAML:    "default-tool: opencode\n",
-			wantTargets:   []string{"opencode"},
-			wantToolTypes: []tools.Tool{tools.OpenCode},
-		},
-		{
-			name:          "empty defaults to claude",
-			configYAML:    "",
-			wantTargets:   []string{"claude"},
-			wantToolTypes: []tools.Tool{tools.Claude},
 		},
 	}
 
@@ -112,6 +91,49 @@ func TestLoad_ValidConfig(t *testing.T) {
 				if i >= len(toolTypes) || toolTypes[i] != wantType {
 					t.Errorf("GetDefaultTargets()[%d] = %v, want %v", i, toolTypes[i], wantType)
 				}
+			}
+		})
+	}
+}
+
+func TestLoad_MissingTargets(t *testing.T) {
+	tests := []struct {
+		name       string
+		configYAML string
+	}{
+		{
+			name:       "old format: claude (no auto-migration)",
+			configYAML: "default-tool: claude\n",
+		},
+		{
+			name:       "old format: opencode (no auto-migration)",
+			configYAML: "default-tool: opencode\n",
+		},
+		{
+			name:       "empty config requires targets",
+			configYAML: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp directory
+			tmpDir, err := os.MkdirTemp("", "config-test-*")
+			if err != nil {
+				t.Fatalf("failed to create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+
+			// Write config file
+			configPath := filepath.Join(tmpDir, DefaultConfigFileName)
+			if err := os.WriteFile(configPath, []byte(tt.configYAML), 0644); err != nil {
+				t.Fatalf("failed to write config file: %v", err)
+			}
+
+			// Load config - should fail because install.targets is required
+			_, err = Load(tmpDir)
+			if err == nil {
+				t.Errorf("Load() expected error for missing install.targets, got nil")
 			}
 		})
 	}
@@ -290,14 +312,14 @@ func TestGetDefaultTargets(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "empty defaults to claude",
+			name: "empty targets returns error",
 			config: Config{
 				Install: InstallConfig{
 					Targets: []string{},
 				},
 			},
-			wantTools: []tools.Tool{tools.Claude},
-			wantError: false,
+			wantTools: nil,
+			wantError: true,
 		},
 		{
 			name: "invalid tool",
@@ -419,15 +441,12 @@ func TestLoadGlobal_NoConfig(t *testing.T) {
 	// Reload XDG paths to pick up new environment variables
 	xdg.Reload()
 
-	// LoadGlobal should return defaults when no config exists
-	cfg, err := LoadGlobal()
-	if err != nil {
-		t.Fatalf("LoadGlobal() error = %v, want nil", err)
-	}
+	// LoadGlobal should return error when no config exists
+	_, err = LoadGlobal()
 
-	// Should return default config
-	if len(cfg.Install.Targets) != 1 || cfg.Install.Targets[0] != DefaultToolValue {
-		t.Errorf("LoadGlobal().Install.Targets = %v, want [%v]", cfg.Install.Targets, DefaultToolValue)
+	// Should return error when no config file exists
+	if err == nil {
+		t.Fatalf("LoadGlobal() expected error when no config exists, got nil")
 	}
 }
 

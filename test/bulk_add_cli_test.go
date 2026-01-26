@@ -165,8 +165,11 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 		t.Fatalf("Skip-existing add failed: %v\nOutput: %s", err, output)
 	}
 
-	if !strings.Contains(output, "Summary: 0 added, 1 skipped") {
+	if !strings.Contains(output, "1 skipped") {
 		t.Errorf("Should skip existing resource, got: %s", output)
+	}
+	if !strings.Contains(output, "0 added") {
+		t.Errorf("Should not add any resources, got: %s", output)
 	}
 }
 

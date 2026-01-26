@@ -38,11 +38,16 @@ targets:
   - opencode`,
 			wantErr: false,
 			checkFn: func(t *testing.T, m *Manifest) {
-				if len(m.Targets) != 2 {
-					t.Errorf("expected 2 targets, got %d", len(m.Targets))
+				// Old 'targets' field should be migrated to 'install.targets'
+				if len(m.Install.Targets) != 2 {
+					t.Errorf("expected 2 install.targets, got %d", len(m.Install.Targets))
 				}
-				if m.Targets[0] != "claude" {
-					t.Errorf("unexpected target[0]: %s", m.Targets[0])
+				if m.Install.Targets[0] != "claude" {
+					t.Errorf("unexpected install.target[0]: %s", m.Install.Targets[0])
+				}
+				// Old field should be cleared after migration
+				if len(m.Targets) != 0 {
+					t.Errorf("expected old Targets field to be cleared after migration, got %d", len(m.Targets))
 				}
 			},
 		},
@@ -195,7 +200,9 @@ func TestSave(t *testing.T) {
 
 	m := &Manifest{
 		Resources: []string{"skill/test", "command/build"},
-		Targets:   []string{"claude"},
+		Install: InstallConfig{
+			Targets: []string{"claude"},
+		},
 	}
 
 	// Save manifest
@@ -218,8 +225,8 @@ func TestSave(t *testing.T) {
 		t.Errorf("resources count mismatch: got %d, want %d", len(loaded.Resources), len(m.Resources))
 	}
 
-	if len(loaded.Targets) != len(m.Targets) {
-		t.Errorf("targets count mismatch: got %d, want %d", len(loaded.Targets), len(m.Targets))
+	if len(loaded.Install.Targets) != len(m.Install.Targets) {
+		t.Errorf("install.targets count mismatch: got %d, want %d", len(loaded.Install.Targets), len(m.Install.Targets))
 	}
 }
 
@@ -263,7 +270,9 @@ func TestValidate(t *testing.T) {
 			name: "valid manifest",
 			m: &Manifest{
 				Resources: []string{"skill/test", "command/build"},
-				Targets:   []string{"claude"},
+				Install: InstallConfig{
+					Targets: []string{"claude"},
+				},
 			},
 			wantErr: false,
 		},
@@ -292,7 +301,9 @@ func TestValidate(t *testing.T) {
 			name: "invalid target",
 			m: &Manifest{
 				Resources: []string{"skill/test"},
-				Targets:   []string{"invalid"},
+				Install: InstallConfig{
+					Targets: []string{"invalid"},
+				},
 			},
 			wantErr: true,
 		},

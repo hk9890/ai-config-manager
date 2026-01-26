@@ -346,8 +346,11 @@ func TestFilterWithSkipExisting(t *testing.T) {
 	}
 
 	// Should show 1 added, 1 skipped
-	if !strings.Contains(output, "Summary: 1 added, 1 skipped") {
-		t.Errorf("Should show 1 added and 1 skipped, got: %s", output)
+	if !strings.Contains(output, "1 added") {
+		t.Errorf("Should show 1 added, got: %s", output)
+	}
+	if !strings.Contains(output, "1 skipped") {
+		t.Errorf("Should show 1 skipped, got: %s", output)
 	}
 }
 

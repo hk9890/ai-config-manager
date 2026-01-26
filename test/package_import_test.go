@@ -157,9 +157,9 @@ description: A test skill for package import testing
 		t.Fatalf("Failed to list resources: %v", err)
 	}
 
-	// Should have command and skill
-	if len(resources) != 2 {
-		t.Errorf("Expected 2 resources in repo, got %d", len(resources))
+	// Should have command, skill, and package (packages are included in List now)
+	if len(resources) != 3 {
+		t.Errorf("Expected 3 resources in repo (command, skill, package), got %d", len(resources))
 	}
 
 	// Verify packages separately
@@ -410,14 +410,14 @@ description: Agent 1
 		t.Errorf("Expected 1 package, got %d", result.PackageCount)
 	}
 
-	// Verify all resources in repo (commands, skills, agents)
+	// Verify all resources in repo (commands, skills, agents, packages)
 	resources, err := manager.List(nil)
 	if err != nil {
 		t.Fatalf("Failed to list resources: %v", err)
 	}
 
-	if len(resources) != 4 {
-		t.Errorf("Expected 4 resources in repo, got %d", len(resources))
+	if len(resources) != 5 {
+		t.Errorf("Expected 5 resources in repo (2 commands, 1 skill, 1 agent, 1 package), got %d", len(resources))
 	}
 
 	// Verify package exists (packages are listed separately)

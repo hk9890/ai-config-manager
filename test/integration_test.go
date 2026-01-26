@@ -3,6 +3,7 @@ package test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hk9890/ai-config-manager/pkg/config"
@@ -459,26 +460,18 @@ func TestConfigIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("config defaults to claude", func(t *testing.T) {
+	t.Run("config requires explicit targets", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		// Load config without file (should use defaults)
-		cfg, err := config.Load(tmpDir)
-		if err != nil {
-			t.Fatalf("Failed to load config: %v", err)
+		// Load config without file (should error - no defaults)
+		_, err := config.Load(tmpDir)
+		if err == nil {
+			t.Error("Expected error when loading config without file, got nil")
 		}
 
-		// Verify defaults to claude
-		if len(cfg.Install.Targets) != 1 || cfg.Install.Targets[0] != "claude" {
-			t.Errorf("Install.Targets = %v, want [claude]", cfg.Install.Targets)
-		}
-
-		targets, err := cfg.GetDefaultTargets()
-		if err != nil {
-			t.Fatalf("Failed to get default targets: %v", err)
-		}
-		if len(targets) != 1 || targets[0] != tools.Claude {
-			t.Errorf("GetDefaultTargets() = %v, want [Claude]", targets)
+		// Error message should mention install.targets
+		if !strings.Contains(err.Error(), "install") {
+			t.Errorf("Error should mention 'install', got: %v", err)
 		}
 	})
 
