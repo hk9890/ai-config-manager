@@ -231,16 +231,20 @@ result, err := mgr.AddBulk(paths, opts)
 ```
 
 **Workspace Caching**: Git repositories are cached in `.workspace/` directory for
-efficient reuse across updates:
-- First update: Full git clone (creates cache)
-- Subsequent updates: Git pull only (10-50x faster)
+efficient reuse across all Git operations:
+- First operation (`repo add`, `repo sync`, `repo update`): Full git clone (creates cache)
+- Subsequent operations: Reuse cached repository (10-50x faster)
 - Automatic cache management with SHA256 hash-based storage
 - Shared across all resources from the same source repository
+- Commands that use workspace cache:
+  - `repo add gh:owner/repo` - Adds resources using cached clone
+  - `repo sync` - Syncs from configured sources using cached clones
+  - `repo update` - Updates resources using cached clones (git pull)
 
-**Update Performance**: The `repo update` command automatically batches resources from
+**Batching Performance**: Repository commands automatically batches resources from
 the same Git repository, cloning each unique source only once. This optimization
-significantly improves update speed for bulk operations (e.g., 39 resources from one
-repository = 1 clone instead of 39).
+significantly improves performance for bulk operations (e.g., 39 resources from one
+repository = 1 cached clone reused 39 times).
 
 **Workspace Directory Structure**:
 ```

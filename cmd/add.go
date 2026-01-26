@@ -13,6 +13,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/source"
+	"github.com/hk9890/ai-config-manager/pkg/workspace"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -573,16 +574,22 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		return fmt.Errorf("failed to get clone URL: %w", err)
 	}
 
-	tempDir, err := source.CloneRepo(cloneURL, parsed.Ref)
+	// Create workspace manager
+	workspaceManager, err := workspace.NewManager(manager.GetRepoPath())
 	if err != nil {
-		return fmt.Errorf("git clone failed: %w", err)
+		return fmt.Errorf("failed to create workspace manager: %w", err)
 	}
-	defer source.CleanupTempDir(tempDir)
+
+	// Get or clone repository using workspace cache
+	cachePath, err := workspaceManager.GetOrClone(cloneURL, parsed.Ref)
+	if err != nil {
+		return fmt.Errorf("failed to get cached repo: %w", err)
+	}
 
 	// Determine search path
-	searchPath := tempDir
+	searchPath := cachePath
 	if parsed.Subpath != "" {
-		searchPath = filepath.Join(tempDir, parsed.Subpath)
+		searchPath = filepath.Join(cachePath, parsed.Subpath)
 	}
 
 	// Discover all resources
