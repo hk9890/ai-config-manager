@@ -1139,10 +1139,20 @@ func printDiscoveryErrors(errors []discovery.DiscoveryError) {
 		return
 	}
 
-	fmt.Printf("⚠ Discovery Issues (%d):\n", len(errors))
+	// Deduplicate errors by path (first error for each path wins)
+	seen := make(map[string]bool)
+	uniqueErrors := make([]discovery.DiscoveryError, 0, len(errors))
+	for _, err := range errors {
+		if !seen[err.Path] {
+			seen[err.Path] = true
+			uniqueErrors = append(uniqueErrors, err)
+		}
+	}
+
+	fmt.Printf("⚠ Discovery Issues (%d):\n", len(uniqueErrors))
 	fmt.Println()
 
-	for _, err := range errors {
+	for _, err := range uniqueErrors {
 		// Extract just the directory/file name for display
 		shortPath := filepath.Base(err.Path)
 		if filepath.Base(filepath.Dir(err.Path)) != "." {
