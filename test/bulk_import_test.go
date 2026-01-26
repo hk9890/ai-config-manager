@@ -234,9 +234,12 @@ func TestBulkImportConflicts(t *testing.T) {
 		}
 
 		// Try to add with same name without flags
-		_, err := manager.AddBulk([]string{cmd1Path}, repo.BulkImportOptions{})
-		if err == nil {
-			t.Error("Expected error on conflict without flags, got nil")
+		result, err := manager.AddBulk([]string{cmd1Path}, repo.BulkImportOptions{})
+		if err != nil {
+			t.Fatalf("AddBulk should not return error: %v", err)
+		}
+		if len(result.Failed) == 0 {
+			t.Error("Expected conflict in result.Failed, got none")
 		}
 	})
 }
