@@ -154,63 +154,78 @@ func FormatBulkResult(result *BulkOperationResult, format Format) error {
 
 // formatAsTable formats the result as a table (human-readable)
 func formatAsTable(result *BulkOperationResult) error {
-	// Print added resources
-	if len(result.Added) > 0 {
-		fmt.Println("Added Resources:")
-		table := tablewriter.NewWriter(os.Stdout)
-		table.Header("Name", "Type")
+	// Create unified table with all resources
+	table := tablewriter.NewWriter(os.Stdout)
+	table.Header("TYPE", "NAME", "STATUS", "MESSAGE")
 
-		for _, res := range result.Added {
-			if err := table.Append(res.Name, res.Type); err != nil {
-				return fmt.Errorf("failed to append row: %w", err)
-			}
+	// Add all resources to table
+	hasContent := false
+
+	// Add successful resources
+	for _, res := range result.Added {
+		status := "SUCCESS"
+		message := res.Message
+		if message == "" {
+			message = "Added to repository"
 		}
+		if err := table.Append(res.Type, res.Name, status, message); err != nil {
+			return fmt.Errorf("failed to append row: %w", err)
+		}
+		hasContent = true
+	}
+
+	// Add skipped resources
+	for _, res := range result.Skipped {
+		status := "SKIPPED"
+		message := res.Message
+		if message == "" {
+			message = "Already exists"
+		}
+		if err := table.Append(res.Type, res.Name, status, message); err != nil {
+			return fmt.Errorf("failed to append row: %w", err)
+		}
+		hasContent = true
+	}
+
+	// Add failed resources
+	for _, res := range result.Failed {
+		status := "FAILED"
+		message := res.Message
+		if message == "" {
+			message = "Unknown error"
+		}
+		if err := table.Append(res.Type, res.Name, status, message); err != nil {
+			return fmt.Errorf("failed to append row: %w", err)
+		}
+		hasContent = true
+	}
+
+	// Render table if there's content
+	if hasContent {
 		if err := table.Render(); err != nil {
 			return fmt.Errorf("failed to render table: %w", err)
 		}
 		fmt.Println()
 	}
 
-	// Print skipped resources
-	if len(result.Skipped) > 0 {
-		fmt.Println("Skipped Resources:")
-		table := tablewriter.NewWriter(os.Stdout)
-		table.Header("Name", "Type", "Reason")
+	// Print summary line
+	totalAdded := len(result.Added)
+	totalSkipped := len(result.Skipped)
+	totalFailed := len(result.Failed)
+	totalResources := totalAdded + totalSkipped + totalFailed
 
-		for _, res := range result.Skipped {
-			if err := table.Append(res.Name, res.Type, res.Message); err != nil {
-				return fmt.Errorf("failed to append row: %w", err)
-			}
-		}
-		if err := table.Render(); err != nil {
-			return fmt.Errorf("failed to render table: %w", err)
-		}
-		fmt.Println()
+	if totalResources == 0 {
+		fmt.Println("No resources to process")
+	} else {
+		fmt.Printf("Summary: %d added, %d failed, %d skipped (%d total)\n",
+			totalAdded, totalFailed, totalSkipped, totalResources)
 	}
 
-	// Print failed resources
-	if len(result.Failed) > 0 {
-		fmt.Println("Failed Resources:")
-		table := tablewriter.NewWriter(os.Stdout)
-		table.Header("Name", "Type", "Error")
-
-		for _, res := range result.Failed {
-			if err := table.Append(res.Name, res.Type, res.Message); err != nil {
-				return fmt.Errorf("failed to append row: %w", err)
-			}
-		}
-		if err := table.Render(); err != nil {
-			return fmt.Errorf("failed to render table: %w", err)
-		}
+	// Show tip about JSON format if there are failures
+	if totalFailed > 0 {
 		fmt.Println()
+		fmt.Println("⚠ Use --format=json to see detailed error messages")
 	}
-
-	// Print summary
-	totalResources := result.CommandCount + result.SkillCount + result.AgentCount + result.PackageCount
-	fmt.Printf("Summary: %d resources (%d commands, %d skills, %d agents, %d packages)\n",
-		totalResources, result.CommandCount, result.SkillCount, result.AgentCount, result.PackageCount)
-	fmt.Printf("  Added: %d, Skipped: %d, Failed: %d\n",
-		len(result.Added), len(result.Skipped), len(result.Failed))
 
 	return nil
 }

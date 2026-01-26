@@ -807,7 +807,6 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		fmt.Println()
 	}
 
-
 	// Print results
 	printImportResults(result)
 
@@ -1127,67 +1126,11 @@ func printImportResults(result *repo.BulkImportResult) {
 		format = output.Table
 	}
 
-	// Use structured output formatter for non-table formats
-	if format != output.Table {
-		bulkResult := output.FromBulkImportResult(result)
-		if err := output.FormatBulkResult(bulkResult, format); err != nil {
-			fmt.Fprintf(os.Stderr, "Error formatting output: %v\n", err)
-		}
-		return
+	// Use structured output formatter for all formats
+	bulkResult := output.FromBulkImportResult(result)
+	if err := output.FormatBulkResult(bulkResult, format); err != nil {
+		fmt.Fprintf(os.Stderr, "Error formatting output: %v\n", err)
 	}
-
-	// Original human-readable output (table format)
-	// Print added resources
-	for _, path := range result.Added {
-		resourceType := "resource"
-		name := filepath.Base(path)
-
-		// Determine type
-		if filepath.Ext(path) == ".md" {
-			// Could be command or agent - check parent directory
-			parentDir := filepath.Base(filepath.Dir(path))
-			if parentDir == "agents" {
-				resourceType = "agent"
-			} else {
-				resourceType = "command"
-			}
-			name = name[:len(name)-3] // Remove .md
-		} else if strings.HasSuffix(path, ".package.json") {
-			resourceType = "package"
-			name = strings.TrimSuffix(name, ".package.json")
-		} else {
-			resourceType = "skill"
-		}
-
-		fmt.Printf("✓ Added %s '%s'\n", resourceType, name)
-	}
-
-	// Print skipped resources
-	for _, path := range result.Skipped {
-		name := filepath.Base(path)
-		if filepath.Ext(path) == ".md" {
-			name = name[:len(name)-3]
-		} else if strings.HasSuffix(path, ".package.json") {
-			name = strings.TrimSuffix(name, ".package.json")
-		}
-		fmt.Printf("⊘ Skipped '%s' (already exists)\n", name)
-	}
-
-	// Print failed resources
-	for _, fail := range result.Failed {
-		name := filepath.Base(fail.Path)
-		if filepath.Ext(fail.Path) == ".md" {
-			name = name[:len(name)-3]
-		} else if strings.HasSuffix(fail.Path, ".package.json") {
-			name = strings.TrimSuffix(name, ".package.json")
-		}
-		fmt.Printf("✗ Failed '%s': %s\n", name, fail.Message)
-	}
-
-	// Print summary
-	fmt.Println()
-	fmt.Printf("Summary: %d added, %d skipped, %d failed\n",
-		len(result.Added), len(result.Skipped), len(result.Failed))
 }
 
 // printDiscoveryErrors prints discovery errors with helpful suggestions

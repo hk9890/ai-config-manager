@@ -695,39 +695,15 @@ func displayUpdateSummary(results []UpdateResult) {
 		format = output.Table
 	}
 
-	// For structured formats, convert to BulkOperationResult
-	if format != output.Table {
-		bulkResult := convertUpdateResultsToBulkResult(results)
-		if err := output.FormatBulkResult(bulkResult, format); err != nil {
-			fmt.Fprintf(os.Stderr, "Error formatting output: %v\n", err)
-		}
+	// Convert to BulkOperationResult and use formatter
+	bulkResult := convertUpdateResultsToBulkResult(results)
+	if err := output.FormatBulkResult(bulkResult, format); err != nil {
+		fmt.Fprintf(os.Stderr, "Error formatting output: %v\n", err)
 		return
 	}
 
-	// Original human-readable output (table format)
-	successCount := 0
-	failCount := 0
-	skipCount := 0
-
-	// Count results (don't display individual results - already shown inline)
-	for _, result := range results {
-		if result.Success {
-			successCount++
-		} else if result.Skipped {
-			skipCount++
-		} else {
-			failCount++
-		}
-	}
-
-	// Display summary
-	if updateDryRunFlag {
-		fmt.Printf("Summary (dry run): %d would be updated, %d would fail, %d would be skipped\n", successCount, failCount, skipCount)
-	} else {
-		fmt.Printf("Summary: %d updated, %d failed, %d skipped\n", successCount, failCount, skipCount)
-	}
-
 	// Display hint if there are skipped resources
+	skipCount := len(bulkResult.Skipped)
 	if skipCount > 0 {
 		fmt.Println()
 		fmt.Println("Hint: Run 'aimgr repo prune' to clean up orphaned metadata for missing source paths")
