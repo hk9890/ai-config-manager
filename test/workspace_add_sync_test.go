@@ -266,10 +266,10 @@ func TestWorkspaceCacheUpdateAfterAdd(t *testing.T) {
 // TestWorkspaceCacheWithLocalSource verifies local sources don't create cache
 func TestWorkspaceCacheWithLocalSource(t *testing.T) {
 	repoDir := t.TempDir()
-	
+
 	// Create a test local source directory
 	localSource := t.TempDir()
-	
+
 	// Parse local source (should not create cache)
 	parsed, err := source.ParseSource(localSource)
 	if err != nil {
