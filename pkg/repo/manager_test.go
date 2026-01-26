@@ -518,7 +518,7 @@ func TestAddBulk(t *testing.T) {
 			wantAddedCount:   0,
 			wantSkippedCount: 0,
 			wantFailedCount:  1,
-			wantError:        true,
+			wantError:        false, // Now continues processing, collects in Failed
 		},
 		{
 			name: "dry run doesn't actually import",
@@ -544,7 +544,7 @@ func TestAddBulk(t *testing.T) {
 			wantAddedCount:   0,
 			wantSkippedCount: 0,
 			wantFailedCount:  1,
-			wantError:        true,
+			wantError:        false, // Now continues processing, collects in Failed
 		},
 	}
 
