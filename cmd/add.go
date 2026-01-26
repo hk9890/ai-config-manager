@@ -9,6 +9,7 @@ import (
 
 	"github.com/hk9890/ai-config-manager/pkg/discovery"
 	"github.com/hk9890/ai-config-manager/pkg/marketplace"
+	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -24,6 +25,7 @@ var (
 	skipExistingFlag bool
 	dryRunFlag       bool
 	filterFlag       string
+	addFormatFlag    string
 )
 
 // addCmd represents the add command
@@ -114,6 +116,7 @@ func init() {
 	addCmd.Flags().BoolVar(&skipExistingFlag, "skip-existing", false, "Skip conflicts silently")
 	addCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without importing")
 	addCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
+	addCmd.Flags().StringVar(&addFormatFlag, "format", "table", "Output format: table, json, yaml")
 }
 
 // Helper functions for bulk add integration
@@ -376,13 +379,13 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		return addSingleResource(localPath, manager)
 	}
 
-	// Discover all resources
+	// Discover all resources (with error collection)
 	commands, err := discovery.DiscoverCommands(localPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to discover commands: %w", err)
 	}
 
-	skills, err := discovery.DiscoverSkills(localPath, "")
+	skills, skillErrors, err := discovery.DiscoverSkillsWithErrors(localPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to discover skills: %w", err)
 	}
@@ -396,6 +399,10 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 	if err != nil {
 		return fmt.Errorf("failed to discover packages: %w", err)
 	}
+
+	// Collect all discovery errors
+	var discoveryErrors []discovery.DiscoveryError
+	discoveryErrors = append(discoveryErrors, skillErrors...)
 
 	// Discover marketplace.json
 	marketplaceConfig, marketplacePath, err := marketplace.DiscoverMarketplace(localPath, "")
@@ -553,6 +560,12 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 				continue
 			}
 		}
+	}
+
+	// Print discovery errors if any
+	if len(discoveryErrors) > 0 {
+		printDiscoveryErrors(discoveryErrors)
+		fmt.Println()
 	}
 
 	// Print results
@@ -1096,6 +1109,24 @@ func formatGitHubShortURL(parsed *source.ParsedSource) string {
 
 // printImportResults prints a formatted summary of import results
 func printImportResults(result *repo.BulkImportResult) {
+	// Parse format flag
+	format, err := output.ParseFormat(addFormatFlag)
+	if err != nil {
+		// Fall back to default human-readable output if format is invalid
+		fmt.Fprintf(os.Stderr, "Warning: %v, using table format\n", err)
+		format = output.Table
+	}
+
+	// Use structured output formatter for non-table formats
+	if format != output.Table {
+		bulkResult := output.FromBulkImportResult(result)
+		if err := output.FormatBulkResult(bulkResult, format); err != nil {
+			fmt.Fprintf(os.Stderr, "Error formatting output: %v\n", err)
+		}
+		return
+	}
+
+	// Original human-readable output (table format)
 	// Print added resources
 	for _, path := range result.Added {
 		resourceType := "resource"
@@ -1147,4 +1178,30 @@ func printImportResults(result *repo.BulkImportResult) {
 	fmt.Println()
 	fmt.Printf("Summary: %d added, %d skipped, %d failed\n",
 		len(result.Added), len(result.Skipped), len(result.Failed))
+}
+
+// printDiscoveryErrors prints discovery errors with helpful suggestions
+func printDiscoveryErrors(errors []discovery.DiscoveryError) {
+	if len(errors) == 0 {
+		return
+	}
+
+	fmt.Printf("⚠ Discovery Issues (%d):\n", len(errors))
+	fmt.Println()
+
+	for _, err := range errors {
+		// Extract just the directory/file name for display
+		shortPath := filepath.Base(err.Path)
+		if filepath.Base(filepath.Dir(err.Path)) != "." {
+			// Include parent directory for context
+			shortPath = filepath.Join(filepath.Base(filepath.Dir(err.Path)), filepath.Base(err.Path))
+		}
+
+		fmt.Printf("  ✗ %s\n", shortPath)
+		fmt.Printf("    Error: %v\n", err.Error)
+		fmt.Println()
+	}
+
+	fmt.Println("  Tip: These resources were skipped due to validation errors.")
+	fmt.Println("       Fix the issues above and re-run the import.")
 }

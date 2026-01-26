@@ -12,6 +12,7 @@ import (
 var (
 	syncSkipExistingFlag bool
 	syncDryRunFlag       bool
+	syncFormatFlag       string
 )
 
 // syncCmd represents the sync command
@@ -63,6 +64,7 @@ func init() {
 	// Add flags
 	syncCmd.Flags().BoolVar(&syncSkipExistingFlag, "skip-existing", false, "Skip conflicts silently")
 	syncCmd.Flags().BoolVar(&syncDryRunFlag, "dry-run", false, "Preview without importing")
+	syncCmd.Flags().StringVar(&syncFormatFlag, "format", "table", "Output format: table, json, yaml")
 }
 
 // runSync executes the sync command
@@ -98,21 +100,24 @@ func runSync(cmd *cobra.Command, args []string) error {
 	sourcesProcessed := 0
 	sourcesFailed := 0
 
-	// Set forceFlag and dryRunFlag for the duration of the sync operation
+	// Set flags for the duration of the sync operation
 	originalForceFlag := forceFlag
 	originalDryRunFlag := dryRunFlag
 	originalSkipExistingFlag := skipExistingFlag
+	originalAddFormatFlag := addFormatFlag
 
 	// Default to force=true unless --skip-existing specified
 	forceFlag = !syncSkipExistingFlag
 	skipExistingFlag = syncSkipExistingFlag
 	dryRunFlag = syncDryRunFlag
+	addFormatFlag = syncFormatFlag
 
 	// Restore original flags when done
 	defer func() {
 		forceFlag = originalForceFlag
 		dryRunFlag = originalDryRunFlag
 		skipExistingFlag = originalSkipExistingFlag
+		addFormatFlag = originalAddFormatFlag
 	}()
 
 	// Process each source

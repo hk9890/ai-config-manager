@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/source"
@@ -18,6 +19,7 @@ import (
 var (
 	updateForceFlag  bool
 	updateDryRunFlag bool
+	updateFormatFlag string
 )
 
 // UpdateResult tracks the results of update operations
@@ -202,6 +204,7 @@ func init() {
 	// Add flags to update command
 	repoUpdateCmd.Flags().BoolVar(&updateForceFlag, "force", false, "Force update, overwriting local changes")
 	repoUpdateCmd.Flags().BoolVar(&updateDryRunFlag, "dry-run", false, "Preview updates without making changes")
+	repoUpdateCmd.Flags().StringVar(&updateFormatFlag, "format", "table", "Output format: table, json, yaml")
 }
 
 // updateResourceTypeWithProgress updates all resources of a specific type with progress tracking
@@ -684,6 +687,24 @@ func displayUpdateSummary(results []UpdateResult) {
 		return
 	}
 
+	// Parse format flag
+	format, err := output.ParseFormat(updateFormatFlag)
+	if err != nil {
+		// Fall back to default human-readable output if format is invalid
+		fmt.Fprintf(os.Stderr, "Warning: %v, using table format\n", err)
+		format = output.Table
+	}
+
+	// For structured formats, convert to BulkOperationResult
+	if format != output.Table {
+		bulkResult := convertUpdateResultsToBulkResult(results)
+		if err := output.FormatBulkResult(bulkResult, format); err != nil {
+			fmt.Fprintf(os.Stderr, "Error formatting output: %v\n", err)
+		}
+		return
+	}
+
+	// Original human-readable output (table format)
 	successCount := 0
 	failCount := 0
 	skipCount := 0
@@ -711,4 +732,46 @@ func displayUpdateSummary(results []UpdateResult) {
 		fmt.Println()
 		fmt.Println("Hint: Run 'aimgr repo prune' to clean up orphaned metadata for missing source paths")
 	}
+}
+
+// convertUpdateResultsToBulkResult converts UpdateResult slice to BulkOperationResult
+func convertUpdateResultsToBulkResult(results []UpdateResult) *output.BulkOperationResult {
+	bulkResult := &output.BulkOperationResult{
+		Added:        []output.ResourceResult{},
+		Skipped:      []output.ResourceResult{},
+		Failed:       []output.ResourceResult{},
+		CommandCount: 0,
+		SkillCount:   0,
+		AgentCount:   0,
+		PackageCount: 0,
+	}
+
+	for _, result := range results {
+		resResult := output.ResourceResult{
+			Name:    result.Name,
+			Type:    string(result.Type),
+			Message: result.Message,
+		}
+
+		if result.Success {
+			bulkResult.Added = append(bulkResult.Added, resResult)
+			// Update counts
+			switch result.Type {
+			case resource.Command:
+				bulkResult.CommandCount++
+			case resource.Skill:
+				bulkResult.SkillCount++
+			case resource.Agent:
+				bulkResult.AgentCount++
+			case resource.PackageType:
+				bulkResult.PackageCount++
+			}
+		} else if result.Skipped {
+			bulkResult.Skipped = append(bulkResult.Skipped, resResult)
+		} else {
+			bulkResult.Failed = append(bulkResult.Failed, resResult)
+		}
+	}
+
+	return bulkResult
 }
