@@ -152,6 +152,11 @@ func verifyRepository(manager *repo.Manager, fix bool) (*VerifyResult, error) {
 
 	// Check 1: Resources without metadata
 	for _, res := range allResources {
+		// Skip packages - they use PackageMetadata and are validated separately
+		if res.Type == resource.PackageType {
+			continue
+		}
+
 		meta, err := manager.GetMetadata(res.Name, res.Type)
 		if err != nil {
 			// Metadata doesn't exist
@@ -372,8 +377,12 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		hasIssues = true
 		fmt.Printf("✗ Type mismatches: %d\n", len(result.TypeMismatches))
 		for _, mismatch := range result.TypeMismatches {
+			metaTypeStr := string(mismatch.MetadataType)
+			if metaTypeStr == "" {
+				metaTypeStr = "(empty - metadata may be corrupted)"
+			}
 			fmt.Printf("  - %s: resource is %s, metadata says %s\n",
-				mismatch.Name, mismatch.ResourceType, mismatch.MetadataType)
+				mismatch.Name, mismatch.ResourceType, metaTypeStr)
 			fmt.Printf("    Resource: %s\n", mismatch.ResourcePath)
 			fmt.Printf("    Metadata: %s\n", mismatch.MetadataPath)
 		}
