@@ -173,7 +173,7 @@ Examples:
 			}
 
 			// Install package
-			return installPackage(packageName, installer, manager)
+			return installPackage(packageName, projectPath, installer, manager)
 		}
 
 		// Get project path (current directory or flag)
@@ -362,10 +362,39 @@ func installFromManifest(cmd *cobra.Command) error {
 	// Track results
 	var results []installResult
 
-	// Process each resource
+	// Process each resource - expand packages first
 	for _, resourceRef := range m.Resources {
-		result := processInstall(resourceRef, installer, manager)
-		results = append(results, result)
+		// Check if this is a package reference
+		if strings.HasPrefix(resourceRef, "package/") {
+			packageName := strings.TrimPrefix(resourceRef, "package/")
+			
+			// Load package
+			repoPath := manager.GetRepoPath()
+			pkgPath := resource.GetPackagePath(packageName, repoPath)
+			pkg, err := resource.LoadPackage(pkgPath)
+			if err != nil {
+				// Package not found - record error
+				result := installResult{
+					name:    resourceRef,
+					success: false,
+					message: fmt.Sprintf("package '%s' not found in repository", packageName),
+				}
+				results = append(results, result)
+				continue
+			}
+			
+			fmt.Printf("Expanding package '%s' (%d resources)...\n", packageName, len(pkg.Resources))
+			
+			// Install each resource from the package
+			for _, pkgResourceRef := range pkg.Resources {
+				result := processInstall(pkgResourceRef, installer, manager)
+				results = append(results, result)
+			}
+		} else {
+			// Normal resource (not a package)
+			result := processInstall(resourceRef, installer, manager)
+			results = append(results, result)
+		}
 	}
 
 	// Print results
@@ -533,7 +562,7 @@ func init() {
 }
 
 // installPackage installs all resources from a package
-func installPackage(packageName string, installer *install.Installer, manager *repo.Manager) error {
+func installPackage(packageName string, projectPath string, installer *install.Installer, manager *repo.Manager) error {
 	repoPath := manager.GetRepoPath()
 	pkgPath := resource.GetPackagePath(packageName, repoPath)
 
@@ -622,6 +651,14 @@ func installPackage(packageName string, installer *install.Installer, manager *r
 		return fmt.Errorf("package installation completed with errors")
 	}
 
+
+	// Update manifest with package reference if successful installations
+	if installed > 0 {
+		packageRef := fmt.Sprintf("package/%s", pkg.Name)
+		if err := updateManifest(projectPath, packageRef); err != nil {
+			fmt.Printf("⚠ Warning: failed to update manifest: %v\n", err)
+		}
+	}
 	return nil
 
 }
