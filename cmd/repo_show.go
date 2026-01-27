@@ -28,7 +28,8 @@ Supports glob patterns: *, ?, [abc], {a,b}
 
 When multiple resources match, shows a summary list.
 When a single resource matches, shows detailed information.`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeResourceArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pattern := args[0]
 

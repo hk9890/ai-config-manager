@@ -2,8 +2,8 @@ package resource
 
 import (
 	"os"
-	"strings"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -111,10 +111,10 @@ func TestWriteCommand(t *testing.T) {
 // TestLoadCommandWithBase tests the LoadCommandWithBase function
 func TestLoadCommandWithBase(t *testing.T) {
 	tests := []struct {
-		name             string
-		setupPath        string   // Path structure to create
-		basePath         string   // Base path for relative calculation
-		expectedRelPath  string   // Expected RelativePath
+		name            string
+		setupPath       string // Path structure to create
+		basePath        string // Base path for relative calculation
+		expectedRelPath string // Expected RelativePath
 	}{
 		{
 			name:            "nested command with base path",
@@ -178,8 +178,11 @@ description: Test command
 				t.Errorf("RelativePath mismatch. Got: %s, Want: %s", res.RelativePath, tt.expectedRelPath)
 			}
 
-			// Verify name is still just the filename
-			expectedName := strings.TrimSuffix(filepath.Base(fullPath), ".md")
+			// Verify name matches RelativePath when basePath is provided
+			expectedName := tt.expectedRelPath
+			if expectedName == "" {
+				expectedName = strings.TrimSuffix(filepath.Base(fullPath), ".md")
+			}
 			if res.Name != expectedName {
 				t.Errorf("Name mismatch. Got: %s, Want: %s", res.Name, expectedName)
 			}
@@ -191,7 +194,7 @@ description: Test command
 func TestLoadCommandWithBase_InvalidBasePath(t *testing.T) {
 	tmpDir := t.TempDir()
 	cmdPath := filepath.Join(tmpDir, "test.md")
-	
+
 	content := `---
 description: Test
 ---

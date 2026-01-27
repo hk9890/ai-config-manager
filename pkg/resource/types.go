@@ -37,25 +37,49 @@ var (
 	// nameRegex matches valid resource names: lowercase alphanumeric + hyphens
 	// Must not start/end with hyphen, no consecutive hyphens
 	nameRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+	// namePartRegex matches valid resource name parts (for nested paths)
+	// Each part separated by / must be valid
+	namePartRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 )
 
 // ValidateName validates a resource name according to agentskills.io spec
 // Rules:
-// - 1-64 characters
-// - Lowercase alphanumeric + hyphens only
+// - 1-64 characters (per segment for nested paths)
+// - Lowercase alphanumeric + hyphens only (+ slashes for nested paths)
 // - Cannot start or end with hyphen
 // - No consecutive hyphens
+// - For nested paths (containing /), each segment must be valid
 func ValidateName(name string) error {
 	if len(name) == 0 {
 		return fmt.Errorf("name cannot be empty")
-	}
-	if len(name) > 64 {
-		return fmt.Errorf("name too long (%d chars, max 64)", len(name))
 	}
 
 	// Check for consecutive hyphens
 	if strings.Contains(name, "--") {
 		return fmt.Errorf("name cannot contain consecutive hyphens")
+	}
+
+	// If name contains slashes, validate each part separately
+	if strings.Contains(name, "/") {
+		parts := strings.Split(name, "/")
+		for i, part := range parts {
+			if len(part) == 0 {
+				return fmt.Errorf("empty segment in path at position %d", i)
+			}
+			if len(part) > 64 {
+				return fmt.Errorf("segment '%s' too long (%d chars, max 64)", part, len(part))
+			}
+			if !namePartRegex.MatchString(part) {
+				return fmt.Errorf("segment '%s' invalid: must be lowercase alphanumeric + hyphens, cannot start/end with hyphen", part)
+			}
+		}
+		return nil
+	}
+
+	// Single-part name (no slashes)
+	if len(name) > 64 {
+		return fmt.Errorf("name too long (%d chars, max 64)", len(name))
 	}
 
 	if !nameRegex.MatchString(name) {

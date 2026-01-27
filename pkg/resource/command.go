@@ -51,13 +51,19 @@ func LoadCommandWithBase(filePath string, basePath string) (*Resource, error) {
 		// Clean paths for consistent comparison
 		cleanFilePath := filepath.Clean(filePath)
 		cleanBasePath := filepath.Clean(basePath)
-		
+
 		// Get relative path from basePath to filePath
 		relPath, err := filepath.Rel(cleanBasePath, cleanFilePath)
 		if err == nil && !strings.HasPrefix(relPath, "..") {
 			// Remove the .md extension from relative path
 			relativePath = strings.TrimSuffix(relPath, ".md")
 		}
+	}
+
+	// Use relativePath as name if available (for nested commands)
+	// Otherwise fallback to basename (for backward compatibility)
+	if relativePath != "" {
+		name = relativePath
 	}
 
 	// Build resource
@@ -113,11 +119,17 @@ func LoadCommandResourceWithBase(filePath string, basePath string) (*CommandReso
 	if basePath != "" {
 		cleanFilePath := filepath.Clean(filePath)
 		cleanBasePath := filepath.Clean(basePath)
-		
+
 		relPath, err := filepath.Rel(cleanBasePath, cleanFilePath)
 		if err == nil && !strings.HasPrefix(relPath, "..") {
 			relativePath = strings.TrimSuffix(relPath, ".md")
 		}
+	}
+
+	// Use relativePath as name if available (for nested commands)
+	// Otherwise fallback to basename (for backward compatibility)
+	if relativePath != "" {
+		name = relativePath
 	}
 
 	// Build command resource
