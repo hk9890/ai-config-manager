@@ -17,7 +17,15 @@ type CommandResource struct {
 }
 
 // LoadCommand loads a command resource from a markdown file
+// For backward compatibility, this does not calculate RelativePath
 func LoadCommand(filePath string) (*Resource, error) {
+	return LoadCommandWithBase(filePath, "")
+}
+
+// LoadCommandWithBase loads a command resource and calculates RelativePath if basePath is provided
+// basePath should be the directory to calculate relative paths from (e.g., "commands/")
+// If basePath is empty, RelativePath will not be set (backward compatibility)
+func LoadCommandWithBase(filePath string, basePath string) (*Resource, error) {
 	// Validate it's a .md file
 	if filepath.Ext(filePath) != ".md" {
 		return nil, WrapLoadError(filePath, Command, fmt.Errorf("command must be a .md file"))
@@ -37,16 +45,32 @@ func LoadCommand(filePath string) (*Resource, error) {
 		return nil, NewValidationError(filePath, "command", name, "frontmatter", err)
 	}
 
+	// Calculate relative path if basePath is provided
+	var relativePath string
+	if basePath != "" {
+		// Clean paths for consistent comparison
+		cleanFilePath := filepath.Clean(filePath)
+		cleanBasePath := filepath.Clean(basePath)
+		
+		// Get relative path from basePath to filePath
+		relPath, err := filepath.Rel(cleanBasePath, cleanFilePath)
+		if err == nil && !strings.HasPrefix(relPath, "..") {
+			// Remove the .md extension from relative path
+			relativePath = strings.TrimSuffix(relPath, ".md")
+		}
+	}
+
 	// Build resource
 	resource := &Resource{
-		Name:        name,
-		Type:        Command,
-		Description: frontmatter.GetString("description"),
-		Version:     frontmatter.GetString("version"),
-		Author:      frontmatter.GetString("author"),
-		License:     frontmatter.GetString("license"),
-		Path:        filePath,
-		Metadata:    frontmatter.GetMap("metadata"),
+		Name:         name,
+		Type:         Command,
+		Description:  frontmatter.GetString("description"),
+		Version:      frontmatter.GetString("version"),
+		Author:       frontmatter.GetString("author"),
+		License:      frontmatter.GetString("license"),
+		Path:         filePath,
+		RelativePath: relativePath,
+		Metadata:     frontmatter.GetMap("metadata"),
 	}
 
 	// Validate
@@ -58,7 +82,13 @@ func LoadCommand(filePath string) (*Resource, error) {
 }
 
 // LoadCommandResource loads a command resource with full details including content
+// For backward compatibility, this does not calculate RelativePath
 func LoadCommandResource(filePath string) (*CommandResource, error) {
+	return LoadCommandResourceWithBase(filePath, "")
+}
+
+// LoadCommandResourceWithBase loads a command resource with full details and calculates RelativePath
+func LoadCommandResourceWithBase(filePath string, basePath string) (*CommandResource, error) {
 	// Validate it's a .md file
 	if filepath.Ext(filePath) != ".md" {
 		return nil, fmt.Errorf("command must be a .md file")
@@ -78,17 +108,30 @@ func LoadCommandResource(filePath string) (*CommandResource, error) {
 	// Extract name from filename (without .md extension)
 	name := strings.TrimSuffix(filepath.Base(filePath), ".md")
 
+	// Calculate relative path if basePath is provided
+	var relativePath string
+	if basePath != "" {
+		cleanFilePath := filepath.Clean(filePath)
+		cleanBasePath := filepath.Clean(basePath)
+		
+		relPath, err := filepath.Rel(cleanBasePath, cleanFilePath)
+		if err == nil && !strings.HasPrefix(relPath, "..") {
+			relativePath = strings.TrimSuffix(relPath, ".md")
+		}
+	}
+
 	// Build command resource
 	cmd := &CommandResource{
 		Resource: Resource{
-			Name:        name,
-			Type:        Command,
-			Description: frontmatter.GetString("description"),
-			Version:     frontmatter.GetString("version"),
-			Author:      frontmatter.GetString("author"),
-			License:     frontmatter.GetString("license"),
-			Path:        filePath,
-			Metadata:    frontmatter.GetMap("metadata"),
+			Name:         name,
+			Type:         Command,
+			Description:  frontmatter.GetString("description"),
+			Version:      frontmatter.GetString("version"),
+			Author:       frontmatter.GetString("author"),
+			License:      frontmatter.GetString("license"),
+			Path:         filePath,
+			RelativePath: relativePath,
+			Metadata:     frontmatter.GetMap("metadata"),
 		},
 		Agent:        frontmatter.GetString("agent"),
 		Model:        frontmatter.GetString("model"),

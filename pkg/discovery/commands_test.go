@@ -240,7 +240,7 @@ func TestDeduplicateCommands(t *testing.T) {
 func TestSearchDirectory(t *testing.T) {
 	basePath := filepath.Join("testdata", "commands-repo", "commands")
 
-	commands, err := searchDirectory(basePath)
+	commands, err := searchDirectory(basePath, basePath)
 	if err != nil {
 		t.Fatalf("searchDirectory failed: %v", err)
 	}

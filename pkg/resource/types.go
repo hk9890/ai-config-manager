@@ -22,14 +22,15 @@ const (
 
 // Resource represents an AI resource (command or skill)
 type Resource struct {
-	Name        string            `yaml:"name"`
-	Type        ResourceType      `yaml:"type"`
-	Description string            `yaml:"description"`
-	Version     string            `yaml:"version,omitempty"`
-	Author      string            `yaml:"author,omitempty"`
-	License     string            `yaml:"license,omitempty"`
-	Path        string            `yaml:"path"`
-	Metadata    map[string]string `yaml:"metadata,omitempty"`
+	Name         string            `yaml:"name"`
+	Type         ResourceType      `yaml:"type"`
+	Description  string            `yaml:"description"`
+	Version      string            `yaml:"version,omitempty"`
+	Author       string            `yaml:"author,omitempty"`
+	License      string            `yaml:"license,omitempty"`
+	Path         string            `yaml:"path"`
+	RelativePath string            `yaml:"relative-path,omitempty"` // Relative path from base directory (e.g., "api/deploy" for commands/api/deploy.md)
+	Metadata     map[string]string `yaml:"metadata,omitempty"`
 }
 
 var (

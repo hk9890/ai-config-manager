@@ -12,7 +12,8 @@ import (
 const maxDepth = 5
 
 // DiscoverCommands discovers command resources (.md files) in a repository
-// It searches in priority locations first, then falls back to recursive search
+// It searches in priority locations first, then also does recursive search
+// to find commands outside of priority directories
 func DiscoverCommands(basePath string, subpath string) ([]*resource.Resource, error) {
 	searchPath := basePath
 	if subpath != "" {
@@ -50,19 +51,23 @@ func DiscoverCommands(basePath string, subpath string) ([]*resource.Resource, er
 		return nil, fmt.Errorf("path is not a directory: %s", searchPath)
 	}
 
-	// Try priority locations first
-	commands, err := searchPriorityLocations(searchPath)
-	if err == nil && len(commands) > 0 {
-		return deduplicateCommands(commands), nil
+	var allCommands []*resource.Resource
+
+	// Search priority locations
+	priorityCommands, err := searchPriorityLocations(searchPath)
+	if err == nil && len(priorityCommands) > 0 {
+		allCommands = append(allCommands, priorityCommands...)
 	}
 
-	// Fall back to recursive search (max depth 5)
-	commands, err = recursiveSearchCommands(searchPath, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search for commands: %w", err)
+	// Also do recursive search to find commands outside priority directories
+	// (e.g., in nested/ or other top-level directories)
+	recursiveCommands, err := recursiveSearchCommands(searchPath, 0, searchPath)
+	if err == nil && len(recursiveCommands) > 0 {
+		allCommands = append(allCommands, recursiveCommands...)
 	}
 
-	return deduplicateCommands(commands), nil
+	// Return deduplicated results (may be empty)
+	return deduplicateCommands(allCommands), nil
 }
 
 // searchPriorityLocations searches standard command directories RECURSIVELY
@@ -81,7 +86,8 @@ func searchPriorityLocations(basePath string) ([]*resource.Resource, error) {
 		}
 
 		// Recursively search within priority directory (starting at depth 0)
-		commands, err := searchCommandsInDirectory(dir, 0)
+		// Use the priority directory as the basePath for relative path calculation
+		commands, err := searchCommandsInDirectory(dir, 0, dir)
 		if err != nil {
 			// Continue searching other directories even if one fails
 			continue
@@ -95,7 +101,8 @@ func searchPriorityLocations(basePath string) ([]*resource.Resource, error) {
 
 // searchCommandsInDirectory recursively searches for command .md files within a directory
 // This is used for priority locations to find commands at any depth within that location
-func searchCommandsInDirectory(dir string, depth int) ([]*resource.Resource, error) {
+// basePath is used to calculate relative paths for commands
+func searchCommandsInDirectory(dir string, depth int, basePath string) ([]*resource.Resource, error) {
 	if depth > maxDepth {
 		return nil, nil
 	}
@@ -112,7 +119,7 @@ func searchCommandsInDirectory(dir string, depth int) ([]*resource.Resource, err
 
 		if entry.IsDir() {
 			// Recursively search subdirectories
-			subCommands, err := searchCommandsInDirectory(entryPath, depth+1)
+			subCommands, err := searchCommandsInDirectory(entryPath, depth+1, basePath)
 			if err == nil {
 				commands = append(commands, subCommands...)
 			}
@@ -129,8 +136,8 @@ func searchCommandsInDirectory(dir string, depth int) ([]*resource.Resource, err
 			continue
 		}
 
-		// Try to load as command
-		cmd, err := resource.LoadCommand(entryPath)
+		// Try to load as command with relative path calculation
+		cmd, err := resource.LoadCommandWithBase(entryPath, basePath)
 		if err != nil {
 			// Invalid command file, skip it
 			continue
@@ -143,7 +150,8 @@ func searchCommandsInDirectory(dir string, depth int) ([]*resource.Resource, err
 }
 
 // recursiveSearchCommands performs a recursive search for command files
-func recursiveSearchCommands(basePath string, depth int) ([]*resource.Resource, error) {
+// basePath is used to calculate relative paths
+func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]*resource.Resource, error) {
 	if depth > maxDepth {
 		return nil, nil
 	}
@@ -151,13 +159,13 @@ func recursiveSearchCommands(basePath string, depth int) ([]*resource.Resource, 
 	var allCommands []*resource.Resource
 
 	// Search current directory
-	commands, err := searchDirectory(basePath)
+	commands, err := searchDirectory(currentPath, basePath)
 	if err == nil {
 		allCommands = append(allCommands, commands...)
 	}
 
 	// Recursively search subdirectories
-	entries, err := os.ReadDir(basePath)
+	entries, err := os.ReadDir(currentPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
@@ -177,8 +185,13 @@ func recursiveSearchCommands(basePath string, depth int) ([]*resource.Resource, 
 			continue
 		}
 
-		subdirPath := filepath.Join(basePath, entry.Name())
-		subCommands, err := recursiveSearchCommands(subdirPath, depth+1)
+		// Skip priority command directories to avoid duplicates
+		if entry.Name() == "commands" {
+			continue
+		}
+
+		subdirPath := filepath.Join(currentPath, entry.Name())
+		subCommands, err := recursiveSearchCommands(subdirPath, depth+1, basePath)
 		if err == nil {
 			allCommands = append(allCommands, subCommands...)
 		}
@@ -188,7 +201,8 @@ func recursiveSearchCommands(basePath string, depth int) ([]*resource.Resource, 
 }
 
 // searchDirectory searches a single directory for command files
-func searchDirectory(dir string) ([]*resource.Resource, error) {
+// basePath is used to calculate relative paths
+func searchDirectory(dir string, basePath string) ([]*resource.Resource, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory: %w", err)
@@ -213,8 +227,8 @@ func searchDirectory(dir string) ([]*resource.Resource, error) {
 
 		filePath := filepath.Join(dir, entry.Name())
 
-		// Try to load as command
-		cmd, err := resource.LoadCommand(filePath)
+		// Try to load as command with relative path calculation
+		cmd, err := resource.LoadCommandWithBase(filePath, basePath)
 		if err != nil {
 			// Invalid command file, skip it
 			continue

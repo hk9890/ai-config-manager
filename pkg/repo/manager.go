@@ -89,16 +89,63 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 		return err
 	}
 
-	// Validate and load the command
-	res, err := resource.LoadCommand(sourcePath)
+	// Validate and load the command with base path for relative path calculation
+	// Strategy: Look for "commands" directory ancestor, or use source's parent dir
+	basePath := ""
+	cleanPath := filepath.Clean(sourcePath)
+	
+	// First try to find a "commands" directory in the path
+	if strings.Contains(cleanPath, "commands") {
+		parts := strings.Split(cleanPath, string(filepath.Separator))
+		for i, part := range parts {
+			if part == "commands" {
+				basePath = filepath.Join(parts[:i+1]...)
+				break
+			}
+		}
+	}
+	
+	// If no "commands" directory found, try to find source repo root
+	// by looking for common markers (.git, .claude, etc.) or use file's grandparent
+	if basePath == "" {
+		dir := filepath.Dir(cleanPath)
+		// Walk up to find a suitable base
+		for dir != "." && dir != "/" {
+			// Check for markers of a repo root
+			if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+				basePath = dir
+				break
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".claude")); err == nil {
+				basePath = dir
+				break
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".opencode")); err == nil {
+				basePath = dir
+				break
+			}
+			dir = filepath.Dir(dir)
+			// Don't go too far up
+			if len(strings.Split(dir, string(filepath.Separator))) < 2 {
+				break
+			}
+		}
+	}
+	
+	res, err := resource.LoadCommandWithBase(sourcePath, basePath)
 	if err != nil {
 		return fmt.Errorf("failed to load command: %w", err)
 	}
 
-	// Check for conflicts
-	destPath := m.GetPath(res.Name, resource.Command)
+	// Check for conflicts using the resource-aware path
+	destPath := m.GetPathForResource(res)
 	if _, err := os.Stat(destPath); err == nil {
 		return fmt.Errorf("command '%s' already exists in repository", res.Name)
+	}
+
+	// Create parent directories if needed (for nested structure)
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return fmt.Errorf("failed to create parent directories: %w", err)
 	}
 
 	// Copy the file
@@ -303,23 +350,28 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 	if resourceType == nil || *resourceType == resource.Command {
 		commandsPath := filepath.Join(m.repoPath, "commands")
 		if _, err := os.Stat(commandsPath); err == nil {
-			entries, err := os.ReadDir(commandsPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read commands directory: %w", err)
-			}
-
-			for _, entry := range entries {
-				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
-					continue
+			// Use filepath.Walk to find commands recursively (supports nested structure)
+			err := filepath.Walk(commandsPath, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				
+				// Skip directories and non-.md files
+				if info.IsDir() || !strings.HasSuffix(info.Name(), ".md") {
+					return nil
 				}
 
-				cmdPath := filepath.Join(commandsPath, entry.Name())
-				res, err := resource.LoadCommand(cmdPath)
+				// Load command with base path to calculate RelativePath
+				res, err := resource.LoadCommandWithBase(path, commandsPath)
 				if err != nil {
 					// Skip invalid commands
-					continue
+					return nil
 				}
 				resources = append(resources, *res)
+				return nil
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to walk commands directory: %w", err)
 			}
 		}
 	}
@@ -502,6 +554,7 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 }
 
 // GetPath returns the full path to a resource in the repository
+// For backward compatibility - does not handle nested paths
 func (m *Manager) GetPath(name string, resourceType resource.ResourceType) string {
 	switch resourceType {
 	case resource.Command:
@@ -510,6 +563,23 @@ func (m *Manager) GetPath(name string, resourceType resource.ResourceType) strin
 		return filepath.Join(m.repoPath, "skills", name)
 	case resource.Agent:
 		return filepath.Join(m.repoPath, "agents", name+".md")
+	default:
+		return ""
+	}
+}
+
+// GetPathForResource returns the full path for a resource, using RelativePath if available
+func (m *Manager) GetPathForResource(res *resource.Resource) string {
+	switch res.Type {
+	case resource.Command:
+		if res.RelativePath != "" {
+			return filepath.Join(m.repoPath, "commands", res.RelativePath+".md")
+		}
+		return filepath.Join(m.repoPath, "commands", res.Name+".md")
+	case resource.Skill:
+		return filepath.Join(m.repoPath, "skills", res.Name)
+	case resource.Agent:
+		return filepath.Join(m.repoPath, "agents", res.Name+".md")
 	default:
 		return ""
 	}
