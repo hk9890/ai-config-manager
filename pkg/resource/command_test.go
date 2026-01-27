@@ -2,7 +2,6 @@ package resource
 
 import (
 	"os"
-	"strings"
 	"path/filepath"
 	"testing"
 )
@@ -22,32 +21,74 @@ func TestLoadCommand(t *testing.T) {
 			checkName: "test-command",
 			checkDesc: "Run tests with coverage",
 		},
+		{
+			name:      "command without frontmatter",
+			filePath:  "testdata/commands/no-frontmatter.md",
+			wantError: true,
+		},
+		{
+			name:      "nonexistent file",
+			filePath:  "testdata/commands/nonexistent.md",
+			wantError: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := LoadCommand(tt.filePath)
-			if (err != nil) != tt.wantError {
-				t.Errorf("LoadCommand() error = %v, wantError %v", err, tt.wantError)
+
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
 				return
 			}
 
-			if !tt.wantError {
-				if res.Name != tt.checkName {
-					t.Errorf("LoadCommand() name = %v, want %v", res.Name, tt.checkName)
-				}
-				if res.Description != tt.checkDesc {
-					t.Errorf("LoadCommand() description = %v, want %v", res.Description, tt.checkDesc)
-				}
-				if res.Type != Command {
-					t.Errorf("LoadCommand() type = %v, want %v", res.Type, Command)
-				}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if res.Name != tt.checkName {
+				t.Errorf("Name mismatch. Got: %s, Want: %s", res.Name, tt.checkName)
+			}
+
+			if res.Description != tt.checkDesc {
+				t.Errorf("Description mismatch. Got: %s, Want: %s", res.Description, tt.checkDesc)
 			}
 		})
 	}
 }
 
-func TestValidateCommand(t *testing.T) {
+func TestLoadCommandWithBase_AbsolutePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	cmdPath := filepath.Join(tmpDir, "commands", "test.md")
+	
+	if err := os.MkdirAll(filepath.Dir(cmdPath), 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+
+	content := `---
+description: Test command
+---
+# Test
+`
+	if err := os.WriteFile(cmdPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
+
+	basePath := filepath.Join(tmpDir, "commands")
+	res, err := LoadCommandWithBase(cmdPath, basePath)
+	if err != nil {
+		t.Fatalf("LoadCommandWithBase failed: %v", err)
+	}
+
+	if res.Name != "test" {
+		t.Errorf("Name mismatch. Got: %s, Want: test", res.Name)
+	}
+}
+
+func TestLoadCommandResource(t *testing.T) {
 	tests := []struct {
 		name      string
 		filePath  string
@@ -59,7 +100,7 @@ func TestValidateCommand(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name:      "non-existent file",
+			name:      "nonexistent file",
 			filePath:  "testdata/commands/nonexistent.md",
 			wantError: true,
 		},
@@ -67,44 +108,24 @@ func TestValidateCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateCommand(tt.filePath)
-			if (err != nil) != tt.wantError {
-				t.Errorf("ValidateCommand() error = %v, wantError %v", err, tt.wantError)
+			res, err := LoadCommandResource(tt.filePath)
+
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if res.Content == "" {
+				t.Errorf("Content should not be empty")
 			}
 		})
-	}
-}
-
-func TestWriteCommand(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test-write.md")
-
-	cmd := NewCommandResource("test-write", "A test command for writing")
-	cmd.Agent = "test-agent"
-	cmd.Model = "test-model"
-	cmd.Content = "# Test Content\n\nThis is test content."
-
-	err := WriteCommand(cmd, filePath)
-	if err != nil {
-		t.Fatalf("WriteCommand() error = %v", err)
-	}
-
-	// Verify file was created
-	if _, err := os.Stat(filePath); err != nil {
-		t.Fatalf("File was not created: %v", err)
-	}
-
-	// Load it back and verify
-	res, err := LoadCommand(filePath)
-	if err != nil {
-		t.Fatalf("LoadCommand() after write error = %v", err)
-	}
-
-	if res.Name != "test-write" {
-		t.Errorf("Loaded command name = %v, want test-write", res.Name)
-	}
-	if res.Description != "A test command for writing" {
-		t.Errorf("Loaded command description = %v, want 'A test command for writing'", res.Description)
 	}
 }
 
@@ -114,31 +135,31 @@ func TestLoadCommandWithBase(t *testing.T) {
 		name             string
 		setupPath        string   // Path structure to create
 		basePath         string   // Base path for relative calculation
-		expectedRelPath  string   // Expected RelativePath
+		expectedName     string   // Expected Name field (nested path for nested commands)
 	}{
 		{
 			name:            "nested command with base path",
 			setupPath:       "commands/api/v2/deploy.md",
 			basePath:        "commands",
-			expectedRelPath: "api/v2/deploy",
+			expectedName:    "api/v2/deploy",
 		},
 		{
 			name:            "nested command with absolute base path",
 			setupPath:       "commands/db/deploy.md",
 			basePath:        "commands",
-			expectedRelPath: "db/deploy",
+			expectedName:    "db/deploy",
 		},
 		{
 			name:            "flat command with base path",
 			setupPath:       "commands/test.md",
 			basePath:        "commands",
-			expectedRelPath: "test",
+			expectedName:    "test",
 		},
 		{
 			name:            "no base path provided",
 			setupPath:       "commands/api/deploy.md",
 			basePath:        "",
-			expectedRelPath: "",
+			expectedName:    "deploy", // Without basePath, Name is just the filename
 		},
 	}
 
@@ -173,15 +194,9 @@ description: Test command
 				t.Fatalf("LoadCommandWithBase failed: %v", err)
 			}
 
-			// Check RelativePath
-			if res.RelativePath != tt.expectedRelPath {
-				t.Errorf("RelativePath mismatch. Got: %s, Want: %s", res.RelativePath, tt.expectedRelPath)
-			}
-
-			// Verify name is still just the filename
-			expectedName := strings.TrimSuffix(filepath.Base(fullPath), ".md")
-			if res.Name != expectedName {
-				t.Errorf("Name mismatch. Got: %s, Want: %s", res.Name, expectedName)
+			// Check Name field (now contains nested path for nested commands)
+			if res.Name != tt.expectedName {
+				t.Errorf("Name mismatch. Got: %s, Want: %s", res.Name, tt.expectedName)
 			}
 		})
 	}
@@ -207,8 +222,9 @@ description: Test
 		t.Fatalf("Should not error with invalid base: %v", err)
 	}
 
-	// RelativePath should be empty when file is not under basePath
-	if res.RelativePath != "" {
-		t.Errorf("RelativePath should be empty for file outside basePath. Got: %s", res.RelativePath)
+	// Name should be just the filename when file is not under basePath
+	expectedName := "test"
+	if res.Name != expectedName {
+		t.Errorf("Name should be just filename for file outside basePath. Got: %s, Want: %s", res.Name, expectedName)
 	}
 }

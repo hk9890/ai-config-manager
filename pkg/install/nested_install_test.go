@@ -45,14 +45,15 @@ description: Deploy API v2
 		t.Fatalf("Command not stored in nested structure: %s", expectedRepoPath)
 	}
 
-	// Load the resource to get RelativePath
+	// Load the resource to get nested name
 	res, err := resource.LoadCommandWithBase(expectedRepoPath, filepath.Join(repoPath, "commands"))
 	if err != nil {
 		t.Fatalf("Failed to load command: %v", err)
 	}
 
-	if res.RelativePath != "api/v2/deploy" {
-		t.Errorf("RelativePath mismatch. Got: %s, Want: api/v2/deploy", res.RelativePath)
+	// Name field now contains the nested path (e.g., "api/v2/deploy")
+	if res.Name != "api/v2/deploy" {
+		t.Errorf("Name mismatch. Got: %s, Want: api/v2/deploy", res.Name)
 	}
 
 	// Create test project
@@ -65,13 +66,16 @@ description: Deploy API v2
 	}
 
 	// Test nested installation logic
+	// For nested commands, Name contains the full path (e.g., "api/v2/deploy")
 	var symlinkPath string
-	if res.RelativePath != "" {
-		symlinkPath = filepath.Join(commandsDir, res.RelativePath+".md")
+	if filepath.Dir(res.Name) != "." {
+		// Nested command - Name contains slashes
+		symlinkPath = filepath.Join(commandsDir, res.Name+".md")
 		if err := os.MkdirAll(filepath.Dir(symlinkPath), 0755); err != nil {
 			t.Fatalf("Failed to create nested directories: %v", err)
 		}
 	} else {
+		// Flat command - Name is just the basename
 		symlinkPath = filepath.Join(commandsDir, filepath.Base(res.Path))
 	}
 
