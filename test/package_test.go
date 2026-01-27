@@ -39,53 +39,19 @@ func TestPackageWorkflow(t *testing.T) {
 	}
 
 	// Create test command
-	testCmdDir := t.TempDir()
-	cmdPath := filepath.Join(testCmdDir, "test-cmd.md")
-	cmdContent := `---
-description: A test command for package testing
----
-# Test Command
-This is a test command.
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "test-cmd", "A test command for package testing")
 	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
 
 	// Create test skill
-	testSkillDir := filepath.Join(t.TempDir(), "test-skill")
-	if err := os.MkdirAll(filepath.Join(testSkillDir, "scripts"), 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-	skillMdPath := filepath.Join(testSkillDir, "SKILL.md")
-	skillContent := `---
-name: test-skill
-description: A test skill for package testing
----
-# Test Skill
-This is a test skill.
-`
-	if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create SKILL.md: %v", err)
-	}
+	testSkillDir := createTestSkill(t, "test-skill", "A test skill for package testing")
 	if err := manager.AddSkill(testSkillDir, "file://"+testSkillDir, "file"); err != nil {
 		t.Fatalf("Failed to add skill: %v", err)
 	}
 
 	// Create test agent
-	testAgentDir := t.TempDir()
-	agentPath := filepath.Join(testAgentDir, "test-agent.md")
-	agentContent := `---
-description: A test agent for package testing
----
-# Test Agent
-This is a test agent.
-`
-	if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
-		t.Fatalf("Failed to create test agent: %v", err)
-	}
+	agentPath := createTestAgent(t, "test-agent", "A test agent for package testing")
 	if err := manager.AddAgent(agentPath, "file://"+agentPath, "file"); err != nil {
 		t.Fatalf("Failed to add agent: %v", err)
 	}
@@ -298,16 +264,7 @@ func TestPackageWithMissingResources(t *testing.T) {
 	}
 
 	// Create only one resource
-	testCmdDir := t.TempDir()
-	cmdPath := filepath.Join(testCmdDir, "existing-cmd.md")
-	cmdContent := `---
-description: An existing command
----
-# Existing Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "existing-cmd", "An existing command")
 	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -402,16 +359,7 @@ func TestPackageRemoval(t *testing.T) {
 	}
 
 	// Create test resources
-	testCmdDir := t.TempDir()
-	cmdPath := filepath.Join(testCmdDir, "remove-test.md")
-	cmdContent := `---
-description: A command for removal testing
----
-# Remove Test
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "remove-test", "A command for removal testing")
 	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -467,46 +415,21 @@ func TestPackageWithSharedResources(t *testing.T) {
 	}
 
 	// Create shared resources
-	testCmdDir := t.TempDir()
 
 	// Shared command
-	sharedCmdPath := filepath.Join(testCmdDir, "shared-cmd.md")
-	sharedCmdContent := `---
-description: A shared command
----
-# Shared Command
-`
-	if err := os.WriteFile(sharedCmdPath, []byte(sharedCmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create shared command: %v", err)
-	}
+	sharedCmdPath := createTestCommand(t, "shared-cmd", "A shared command")
 	if err := manager.AddCommand(sharedCmdPath, "file://"+sharedCmdPath, "file"); err != nil {
 		t.Fatalf("Failed to add shared command: %v", err)
 	}
 
 	// Package A specific command
-	cmdAPath := filepath.Join(testCmdDir, "cmd-a.md")
-	cmdAContent := `---
-description: Command A
----
-# Command A
-`
-	if err := os.WriteFile(cmdAPath, []byte(cmdAContent), 0644); err != nil {
-		t.Fatalf("Failed to create command A: %v", err)
-	}
+	cmdAPath := createTestCommand(t, "cmd-a", "Command A")
 	if err := manager.AddCommand(cmdAPath, "file://"+cmdAPath, "file"); err != nil {
 		t.Fatalf("Failed to add command A: %v", err)
 	}
 
 	// Package B specific command
-	cmdBPath := filepath.Join(testCmdDir, "cmd-b.md")
-	cmdBContent := `---
-description: Command B
----
-# Command B
-`
-	if err := os.WriteFile(cmdBPath, []byte(cmdBContent), 0644); err != nil {
-		t.Fatalf("Failed to create command B: %v", err)
-	}
+	cmdBPath := createTestCommand(t, "cmd-b", "Command B")
 	if err := manager.AddCommand(cmdBPath, "file://"+cmdBPath, "file"); err != nil {
 		t.Fatalf("Failed to add command B: %v", err)
 	}
@@ -650,18 +573,8 @@ func TestPackageCLI(t *testing.T) {
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create test resources
-	testDir := t.TempDir()
-	cmdPath := filepath.Join(testDir, "cli-test.md")
-	cmdContent := `---
-description: A command for CLI package testing
----
-# CLI Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "cli-test", "A command for CLI package testing")
 
-	// Add command to repo
 	// Add command to repo
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
@@ -725,16 +638,7 @@ func TestPackageForceReinstall(t *testing.T) {
 	}
 
 	// Create test resource
-	testCmdDir := t.TempDir()
-	cmdPath := filepath.Join(testCmdDir, "force-test.md")
-	cmdContent := `---
-description: A command for force reinstall testing
----
-# Force Test
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "force-test", "A command for force reinstall testing")
 	if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -838,51 +742,21 @@ func TestPackageRemovalWithResources(t *testing.T) {
 			}
 
 			// Create test resources
-			testDir := t.TempDir()
 
 			// Create command
-			cmdPath := filepath.Join(testDir, "pkg-remove-cmd.md")
-			cmdContent := `---
-description: Command for package removal testing
----
-# Package Removal Command
-`
-			if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-				t.Fatalf("Failed to create test command: %v", err)
-			}
+			cmdPath := createTestCommand(t, "pkg-remove-cmd", "Command for package removal testing")
 			if err := manager.AddCommand(cmdPath, "file://"+cmdPath, "file"); err != nil {
 				t.Fatalf("Failed to add command: %v", err)
 			}
 
 			// Create skill
-			skillDir := filepath.Join(testDir, "pkg-remove-skill")
-			if err := os.MkdirAll(filepath.Join(skillDir, "scripts"), 0755); err != nil {
-				t.Fatalf("Failed to create skill directory: %v", err)
-			}
-			skillMdPath := filepath.Join(skillDir, "SKILL.md")
-			skillContent := `---
-name: pkg-remove-skill
-description: Skill for package removal testing
----
-# Package Removal Skill
-`
-			if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
-				t.Fatalf("Failed to create SKILL.md: %v", err)
-			}
+			skillDir := createTestSkill(t, "pkg-remove-skill", "Skill for package removal testing")
 			if err := manager.AddSkill(skillDir, "file://"+skillDir, "file"); err != nil {
 				t.Fatalf("Failed to add skill: %v", err)
 			}
 
 			// Create agent
-			agentPath := filepath.Join(testDir, "pkg-remove-agent.md")
-			agentContent := `---
-description: Agent for package removal testing
----
-# Package Removal Agent
-`
-			if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
-				t.Fatalf("Failed to create test agent: %v", err)
-			}
+			agentPath := createTestAgent(t, "pkg-remove-agent", "Agent for package removal testing")
 			if err := manager.AddAgent(agentPath, "file://"+agentPath, "file"); err != nil {
 				t.Fatalf("Failed to add agent: %v", err)
 			}

@@ -2,7 +2,6 @@ package test
 
 import (
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -20,25 +19,7 @@ func TestOutputFormatTable(t *testing.T) {
 
 	// Create a resources directory with valid skill
 	resourcesDir := filepath.Join(testDir, "resources")
-	skillsDir := filepath.Join(resourcesDir, "skills")
-	validSkillDir := filepath.Join(skillsDir, "output-test-skill")
-	if err := os.MkdirAll(validSkillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillContent := `---
-name: output-test-skill
-description: A skill for testing table output
-license: MIT
----
-
-# Test Skill
-
-This skill tests table output format.
-`
-	if err := os.WriteFile(filepath.Join(validSkillDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to write SKILL.md: %v", err)
-	}
+	createTestSkillInDir(t, resourcesDir, "output-test-skill", "A skill for testing table output")
 
 	// Run repo add with table format (default)
 	output, err := runAimgr(t, "repo", "import", resourcesDir)
@@ -81,25 +62,7 @@ func TestOutputFormatJSON(t *testing.T) {
 
 	// Create a resources directory with valid skill
 	resourcesDir := filepath.Join(testDir, "resources")
-	skillsDir := filepath.Join(resourcesDir, "skills")
-	validSkillDir := filepath.Join(skillsDir, "json-test-skill")
-	if err := os.MkdirAll(validSkillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillContent := `---
-name: json-test-skill
-description: A skill for testing JSON output
-license: MIT
----
-
-# JSON Test Skill
-
-This skill tests JSON output format.
-`
-	if err := os.WriteFile(filepath.Join(validSkillDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to write SKILL.md: %v", err)
-	}
+	createTestSkillInDir(t, resourcesDir, "json-test-skill", "A skill for testing JSON output")
 
 	// Run repo add with JSON format
 	output, err := runAimgr(t, "repo", "import", "--format=json", resourcesDir)
@@ -185,25 +148,7 @@ func TestOutputFormatYAML(t *testing.T) {
 
 	// Create a resources directory with valid skill
 	resourcesDir := filepath.Join(testDir, "resources")
-	skillsDir := filepath.Join(resourcesDir, "skills")
-	validSkillDir := filepath.Join(skillsDir, "yaml-test-skill")
-	if err := os.MkdirAll(validSkillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillContent := `---
-name: yaml-test-skill
-description: A skill for testing YAML output
-license: MIT
----
-
-# YAML Test Skill
-
-This skill tests YAML output format.
-`
-	if err := os.WriteFile(filepath.Join(validSkillDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to write SKILL.md: %v", err)
-	}
+	createTestSkillInDir(t, resourcesDir, "yaml-test-skill", "A skill for testing YAML output")
 
 	// Run repo add with YAML format
 	output, err := runAimgr(t, "repo", "import", "--format=yaml", resourcesDir)
@@ -282,24 +227,9 @@ func TestOutputFormatMixedResults(t *testing.T) {
 
 	// Create resources directory with mixed resources
 	resourcesDir := filepath.Join(testDir, "resources")
-	skillsDir := filepath.Join(resourcesDir, "skills")
 
 	// Create valid skill
-	validSkillDir := filepath.Join(skillsDir, "mixed-valid-skill")
-	if err := os.MkdirAll(validSkillDir, 0755); err != nil {
-		t.Fatalf("Failed to create valid skill directory: %v", err)
-	}
-	validContent := `---
-name: mixed-valid-skill
-description: A valid skill
-license: MIT
----
-
-# Valid Skill
-`
-	if err := os.WriteFile(filepath.Join(validSkillDir, "SKILL.md"), []byte(validContent), 0644); err != nil {
-		t.Fatalf("Failed to write valid SKILL.md: %v", err)
-	}
+	createTestSkillInDir(t, resourcesDir, "mixed-valid-skill", "A valid skill")
 
 	// First add: should succeed with 1 valid skill
 	output1, err := runAimgr(t, "repo", "import", "--skip-existing", "--format=json", resourcesDir)
@@ -379,23 +309,7 @@ func TestOutputFormatDryRun(t *testing.T) {
 
 	// Create a resources directory with valid command
 	resourcesDir := filepath.Join(testDir, "resources")
-	commandsDir := filepath.Join(resourcesDir, "commands")
-	if err := os.MkdirAll(commandsDir, 0755); err != nil {
-		t.Fatalf("Failed to create commands directory: %v", err)
-	}
-
-	cmdContent := `---
-description: A command for testing dry-run output
----
-
-# Dry Run Test Command
-
-This command tests dry-run mode.
-`
-	cmdPath := filepath.Join(commandsDir, "dryrun-test.md")
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to write command: %v", err)
-	}
+	createTestCommandInDir(t, resourcesDir, "dryrun-test", "A command for testing dry-run output")
 
 	// Run with dry-run and JSON format
 	output, err := runAimgr(t, "repo", "import", "--dry-run", "--format=json", resourcesDir)
@@ -506,60 +420,14 @@ func TestOutputFormatBulkOperations(t *testing.T) {
 	resourcesDir := filepath.Join(testDir, "resources")
 
 	// Create commands
-	commandsDir := filepath.Join(resourcesDir, "commands")
-	if err := os.MkdirAll(commandsDir, 0755); err != nil {
-		t.Fatalf("Failed to create commands directory: %v", err)
-	}
-
-	cmd1 := `---
-description: First test command
----
-# Command 1
-`
-	cmd2 := `---
-description: Second test command
----
-# Command 2
-`
-	if err := os.WriteFile(filepath.Join(commandsDir, "bulk-cmd1.md"), []byte(cmd1), 0644); err != nil {
-		t.Fatalf("Failed to write command 1: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(commandsDir, "bulk-cmd2.md"), []byte(cmd2), 0644); err != nil {
-		t.Fatalf("Failed to write command 2: %v", err)
-	}
+	createTestCommandInDir(t, resourcesDir, "bulk-cmd1", "First test command")
+	createTestCommandInDir(t, resourcesDir, "bulk-cmd2", "Second test command")
 
 	// Create skills
-	skillsDir := filepath.Join(resourcesDir, "skills")
-	skill1Dir := filepath.Join(skillsDir, "bulk-skill1")
-	if err := os.MkdirAll(skill1Dir, 0755); err != nil {
-		t.Fatalf("Failed to create skill1 directory: %v", err)
-	}
-
-	skill1 := `---
-name: bulk-skill1
-description: First test skill
-license: MIT
----
-# Skill 1
-`
-	if err := os.WriteFile(filepath.Join(skill1Dir, "SKILL.md"), []byte(skill1), 0644); err != nil {
-		t.Fatalf("Failed to write skill 1: %v", err)
-	}
+	createTestSkillInDir(t, resourcesDir, "bulk-skill1", "First test skill")
 
 	// Create agent
-	agentsDir := filepath.Join(resourcesDir, "agents")
-	if err := os.MkdirAll(agentsDir, 0755); err != nil {
-		t.Fatalf("Failed to create agents directory: %v", err)
-	}
-
-	agent1 := `---
-description: First test agent
----
-# Agent 1
-`
-	if err := os.WriteFile(filepath.Join(agentsDir, "bulk-agent1.md"), []byte(agent1), 0644); err != nil {
-		t.Fatalf("Failed to write agent: %v", err)
-	}
+	createTestAgentInDir(t, resourcesDir, "bulk-agent1", "First test agent")
 
 	// Run bulk add with JSON format
 	output, err := runAimgr(t, "repo", "import", "--format=json", resourcesDir)
