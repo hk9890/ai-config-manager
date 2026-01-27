@@ -297,3 +297,7 @@ func completeConfigSetArgs(cmd *cobra.Command, args []string, toComplete string)
 	}
 	return nil, cobra.ShellCompDirectiveNoFileComp
 }
+// completeToolNames provides completion for tool names (claude, opencode, copilot)
+func completeToolNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{"claude", "opencode", "copilot"}, cobra.ShellCompDirectiveNoFileComp
+}

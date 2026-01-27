@@ -528,6 +528,8 @@ func init() {
 	installCmd.Flags().StringVar(&installTargetFlag, "target", "", "Target tools (comma-separated: claude,opencode,copilot)")
 	installCmd.Flags().BoolVar(&installSaveFlag, "save", true, "Save installed resources to ai.package.yaml")
 	installCmd.Flags().BoolVar(&installNoSaveFlag, "no-save", false, "Don't save to ai.package.yaml")
+	// Register completion for --target flag
+	installCmd.RegisterFlagCompletionFunc("target", completeToolNames)
 }
 
 // installPackage installs all resources from a package
