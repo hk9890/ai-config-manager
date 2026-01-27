@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
@@ -83,21 +84,24 @@ func Load(name string, resourceType resource.ResourceType, repoPath string) (*Re
 //
 // Metadata is stored in a centralized .metadata/ directory with the pattern:
 //
-//	<repoPath>/.metadata/<type>s/<name>-metadata.json
+//	<repoPath>/.metadata/<type>s/<name-with-slashes-escaped>-metadata.json
 //
-// This structure keeps metadata separate from resource files for better organization
-// and easier backup/management.
+// For nested resources, slashes in names are replaced with hyphens to create flat filenames.
 //
 // Examples:
-//   - command: ~/.local/share/ai-config/repo/.metadata/commands/mycmd-metadata.json
+//   - flat command: ~/.local/share/ai-config/repo/.metadata/commands/mycmd-metadata.json
+//   - nested command: ~/.local/share/ai-config/repo/.metadata/commands/api-deploy-metadata.json (from name "api/deploy")
 //   - skill: ~/.local/share/ai-config/repo/.metadata/skills/myskill-metadata.json
 //   - agent: ~/.local/share/ai-config/repo/.metadata/agents/myagent-metadata.json
 func GetMetadataPath(name string, resourceType resource.ResourceType, repoPath string) string {
 	// Get the resource type directory (commands, skills, agents)
 	typeDir := string(resourceType) + "s"
 
+	// Escape slashes in name for flat filename (e.g., "api/deploy" -> "api-deploy")
+	escapedName := strings.ReplaceAll(name, "/", "-")
+
 	// Build filename: <name>-metadata.json
-	filename := fmt.Sprintf("%s-metadata.json", name)
+	filename := fmt.Sprintf("%s-metadata.json", escapedName)
 
 	return filepath.Join(repoPath, ".metadata", typeDir, filename)
 }

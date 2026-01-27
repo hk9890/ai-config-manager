@@ -17,14 +17,15 @@ type CommandResource struct {
 }
 
 // LoadCommand loads a command resource from a markdown file
-// For backward compatibility, this does not calculate RelativePath
+// For flat commands without nested structure
 func LoadCommand(filePath string) (*Resource, error) {
 	return LoadCommandWithBase(filePath, "")
 }
 
-// LoadCommandWithBase loads a command resource and calculates RelativePath if basePath is provided
+// LoadCommandWithBase loads a command resource and calculates nested name if basePath is provided
 // basePath should be the directory to calculate relative paths from (e.g., "commands/")
-// If basePath is empty, RelativePath will not be set (backward compatibility)
+// If basePath is provided and file is nested, Name will contain the full nested path (e.g., "api/deploy")
+// If basePath is empty, Name will be just the basename (backward compatibility)
 func LoadCommandWithBase(filePath string, basePath string) (*Resource, error) {
 	// Validate it's a .md file
 	if filepath.Ext(filePath) != ".md" {
@@ -36,7 +37,7 @@ func LoadCommandWithBase(filePath string, basePath string) (*Resource, error) {
 		return nil, WrapLoadError(filePath, Command, fmt.Errorf("file does not exist: %w", err))
 	}
 
-	// Extract name from filename (without .md extension)
+	// Extract basename from filename (without .md extension)
 	name := strings.TrimSuffix(filepath.Base(filePath), ".md")
 
 	// Parse frontmatter
@@ -45,8 +46,7 @@ func LoadCommandWithBase(filePath string, basePath string) (*Resource, error) {
 		return nil, NewValidationError(filePath, "command", name, "frontmatter", err)
 	}
 
-	// Calculate relative path if basePath is provided
-	var relativePath string
+	// Calculate relative path if basePath is provided, and use it as Name for nested commands
 	if basePath != "" {
 		// Clean paths for consistent comparison
 		cleanFilePath := filepath.Clean(filePath)
@@ -56,21 +56,24 @@ func LoadCommandWithBase(filePath string, basePath string) (*Resource, error) {
 		relPath, err := filepath.Rel(cleanBasePath, cleanFilePath)
 		if err == nil && !strings.HasPrefix(relPath, "..") {
 			// Remove the .md extension from relative path
-			relativePath = strings.TrimSuffix(relPath, ".md")
+			relativePath := strings.TrimSuffix(relPath, ".md")
+			// Use relative path as name for nested commands
+			if relativePath != "" && relativePath != name {
+				name = relativePath
+			}
 		}
 	}
 
 	// Build resource
 	resource := &Resource{
-		Name:         name,
-		Type:         Command,
-		Description:  frontmatter.GetString("description"),
-		Version:      frontmatter.GetString("version"),
-		Author:       frontmatter.GetString("author"),
-		License:      frontmatter.GetString("license"),
-		Path:         filePath,
-		RelativePath: relativePath,
-		Metadata:     frontmatter.GetMap("metadata"),
+		Name:        name, // Now contains full nested path (e.g., "opencode-coder/doctor") or basename
+		Type:        Command,
+		Description: frontmatter.GetString("description"),
+		Version:     frontmatter.GetString("version"),
+		Author:      frontmatter.GetString("author"),
+		License:     frontmatter.GetString("license"),
+		Path:        filePath,
+		Metadata:    frontmatter.GetMap("metadata"),
 	}
 
 	// Validate
@@ -82,12 +85,12 @@ func LoadCommandWithBase(filePath string, basePath string) (*Resource, error) {
 }
 
 // LoadCommandResource loads a command resource with full details including content
-// For backward compatibility, this does not calculate RelativePath
+// For flat commands without nested structure
 func LoadCommandResource(filePath string) (*CommandResource, error) {
 	return LoadCommandResourceWithBase(filePath, "")
 }
 
-// LoadCommandResourceWithBase loads a command resource with full details and calculates RelativePath
+// LoadCommandResourceWithBase loads a command resource with full details and calculates nested name
 func LoadCommandResourceWithBase(filePath string, basePath string) (*CommandResource, error) {
 	// Validate it's a .md file
 	if filepath.Ext(filePath) != ".md" {
@@ -105,33 +108,35 @@ func LoadCommandResourceWithBase(filePath string, basePath string) (*CommandReso
 		return nil, fmt.Errorf("failed to parse frontmatter: %w", err)
 	}
 
-	// Extract name from filename (without .md extension)
+	// Extract basename from filename (without .md extension)
 	name := strings.TrimSuffix(filepath.Base(filePath), ".md")
 
-	// Calculate relative path if basePath is provided
-	var relativePath string
+	// Calculate relative path if basePath is provided, and use it as Name for nested commands
 	if basePath != "" {
 		cleanFilePath := filepath.Clean(filePath)
 		cleanBasePath := filepath.Clean(basePath)
 		
 		relPath, err := filepath.Rel(cleanBasePath, cleanFilePath)
 		if err == nil && !strings.HasPrefix(relPath, "..") {
-			relativePath = strings.TrimSuffix(relPath, ".md")
+			relativePath := strings.TrimSuffix(relPath, ".md")
+			// Use relative path as name for nested commands
+			if relativePath != "" && relativePath != name {
+				name = relativePath
+			}
 		}
 	}
 
 	// Build command resource
 	cmd := &CommandResource{
 		Resource: Resource{
-			Name:         name,
-			Type:         Command,
-			Description:  frontmatter.GetString("description"),
-			Version:      frontmatter.GetString("version"),
-			Author:       frontmatter.GetString("author"),
-			License:      frontmatter.GetString("license"),
-			Path:         filePath,
-			RelativePath: relativePath,
-			Metadata:     frontmatter.GetMap("metadata"),
+			Name:        name, // Now contains full nested path (e.g., "opencode-coder/doctor") or basename
+			Type:        Command,
+			Description: frontmatter.GetString("description"),
+			Version:     frontmatter.GetString("version"),
+			Author:      frontmatter.GetString("author"),
+			License:     frontmatter.GetString("license"),
+			Path:        filePath,
+			Metadata:    frontmatter.GetMap("metadata"),
 		},
 		Agent:        frontmatter.GetString("agent"),
 		Model:        frontmatter.GetString("model"),

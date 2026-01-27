@@ -20,42 +20,65 @@ const (
 	PackageType ResourceType = "package"
 )
 
-// Resource represents an AI resource (command or skill)
+// Resource represents an AI resource (command, skill, or agent)
 type Resource struct {
-	Name         string            `yaml:"name"`
-	Type         ResourceType      `yaml:"type"`
-	Description  string            `yaml:"description"`
-	Version      string            `yaml:"version,omitempty"`
-	Author       string            `yaml:"author,omitempty"`
-	License      string            `yaml:"license,omitempty"`
-	Path         string            `yaml:"path"`
-	RelativePath string            `yaml:"relative-path,omitempty"` // Relative path from base directory (e.g., "api/deploy" for commands/api/deploy.md)
-	Metadata     map[string]string `yaml:"metadata,omitempty"`
+	Name        string            `yaml:"name"` // For nested commands, contains full path (e.g., "api/deploy")
+	Type        ResourceType      `yaml:"type"`
+	Description string            `yaml:"description"`
+	Version     string            `yaml:"version,omitempty"`
+	Author      string            `yaml:"author,omitempty"`
+	License     string            `yaml:"license,omitempty"`
+	Path        string            `yaml:"path"`
+	Metadata    map[string]string `yaml:"metadata,omitempty"`
 }
 
 var (
 	// nameRegex matches valid resource names: lowercase alphanumeric + hyphens
 	// Must not start/end with hyphen, no consecutive hyphens
 	nameRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+
+	// namePartRegex matches valid resource name parts (for nested paths)
+	// Each part separated by / must be valid
+	namePartRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 )
 
 // ValidateName validates a resource name according to agentskills.io spec
 // Rules:
-// - 1-64 characters
-// - Lowercase alphanumeric + hyphens only
+// - 1-64 characters (per segment for nested paths)
+// - Lowercase alphanumeric + hyphens only (+ slashes for nested paths)
 // - Cannot start or end with hyphen
 // - No consecutive hyphens
+// - For nested paths (containing /), each segment must be valid
 func ValidateName(name string) error {
 	if len(name) == 0 {
 		return fmt.Errorf("name cannot be empty")
-	}
-	if len(name) > 64 {
-		return fmt.Errorf("name too long (%d chars, max 64)", len(name))
 	}
 
 	// Check for consecutive hyphens
 	if strings.Contains(name, "--") {
 		return fmt.Errorf("name cannot contain consecutive hyphens")
+	}
+
+	// If name contains slashes, validate each part separately (nested commands)
+	if strings.Contains(name, "/") {
+		parts := strings.Split(name, "/")
+		for i, part := range parts {
+			if len(part) == 0 {
+				return fmt.Errorf("empty segment in path at position %d", i)
+			}
+			if len(part) > 64 {
+				return fmt.Errorf("segment '%s' too long (%d chars, max 64)", part, len(part))
+			}
+			if !namePartRegex.MatchString(part) {
+				return fmt.Errorf("segment '%s' invalid: must be lowercase alphanumeric + hyphens, cannot start/end with hyphen", part)
+			}
+		}
+		return nil
+	}
+
+	// Single-part name (no slashes)
+	if len(name) > 64 {
+		return fmt.Errorf("name too long (%d chars, max 64)", len(name))
 	}
 
 	if !nameRegex.MatchString(name) {

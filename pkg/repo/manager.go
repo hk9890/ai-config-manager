@@ -576,13 +576,12 @@ func (m *Manager) GetPath(name string, resourceType resource.ResourceType) strin
 	}
 }
 
-// GetPathForResource returns the full path for a resource, using RelativePath if available
+
+// GetPathForResource returns the full path for a resource
+// For commands with nested names (e.g., "api/deploy"), creates nested directory structure
 func (m *Manager) GetPathForResource(res *resource.Resource) string {
 	switch res.Type {
 	case resource.Command:
-		if res.RelativePath != "" {
-			return filepath.Join(m.repoPath, "commands", res.RelativePath+".md")
-		}
 		return filepath.Join(m.repoPath, "commands", res.Name+".md")
 	case resource.Skill:
 		return filepath.Join(m.repoPath, "skills", res.Name)
@@ -592,6 +591,21 @@ func (m *Manager) GetPathForResource(res *resource.Resource) string {
 		return ""
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // GetRepoPath returns the repository root path
 func (m *Manager) GetRepoPath() string {

@@ -118,18 +118,13 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 			return fmt.Errorf("failed to create commands directory for %s: %w", tool, err)
 		}
 
-		// Determine symlink path - use RelativePath if available for nested structure
-		var symlinkPath string
-		if res.RelativePath != "" {
-			// Nested structure - preserve relative path
-			symlinkPath = filepath.Join(commandsDir, res.RelativePath+".md")
-			// Create parent directories if needed
-			if err := os.MkdirAll(filepath.Dir(symlinkPath), 0755); err != nil {
-				return fmt.Errorf("failed to create nested directory for %s: %w", tool, err)
-			}
-		} else {
-			// Flat structure - backward compatibility
-			symlinkPath = filepath.Join(commandsDir, filepath.Base(res.Path))
+		// Determine symlink path using resource name (supports nested structure)
+		// For nested commands (e.g., name="api/deploy"), create nested directories
+		symlinkPath := filepath.Join(commandsDir, res.Name+".md")
+		
+		// Create parent directories if needed (for nested structure)
+		if err := os.MkdirAll(filepath.Dir(symlinkPath), 0755); err != nil {
+			return fmt.Errorf("failed to create directory for %s: %w", tool, err)
 		}
 
 		// Check if already installed
