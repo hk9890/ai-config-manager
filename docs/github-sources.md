@@ -16,7 +16,7 @@ This guide provides detailed information about using GitHub sources with `ai-rep
 ### Basic GitHub Source
 
 ```bash
-ai-repo add skill gh:owner/repo
+aimgr repo import skill gh:owner/repo
 ```
 
 This clones the repository and auto-discovers all skills.
@@ -24,7 +24,7 @@ This clones the repository and auto-discovers all skills.
 ### GitHub Source with Path
 
 ```bash
-ai-repo add skill gh:owner/repo/path/to/skill
+aimgr repo import skill gh:owner/repo/path/to/skill
 ```
 
 Looks for a skill in a specific path within the repository.
@@ -32,8 +32,8 @@ Looks for a skill in a specific path within the repository.
 ### GitHub Source with Branch/Tag
 
 ```bash
-ai-repo add skill gh:owner/repo@branch-name
-ai-repo add skill gh:owner/repo@v1.0.0
+aimgr repo import skill gh:owner/repo@branch-name
+aimgr repo import skill gh:owner/repo@v1.0.0
 ```
 
 Clones from a specific branch or tag.
@@ -41,7 +41,7 @@ Clones from a specific branch or tag.
 ### Combined Path and Reference
 
 ```bash
-ai-repo add skill gh:owner/repo/skills/my-skill@v2.0.0
+aimgr repo import skill gh:owner/repo/skills/my-skill@v2.0.0
 ```
 
 Uses both a specific path and a version reference.
@@ -52,8 +52,8 @@ The `gh:` prefix can be omitted for `owner/repo` format:
 
 ```bash
 # These are equivalent
-ai-repo add skill vercel-labs/agent-skills
-ai-repo add skill gh:vercel-labs/agent-skills
+aimgr repo import skill vercel-labs/agent-skills
+aimgr repo import skill gh:vercel-labs/agent-skills
 ```
 
 ### Git URL Sources
@@ -62,14 +62,14 @@ Use any Git URL directly:
 
 ```bash
 # HTTPS
-ai-repo add skill https://github.com/owner/repo.git
-ai-repo add skill https://gitlab.com/owner/repo.git
+aimgr repo import skill https://github.com/owner/repo.git
+aimgr repo import skill https://gitlab.com/owner/repo.git
 
 # SSH
-ai-repo add skill git@github.com:owner/repo.git
+aimgr repo import skill git@github.com:owner/repo.git
 
 # With branch
-ai-repo add skill https://github.com/owner/repo.git@develop
+aimgr repo import skill https://github.com/owner/repo.git@develop
 ```
 
 ## Auto-Discovery Algorithm
@@ -142,7 +142,7 @@ When adding resources from GitHub, `ai-repo` searches for resources in standard 
 If exactly one resource is found, it's automatically added:
 
 ```bash
-$ ai-repo add skill gh:myorg/my-skill
+$ aimgr repo import skill gh:myorg/my-skill
 Cloning repository...
 Found skill: my-skill
 ✓ Added skill 'my-skill' to repository
@@ -155,7 +155,7 @@ Found skill: my-skill
 If multiple resources are found and no specific path was provided, you'll be prompted to select:
 
 ```bash
-$ ai-repo add skill gh:myorg/multi-skill-repo
+$ aimgr repo import skill gh:myorg/multi-skill-repo
 Cloning repository...
 Found 3 skills:
   1. skill-one - Frontend development skill
@@ -169,7 +169,7 @@ Select a skill to add (1-3): 2
 To avoid the prompt, specify the exact path:
 
 ```bash
-ai-repo add skill gh:myorg/multi-skill-repo/skills/skill-two
+aimgr repo import skill gh:myorg/multi-skill-repo/skills/skill-two
 ```
 
 ### No Resources Found
@@ -177,7 +177,7 @@ ai-repo add skill gh:myorg/multi-skill-repo/skills/skill-two
 If no resources are found, an error is displayed:
 
 ```bash
-$ ai-repo add skill gh:myorg/empty-repo
+$ aimgr repo import skill gh:myorg/empty-repo
 Cloning repository...
 Error: no skills found in repository: https://github.com/myorg/empty-repo
 ```
@@ -200,60 +200,60 @@ The first valid resource found wins.
 
 ```bash
 # Add the entire vercel-labs/agent-skills repository
-ai-repo add skill gh:vercel-labs/agent-skills
+aimgr repo import skill gh:vercel-labs/agent-skills
 
 # Or use shorthand
-ai-repo add skill vercel-labs/agent-skills
+aimgr repo import skill vercel-labs/agent-skills
 ```
 
 ### Example 2: Add a Specific Skill from Multi-Skill Repo
 
 ```bash
 # Specify the exact skill path
-ai-repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo import skill gh:vercel-labs/agent-skills/skills/frontend-design
 ```
 
 ### Example 3: Add from a Specific Version
 
 ```bash
 # Add from a tagged release
-ai-repo add skill gh:anthropics/skills@v2.1.0
+aimgr repo import skill gh:anthropics/skills@v2.1.0
 
 # Add from a branch
-ai-repo add skill gh:myorg/experimental-skills@develop
+aimgr repo import skill gh:myorg/experimental-skills@develop
 ```
 
 ### Example 4: Add Commands from GitHub
 
 ```bash
 # Auto-discover commands in a repository
-ai-repo add command gh:myorg/commands
+aimgr repo import command gh:myorg/commands
 
 # Add a specific command
-ai-repo add command gh:myorg/repo/commands/deploy.md
+aimgr repo import command gh:myorg/repo/commands/deploy.md
 ```
 
 ### Example 5: Add Agents from GitHub
 
 ```bash
 # Auto-discover agents
-ai-repo add agent gh:myorg/agents
+aimgr repo import agent gh:myorg/agents
 
 # Add specific agent
-ai-repo add agent gh:myorg/agents/code-reviewer.md
+aimgr repo import agent gh:myorg/agents/code-reviewer.md
 ```
 
 ### Example 6: Use Git URLs
 
 ```bash
 # HTTPS URL
-ai-repo add skill https://github.com/myorg/custom-skills.git
+aimgr repo import skill https://github.com/myorg/custom-skills.git
 
 # SSH URL (if you have keys configured)
-ai-repo add skill git@github.com:myorg/private-skills.git
+aimgr repo import skill git@github.com:myorg/private-skills.git
 
 # GitLab or other Git hosting
-ai-repo add skill https://gitlab.com/mygroup/skills.git
+aimgr repo import skill https://gitlab.com/mygroup/skills.git
 ```
 
 ## Centralized Storage
@@ -361,7 +361,7 @@ git --version
 **Error:** `multiple skills found, please specify path`
 
 **Solutions:**
-- Add the specific path: `ai-repo add skill gh:owner/repo/skills/specific-skill`
+- Add the specific path: `aimgr repo import skill gh:owner/repo/skills/specific-skill`
 - Or select interactively from the prompt
 
 ## Best Practices
@@ -372,10 +372,10 @@ For production use, pin to specific versions:
 
 ```bash
 # Good - pinned version
-ai-repo add skill gh:myorg/skills@v1.2.0
+aimgr repo import skill gh:myorg/skills@v1.2.0
 
 # Risky - uses latest code
-ai-repo add skill gh:myorg/skills
+aimgr repo import skill gh:myorg/skills
 ```
 
 ### 2. Specify Paths for Multi-Resource Repos
@@ -384,10 +384,10 @@ Avoid ambiguity by specifying the exact resource:
 
 ```bash
 # Specific - no prompt needed
-ai-repo add skill gh:myorg/mono-repo/skills/my-skill
+aimgr repo import skill gh:myorg/mono-repo/skills/my-skill
 
 # Generic - may prompt for selection
-ai-repo add skill gh:myorg/mono-repo
+aimgr repo import skill gh:myorg/mono-repo
 ```
 
 ### 3. Use Shorthand for Public Repos
@@ -396,10 +396,10 @@ The shorthand syntax is cleaner for GitHub repos:
 
 ```bash
 # Preferred
-ai-repo add skill vercel-labs/agent-skills
+aimgr repo import skill vercel-labs/agent-skills
 
 # Also works, but more verbose
-ai-repo add skill gh:vercel-labs/agent-skills
+aimgr repo import skill gh:vercel-labs/agent-skills
 ```
 
 ### 4. Check Repository Documentation
@@ -414,7 +414,7 @@ Before adding, check the repository's README for:
 For production-critical resources, consider:
 1. Add from GitHub to your repo
 2. Export to local directory: `cp -r ~/.local/share/ai-config/repo/skills/my-skill ~/backups/`
-3. Re-add from local if needed: `ai-repo add skill ~/backups/my-skill --force`
+3. Re-add from local if needed: `aimgr repo import skill ~/backups/my-skill --force`
 
 ## Contributing GitHub Sources
 
@@ -497,7 +497,7 @@ git push origin v1.0.0
 Users can then reference specific versions:
 
 ```bash
-ai-repo add skill gh:yourorg/your-repo@v1.0.0
+aimgr repo import skill gh:yourorg/your-repo@v1.0.0
 ```
 
 ### Documentation

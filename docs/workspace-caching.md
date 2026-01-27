@@ -8,18 +8,18 @@ Git repositories are cached in the `.workspace/` directory for efficient reuse a
 
 ## Performance Benefits
 
-- **First operation** (`repo add`, `repo sync`, `repo update`): Full git clone (creates cache)
+- **First operation** (`repo import`, `repo sync`, `repo update`): Full git clone (creates cache)
 - **Subsequent operations**: Reuse cached repository (10-50x faster)
 - **Automatic cache management** with SHA256 hash-based storage
 - **Shared across all resources** from the same source repository
 
 ## Commands Using Workspace Cache
 
-### repo add
+### repo import
 Adds resources using cached clone:
 ```bash
-aimgr repo add gh:owner/repo
-aimgr repo add https://github.com/owner/repo
+aimgr repo import gh:owner/repo
+aimgr repo import https://github.com/owner/repo
 ```
 
 ### repo sync
@@ -122,7 +122,7 @@ The cache will be recreated on the next Git operation.
 When you add a resource from a Git repository for the first time:
 
 ```bash
-aimgr repo add gh:owner/repo
+aimgr repo import gh:owner/repo
 ```
 
 1. Calculate SHA256 hash of the repository URL
@@ -136,7 +136,7 @@ aimgr repo add gh:owner/repo
 When you add more resources from the same repository:
 
 ```bash
-aimgr repo add gh:owner/repo --filter "skill/*"
+aimgr repo import gh:owner/repo --filter "skill/*"
 ```
 
 1. Calculate SHA256 hash of the repository URL
@@ -166,7 +166,7 @@ aimgr repo update
 ## Cache Lifecycle
 
 ### Creation
-- Cache created on first `repo add` from a Git source
+- Cache created on first `repo import` from a Git source
 - Full clone operation
 
 ### Reuse

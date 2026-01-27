@@ -15,9 +15,9 @@ This guide helps you migrate from the old `ai-repo` command to the new `aimgr` (
 
 | Old Command (ai-repo) | New Command (aimgr) |
 |----------------------|---------------------|
-| `ai-repo add skill foo` | `aimgr repo add skill foo` |
-| `ai-repo add command bar` | `aimgr repo add command bar` |
-| `ai-repo add agent reviewer` | `aimgr repo add agent reviewer` |
+| `ai-repo import skill foo` | `aimgr repo import skill foo` |
+| `ai-repo import command bar` | `aimgr repo import command bar` |
+| `ai-repo import agent reviewer` | `aimgr repo import agent reviewer` |
 | `ai-repo list` | `aimgr repo list` |
 | `ai-repo list skill` | `aimgr repo list skill` |
 | `ai-repo remove skill old` | `aimgr repo remove skill old` |
@@ -59,14 +59,14 @@ Repository management commands now require the `repo` subcommand prefix.
 
 **Before:**
 ```bash
-ai-repo add skill pdf-processing
+ai-repo import skill pdf-processing (old)
 ai-repo list
 ai-repo remove command old-test
 ```
 
 **After:**
 ```bash
-aimgr repo add skill pdf-processing
+aimgr repo import skill pdf-processing
 aimgr repo list
 aimgr repo remove command old-test
 ```
@@ -428,7 +428,7 @@ Update script to use `repo` subcommand:
 aimgr add skill foo
 
 # To this:
-aimgr repo add skill foo
+aimgr repo import skill foo
 ```
 
 ### Issue: Install Command Failing
@@ -512,7 +512,7 @@ If you encounter migration issues:
 The migration from `ai-repo` to `aimgr` is straightforward:
 
 1. ✅ Replace binary: `ai-repo` → `aimgr`
-2. ✅ Add `repo` for repository commands: `aimgr repo add/list/remove`
+2. ✅ Add `repo` for repository commands: `aimgr repo import/list/remove`
 3. ✅ Use type prefixes for install: `aimgr install skill/name`
 4. ✅ Update shell completion and scripts
 5. ✅ Enjoy new features: `repo show`, `repo update`, metadata tracking

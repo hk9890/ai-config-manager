@@ -28,7 +28,7 @@ All external Git repository operations **MUST** use the `pkg/workspace` cache co
 
 #### Consistency
 - Single source of truth for repository state
-- Shared cache across all commands (`repo add`, `repo sync`, `repo update`)
+- Shared cache across all commands (`repo import`, `repo sync`, `repo update`)
 - Predictable behavior across the application
 
 #### Maintainability

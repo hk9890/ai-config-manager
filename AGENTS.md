@@ -213,24 +213,24 @@ Commands support multiple output formats via `--format` flag:
 
 **Table (default)**:
 ```bash
-aimgr repo add ~/resources/
+aimgr repo import ~/resources/
 # Shows human-readable table with results
 ```
 
 **JSON (for scripting)**:
 ```bash
-aimgr repo add ~/resources/ --format=json
+aimgr repo import ~/resources/ --format=json
 # Returns structured JSON output
 ```
 
 **YAML (structured, human-readable)**:
 ```bash
-aimgr repo add ~/resources/ --format=yaml
+aimgr repo import ~/resources/ --format=yaml
 # Returns YAML output
 ```
 
 **Commands supporting --format:**
-- `repo add`, `repo sync`, `repo list`, `repo update`
+- `repo import`, `repo sync`, `repo list`, `repo update`
 - `list`, `install`, `uninstall`
 
 See [docs/output-formats.md](docs/output-formats.md) for comprehensive documentation.
@@ -240,7 +240,7 @@ See [docs/output-formats.md](docs/output-formats.md) for comprehensive documenta
 Git repositories are cached in `.workspace/` for efficient reuse:
 - **First operation**: Full clone (creates cache)
 - **Subsequent operations**: Reuse cache (10-50x faster)
-- **Commands**: `repo add`, `repo sync`, `repo update`
+- **Commands**: `repo import`, `repo sync`, `repo update`
 - **Cache management**: `aimgr repo prune`
 
 See [docs/workspace-caching.md](docs/workspace-caching.md) for details.
@@ -359,9 +359,9 @@ aimgr install skill/test --no-save  # Install without adding
 
 Import from directories with auto-discovery:
 ```bash
-aimgr repo add ~/.opencode
-aimgr repo add ~/.claude
-aimgr repo add gh:owner/repo --filter "skill/*"
+aimgr repo import ~/.opencode
+aimgr repo import ~/.claude
+aimgr repo import gh:owner/repo --filter "skill/*"
 ```
 
 See [docs/resource-formats.md](docs/resource-formats.md) for complete specifications.

@@ -136,12 +136,6 @@ resType, resName, err := resource.ParseResourceReference("command/test")
 
 ### CLI Commands
 
-**Create a package:**
-```bash
-aimgr repo create-package web-tools \
-  --description="Web development tools" \
-  --resources="command/build,skill/typescript-helper"
-```
 
 **Install a package:**
 ```bash

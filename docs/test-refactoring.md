@@ -171,7 +171,7 @@ func isOnline() bool {
 
 | Test Name | External Calls | Purpose | Refactor Strategy |
 |-----------|----------------|---------|-------------------|
-| `TestWorkspaceCacheWithRepoAdd` | Clone anthropics/skills | Test cache on repo add | 🔧 Use local Git repo |
+| `TestWorkspaceCacheWithRepoAdd` | Clone anthropics/skills | Test cache on repo import | 🔧 Use local Git repo |
 | `TestWorkspaceCacheMetadataAfterAdd` | Clone anthropics/skills | Test metadata creation | 🔧 Use local Git repo |
 | `TestWorkspaceCacheWithDifferentRefs` | Clone same repo twice | Test ref handling | 🔧 Use local Git repo |
 | `TestWorkspaceCacheWithRepoSync` | Clone 2 repos (skills + ai-tools) | Test multi-repo sync | 🔧 Use 2 local Git repos |
