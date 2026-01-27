@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -149,4 +150,57 @@ Test agent content.
 	}
 
 	return agentPath
+}
+
+// copyFile copies a file from src to dst
+func copyFile(t *testing.T, src, dst string) {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		t.Fatalf("Failed to open source file %s: %v", src, err)
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		t.Fatalf("Failed to create destination file %s: %v", dst, err)
+	}
+	defer dstFile.Close()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		t.Fatalf("Failed to copy file from %s to %s: %v", src, dst, err)
+	}
+}
+
+// copyDir recursively copies a directory from src to dst
+func copyDir(t *testing.T, src, dst string) {
+	// Get source directory info
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		t.Fatalf("Failed to stat source directory %s: %v", src, err)
+	}
+
+	// Create destination directory
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		t.Fatalf("Failed to create destination directory %s: %v", dst, err)
+	}
+
+	// Read source directory entries
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		t.Fatalf("Failed to read source directory %s: %v", src, err)
+	}
+
+	// Copy each entry
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			// Recursively copy subdirectory
+			copyDir(t, srcPath, dstPath)
+		} else {
+			// Copy file
+			copyFile(t, srcPath, dstPath)
+		}
+	}
 }

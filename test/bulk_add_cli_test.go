@@ -1,31 +1,11 @@
 package test
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
-
-// copyFile copies a file from src to dst
-func copyFile(t *testing.T, src, dst string) {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		t.Fatalf("Failed to open source file %s: %v", src, err)
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		t.Fatalf("Failed to create destination file %s: %v", dst, err)
-	}
-	defer dstFile.Close()
-
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		t.Fatalf("Failed to copy file from %s to %s: %v", src, dst, err)
-	}
-}
 
 // TestCLIBulkAdd tests the 'aimgr repo add bulk' command
 func TestCLIBulkAdd(t *testing.T) {

@@ -14,7 +14,6 @@ import (
 func TestZeroArgInstall(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -24,32 +23,9 @@ func TestZeroArgInstall(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create test resources
-	cmdPath := filepath.Join(testDir, "test-cmd.md")
-	cmdContent := `---
-description: Test command for zero-arg install
----
-# Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
-
-	skillDir := filepath.Join(testDir, "test-skill")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillContent := `---
-name: test-skill
-description: Test skill for zero-arg install
----
-# Test Skill
-`
-	skillPath := filepath.Join(skillDir, "SKILL.md")
-	if err := os.WriteFile(skillPath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create SKILL.md: %v", err)
-	}
+	// Create test resources using helper functions
+	cmdPath := createTestCommand(t, "test-cmd", "Test command for zero-arg install")
+	skillDir := createTestSkill(t, "test-skill", "Test skill for zero-arg install")
 
 	// Add resources to repository
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -102,7 +78,6 @@ description: Test skill for zero-arg install
 func TestSaveOnInstall(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -112,16 +87,8 @@ func TestSaveOnInstall(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "save-test.md")
-	cmdContent := `---
-description: Test command for save functionality
----
-# Save Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper function
+	cmdPath := createTestCommand(t, "save-test", "Test command for save functionality")
 
 	// Add to repository
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -156,22 +123,8 @@ description: Test command for save functionality
 		t.Errorf("Manifest should contain command/save-test, got: %v", m.Resources)
 	}
 
-	// Install another resource
-	skillDir := filepath.Join(testDir, "save-skill")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillContent := `---
-name: save-skill
-description: Test skill for save functionality
----
-# Save Skill
-`
-	skillPath := filepath.Join(skillDir, "SKILL.md")
-	if err := os.WriteFile(skillPath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create SKILL.md: %v", err)
-	}
+	// Install another resource using helper function
+	skillDir := createTestSkill(t, "save-skill", "Test skill for save functionality")
 
 	_, err = runAimgr(t, "repo", "import", "--force", skillDir)
 	if err != nil {
@@ -204,7 +157,6 @@ description: Test skill for save functionality
 func TestNoSaveFlag(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -214,16 +166,8 @@ func TestNoSaveFlag(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "no-save-test.md")
-	cmdContent := `---
-description: Test command for no-save flag
----
-# No Save Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper function
+	cmdPath := createTestCommand(t, "no-save-test", "Test command for no-save flag")
 
 	// Add to repository
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -254,7 +198,6 @@ description: Test command for no-save flag
 func TestNoSaveFlagWithExistingManifest(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -273,26 +216,9 @@ func TestNoSaveFlagWithExistingManifest(t *testing.T) {
 		t.Fatalf("Failed to create manifest: %v", err)
 	}
 
-	// Create test commands
-	cmd1Path := filepath.Join(testDir, "existing.md")
-	cmd1Content := `---
-description: Existing command
----
-# Existing
-`
-	if err := os.WriteFile(cmd1Path, []byte(cmd1Content), 0644); err != nil {
-		t.Fatalf("Failed to create existing command: %v", err)
-	}
-
-	cmd2Path := filepath.Join(testDir, "new-cmd.md")
-	cmd2Content := `---
-description: New command
----
-# New Command
-`
-	if err := os.WriteFile(cmd2Path, []byte(cmd2Content), 0644); err != nil {
-		t.Fatalf("Failed to create new command: %v", err)
-	}
+	// Create test commands using helper functions
+	cmd1Path := createTestCommand(t, "existing", "Existing command")
+	cmd2Path := createTestCommand(t, "new-cmd", "New command")
 
 	// Add to repository
 	_, err := runAimgr(t, "repo", "import", "--force", cmd1Path)
@@ -414,7 +340,6 @@ func TestInvalidManifest(t *testing.T) {
 func TestMissingResources(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -424,16 +349,8 @@ func TestMissingResources(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create one real resource
-	cmdPath := filepath.Join(testDir, "real-cmd.md")
-	cmdContent := `---
-description: Real command that exists
----
-# Real Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create one real resource using helper function
+	cmdPath := createTestCommand(t, "real-cmd", "Real command that exists")
 
 	// Add to repository
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -477,7 +394,6 @@ description: Real command that exists
 func TestBackwardCompatibility(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -487,16 +403,8 @@ func TestBackwardCompatibility(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "compat-test.md")
-	cmdContent := `---
-description: Test command for backward compatibility
----
-# Compat Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper function
+	cmdPath := createTestCommand(t, "compat-test", "Test command for backward compatibility")
 
 	// Add to repository
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -601,7 +509,6 @@ func TestEmptyManifest(t *testing.T) {
 func TestManifestWithTargets(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -615,16 +522,8 @@ func TestManifestWithTargets(t *testing.T) {
 		t.Fatalf("Failed to create .opencode directory: %v", err)
 	}
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "target-test.md")
-	cmdContent := `---
-description: Test command for target functionality
----
-# Target Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper function
+	cmdPath := createTestCommand(t, "target-test", "Test command for target functionality")
 
 	// Add to repository
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -666,7 +565,6 @@ targets:
 func TestInstallFromManifestVsArgs(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -676,26 +574,9 @@ func TestInstallFromManifestVsArgs(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create test commands
-	cmd1Path := filepath.Join(testDir, "cmd1.md")
-	cmd1Content := `---
-description: Command 1
----
-# Command 1
-`
-	if err := os.WriteFile(cmd1Path, []byte(cmd1Content), 0644); err != nil {
-		t.Fatalf("Failed to create command 1: %v", err)
-	}
-
-	cmd2Path := filepath.Join(testDir, "cmd2.md")
-	cmd2Content := `---
-description: Command 2
----
-# Command 2
-`
-	if err := os.WriteFile(cmd2Path, []byte(cmd2Content), 0644); err != nil {
-		t.Fatalf("Failed to create command 2: %v", err)
-	}
+	// Create test commands using helper functions
+	cmd1Path := createTestCommand(t, "cmd1", "Command 1")
+	cmd2Path := createTestCommand(t, "cmd2", "Command 2")
 
 	// Add to repository
 	_, err := runAimgr(t, "repo", "import", "--force", cmd1Path)
@@ -768,7 +649,6 @@ description: Command 2
 func TestManifestPersistence(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -778,14 +658,10 @@ func TestManifestPersistence(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create multiple test resources
+	// Create multiple test resources using helper functions
 	resources := []string{"cmd1", "cmd2", "cmd3"}
 	for _, name := range resources {
-		cmdPath := filepath.Join(testDir, name+".md")
-		cmdContent := "---\ndescription: " + name + "\n---\n# " + name
-		if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-			t.Fatalf("Failed to create %s: %v", name, err)
-		}
+		cmdPath := createTestCommand(t, name, name)
 		_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 		if err != nil {
 			t.Fatalf("Failed to add %s: %v", name, err)
@@ -850,7 +726,6 @@ func TestManifestPersistence(t *testing.T) {
 func TestManifestErrorRecovery(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -860,16 +735,8 @@ func TestManifestErrorRecovery(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "recovery-test.md")
-	cmdContent := `---
-description: Test command
----
-# Test
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper function
+	cmdPath := createTestCommand(t, "recovery-test", "Test command")
 
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
