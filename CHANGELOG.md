@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Package Validation**
   - Fixed various package validation bugs
   - More robust error checking for package format and content
+  - Added comprehensive test coverage for package validation in `repo verify`
+  - Validates package resource references against actual repository contents
   
 - **Bulk Operations**
   - Improved error handling - continues on validation/resource errors instead of aborting

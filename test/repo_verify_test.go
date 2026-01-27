@@ -24,24 +24,313 @@ func TestCLIRepoVerifyBasic(t *testing.T) {
 	if !strings.Contains(output, "Repository Verification") {
 		t.Errorf("Expected 'Repository Verification' header, got: %s", output)
 	}
+}
 
-	// Should have some status output
-	validStatuses := []string{
-		"No issues found",
-		"ERRORS found",
-		"Warnings only",
+// TestCLIRepoVerifyPackageWithMissingRefs tests detection of packages with missing resource references
+func TestCLIRepoVerifyPackageWithMissingRefs(t *testing.T) {
+	repoDir := t.TempDir()
+	testDir := t.TempDir()
+
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Create a valid command resource that we'll reference in the package
+	validCmdPath := filepath.Join(testDir, "valid-cmd.md")
+	validCmdContent := `---
+description: Valid command
+---
+# Valid Command
+`
+	if err := os.WriteFile(validCmdPath, []byte(validCmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create valid command: %v", err)
 	}
 
-	hasStatus := false
-	for _, status := range validStatuses {
-		if strings.Contains(output, status) {
-			hasStatus = true
-			break
+	_, err := runAimgr(t, "repo", "add", "--force", validCmdPath)
+	if err != nil {
+		t.Fatalf("Failed to add valid command: %v", err)
+	}
+
+	// Create a package directly in the repository (not via add command)
+	// Packages need to be in repo/packages/ directory
+	packagesDir := filepath.Join(repoDir, "packages")
+	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+		t.Fatalf("Failed to create packages directory: %v", err)
+	}
+
+	packagePath := filepath.Join(packagesDir, "test-package.package.json")
+	packageContent := `{
+  "name": "test-package",
+  "description": "Package with missing refs",
+  "resources": [
+    "command/valid-cmd",
+    "command/missing-cmd",
+    "skill/missing-skill",
+    "agent/missing-agent"
+  ]
+}`
+	if err := os.WriteFile(packagePath, []byte(packageContent), 0644); err != nil {
+		t.Fatalf("Failed to create package: %v", err)
+	}
+
+	// Test: verify should detect package with missing resource references
+	output, _ := runAimgr(t, "repo", "verify")
+
+	if !strings.Contains(output, "Packages with missing resource references") {
+		t.Errorf("Expected 'Packages with missing resource references' error, got: %s", output)
+	}
+
+	if !strings.Contains(output, "test-package") {
+		t.Errorf("Expected 'test-package' in output, got: %s", output)
+	}
+
+	if !strings.Contains(output, "command/missing-cmd") {
+		t.Errorf("Expected 'command/missing-cmd' in output, got: %s", output)
+	}
+
+	if !strings.Contains(output, "skill/missing-skill") {
+		t.Errorf("Expected 'skill/missing-skill' in output, got: %s", output)
+	}
+
+	if !strings.Contains(output, "agent/missing-agent") {
+		t.Errorf("Expected 'agent/missing-agent' in output, got: %s", output)
+	}
+
+	// Should be an error (exit code 1)
+	if !strings.Contains(output, "ERRORS found") {
+		t.Errorf("Packages with missing refs should be an error")
+	}
+
+	// Verify it shows the count of missing resources
+	if !strings.Contains(output, "3 missing") {
+		t.Errorf("Expected '3 missing' count in output, got: %s", output)
+	}
+}
+
+// TestCLIRepoVerifyPackageJSON tests JSON output for package validation
+func TestCLIRepoVerifyPackageJSON(t *testing.T) {
+	repoDir := t.TempDir()
+
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Create a package directly in the repository
+	packagesDir := filepath.Join(repoDir, "packages")
+	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+		t.Fatalf("Failed to create packages directory: %v", err)
+	}
+
+	packagePath := filepath.Join(packagesDir, "json-package.package.json")
+	packageContent := `{
+  "name": "json-package",
+  "description": "Package for JSON test",
+  "resources": [
+    "command/nonexistent-cmd",
+    "skill/nonexistent-skill"
+  ]
+}`
+	if err := os.WriteFile(packagePath, []byte(packageContent), 0644); err != nil {
+		t.Fatalf("Failed to create package: %v", err)
+	}
+
+	// Test: verify --json
+	output, _ := runAimgr(t, "repo", "verify", "--json")
+
+	var result struct {
+		PackagesWithMissingRefs []struct {
+			Name             string   `json:"name"`
+			Path             string   `json:"path"`
+			MissingResources []string `json:"missing_resources"`
+		} `json:"packages_with_missing_refs"`
+		HasErrors   bool `json:"has_errors"`
+		HasWarnings bool `json:"has_warnings"`
+	}
+
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("Failed to parse JSON: %v\nOutput: %s", err, output)
+	}
+
+	// Check that package issue was detected
+	if len(result.PackagesWithMissingRefs) != 1 {
+		t.Errorf("Expected 1 package with missing refs, got %d", len(result.PackagesWithMissingRefs))
+	}
+
+	if len(result.PackagesWithMissingRefs) > 0 {
+		pkg := result.PackagesWithMissingRefs[0]
+		if pkg.Name != "json-package" {
+			t.Errorf("Expected package name 'json-package', got '%s'", pkg.Name)
+		}
+
+		if len(pkg.MissingResources) != 2 {
+			t.Errorf("Expected 2 missing resources, got %d", len(pkg.MissingResources))
+		}
+
+		// Check that the missing resources are listed
+		hasCmdRef := false
+		hasSkillRef := false
+		for _, ref := range pkg.MissingResources {
+			if ref == "command/nonexistent-cmd" {
+				hasCmdRef = true
+			}
+			if ref == "skill/nonexistent-skill" {
+				hasSkillRef = true
+			}
+		}
+
+		if !hasCmdRef {
+			t.Errorf("Expected 'command/nonexistent-cmd' in missing resources")
+		}
+		if !hasSkillRef {
+			t.Errorf("Expected 'skill/nonexistent-skill' in missing resources")
 		}
 	}
 
-	if !hasStatus {
-		t.Errorf("Expected a status message in output, got: %s", output)
+	// Should have errors
+	if !result.HasErrors {
+		t.Errorf("Expected has_errors=true for package with missing refs")
+	}
+}
+
+// TestCLIRepoVerifyHealthyPackage tests verification of a package with all resources present
+func TestCLIRepoVerifyHealthyPackage(t *testing.T) {
+	repoDir := t.TempDir()
+	testDir := t.TempDir()
+
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Create resources
+	cmdPath := filepath.Join(testDir, "pkg-cmd.md")
+	cmdContent := `---
+description: Command for package
+---
+# Package Command
+`
+	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		t.Fatalf("Failed to create command: %v", err)
+	}
+
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	if err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	skillPath := filepath.Join(testDir, "pkg-skill")
+	if err := os.MkdirAll(skillPath, 0755); err != nil {
+		t.Fatalf("Failed to create skill directory: %v", err)
+	}
+	skillFilePath := filepath.Join(skillPath, "SKILL.md")
+	skillContent := `---
+name: pkg-skill
+description: Skill for package
+---
+# Package Skill
+`
+	if err := os.WriteFile(skillFilePath, []byte(skillContent), 0644); err != nil {
+		t.Fatalf("Failed to create skill: %v", err)
+	}
+
+	_, err = runAimgr(t, "repo", "add", "--force", skillPath)
+	if err != nil {
+		t.Fatalf("Failed to add skill: %v", err)
+	}
+
+	// Create a package directly in the repository that references these resources
+	packagesDir := filepath.Join(repoDir, "packages")
+	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+		t.Fatalf("Failed to create packages directory: %v", err)
+	}
+
+	packagePath := filepath.Join(packagesDir, "healthy-package.package.json")
+	packageContent := `{
+  "name": "healthy-package",
+  "description": "Package with all valid refs",
+  "resources": [
+    "command/pkg-cmd",
+    "skill/pkg-skill"
+  ]
+}`
+	if err := os.WriteFile(packagePath, []byte(packageContent), 0644); err != nil {
+		t.Fatalf("Failed to create package: %v", err)
+	}
+
+	// Test: verify should find no issues
+	output, _ := runAimgr(t, "repo", "verify")
+
+	if !strings.Contains(output, "No issues found") {
+		t.Errorf("Expected 'No issues found' for healthy package, got: %s", output)
+	}
+
+	if strings.Contains(output, "Packages with missing resource references") {
+		t.Errorf("Should not report package issues for healthy package, got: %s", output)
+	}
+
+	// Verify JSON output also shows healthy
+	jsonOutput, _ := runAimgr(t, "repo", "verify", "--json")
+
+	var result struct {
+		PackagesWithMissingRefs []interface{} `json:"packages_with_missing_refs"`
+		HasErrors               bool          `json:"has_errors"`
+		HasWarnings             bool          `json:"has_warnings"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonOutput), &result); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	if len(result.PackagesWithMissingRefs) > 0 {
+		t.Errorf("Healthy package should have no missing refs, got %d", len(result.PackagesWithMissingRefs))
+	}
+
+	if result.HasErrors {
+		t.Errorf("Healthy package should have has_errors=false")
+	}
+}
+
+// TestCLIRepoVerifyPackageInvalidRef tests detection of invalid resource reference format
+func TestCLIRepoVerifyPackageInvalidRef(t *testing.T) {
+	repoDir := t.TempDir()
+
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Create a package directly in the repository with invalid resource reference format
+	packagesDir := filepath.Join(repoDir, "packages")
+	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+		t.Fatalf("Failed to create packages directory: %v", err)
+	}
+
+	packagePath := filepath.Join(packagesDir, "invalid-ref-package.package.json")
+	packageContent := `{
+  "name": "invalid-ref-package",
+  "description": "Package with invalid ref format",
+  "resources": [
+    "invalid-format",
+    "unknown-type/resource-name"
+  ]
+}`
+	if err := os.WriteFile(packagePath, []byte(packageContent), 0644); err != nil {
+		t.Fatalf("Failed to create package: %v", err)
+	}
+
+	// Test: verify should detect invalid references as missing
+	output, _ := runAimgr(t, "repo", "verify")
+
+	if !strings.Contains(output, "Packages with missing resource references") {
+		t.Errorf("Expected 'Packages with missing resource references' error, got: %s", output)
+	}
+
+	if !strings.Contains(output, "invalid-ref-package") {
+		t.Errorf("Expected 'invalid-ref-package' in output, got: %s", output)
+	}
+
+	// Should report both invalid references as missing
+	if !strings.Contains(output, "invalid-format") {
+		t.Errorf("Expected 'invalid-format' in output, got: %s", output)
+	}
+
+	if !strings.Contains(output, "unknown-type/resource-name") {
+		t.Errorf("Expected 'unknown-type/resource-name' in output, got: %s", output)
+	}
+
+	// Should be an error
+	if !strings.Contains(output, "ERRORS found") {
+		t.Errorf("Invalid package refs should be an error")
 	}
 }
 

@@ -67,6 +67,7 @@ aimgr repo verify --json      # Machine-readable output
 - ✗ **Orphaned metadata** (error) - Metadata files for non-existent resources
 - ⚠️ **Missing source paths** (warning) - Metadata references to deleted/moved sources
 - ✗ **Type mismatches** (error) - Resource type differs from metadata type
+- ✗ **Packages with missing resource references** (error) - Packages referencing non-existent resources
 
 **Exit Codes:**
 - `0` - No errors found (warnings are acceptable)
