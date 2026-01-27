@@ -114,11 +114,18 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 	}
 
 	// If no "commands" directory found, try to find source repo root
-	// by looking for common markers (.git, .claude, etc.) or use file's grandparent
+	// by looking for common markers (.git, .claude, etc.)
 	if basePath == "" {
 		dir := filepath.Dir(cleanPath)
-		// Walk up to find a suitable base
-		for dir != "." && dir != "/" {
+		// Walk up to find a suitable base, but stop before system directories
+		for dir != "." && dir != "/" && dir != "/tmp" {
+			// Don't go too far up - stop at directories with less than 3 segments
+			// This prevents walking into /tmp, /var, etc.
+			segments := strings.Split(filepath.Clean(dir), string(filepath.Separator))
+			if len(segments) < 3 {
+				break
+			}
+
 			// Check for markers of a repo root
 			if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 				basePath = dir
@@ -133,12 +140,9 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 				break
 			}
 			dir = filepath.Dir(dir)
-			// Don't go too far up
-			if len(strings.Split(dir, string(filepath.Separator))) < 2 {
-				break
-			}
 		}
 	}
+
 
 	res, err := resource.LoadCommandWithBase(sourcePath, basePath)
 	if err != nil {
@@ -578,7 +582,6 @@ func (m *Manager) GetPath(name string, resourceType resource.ResourceType) strin
 	}
 }
 
-
 // GetPathForResource returns the full path for a resource
 // For commands with nested names (e.g., "api/deploy"), creates nested directory structure
 func (m *Manager) GetPathForResource(res *resource.Resource) string {
@@ -593,21 +596,6 @@ func (m *Manager) GetPathForResource(res *resource.Resource) string {
 		return ""
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // GetRepoPath returns the repository root path
 func (m *Manager) GetRepoPath() string {
