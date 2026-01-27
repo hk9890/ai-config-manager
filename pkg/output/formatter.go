@@ -98,21 +98,45 @@ func FromBulkImportResult(result *repo.BulkImportResult) *BulkOperationResult {
 }
 
 // extractResourceName extracts the resource name from a file path
+// For nested resources, returns the relative path from the resource type directory
+// Example: "/path/to/repo/commands/opencode-coder/doctor.md" -> "opencode-coder/doctor"
+// extractResourceName extracts the resource name from a file path
+// For nested resources, returns the relative path from the resource type directory
+// Example: "/path/to/repo/commands/opencode-coder/doctor.md" -> "opencode-coder/doctor"
 func extractResourceName(path string) string {
-	// Get the base filename
-	name := path
-	if idx := strings.LastIndex(path, "/"); idx != -1 {
-		name = path[idx+1:]
+	// Handle empty or invalid paths
+	if path == "" || strings.HasSuffix(path, "/") || strings.HasSuffix(path, "\\") {
+		return ""
 	}
-	if idx := strings.LastIndex(path, "\\"); idx != -1 {
-		name = path[idx+1:]
+	
+	// Normalize path separators
+	path = strings.ReplaceAll(path, "\\", "/")
+	
+	// Find the resource type directory (commands/, skills/, agents/, packages/)
+	var relPath string
+	
+	if idx := strings.Index(path, "/commands/"); idx != -1 {
+		relPath = path[idx+len("/commands/"):]
+	} else if idx := strings.Index(path, "/skills/"); idx != -1 {
+		relPath = path[idx+len("/skills/"):]
+	} else if idx := strings.Index(path, "/agents/"); idx != -1 {
+		relPath = path[idx+len("/agents/"):]
+	} else if idx := strings.Index(path, "/packages/"); idx != -1 {
+		relPath = path[idx+len("/packages/"):]
+	} else {
+		// Fallback: just get the basename
+		if idx := strings.LastIndex(path, "/"); idx != -1 {
+			relPath = path[idx+1:]
+		} else {
+			relPath = path
+		}
 	}
-
+	
 	// Remove file extensions
-	name = strings.TrimSuffix(name, ".md")
-	name = strings.TrimSuffix(name, ".package.json")
-
-	return name
+	relPath = strings.TrimSuffix(relPath, ".md")
+	relPath = strings.TrimSuffix(relPath, ".package.json")
+	
+	return relPath
 }
 
 // extractResourceType extracts the resource type from a file path
