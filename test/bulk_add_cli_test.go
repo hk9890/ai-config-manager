@@ -1,11 +1,31 @@
 package test
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// copyFile copies a file from src to dst
+func copyFile(t *testing.T, src, dst string) {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		t.Fatalf("Failed to open source file %s: %v", src, err)
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		t.Fatalf("Failed to create destination file %s: %v", dst, err)
+	}
+	defer dstFile.Close()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		t.Fatalf("Failed to copy file from %s to %s: %v", src, dst, err)
+	}
+}
 
 // TestCLIBulkAdd tests the 'aimgr repo add bulk' command
 func TestCLIBulkAdd(t *testing.T) {
@@ -14,47 +34,43 @@ func TestCLIBulkAdd(t *testing.T) {
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
-	// Create a folder with mixed resources
+	// Create a folder with mixed resources using helper functions
 	resourcesDir := filepath.Join(testDir, "resources")
+	if err := os.MkdirAll(resourcesDir, 0755); err != nil {
+		t.Fatalf("Failed to create resources dir: %v", err)
+	}
 
-	// Create commands directory
+	// Create commands using helper - note: helper returns full path to .md file
+	cmd1Path := createTestCommand(t, "bulk-cmd1", "Bulk test command 1")
+	cmd2Path := createTestCommand(t, "bulk-cmd2", "Bulk test command 2")
+
+	// Copy commands to shared resources directory
 	commandsDir := filepath.Join(resourcesDir, "commands")
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands dir: %v", err)
 	}
+	copyFile(t, cmd1Path, filepath.Join(commandsDir, "bulk-cmd1.md"))
+	copyFile(t, cmd2Path, filepath.Join(commandsDir, "bulk-cmd2.md"))
 
-	cmd1 := []byte("---\ndescription: Bulk test command 1\n---\n# Command 1")
-	if err := os.WriteFile(filepath.Join(commandsDir, "bulk-cmd1.md"), cmd1, 0644); err != nil {
-		t.Fatalf("Failed to write command 1: %v", err)
+	// Create skill using helper - note: helper returns directory path
+	skill1Path := createTestSkill(t, "bulk-skill1", "Bulk test skill 1")
+
+	// Copy skill to shared resources directory
+	skillsDir := filepath.Join(resourcesDir, "skills", "bulk-skill1")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skill dir: %v", err)
 	}
+	copyFile(t, filepath.Join(skill1Path, "SKILL.md"), filepath.Join(skillsDir, "SKILL.md"))
 
-	cmd2 := []byte("---\ndescription: Bulk test command 2\n---\n# Command 2")
-	if err := os.WriteFile(filepath.Join(commandsDir, "bulk-cmd2.md"), cmd2, 0644); err != nil {
-		t.Fatalf("Failed to write command 2: %v", err)
-	}
+	// Create agent using helper - note: helper returns full path to .md file
+	agent1Path := createTestAgent(t, "bulk-agent1", "Bulk test agent 1")
 
-	// Create skills directory
-	skillsDir := filepath.Join(resourcesDir, "skills")
-	skill1Dir := filepath.Join(skillsDir, "bulk-skill1")
-	if err := os.MkdirAll(skill1Dir, 0755); err != nil {
-		t.Fatalf("Failed to create skill1 dir: %v", err)
-	}
-
-	skill1 := []byte("---\nname: bulk-skill1\ndescription: Bulk test skill 1\n---\n# Skill 1")
-	if err := os.WriteFile(filepath.Join(skill1Dir, "SKILL.md"), skill1, 0644); err != nil {
-		t.Fatalf("Failed to write skill 1: %v", err)
-	}
-
-	// Create agents directory
+	// Copy agent to shared resources directory
 	agentsDir := filepath.Join(resourcesDir, "agents")
 	if err := os.MkdirAll(agentsDir, 0755); err != nil {
 		t.Fatalf("Failed to create agents dir: %v", err)
 	}
-
-	agent1 := []byte("---\ndescription: Bulk test agent 1\n---\n# Agent 1")
-	if err := os.WriteFile(filepath.Join(agentsDir, "bulk-agent1.md"), agent1, 0644); err != nil {
-		t.Fatalf("Failed to write agent 1: %v", err)
-	}
+	copyFile(t, agent1Path, filepath.Join(agentsDir, "bulk-agent1.md"))
 
 	// Test: aimgr repo add (unified command)
 	output, err := runAimgr(t, "repo", "import", resourcesDir)
@@ -92,30 +108,24 @@ func TestCLIBulkAddForce(t *testing.T) {
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
-	// Create and add a command first
-	cmdPath := filepath.Join(testDir, "conflict.md")
-	cmd := []byte("---\ndescription: Original command\n---\n# Original")
-	if err := os.WriteFile(cmdPath, cmd, 0644); err != nil {
-		t.Fatalf("Failed to write command: %v", err)
-	}
+	// Create and add a command first using helper
+	cmdPath := createTestCommand(t, "conflict", "Original command")
 
 	_, err := runAimgr(t, "repo", "import", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command first time: %v", err)
 	}
 
-	// Create resources dir with same command
+	// Create resources dir with same command name but updated content
 	resourcesDir := filepath.Join(testDir, "resources")
 	commandsDir := filepath.Join(resourcesDir, "commands")
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands dir: %v", err)
 	}
 
-	cmdPath2 := filepath.Join(commandsDir, "conflict.md")
-	cmd2 := []byte("---\ndescription: Updated command\n---\n# Updated")
-	if err := os.WriteFile(cmdPath2, cmd2, 0644); err != nil {
-		t.Fatalf("Failed to write command 2: %v", err)
-	}
+	// Create a command with same name but different content
+	cmdPath2 := createTestCommand(t, "conflict", "Updated command")
+	copyFile(t, cmdPath2, filepath.Join(commandsDir, "conflict.md"))
 
 	// Try unified add with force
 	output, err := runAimgr(t, "repo", "import", "--force", resourcesDir)
@@ -135,12 +145,8 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
-	// Create and add a command
-	cmdPath := filepath.Join(testDir, "skip.md")
-	cmd := []byte("---\ndescription: Existing command\n---\n# Existing")
-	if err := os.WriteFile(cmdPath, cmd, 0644); err != nil {
-		t.Fatalf("Failed to write command: %v", err)
-	}
+	// Create and add a command using helper
+	cmdPath := createTestCommand(t, "skip", "Existing command")
 
 	_, err := runAimgr(t, "repo", "import", cmdPath)
 	if err != nil {
@@ -154,10 +160,8 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 		t.Fatalf("Failed to create commands dir: %v", err)
 	}
 
-	cmdPath2 := filepath.Join(commandsDir, "skip.md")
-	if err := os.WriteFile(cmdPath2, cmd, 0644); err != nil {
-		t.Fatalf("Failed to write command 2: %v", err)
-	}
+	cmdPath2 := createTestCommand(t, "skip", "Existing command")
+	copyFile(t, cmdPath2, filepath.Join(commandsDir, "skip.md"))
 
 	// Try unified add with skip-existing
 	output, err := runAimgr(t, "repo", "import", "--skip-existing", resourcesDir)
@@ -180,12 +184,8 @@ func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
-	// Create and add a command
-	cmdPath := filepath.Join(testDir, "fail.md")
-	cmd := []byte("---\ndescription: Existing command\n---\n# Existing")
-	if err := os.WriteFile(cmdPath, cmd, 0644); err != nil {
-		t.Fatalf("Failed to write command: %v", err)
-	}
+	// Create and add a command using helper
+	cmdPath := createTestCommand(t, "fail", "Existing command")
 
 	_, err := runAimgr(t, "repo", "import", cmdPath)
 	if err != nil {
@@ -199,10 +199,8 @@ func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 		t.Fatalf("Failed to create commands dir: %v", err)
 	}
 
-	cmdPath2 := filepath.Join(commandsDir, "fail.md")
-	if err := os.WriteFile(cmdPath2, cmd, 0644); err != nil {
-		t.Fatalf("Failed to write command 2: %v", err)
-	}
+	cmdPath2 := createTestCommand(t, "fail", "Existing command")
+	copyFile(t, cmdPath2, filepath.Join(commandsDir, "fail.md"))
 
 	// Try unified add without flags (should fail)
 	_, err = runAimgr(t, "repo", "import", resourcesDir)
@@ -218,18 +216,15 @@ func TestCLIBulkAddDryRun(t *testing.T) {
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
-	// Create a resources directory with one command
+	// Create a resources directory with one command using helper
 	resourcesDir := filepath.Join(testDir, "resources")
 	commandsDir := filepath.Join(resourcesDir, "commands")
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands dir: %v", err)
 	}
 
-	cmdPath := filepath.Join(commandsDir, "dryrun.md")
-	cmd := []byte("---\ndescription: Dry run test\n---\n# Dry Run")
-	if err := os.WriteFile(cmdPath, cmd, 0644); err != nil {
-		t.Fatalf("Failed to write command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "dryrun", "Dry run test")
+	copyFile(t, cmdPath, filepath.Join(commandsDir, "dryrun.md"))
 
 	// Test unified add with dry-run
 	output, err := runAimgr(t, "repo", "import", "--dry-run", resourcesDir)
@@ -283,12 +278,8 @@ func TestCLIAddSingleFile(t *testing.T) {
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
-	// Create a command file
-	cmdPath := filepath.Join(testDir, "test-cmd.md")
-	cmd := []byte("---\ndescription: Test command\n---\n# Test Command")
-	if err := os.WriteFile(cmdPath, cmd, 0644); err != nil {
-		t.Fatalf("Failed to create command file: %v", err)
-	}
+	// Create a command file using helper
+	cmdPath := createTestCommand(t, "test-cmd", "Test command")
 
 	// Test unified add on single file (should succeed)
 	output, err := runAimgr(t, "repo", "import", cmdPath)
