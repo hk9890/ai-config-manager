@@ -23,39 +23,9 @@ func TestPackageAutoImportFromLocalDir(t *testing.T) {
 		t.Fatalf("Failed to create packages directory: %v", err)
 	}
 
-	// Create test resources first
-	commandsDir := filepath.Join(sourceDir, "commands")
-	if err := os.MkdirAll(commandsDir, 0755); err != nil {
-		t.Fatalf("Failed to create commands directory: %v", err)
-	}
-
-	cmdPath := filepath.Join(commandsDir, "test-cmd.md")
-	cmdContent := `---
-description: A test command for package import testing
----
-# Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
-
-	// Create test skill
-	skillsDir := filepath.Join(sourceDir, "skills")
-	skillDir := filepath.Join(skillsDir, "test-skill")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillMdPath := filepath.Join(skillDir, "SKILL.md")
-	skillContent := `---
-name: test-skill
-description: A test skill for package import testing
----
-# Test Skill
-`
-	if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create SKILL.md: %v", err)
-	}
+	// Create test resources using helper functions
+	cmdPath := createTestCommandInDir(t, sourceDir, "test-cmd", "A test command for package import testing")
+	skillDir := createTestSkillInDir(t, sourceDir, "test-skill", "A test skill for package import testing")
 
 	// Create test package
 	pkg1Content := `{
@@ -265,65 +235,11 @@ func TestPackageAutoImportMixedResources(t *testing.T) {
 	// Create OpenCode-style directory structure
 	opencodeDir := filepath.Join(sourceDir, ".opencode")
 
-	// Create commands
-	commandsDir := filepath.Join(opencodeDir, "commands")
-	if err := os.MkdirAll(commandsDir, 0755); err != nil {
-		t.Fatalf("Failed to create commands directory: %v", err)
-	}
-
-	cmd1Path := filepath.Join(commandsDir, "cmd1.md")
-	cmd1Content := `---
-description: Command 1
----
-# Command 1
-`
-	if err := os.WriteFile(cmd1Path, []byte(cmd1Content), 0644); err != nil {
-		t.Fatalf("Failed to create command 1: %v", err)
-	}
-
-	cmd2Path := filepath.Join(commandsDir, "cmd2.md")
-	cmd2Content := `---
-description: Command 2
----
-# Command 2
-`
-	if err := os.WriteFile(cmd2Path, []byte(cmd2Content), 0644); err != nil {
-		t.Fatalf("Failed to create command 2: %v", err)
-	}
-
-	// Create skills
-	skillsDir := filepath.Join(opencodeDir, "skills")
-	skill1Dir := filepath.Join(skillsDir, "skill1")
-	if err := os.MkdirAll(skill1Dir, 0755); err != nil {
-		t.Fatalf("Failed to create skill1 directory: %v", err)
-	}
-
-	skill1MdPath := filepath.Join(skill1Dir, "SKILL.md")
-	skill1Content := `---
-name: skill1
-description: Skill 1
----
-# Skill 1
-`
-	if err := os.WriteFile(skill1MdPath, []byte(skill1Content), 0644); err != nil {
-		t.Fatalf("Failed to create skill1: %v", err)
-	}
-
-	// Create agents
-	agentsDir := filepath.Join(opencodeDir, "agents")
-	if err := os.MkdirAll(agentsDir, 0755); err != nil {
-		t.Fatalf("Failed to create agents directory: %v", err)
-	}
-
-	agent1Path := filepath.Join(agentsDir, "agent1.md")
-	agent1Content := `---
-description: Agent 1
----
-# Agent 1
-`
-	if err := os.WriteFile(agent1Path, []byte(agent1Content), 0644); err != nil {
-		t.Fatalf("Failed to create agent1: %v", err)
-	}
+	// Create test resources using helper functions
+	_ = createTestCommandInDir(t, opencodeDir, "cmd1", "Command 1")
+	_ = createTestCommandInDir(t, opencodeDir, "cmd2", "Command 2")
+	_ = createTestSkillInDir(t, opencodeDir, "skill1", "Skill 1")
+	_ = createTestAgentInDir(t, opencodeDir, "agent1", "Agent 1")
 
 	// Create packages directory at root level (not in .opencode)
 	packagesDir := filepath.Join(sourceDir, "packages")
@@ -627,21 +543,8 @@ func TestPackageAutoImportCLI(t *testing.T) {
 		t.Fatalf("Failed to create packages directory: %v", err)
 	}
 
-	// Create commands
-	commandsDir := filepath.Join(sourceDir, "commands")
-	if err := os.MkdirAll(commandsDir, 0755); err != nil {
-		t.Fatalf("Failed to create commands directory: %v", err)
-	}
-
-	cmdPath := filepath.Join(commandsDir, "cli-cmd.md")
-	cmdContent := `---
-description: CLI test command
----
-# CLI Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create command: %v", err)
-	}
+	// Create test command using helper function
+	createTestCommandInDir(t, sourceDir, "cli-cmd", "CLI test command")
 
 	// Create package
 	pkgContent := `{
