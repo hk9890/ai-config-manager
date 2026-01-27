@@ -117,6 +117,27 @@ if err != nil {
 ```
 
 ### Testing
+
+Tests are split into fast unit tests (default) and slow integration tests (opt-in).
+
+**Unit tests** (fixtures):
+- Use committed fixtures in `testdata/repos/`
+- No network calls
+- Run by default: `make test`
+- Execution time: <5 seconds
+
+**Integration tests** (network):
+- Tag: `//go:build integration`
+- Use real GitHub repos (hk9890/ai-tools)
+- Run with: `make test-integration`
+- Execution time: ~30 seconds
+
+**Adding tests**:
+- Prefer unit tests with fixtures
+- Only add integration tests for new Git features
+- See docs/test-refactoring.md for details
+
+**Best practices**:
 - Use table-driven tests
 - Use `t.TempDir()` for temporary directories
 - Test both success and error cases

@@ -1,37 +1,46 @@
-# Test Fixtures for Discovery Tests
+# Test Fixtures
 
-This directory contains committed test fixtures used by discovery unit tests. These fixtures replace slow GitHub integration tests with fast file-based tests.
+This directory contains committed test fixtures used by unit tests to avoid slow network operations.
 
 ## Purpose
 
-The fixtures in this directory allow us to test resource discovery without relying on external GitHub repositories or Git operations. This makes tests:
-
-- **Fast**: No network calls or git clones (50+ seconds saved per test run)
-- **Reliable**: No dependency on external services
-- **Deterministic**: Fixed test data ensures consistent results
-- **Easy to debug**: All test data is visible in the repository
+Tests in `test/discovery_*_test.go` use these fixtures instead of cloning real GitHub repositories. This provides:
+- **Fast execution**: <1 second vs 30+ seconds for Git clone
+- **Reliability**: No network dependency, no flaky tests
+- **Consistency**: Fixtures don't change unexpectedly
+- **Clarity**: Fixtures are minimal and focused
 
 ## Structure
 
-Each subdirectory represents a complete test repository with various resource layouts:
+Each directory is a self-contained fixture representing a repository structure:
 
-- **skills-standard**: Standard skills directory structure (2 skills)
-- **commands-nested**: Commands with nested directory structure (3 commands)
-- **mixed-resources**: Mix of commands, skills, and agents
-- **dotdir-resources**: Tool-specific directories (.claude, .opencode)
-- **malformed-resources**: Edge cases for error handling
-- **subpath-test**: Deeply nested resources
-- **empty-repo**: Repository with no resources
+| Fixture | Purpose | Based On |
+|---------|---------|----------|
+| `skills-standard/` | Standard skills layout | anthropics/skills |
+| `commands-nested/` | Nested command structure | anthropics/quickstarts |
+| `mixed-resources/` | Multiple resource types | Combined structure |
+| `dotdir-resources/` | Hidden tool directories | .claude, .opencode patterns |
+| `malformed-resources/` | Error handling | Edge cases |
+| `subpath-test/` | Deep directory nesting | Subpath discovery testing |
+| `empty-repo/` | No resources | Empty repository case |
 
 ## Adding New Fixtures
 
-To add a new test fixture:
+1. Create directory: `mkdir testdata/repos/new-fixture`
+2. Add README.md with origin: `# Based on: <source>`
+3. Create minimal resource structure
+4. Keep files small and focused
+5. Commit to repository
+6. Document in this README
 
-1. Create a new directory under `testdata/repos/`
-2. Add a `README.md` explaining the fixture's purpose and origin
-3. Create valid resource files following the formats below
-4. Keep content minimal but realistic
-5. Commit all files to the repository
+## Guidelines
+
+- **Minimal**: Only include files needed for tests
+- **Valid**: Resources should have proper frontmatter
+- **Documented**: README.md explains purpose and origin
+- **Small**: Keep total fixture size <1MB
+- **No binaries**: Text files only
+- **No .git**: These are file trees, not Git repos
 
 ### Resource Formats
 
@@ -75,31 +84,18 @@ license: License (optional)
 # Agent content here
 ```
 
-## Attribution
-
-These fixtures are based on structures from:
-- Anthropic's skills repository (https://github.com/anthropics/skills)
-- Anthropic's quickstarts repository (https://github.com/anthropics/quickstarts)
-- OpenCode examples
-- Real-world usage patterns
-
 ## Usage in Tests
 
-Import fixtures in tests:
-
 ```go
-import "path/filepath"
+import "github.com/hk9890/ai-config-manager/test/testutil"
 
-func TestDiscovery(t *testing.T) {
-    fixturePath := filepath.Join("testdata", "repos", "skills-standard")
-    resources, err := discovery.Discover(fixturePath, opts)
+func TestExample(t *testing.T) {
+    fixturePath := testutil.GetFixturePath("skills-standard")
+    skills, err := discovery.DiscoverSkills(fixturePath, "")
     // ... assertions
 }
 ```
 
-## Maintenance
+## Attribution
 
-- Keep fixtures small and focused on specific test scenarios
-- Update fixtures when resource formats change
-- Document any non-obvious test cases in fixture README files
-- Avoid binary files or large content
+Fixtures are inspired by real open-source projects but are minimal, modified versions created specifically for testing. See individual README files for attribution.

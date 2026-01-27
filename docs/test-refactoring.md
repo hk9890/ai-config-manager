@@ -642,6 +642,84 @@ jobs:
 
 ---
 
+## ✅ Implementation Complete
+
+### What Changed
+
+**Before**: Tests cloned real GitHub repos (anthropics/quickstarts, anthropics/skills)
+- Execution time: ~3 minutes
+- Network dependent
+- Flaky failures
+
+**After**: Tests use committed fixtures + minimal Git integration tests
+- Execution time: <30 seconds
+- Fast unit tests (<5s) by default
+- Integration tests opt-in
+
+### New Test Structure
+
+```
+test/
+  testutil/
+    fixtures.go         # Helper: GetFixturePath()
+    doc.go              # Package documentation
+  
+  git_integration_test.go   # Minimal Git tests (opt-in, //go:build integration)
+  discovery_skills_test.go  # Skills discovery (fixtures)
+  discovery_commands_test.go # Commands discovery (fixtures)
+  discovery_agents_test.go   # Agents discovery (fixtures)
+  discovery_mixed_test.go    # Mixed scenarios (fixtures)
+
+testdata/
+  repos/
+    skills-standard/     # Standard skills layout
+    commands-nested/     # Nested commands
+    mixed-resources/     # Multiple resource types
+    dotdir-resources/    # .claude, .opencode dirs
+    malformed-resources/ # Error cases
+    subpath-test/        # Deep nesting
+    empty-repo/          # No resources
+    README.md            # Fixture documentation
+```
+
+### Running Tests
+
+```bash
+# Fast unit tests (default) - <5 seconds
+make test
+
+# With integration tests (uses network) - ~30 seconds
+make test-integration
+
+# Just integration tests
+go test -v -tags=integration ./test
+
+# Coverage report
+make test-coverage
+```
+
+### Adding New Tests
+
+**For discovery logic** (preferred):
+1. Add fixture to `testdata/repos/`
+2. Write test using `testutil.GetFixturePath()`
+3. No network required, fast execution
+
+**For Git operations** (rare):
+1. Add to `git_integration_test.go`
+2. Use `//go:build integration` tag
+3. Use `hk9890/ai-tools` repo only
+4. Must be justified (test new Git feature)
+
+### Test Philosophy
+
+- **Unit tests** (fixtures): Test discovery, parsing, resource handling
+- **Integration tests** (network): Test Git operations work
+- **Don't test** Git itself works (that's Git's job)
+- **Do test** our integration with Git works correctly
+
+---
+
 ## Appendix
 
 ### Test Execution Time Benchmarks
