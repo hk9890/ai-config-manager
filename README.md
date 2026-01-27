@@ -264,13 +264,13 @@ Add specific resources (type is auto-detected):
 
 ```bash
 # Add a command (single .md file - auto-detected as command)
-aimgr repo add ~/.claude/commands/my-command.md
+aimgr repo import ~/.claude/commands/my-command.md
 
 # Add a skill (directory with SKILL.md - auto-detected as skill)
-aimgr repo add ~/my-skills/pdf-processing
+aimgr repo import ~/my-skills/pdf-processing
 
 # Add an agent (single .md file - auto-detected as agent)
-aimgr repo add ~/.claude/agents/code-reviewer.md
+aimgr repo import ~/.claude/agents/code-reviewer.md
 ```
 
 #### Auto-Discovery from Folders and Repositories
@@ -279,25 +279,25 @@ Auto-discover and add all resources (commands, skills, agents, packages) from a 
 
 ```bash
 # From local folders
-aimgr repo add ~/.opencode/           # Discovers all resources in .opencode
-aimgr repo add ~/project/.claude/     # Discovers all resources in .claude
-aimgr repo add ./my-resources/        # Any folder with resources
+aimgr repo import ~/.opencode/           # Discovers all resources in .opencode
+aimgr repo import ~/project/.claude/     # Discovers all resources in .claude
+aimgr repo import ./my-resources/        # Any folder with resources
 
 # From GitHub
-aimgr repo add gh:owner/repo          # Auto-discovers all resources in repo
-aimgr repo add gh:owner/repo@v1.0.0   # Specific version
-aimgr repo add owner/repo             # Shorthand (gh: inferred)
+aimgr repo import gh:owner/repo          # Auto-discovers all resources in repo
+aimgr repo import gh:owner/repo@v1.0.0   # Specific version
+aimgr repo import owner/repo             # Shorthand (gh: inferred)
 
 # With options
-aimgr repo add ~/.opencode/ --force         # Overwrite existing
-aimgr repo add ./resources/ --skip-existing # Skip conflicts
-aimgr repo add ./test/ --dry-run            # Preview without importing
+aimgr repo import ~/.opencode/ --force         # Overwrite existing
+aimgr repo import ./resources/ --skip-existing # Skip conflicts
+aimgr repo import ./test/ --dry-run            # Preview without importing
 
 # Filter resources with patterns
-aimgr repo add gh:owner/repo --filter "skill/*"     # Only add skills
-aimgr repo add ./resources/ --filter "skill/pdf*"   # Skills starting with "pdf"
-aimgr repo add ~/.claude/ --filter "*test*"         # Resources with "test" in name
-aimgr repo add gh:owner/repo --filter "package/*"   # Only add packages
+aimgr repo import gh:owner/repo --filter "skill/*"     # Only add skills
+aimgr repo import ./resources/ --filter "skill/pdf*"   # Skills starting with "pdf"
+aimgr repo import ~/.claude/ --filter "*test*"         # Resources with "test" in name
+aimgr repo import gh:owner/repo --filter "package/*"   # Only add packages
 
 # Example output:
 # Importing from: /home/user/.opencode
@@ -330,17 +330,17 @@ Add specific resources from GitHub repositories:
 
 ```bash
 # Add resources from GitHub (type auto-detected)
-aimgr repo add gh:vercel-labs/agent-skills
+aimgr repo import gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-aimgr repo add gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo import gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific branch or tag
-aimgr repo add gh:anthropics/skills@v1.0.0
+aimgr repo import gh:anthropics/skills@v1.0.0
 
 # Add specific resource types using filters
-aimgr repo add gh:myorg/repo --filter "command/*"
-aimgr repo add gh:myorg/repo --filter "agent/*"
+aimgr repo import gh:myorg/repo --filter "command/*"
+aimgr repo import gh:myorg/repo --filter "agent/*"
 ```
 
 ### 3. List Available Resources
@@ -514,29 +514,29 @@ Add resources directly from GitHub repositories using the `gh:` prefix:
 
 ```bash
 # Basic syntax
-aimgr repo add skill gh:owner/repo
+aimgr repo import skill gh:owner/repo
 
 # With specific path (for multi-resource repos)
-aimgr repo add skill gh:owner/repo/path/to/skill
+aimgr repo import skill gh:owner/repo/path/to/skill
 
 # With branch or tag reference
-aimgr repo add skill gh:owner/repo@branch-name
-aimgr repo add skill gh:owner/repo@v1.0.0
+aimgr repo import skill gh:owner/repo@branch-name
+aimgr repo import skill gh:owner/repo@v1.0.0
 
 # Combined: path and reference
-aimgr repo add skill gh:owner/repo/skills/my-skill@main
+aimgr repo import skill gh:owner/repo/skills/my-skill@main
 ```
 
 **Examples:**
 ```bash
 # Add a skill from Vercel's agent-skills repository
-aimgr repo add skill gh:vercel-labs/agent-skills
+aimgr repo import skill gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo import skill gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific version tag
-aimgr repo add skill gh:anthropics/skills@v2.1.0
+aimgr repo import skill gh:anthropics/skills@v2.1.0
 ```
 
 **How it works:**
@@ -551,12 +551,12 @@ Add resources from your local filesystem using the `local:` prefix or a direct p
 
 ```bash
 # Explicit local prefix
-aimgr repo add skill local:./my-skill
-aimgr repo add skill local:/absolute/path/to/skill
+aimgr repo import skill local:./my-skill
+aimgr repo import skill local:/absolute/path/to/skill
 
 # Direct path (local: is implied)
-aimgr repo add skill ./my-skill
-aimgr repo add skill ~/my-skills/pdf-processing
+aimgr repo import skill ./my-skill
+aimgr repo import skill ~/my-skills/pdf-processing
 ```
 
 **Note:** Local sources work exactly as before - the `local:` prefix is optional for backward compatibility.
@@ -567,14 +567,14 @@ Add from any Git repository using full URLs:
 
 ```bash
 # HTTPS URLs
-aimgr repo add skill https://github.com/owner/repo.git
-aimgr repo add skill https://gitlab.com/owner/repo.git
+aimgr repo import skill https://github.com/owner/repo.git
+aimgr repo import skill https://gitlab.com/owner/repo.git
 
 # SSH URLs
-aimgr repo add skill git@github.com:owner/repo.git
+aimgr repo import skill git@github.com:owner/repo.git
 
 # With branch reference
-aimgr repo add skill https://github.com/owner/repo.git@develop
+aimgr repo import skill https://github.com/owner/repo.git@develop
 ```
 
 ### Shorthand Syntax
@@ -583,12 +583,12 @@ For convenience, `aimgr` infers the `gh:` prefix for GitHub-style `owner/repo` p
 
 ```bash
 # These are equivalent:
-aimgr repo add skill vercel-labs/agent-skills
-aimgr repo add skill gh:vercel-labs/agent-skills
+aimgr repo import skill vercel-labs/agent-skills
+aimgr repo import skill gh:vercel-labs/agent-skills
 
 # With path:
-aimgr repo add skill vercel-labs/agent-skills/skills/frontend-design
-aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo import skill vercel-labs/agent-skills/skills/frontend-design
+aimgr repo import skill gh:vercel-labs/agent-skills/skills/frontend-design
 ```
 
 ### Auto-Discovery
@@ -627,7 +627,7 @@ When adding resources from GitHub or Git URLs, `aimgr` automatically searches fo
 
 ## Pattern Syntax
 
-Many commands support glob patterns for matching multiple resources. Patterns work with `repo add --filter`, `install`, and `uninstall` commands.
+Many commands support glob patterns for matching multiple resources. Patterns work with `repo import --filter`, `install`, and `uninstall` commands.
 
 ### Pattern Operators
 
@@ -649,19 +649,19 @@ Patterns can optionally specify a resource type prefix:
 **Adding resources with filters:**
 ```bash
 # Add all skills from a repository
-aimgr repo add gh:owner/repo --filter "skill/*"
+aimgr repo import gh:owner/repo --filter "skill/*"
 
 # Add skills matching a pattern
-aimgr repo add gh:owner/repo --filter "skill/pdf*"
+aimgr repo import gh:owner/repo --filter "skill/pdf*"
 
 # Add all resources with "test" in the name
-aimgr repo add ./resources/ --filter "*test*"
+aimgr repo import ./resources/ --filter "*test*"
 
 # Add commands and agents only (no skills)
-aimgr repo add ~/.opencode/ --filter "command/*" --filter "agent/*"
+aimgr repo import ~/.opencode/ --filter "command/*" --filter "agent/*"
 
 # Add only packages from a repository
-aimgr repo add gh:owner/repo --filter "package/*"
+aimgr repo import gh:owner/repo --filter "package/*"
 ```
 
 **Installing resources with patterns:**
@@ -723,7 +723,7 @@ aimgr uninstall "skill/legacy-*" "command/deprecated-*"
 Provides clean, formatted output with status indicators:
 
 ```bash
-$ aimgr repo add ~/my-resources/
+$ aimgr repo import ~/my-resources/
 
 ┌─────────┬─────────────────────┬─────────┬──────────────────────┐
 │ TYPE    │ NAME                │ STATUS  │ MESSAGE              │
@@ -743,7 +743,7 @@ Summary: 4 added, 0 failed, 1 skipped (5 total)
 Perfect for scripting and automation:
 
 ```bash
-$ aimgr repo add ~/my-resources/ --format=json
+$ aimgr repo import ~/my-resources/ --format=json
 {
   "added": [
     {
@@ -770,16 +770,16 @@ $ aimgr repo add ~/my-resources/ --format=json
 
 ```bash
 # Extract only added resource names
-aimgr repo add ~/resources/ --format=json | jq '.added[].name'
+aimgr repo import ~/resources/ --format=json | jq '.added[].name'
 
 # Check for failures in scripts
-if [ $(aimgr repo add ~/resources/ --format=json | jq '.failed | length') -gt 0 ]; then
+if [ $(aimgr repo import ~/resources/ --format=json | jq '.failed | length') -gt 0 ]; then
   echo "Import failed!"
   exit 1
 fi
 
 # Get error messages
-aimgr repo add ~/resources/ --format=json | jq '.failed[] | {name, error: .message}'
+aimgr repo import ~/resources/ --format=json | jq '.failed[] | {name, error: .message}'
 ```
 
 ### YAML Format
@@ -787,7 +787,7 @@ aimgr repo add ~/resources/ --format=json | jq '.failed[] | {name, error: .messa
 Human-readable structured output:
 
 ```bash
-$ aimgr repo add ~/my-resources/ --format=yaml
+$ aimgr repo import ~/my-resources/ --format=yaml
 added:
   - name: pdf-processing
     type: skill
@@ -807,7 +807,7 @@ package_count: 0
 
 ```bash
 # Save import log
-aimgr repo add gh:myorg/resources --format=yaml > import-log.yaml
+aimgr repo import gh:myorg/resources --format=yaml > import-log.yaml
 
 # Review later
 cat import-log.yaml
@@ -844,7 +844,7 @@ The `--format` flag is available on these commands:
 
 ```bash
 # Repository operations
-aimgr repo add <source> --format=json
+aimgr repo import <source> --format=json
 aimgr repo sync --format=json
 aimgr repo list --format=json
 aimgr repo update --format=json
@@ -877,48 +877,48 @@ aimgr config set install.targets claude
 aimgr config set install.targets claude,opencode
 ```
 
-### `aimgr repo add`
+### `aimgr repo import`
 
 Add resources to the repository from various sources. Resource types are auto-detected from file structure and content.
 
 ```bash
 # Add from GitHub (with auto-discovery)
-aimgr repo add gh:owner/repo
-aimgr repo add gh:owner/repo/path/to/resource
-aimgr repo add gh:owner/repo@v1.0.0
+aimgr repo import gh:owner/repo
+aimgr repo import gh:owner/repo/path/to/resource
+aimgr repo import gh:owner/repo@v1.0.0
 
 # Add from local path (type auto-detected)
-aimgr repo add <path-to-file.md>           # Auto-detects command or agent
-aimgr repo add <path-to-directory>         # Auto-detects skill
-aimgr repo add ~/.claude/commands/test.md  # Command
-aimgr repo add ~/my-skills/pdf-processing  # Skill
-aimgr repo add ~/.claude/agents/reviewer.md # Agent
+aimgr repo import <path-to-file.md>           # Auto-detects command or agent
+aimgr repo import <path-to-directory>         # Auto-detects skill
+aimgr repo import ~/.claude/commands/test.md  # Command
+aimgr repo import ~/my-skills/pdf-processing  # Skill
+aimgr repo import ~/.claude/agents/reviewer.md # Agent
 
 # Add using shorthand (infers gh: for owner/repo)
-aimgr repo add vercel-labs/agent-skills
+aimgr repo import vercel-labs/agent-skills
 
 # Add from Git URL
-aimgr repo add https://github.com/owner/repo.git
-aimgr repo add git@github.com:owner/repo.git
+aimgr repo import https://github.com/owner/repo.git
+aimgr repo import git@github.com:owner/repo.git
 
 # Add with explicit local prefix
-aimgr repo add local:./my-resource
-aimgr repo add local:/absolute/path/to/resource
+aimgr repo import local:./my-resource
+aimgr repo import local:/absolute/path/to/resource
 
 # Add all resources from a folder (auto-discovery)
-aimgr repo add ~/.opencode/
-aimgr repo add ~/project/.claude/
-aimgr repo add ./my-resources/
+aimgr repo import ~/.opencode/
+aimgr repo import ~/project/.claude/
+aimgr repo import ./my-resources/
 
 # Filter resources during import
-aimgr repo add gh:owner/repo --filter "skill/*"       # Only skills
-aimgr repo add ~/.opencode/ --filter "skill/pdf*"     # Skills starting with "pdf"
-aimgr repo add ./resources/ --filter "*test*"         # Resources with "test" in name
+aimgr repo import gh:owner/repo --filter "skill/*"       # Only skills
+aimgr repo import ~/.opencode/ --filter "skill/pdf*"     # Skills starting with "pdf"
+aimgr repo import ./resources/ --filter "*test*"         # Resources with "test" in name
 
 # Import options
-aimgr repo add <source> --force                       # Overwrite existing
-aimgr repo add <source> --skip-existing               # Skip conflicts
-aimgr repo add <source> --dry-run                     # Preview without importing
+aimgr repo import <source> --force                       # Overwrite existing
+aimgr repo import <source> --skip-existing               # Skip conflicts
+aimgr repo import <source> --dry-run                     # Preview without importing
 ```
 
 **Source Formats:**
@@ -1052,9 +1052,9 @@ If you previously used an `aimgr-init` setup script to populate your repository,
 ```bash
 #!/bin/bash
 # aimgr-init - Manual setup script
-aimgr repo add gh:anthropics/skills
-aimgr repo add gh:myorg/commands --filter "command/*"
-aimgr repo add ~/local/resources --filter "skill/*"
+aimgr repo import gh:anthropics/skills
+aimgr repo import gh:myorg/commands --filter "command/*"
+aimgr repo import ~/local/resources --filter "skill/*"
 ```
 
 **New approach (config file):**
@@ -1104,36 +1104,6 @@ aimgr repo sync
 aimgr repo sync --skip-existing  # Keep local changes
 ```
 
-### `aimgr repo create-package`
-
-Create a package from existing resources in the repository.
-
-```bash
-# Create package with description and resources
-aimgr repo create-package web-dev-tools \
-  --description="Web development toolkit" \
-  --resources="command/build,skill/typescript-helper,agent/code-reviewer"
-
-# Create package with multiple resources
-aimgr repo create-package testing-suite \
-  --description="Complete testing toolkit" \
-  --resources="command/test,command/coverage,skill/test-generator"
-
-# Overwrite existing package
-aimgr repo create-package my-tools \
-  --description="Updated tools" \
-  --resources="command/lint,skill/formatter" \
-  --force
-```
-
-**Flags:**
-- `--description`: Package description (required)
-- `--resources`: Comma-separated list of resources in `type/name` format (required)
-- `--force, -f`: Overwrite existing package
-
-**Resource Format:** `type/name` where type is `command`, `skill`, or `agent`
-
-All specified resources must exist in the repository before creating the package.
 
 ### `aimgr repo list`
 
@@ -1432,29 +1402,29 @@ Add resources directly from GitHub repositories using the `gh:` prefix:
 
 ```bash
 # Basic syntax
-aimgr repo add skill gh:owner/repo
+aimgr repo import skill gh:owner/repo
 
 # With specific path (for multi-resource repos)
-aimgr repo add skill gh:owner/repo/path/to/skill
+aimgr repo import skill gh:owner/repo/path/to/skill
 
 # With branch or tag reference
-aimgr repo add skill gh:owner/repo@branch-name
-aimgr repo add skill gh:owner/repo@v1.0.0
+aimgr repo import skill gh:owner/repo@branch-name
+aimgr repo import skill gh:owner/repo@v1.0.0
 
 # Combined: path and reference
-aimgr repo add skill gh:owner/repo/skills/my-skill@main
+aimgr repo import skill gh:owner/repo/skills/my-skill@main
 ```
 
 **Examples:**
 ```bash
 # Add a skill from Vercel's agent-skills repository
-aimgr repo add skill gh:vercel-labs/agent-skills
+aimgr repo import skill gh:vercel-labs/agent-skills
 
 # Add a specific skill from a multi-skill repo
-aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo import skill gh:vercel-labs/agent-skills/skills/frontend-design
 
 # Add from a specific version tag
-aimgr repo add skill gh:anthropics/skills@v2.1.0
+aimgr repo import skill gh:anthropics/skills@v2.1.0
 ```
 
 **How it works:**
@@ -1469,12 +1439,12 @@ Add resources from your local filesystem using the `local:` prefix or a direct p
 
 ```bash
 # Explicit local prefix
-aimgr repo add skill local:./my-skill
-aimgr repo add skill local:/absolute/path/to/skill
+aimgr repo import skill local:./my-skill
+aimgr repo import skill local:/absolute/path/to/skill
 
 # Direct path (local: is implied)
-aimgr repo add skill ./my-skill
-aimgr repo add skill ~/my-skills/pdf-processing
+aimgr repo import skill ./my-skill
+aimgr repo import skill ~/my-skills/pdf-processing
 ```
 
 **Note:** Local sources work exactly as before - the `local:` prefix is optional for backward compatibility.
@@ -1485,14 +1455,14 @@ Add from any Git repository using full URLs:
 
 ```bash
 # HTTPS URLs
-aimgr repo add skill https://github.com/owner/repo.git
-aimgr repo add skill https://gitlab.com/owner/repo.git
+aimgr repo import skill https://github.com/owner/repo.git
+aimgr repo import skill https://gitlab.com/owner/repo.git
 
 # SSH URLs
-aimgr repo add skill git@github.com:owner/repo.git
+aimgr repo import skill git@github.com:owner/repo.git
 
 # With branch reference
-aimgr repo add skill https://github.com/owner/repo.git@develop
+aimgr repo import skill https://github.com/owner/repo.git@develop
 ```
 
 ### Shorthand Syntax
@@ -1501,12 +1471,12 @@ For convenience, `aimgr` infers the `gh:` prefix for GitHub-style `owner/repo` p
 
 ```bash
 # These are equivalent:
-aimgr repo add skill vercel-labs/agent-skills
-aimgr repo add skill gh:vercel-labs/agent-skills
+aimgr repo import skill vercel-labs/agent-skills
+aimgr repo import skill gh:vercel-labs/agent-skills
 
 # With path:
-aimgr repo add skill vercel-labs/agent-skills/skills/frontend-design
-aimgr repo add skill gh:vercel-labs/agent-skills/skills/frontend-design
+aimgr repo import skill vercel-labs/agent-skills/skills/frontend-design
+aimgr repo import skill gh:vercel-labs/agent-skills/skills/frontend-design
 ```
 
 ### Auto-Discovery
@@ -1554,24 +1524,24 @@ A package is a JSON file that references existing resources in your repository. 
 
 ### Creating Packages
 
-Create a package from existing resources in your repository:
+Packages are defined as JSON files with the format `<name>.package.json` in a `packages/` directory. Create a package file with this structure:
+
+```json
+{
+  "name": "web-dev-tools",
+  "description": "Web development toolkit",
+  "resources": [
+    "command/build",
+    "skill/typescript-helper",
+    "agent/code-reviewer"
+  ]
+}
+```
+
+Then import it:
 
 ```bash
-# Create a package with description and resources
-aimgr repo create-package web-dev-tools \
-  --description="Web development toolkit" \
-  --resources="command/build,skill/typescript-helper,agent/code-reviewer"
-
-# Create a package with multiple resources
-aimgr repo create-package testing-suite \
-  --description="Complete testing toolkit" \
-  --resources="command/test,command/coverage,skill/test-generator,agent/qa-tester"
-
-# Overwrite existing package
-aimgr repo create-package my-tools \
-  --description="Updated tools collection" \
-  --resources="command/lint,skill/formatter" \
-  --force
+aimgr repo import ~/my-packages/
 ```
 
 **Resource Format**: Resources are specified as `type/name`:
@@ -1579,7 +1549,7 @@ aimgr repo create-package my-tools \
 - `skill/name` - Skill resource  
 - `agent/name` - Agent resource
 
-All resources must already exist in your repository before creating a package.
+All resources must already exist in your repository before the package can be installed.
 
 ### Installing Packages
 
@@ -1681,42 +1651,42 @@ See [examples/packages/](examples/packages/) for complete examples.
 
 **1. Project Setup:**
 ```bash
-# Create a package for React projects
-aimgr repo create-package react-starter \
-  --description="React development essentials" \
-  --resources="command/dev,command/build,skill/react-helper,agent/react-reviewer"
+# Create a package file: react-starter.package.json
+# {
+#   "name": "react-starter",
+#   "description": "React development essentials",
+#   "resources": ["command/dev", "command/build", "skill/react-helper", "agent/react-reviewer"]
+# }
 
-# Install in new React project
+# Import and install in new React project
+aimgr repo import ~/packages/
 cd my-react-app
 aimgr install package/react-starter
 ```
 
 **2. Testing Workflow:**
 ```bash
-# Testing tools package
-aimgr repo create-package test-tools \
-  --description="Complete testing suite" \
-  --resources="command/test,command/coverage,skill/test-generator,agent/qa-tester"
-
-# Install for testing workflow
+# Create test-tools.package.json with testing resources
+# Then import and install
+aimgr repo import ~/packages/
 aimgr install package/test-tools
 ```
 
 **3. Documentation:**
 ```bash
-# Documentation helpers
-aimgr repo create-package docs-tools \
-  --description="Documentation toolkit" \
-  --resources="skill/markdown-formatter,agent/doc-writer,command/doc-gen"
+# Create docs-tools.package.json with documentation resources
+# Then import and install
+aimgr repo import ~/packages/
+aimgr install package/docs-tools
 ```
 
 ## Marketplace Import
 
-Import Claude plugin marketplaces to quickly bootstrap your repository with curated collections of resources. Marketplace files are automatically discovered and imported when you use `aimgr repo add`.
+Import Claude plugin marketplaces to quickly bootstrap your repository with curated collections of resources. Marketplace files are automatically discovered and imported when you use `aimgr repo import`.
 
 ### What is Marketplace Import?
 
-Claude plugin marketplaces use a `marketplace.json` file to define collections of plugins with commands, skills, and agents. When `aimgr repo add` detects a marketplace file, it automatically:
+Claude plugin marketplaces use a `marketplace.json` file to define collections of plugins with commands, skills, and agents. When `aimgr repo import` detects a marketplace file, it automatically:
 
 - **Parses** the marketplace.json file
 - **Discovers** resources in each plugin's source directory  
@@ -1728,22 +1698,22 @@ This makes it easy to import entire plugin ecosystems in one command.
 
 ### Basic Usage
 
-The marketplace import feature is integrated into `aimgr repo add`. When you add a directory containing a `marketplace.json` file, it's automatically detected and processed:
+The marketplace import feature is integrated into `aimgr repo import`. When you add a directory containing a `marketplace.json` file, it's automatically detected and processed:
 
 ```bash
 # Import from local directory with marketplace
-aimgr repo add ~/my-marketplace/
+aimgr repo import ~/my-marketplace/
 
 # Import from GitHub repository with marketplace
-aimgr repo add gh:myorg/plugins
+aimgr repo import gh:myorg/plugins
 
 # Preview without importing
-aimgr repo add ~/my-marketplace/ --dry-run
+aimgr repo import ~/my-marketplace/ --dry-run
 ```
 
 ### Auto-Discovery
 
-`aimgr repo add` automatically searches for marketplace files in standard locations:
+`aimgr repo import` automatically searches for marketplace files in standard locations:
 
 **Marketplace Discovery:**
 1. `marketplace.json` in the root directory
@@ -1754,7 +1724,7 @@ When found, the marketplace is automatically imported along with any other resou
 
 ### Command Options
 
-Use the same flags as `aimgr repo add`:
+Use the same flags as `aimgr repo import`:
 
 **Flags:**
 - `--dry-run`: Preview what would be imported without making changes
@@ -1766,21 +1736,21 @@ Use the same flags as `aimgr repo add`:
 
 ```bash
 # Import marketplace with all its plugins
-aimgr repo add ~/claude-plugins/
+aimgr repo import ~/claude-plugins/
 
 # Import specific plugins only
-aimgr repo add ~/claude-plugins/ --filter "web-*"
+aimgr repo import ~/claude-plugins/ --filter "web-*"
 
 # Force overwrite existing packages
-aimgr repo add gh:myorg/plugins --force
+aimgr repo import gh:myorg/plugins --force
 
 # Preview what would be imported
-aimgr repo add ~/marketplace/ --dry-run
+aimgr repo import ~/marketplace/ --dry-run
 ```
 
 ### How It Works
 
-When `aimgr repo add` finds a marketplace:
+When `aimgr repo import` finds a marketplace:
 
 1. **Parse**: Reads the marketplace.json file
 2. **Filter**: Applies optional pattern filters to select specific plugins
@@ -1849,7 +1819,7 @@ See [examples/marketplace/](examples/marketplace/) for complete examples.
 # Create marketplace for your organization's plugins
 # Distribute repository to team members via GitHub
 # They import with one command:
-aimgr repo add gh:myorg/plugins
+aimgr repo import gh:myorg/plugins
 
 # All plugins become packages they can install:
 aimgr install package/web-dev-tools
@@ -1859,7 +1829,7 @@ aimgr install package/testing-suite
 **2. Public Plugin Collections:**
 ```bash
 # Import community plugin collections
-aimgr repo add gh:community/awesome-claude-plugins
+aimgr repo import gh:community/awesome-claude-plugins
 
 # Browse imported packages
 aimgr repo list package
@@ -1875,7 +1845,7 @@ git clone https://github.com/myorg/project
 cd project
 
 # Import project-specific plugins
-aimgr repo add ./.claude-plugin/
+aimgr repo import ./.claude-plugin/
 
 # All project resources available immediately
 aimgr install package/backend-tools package/frontend-tools
@@ -1929,19 +1899,19 @@ Use glob patterns to import specific plugins:
 
 ```bash
 # Import only web-related plugins
-aimgr repo add ~/marketplace/ --filter "web-*"
+aimgr repo import ~/marketplace/ --filter "web-*"
 
 # Import testing plugins
-aimgr repo add gh:myorg/plugins --filter "*-test"
+aimgr repo import gh:myorg/plugins --filter "*-test"
 
 # Import multiple patterns (multiple commands)
-aimgr repo add ~/marketplace/ --filter "code-*"
-aimgr repo add ~/marketplace/ --filter "dev-*"
+aimgr repo import ~/marketplace/ --filter "code-*"
+aimgr repo import ~/marketplace/ --filter "dev-*"
 ```
 
-### Integration with repo add
+### Integration with repo import
 
-Marketplace import is seamlessly integrated into `aimgr repo add`:
+Marketplace import is seamlessly integrated into `aimgr repo import`:
 
 - **Automatic detection**: No special command needed
 - **Works with all sources**: Local paths and GitHub repositories
@@ -1951,7 +1921,7 @@ Marketplace import is seamlessly integrated into `aimgr repo add`:
 
 **Example output:**
 ```bash
-$ aimgr repo add ~/my-plugins/ --dry-run
+$ aimgr repo import ~/my-plugins/ --dry-run
 
 Importing from: /home/user/my-plugins
   Mode: DRY RUN (preview only)
@@ -2433,21 +2403,21 @@ In recent versions, aimgr unified its command structure to be simpler and more c
 
 | Old Command | New Command | Notes |
 |-------------|-------------|-------|
-| `aimgr repo add bulk <source>` | `aimgr repo add <source>` | Auto-discovery is now the default behavior |
-| `aimgr repo add command <file>` | `aimgr repo add <file>` | Type auto-detected from file content |
-| `aimgr repo add skill <dir>` | `aimgr repo add <dir>` | Type auto-detected from SKILL.md |
-| `aimgr repo add agent <file>` | `aimgr repo add <file>` | Type auto-detected from frontmatter |
-| N/A | `aimgr repo add <source> --filter "type/*"` | New: Filter resources during import |
+| `aimgr repo import bulk <source>` | `aimgr repo import <source>` | Auto-discovery is now the default behavior |
+| `aimgr repo import command <file>` | `aimgr repo import <file>` | Type auto-detected from file content |
+| `aimgr repo import skill <dir>` | `aimgr repo import <dir>` | Type auto-detected from SKILL.md |
+| `aimgr repo import agent <file>` | `aimgr repo import <file>` | Type auto-detected from frontmatter |
+| N/A | `aimgr repo import <source> --filter "type/*"` | New: Filter resources during import |
 
 ### Before and After Examples
 
 **Adding all resources from a folder:**
 ```bash
 # Old way
-aimgr repo add bulk ~/.opencode/
+aimgr repo import bulk ~/.opencode/
 
 # New way (exactly the same)
-aimgr repo add ~/.opencode/
+aimgr repo import ~/.opencode/
 ```
 
 **Adding only skills from a repository:**
@@ -2457,20 +2427,20 @@ aimgr repo add ~/.opencode/
 # 2. Add each skill individually
 
 # New way
-aimgr repo add gh:owner/repo --filter "skill/*"
+aimgr repo import gh:owner/repo --filter "skill/*"
 ```
 
 **Adding a single resource:**
 ```bash
 # Old way
-aimgr repo add command ~/my-command.md
-aimgr repo add skill ~/my-skill/
-aimgr repo add agent ~/my-agent.md
+aimgr repo import command ~/my-command.md
+aimgr repo import skill ~/my-skill/
+aimgr repo import agent ~/my-agent.md
 
 # New way (type auto-detected)
-aimgr repo add ~/my-command.md
-aimgr repo add ~/my-skill/
-aimgr repo add ~/my-agent.md
+aimgr repo import ~/my-command.md
+aimgr repo import ~/my-skill/
+aimgr repo import ~/my-agent.md
 ```
 
 **Installing resources with patterns:**
@@ -2505,8 +2475,8 @@ aimgr uninstall "*test*"
 
 ### Migration Checklist
 
-- ✅ Replace `repo add bulk` with `repo add` (both work)
-- ✅ Replace `repo add command/skill/agent` with `repo add` (type auto-detected)
+- ✅ Replace `repo import bulk` with `repo import` (both work)
+- ✅ Replace `repo import command/skill/agent` with `repo import` (type auto-detected)
 - ✅ Use `--filter` flag to selectively import resources
 - ✅ Use patterns with `install` and `uninstall` for batch operations
 - ✅ Update scripts and documentation to use new syntax
@@ -2520,14 +2490,14 @@ All old commands continue to work - no breaking changes!
 1. Create a `.md` file with valid name: `my-command.md`
 2. Add YAML frontmatter with `description`
 3. Write command body in markdown
-4. Test: `aimgr repo add command ./my-command.md`
+4. Test: `aimgr repo import command ./my-command.md`
 
 ### Create a Skill
 
 1. Create directory with valid name: `my-skill/`
 2. Create `SKILL.md` with frontmatter (name must match directory)
 3. Optionally add `scripts/`, `references/`, `assets/`
-4. Test: `aimgr repo add skill ./my-skill`
+4. Test: `aimgr repo import skill ./my-skill`
 
 ### Create an Agent
 
@@ -2535,7 +2505,7 @@ All old commands continue to work - no breaking changes!
 2. Add YAML frontmatter with `description`
 3. Optionally add `type`, `instructions`, `capabilities` (OpenCode format)
 4. Write agent documentation in markdown body
-5. Test: `aimgr repo add agent ./my-agent.md`
+5. Test: `aimgr repo import agent ./my-agent.md`
 
 See [examples/README.md](examples/README.md) for detailed instructions.
 
@@ -2585,14 +2555,14 @@ Solution:
 
 Solution:
 - Verify the repository contains resources in standard locations
-- Try specifying a direct path: `aimgr repo add skill gh:owner/repo/path/to/skill`
+- Try specifying a direct path: `aimgr repo import skill gh:owner/repo/path/to/skill`
 - Check that resources have valid frontmatter (SKILL.md with name and description)
 - Use the repository's documentation to find resource locations
 
 **Problem: "Multiple resources found, please specify path"**
 
 Solution:
-- Add the specific path to your command: `aimgr repo add skill gh:owner/repo/skills/specific-skill`
+- Add the specific path to your command: `aimgr repo import skill gh:owner/repo/skills/specific-skill`
 - List available resources by cloning the repo manually: `git clone https://github.com/owner/repo && ls -R`
 
 **Problem: Network timeout or slow clones**
@@ -2635,7 +2605,7 @@ Solution:
 **Problem: "Resource already exists"**
 
 Solution:
-- Use `--force` flag to overwrite: `aimgr repo add skill gh:owner/repo --force`
+- Use `--force` flag to overwrite: `aimgr repo import skill gh:owner/repo --force`
 - Or remove the existing resource first: `aimgr repo remove skill <name>`
 - Check what's installed: `aimgr list`
 
@@ -2660,7 +2630,7 @@ Solution:
 **Enable verbose output:**
 ```bash
 # Most commands support verbose flags (check with --help)
-aimgr repo add skill gh:owner/repo -v
+aimgr repo import skill gh:owner/repo -v
 ```
 
 **Check repository contents:**
