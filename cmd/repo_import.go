@@ -492,17 +492,28 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 	for _, cmd := range commands {
 		allPaths = append(allPaths, cmd.Path)
 	}
-	// Add skills - use discovered paths directly
+	// Add skills
 	for _, skill := range skills {
-		allPaths = append(allPaths, skill.Path)
+		skillPath, err := findSkillDir(localPath, skill.Name)
+		if err == nil {
+			allPaths = append(allPaths, skillPath)
+		}
 	}
-	// Add agents - use discovered paths directly
+
+	// Add agents
 	for _, agent := range agents {
-		allPaths = append(allPaths, agent.Path)
+		agentPath, err := findAgentFile(localPath, agent.Name)
+		if err == nil {
+			allPaths = append(allPaths, agentPath)
+		}
 	}
-	// Add packages - use discovered paths directly
+
+	// Add packages
 	for _, pkg := range packages {
-		allPaths = append(allPaths, pkg.Path)
+		pkgPath, err := findPackageFile(localPath, pkg.Name)
+		if err == nil {
+			allPaths = append(allPaths, pkgPath)
+		}
 	}
 
 	// Add resources from marketplace-generated packages
