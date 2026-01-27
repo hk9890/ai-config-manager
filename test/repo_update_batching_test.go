@@ -9,17 +9,12 @@ import (
 
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/test/testutil"
 )
 
 // TestUpdateBatching tests that multiple resources from the same Git source are batched
 func TestUpdateBatching(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	repoDir := t.TempDir()
 	manager := repo.NewManagerWithPath(repoDir)

@@ -2,17 +2,16 @@ package test
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/source"
 	"github.com/hk9890/ai-config-manager/pkg/workspace"
+	"github.com/hk9890/ai-config-manager/test/testutil"
 )
 
 // getRefOrDefault returns the ref from parsed source or "main" as default
@@ -32,27 +31,9 @@ func isGitAvailable() bool {
 	return true
 }
 
-// isOnline checks if network connectivity is available
-func isOnline() bool {
-	// Try to resolve github.com to check network connectivity
-	timeout := 2 * time.Second
-	conn, err := net.DialTimeout("tcp", "github.com:443", timeout)
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
-}
-
 // TestWorkspaceCacheFirstUpdate tests that the first update clones to cache
 func TestWorkspaceCacheFirstUpdate(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	repoDir := t.TempDir()
 
@@ -145,13 +126,7 @@ func TestWorkspaceCacheFirstUpdate(t *testing.T) {
 
 // TestWorkspaceCacheSubsequentUpdate tests that subsequent updates use git pull
 func TestWorkspaceCacheSubsequentUpdate(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	repoDir := t.TempDir()
 
@@ -240,13 +215,7 @@ func TestWorkspaceCacheSubsequentUpdate(t *testing.T) {
 
 // TestWorkspaceCacheCorruption tests handling of corrupted cache
 func TestWorkspaceCacheCorruption(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	repoDir := t.TempDir()
 
@@ -341,13 +310,7 @@ func TestWorkspaceCacheCorruption(t *testing.T) {
 
 // TestWorkspacePrune tests that prune removes unreferenced repos
 func TestWorkspacePrune(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	repoDir := t.TempDir()
 	manager := repo.NewManagerWithPath(repoDir)
@@ -485,13 +448,7 @@ description: Test command from GitHub
 
 // TestWorkspacePruneDryRun tests that dry-run doesn't remove anything
 func TestWorkspacePruneDryRun(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	repoDir := t.TempDir()
 
@@ -598,13 +555,7 @@ func TestWorkspacePruneDryRun(t *testing.T) {
 
 // TestWorkspaceCacheConcurrent tests concurrent updates to same repo (if using locking)
 func TestWorkspaceCacheConcurrent(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	// Note: The current workspace.Manager implementation doesn't have explicit locking
 	// for concurrent git operations. This can cause race conditions when multiple
@@ -723,13 +674,7 @@ func TestWorkspaceCacheConcurrent(t *testing.T) {
 
 // Additional helper test to verify cache metadata functionality
 func TestWorkspaceCacheMetadata(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	repoDir := t.TempDir()
 
@@ -804,13 +749,7 @@ func TestWorkspaceCacheMetadata(t *testing.T) {
 
 // TestWorkspaceCacheEmptyRef tests that empty ref defaults to repository's default branch
 func TestWorkspaceCacheEmptyRef(t *testing.T) {
-	if !isGitAvailable() {
-		t.Skip("Skipping test: git not available")
-	}
-
-	if !isOnline() {
-		t.Skip("Skipping test: network not available")
-	}
+	testutil.SkipIfNoGit(t)
 
 	repoDir := t.TempDir()
 
