@@ -17,19 +17,9 @@ func TestBulkAddSimple(t *testing.T) {
 	// Set XDG_DATA_HOME to control where the repo is created
 	t.Setenv("XDG_DATA_HOME", xdgData)
 
-	// Create a folder with resources
-	resourcesDir := filepath.Join(testDir, "resources")
-
-	// Create one command
-	commandsDir := filepath.Join(resourcesDir, "commands")
-	if err := os.MkdirAll(commandsDir, 0755); err != nil {
-		t.Fatalf("Failed to create commands dir: %v", err)
-	}
-
-	cmd1 := []byte("---\ndescription: Test command\n---\n# Command")
-	if err := os.WriteFile(filepath.Join(commandsDir, "test-cmd.md"), cmd1, 0644); err != nil {
-		t.Fatalf("Failed to write command: %v", err)
-	}
+	// Create one command using helper function
+	cmdPath := createTestCommand(t, "test-cmd", "Test command")
+	resourcesDir := filepath.Dir(filepath.Dir(cmdPath)) // Go up to parent of commands/
 
 	// Run unified add
 	output, err := runAimgr(t, "repo", "import", resourcesDir)
