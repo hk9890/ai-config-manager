@@ -662,32 +662,28 @@ description: A command for CLI package testing
 	}
 
 	// Add command to repo
+	// Add command to repo
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
 
-	// Create package via CLI
-	t.Log("Creating package via CLI")
-	output, err := runAimgr(t, "repo", "create-package", "cli-test-pkg",
-		"--description=Test package via CLI",
-		"--resources=command/cli-test",
-		"--force")
-	if err != nil {
-		t.Fatalf("Failed to create package: %v\nOutput: %s", err, output)
-	}
-
-	if !strings.Contains(output, "cli-test-pkg") {
-		t.Errorf("Create package output should mention package name, got: %s", output)
-	}
-	if !strings.Contains(output, "command/cli-test") {
-		t.Errorf("Create package output should list resources, got: %s", output)
-	}
-
-	// Verify package exists
+	// Create package manually (create-package command was removed)
+	t.Log("Creating package manually (create-package command was removed)")
 	pkgPath := resource.GetPackagePath("cli-test-pkg", repoDir)
+	pkg := &resource.Package{
+		Name:        "cli-test-pkg",
+		Description: "Test package via CLI",
+		Resources:   []string{"command/cli-test"},
+	}
+	err = resource.SavePackage(pkg, repoDir)
+	if err != nil {
+		t.Fatalf("Failed to create package: %v", err)
+	}
+
+	// Verify package was created
 	if _, err := os.Stat(pkgPath); os.IsNotExist(err) {
-		t.Errorf("Package file not created at %s", pkgPath)
+		t.Fatalf("Package file was not created at %s", pkgPath)
 	}
 
 	// Create project directory with .claude
@@ -701,7 +697,7 @@ description: A command for CLI package testing
 
 	// Uninstall package via CLI (this should work even without resources installed)
 	t.Log("Uninstalling package via CLI")
-	output, err = runAimgr(t, "uninstall", "package/cli-test-pkg", "--project-path", projectDir)
+	output, err := runAimgr(t, "uninstall", "package/cli-test-pkg", "--project-path", projectDir)
 	// This should succeed with "not installed" message rather than fail
 	if err != nil {
 		// Check if error is about resources not being installed (expected)
