@@ -3,7 +3,6 @@ package test
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,15 +10,6 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
-
-// isGitAvailable checks if git is available on the system
-func isGitAvailable() bool {
-	cmd := exec.Command("git", "--version")
-	if err := cmd.Run(); err != nil {
-		return false
-	}
-	return true
-}
 
 // TestUpdateBatching tests that multiple resources from the same Git source are batched
 func TestUpdateBatching(t *testing.T) {

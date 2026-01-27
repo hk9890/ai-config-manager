@@ -696,8 +696,7 @@ func (m *Manager) updateMetadataEntry(url string, ref string, updateType string)
 }
 
 // cloneRepo clones a Git repository to the specified cache path.
-// Unlike pkg/source/git.go's CloneRepo, this does a full clone (not shallow)
-// to support ref switching.
+// This does a full clone (not shallow) to support ref switching.
 func (m *Manager) cloneRepo(url string, cachePath string, ref string) error {
 	// Build git clone command (full clone for ref switching)
 	args := []string{"clone"}

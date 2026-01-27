@@ -305,3 +305,35 @@ func parseGitSSH(input string) (*ParsedSource, error) {
 		URL:  httpsURL,
 	}, nil
 }
+
+// GetCloneURL converts a ParsedSource to a git clone URL
+// This is useful for getting the clone URL from a parsed source
+func GetCloneURL(ps *ParsedSource) (string, error) {
+	if ps == nil {
+		return "", fmt.Errorf("parsed source cannot be nil")
+	}
+
+	switch ps.Type {
+	case GitHub:
+		// Convert GitHub URL to git clone URL
+		// https://github.com/owner/repo/tree/branch -> https://github.com/owner/repo
+		url := ps.URL
+		// Remove /tree/ref suffix if present
+		if ps.Ref != "" {
+			url = strings.TrimSuffix(url, fmt.Sprintf("/tree/%s", ps.Ref))
+		}
+		return url, nil
+
+	case GitLab:
+		return ps.URL, nil
+
+	case GitURL:
+		return ps.URL, nil
+
+	case Local:
+		return "", fmt.Errorf("local sources cannot be cloned")
+
+	default:
+		return "", fmt.Errorf("unsupported source type: %s", ps.Type)
+	}
+}

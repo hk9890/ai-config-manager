@@ -2,11 +2,13 @@ package test
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/source"
@@ -19,6 +21,27 @@ func getRefOrDefault(parsed *source.ParsedSource) string {
 		return parsed.Ref
 	}
 	return "main"
+}
+
+// isGitAvailable checks if git is available in PATH
+func isGitAvailable() bool {
+	cmd := exec.Command("git", "--version")
+	if err := cmd.Run(); err != nil {
+		return false
+	}
+	return true
+}
+
+// isOnline checks if network connectivity is available
+func isOnline() bool {
+	// Try to resolve github.com to check network connectivity
+	timeout := 2 * time.Second
+	conn, err := net.DialTimeout("tcp", "github.com:443", timeout)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
 }
 
 // TestWorkspaceCacheFirstUpdate tests that the first update clones to cache
