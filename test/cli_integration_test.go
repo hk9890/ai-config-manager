@@ -43,23 +43,14 @@ func runAimgr(t *testing.T, args ...string) (string, error) {
 
 // TestCLIRepoAdd tests the 'aimgr repo add' command
 func TestCLIRepoAdd(t *testing.T) {
-	// Create temporary directories
+	// Create temporary repo directory
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	// Set custom repo path
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create test command file
-	cmdPath := filepath.Join(testDir, "test-cmd.md")
-	cmdContent := `---
-description: A test command
----
-# Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper
+	cmdPath := createTestCommand(t, "test-cmd", "A test command")
 
 	// Test: aimgr repo add (unified command)
 	output, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -75,20 +66,11 @@ description: A test command
 // TestCLIRepoList tests the 'aimgr repo list' command
 func TestCLIRepoList(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create and add a test command
-	cmdPath := filepath.Join(testDir, "list-test.md")
-	cmdContent := `---
-description: A command for list testing
----
-# List Test
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper
+	cmdPath := createTestCommand(t, "list-test", "A command for list testing")
 
 	// Add the command
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -110,12 +92,18 @@ description: A command for list testing
 // TestCLIRepoShow tests the 'aimgr repo show' command
 func TestCLIRepoShow(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create and add a test command with metadata
-	cmdPath := filepath.Join(testDir, "show-test.md")
+	// Create test command using helper, but we need custom metadata
+	// So we'll create it manually but in proper structure
+	tempDir := t.TempDir()
+	commandsDir := filepath.Join(tempDir, "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands directory: %v", err)
+	}
+
+	cmdPath := filepath.Join(commandsDir, "show-test.md")
 	cmdContent := `---
 description: A command for show testing
 version: "1.0.0"
@@ -160,12 +148,13 @@ license: MIT
 // TestCLIRepoShowSkill tests 'aimgr repo show skill'
 func TestCLIRepoShowSkill(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create test skill
-	skillDir := filepath.Join(testDir, "show-skill")
+	// Create test skill using helper, but we need custom metadata
+	// So we'll create it manually but in proper structure
+	tempDir := t.TempDir()
+	skillDir := filepath.Join(tempDir, "skills", "show-skill")
 	if err := os.MkdirAll(skillDir, 0755); err != nil {
 		t.Fatalf("Failed to create skill directory: %v", err)
 	}
@@ -215,12 +204,18 @@ license: Apache-2.0
 // TestCLIRepoShowAgent tests 'aimgr repo show agent'
 func TestCLIRepoShowAgent(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create test agent
-	agentPath := filepath.Join(testDir, "show-agent.md")
+	// Create test agent using helper, but we need custom metadata
+	// So we'll create it manually but in proper structure
+	tempDir := t.TempDir()
+	agentsDir := filepath.Join(tempDir, "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		t.Fatalf("Failed to create agents directory: %v", err)
+	}
+
+	agentPath := filepath.Join(agentsDir, "show-agent.md")
 	agentContent := `---
 description: An agent for show testing
 type: helper
@@ -261,12 +256,17 @@ version: "1.5.0"
 // TestCLIRepoUpdate tests the 'aimgr repo update' command
 func TestCLIRepoUpdate(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "update-test.md")
+	// Create test command using helper structure but with version
+	tempDir := t.TempDir()
+	commandsDir := filepath.Join(tempDir, "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands directory: %v", err)
+	}
+
+	cmdPath := filepath.Join(commandsDir, "update-test.md")
 	cmdContent := `---
 description: Original description
 version: "1.0.0"
@@ -317,12 +317,17 @@ version: "2.0.0"
 // TestCLIRepoUpdateAll tests 'aimgr repo update' (update all)
 func TestCLIRepoUpdateAll(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "update-all-test.md")
+	// Create test command using proper structure
+	tempDir := t.TempDir()
+	commandsDir := filepath.Join(tempDir, "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands directory: %v", err)
+	}
+
+	cmdPath := filepath.Join(commandsDir, "update-all-test.md")
 	cmdContent := `---
 description: Original
 ---
@@ -363,7 +368,6 @@ description: Updated
 func TestCLIInstall(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -373,22 +377,8 @@ func TestCLIInstall(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create and add a test skill
-	skillDir := filepath.Join(testDir, "install-skill")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillContent := `---
-name: install-skill
-description: A skill for install testing
----
-# Install Skill
-`
-	skillPath := filepath.Join(skillDir, "SKILL.md")
-	if err := os.WriteFile(skillPath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create SKILL.md: %v", err)
-	}
+	// Create test skill using helper
+	skillDir := createTestSkill(t, "install-skill", "A skill for install testing")
 
 	// Add to repository
 	addOutput, err := runAimgr(t, "repo", "import", "--force", skillDir)
@@ -413,7 +403,6 @@ description: A skill for install testing
 func TestCLIInstallMultiple(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -423,33 +412,11 @@ func TestCLIInstallMultiple(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "multi-cmd.md")
-	cmdContent := `---
-description: Multi test command
----
-# Multi Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper
+	cmdPath := createTestCommand(t, "multi-cmd", "Multi test command")
 
-	// Create test skill
-	skillDir := filepath.Join(testDir, "multi-skill")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillContent := `---
-name: multi-skill
-description: Multi test skill
----
-# Multi Skill
-`
-	skillPath := filepath.Join(skillDir, "SKILL.md")
-	if err := os.WriteFile(skillPath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create SKILL.md: %v", err)
-	}
+	// Create test skill using helper
+	skillDir := createTestSkill(t, "multi-skill", "Multi test skill")
 
 	// Add both to repository
 	addCmdOutput, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -489,7 +456,6 @@ description: Multi test skill
 func TestCLIUninstall(t *testing.T) {
 	repoDir := t.TempDir()
 	projectDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -499,22 +465,8 @@ func TestCLIUninstall(t *testing.T) {
 		t.Fatalf("Failed to create .claude directory: %v", err)
 	}
 
-	// Create and add a test skill
-	skillDir := filepath.Join(testDir, "uninstall-skill")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillContent := `---
-name: uninstall-skill
-description: A skill for uninstall testing
----
-# Uninstall Skill
-`
-	skillPath := filepath.Join(skillDir, "SKILL.md")
-	if err := os.WriteFile(skillPath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create SKILL.md: %v", err)
-	}
+	// Create test skill using helper
+	skillDir := createTestSkill(t, "uninstall-skill", "A skill for uninstall testing")
 
 	// Add to repository
 	addOutput, err := runAimgr(t, "repo", "import", "--force", skillDir)
@@ -624,20 +576,11 @@ func TestCLIUninstallSkipsExternalSymlinks(t *testing.T) {
 // TestCLIMetadataTracking tests that metadata is properly tracked
 func TestCLIMetadataTracking(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "metadata-test.md")
-	cmdContent := `---
-description: Metadata test command
----
-# Metadata Test
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper
+	cmdPath := createTestCommand(t, "metadata-test", "Metadata test command")
 
 	// Add the command
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
@@ -673,12 +616,17 @@ description: Metadata test command
 // TestCLIMetadataUpdatedOnUpdate tests metadata timestamps are updated
 func TestCLIMetadataUpdatedOnUpdate(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "meta-update-test.md")
+	// Create test command using proper structure
+	tempDir := t.TempDir()
+	commandsDir := filepath.Join(tempDir, "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands directory: %v", err)
+	}
+
+	cmdPath := filepath.Join(commandsDir, "meta-update-test.md")
 	cmdContent := `---
 description: Original
 ---
@@ -736,20 +684,11 @@ description: Updated
 // TestCLIMetadataDeletedOnRemove tests metadata is deleted with resource
 func TestCLIMetadataDeletedOnRemove(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	// Create test command
-	cmdPath := filepath.Join(testDir, "meta-remove-test.md")
-	cmdContent := `---
-description: Remove test
----
-# Meta Remove Test
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create test command: %v", err)
-	}
+	// Create test command using helper
+	cmdPath := createTestCommand(t, "meta-remove-test", "Remove test")
 
 	// Add the command
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
