@@ -741,7 +741,7 @@ func setupRealisticMarketplace(t *testing.T, baseDir string) {
 	for _, plugin := range plugins {
 		pluginDir := filepath.Join(baseDir, "plugins", plugin.name)
 
-		// Create commands
+		// Create commands using helper
 		if len(plugin.commands) > 0 {
 			commandsDir := filepath.Join(pluginDir, "commands")
 			if err := os.MkdirAll(commandsDir, 0755); err != nil {
@@ -749,32 +749,43 @@ func setupRealisticMarketplace(t *testing.T, baseDir string) {
 			}
 
 			for _, cmdName := range plugin.commands {
+				// Use helper to create command with proper structure
+				tmpCmdPath := createTestCommand(t, cmdName, cmdName+" command")
+				// Copy to marketplace location
 				cmdPath := filepath.Join(commandsDir, cmdName+".md")
-				cmdContent := "---\ndescription: " + cmdName + " command\n---\n# " + cmdName + "\n"
-				if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+				content, err := os.ReadFile(tmpCmdPath)
+				if err != nil {
+					t.Fatalf("Failed to read command from helper: %v", err)
+				}
+				if err := os.WriteFile(cmdPath, content, 0644); err != nil {
 					t.Fatalf("Failed to create command: %v", err)
 				}
 			}
 		}
 
-		// Create skills
+		// Create skills using helper
 		if len(plugin.skills) > 0 {
 			skillsDir := filepath.Join(pluginDir, "skills")
 			for _, skillName := range plugin.skills {
+				// Use helper to create skill with proper structure
+				tmpSkillDir := createTestSkill(t, skillName, skillName+" skill")
+				// Copy to marketplace location
 				skillDir := filepath.Join(skillsDir, skillName)
 				if err := os.MkdirAll(skillDir, 0755); err != nil {
 					t.Fatalf("Failed to create skill directory: %v", err)
 				}
-
 				skillMdPath := filepath.Join(skillDir, "SKILL.md")
-				skillContent := "---\nname: " + skillName + "\ndescription: " + skillName + " skill\n---\n# " + skillName + "\n"
-				if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
+				content, err := os.ReadFile(filepath.Join(tmpSkillDir, "SKILL.md"))
+				if err != nil {
+					t.Fatalf("Failed to read skill from helper: %v", err)
+				}
+				if err := os.WriteFile(skillMdPath, content, 0644); err != nil {
 					t.Fatalf("Failed to create SKILL.md: %v", err)
 				}
 			}
 		}
 
-		// Create agents
+		// Create agents using helper
 		if len(plugin.agents) > 0 {
 			agentsDir := filepath.Join(pluginDir, "agents")
 			if err := os.MkdirAll(agentsDir, 0755); err != nil {
@@ -782,9 +793,15 @@ func setupRealisticMarketplace(t *testing.T, baseDir string) {
 			}
 
 			for _, agentName := range plugin.agents {
+				// Use helper to create agent with proper structure
+				tmpAgentPath := createTestAgent(t, agentName, agentName+" agent")
+				// Copy to marketplace location
 				agentPath := filepath.Join(agentsDir, agentName+".md")
-				agentContent := "---\ndescription: " + agentName + " agent\n---\n# " + agentName + "\n"
-				if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
+				content, err := os.ReadFile(tmpAgentPath)
+				if err != nil {
+					t.Fatalf("Failed to read agent from helper: %v", err)
+				}
+				if err := os.WriteFile(agentPath, content, 0644); err != nil {
 					t.Fatalf("Failed to create agent: %v", err)
 				}
 			}
@@ -801,9 +818,15 @@ func setupSimpleMarketplace(t *testing.T, baseDir string) {
 		t.Fatalf("Failed to create commands directory: %v", err)
 	}
 
+	// Use helper to create command with proper structure
+	tmpCmdPath := createTestCommand(t, "test", "Test command")
+	// Copy to marketplace location
 	cmdPath := filepath.Join(commandsDir, "test.md")
-	cmdContent := "---\ndescription: Test command\n---\n# Test Command\n"
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+	content, err := os.ReadFile(tmpCmdPath)
+	if err != nil {
+		t.Fatalf("Failed to read command from helper: %v", err)
+	}
+	if err := os.WriteFile(cmdPath, content, 0644); err != nil {
 		t.Fatalf("Failed to create command: %v", err)
 	}
 }
@@ -820,9 +843,15 @@ func setupMultiPluginMarketplace(t *testing.T, baseDir string) {
 			t.Fatalf("Failed to create commands directory: %v", err)
 		}
 
+		// Use helper to create command with proper structure
+		tmpCmdPath := createTestCommand(t, "main", plugin+" command")
+		// Copy to marketplace location
 		cmdPath := filepath.Join(commandsDir, "main.md")
-		cmdContent := "---\ndescription: " + plugin + " command\n---\n# " + plugin + "\n"
-		if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+		content, err := os.ReadFile(tmpCmdPath)
+		if err != nil {
+			t.Fatalf("Failed to read command from helper: %v", err)
+		}
+		if err := os.WriteFile(cmdPath, content, 0644); err != nil {
 			t.Fatalf("Failed to create command: %v", err)
 		}
 	}
