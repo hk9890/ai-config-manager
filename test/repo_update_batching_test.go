@@ -26,50 +26,31 @@ func TestUpdateBatching(t *testing.T) {
 	// Create test resources with GitHub source metadata
 	// We'll create local test resources but set their metadata to point to GitHub
 	testResources := []struct {
-		name     string
-		resType  resource.ResourceType
-		filename string
-		content  string
+		name        string
+		resType     resource.ResourceType
+		description string
 	}{
 		{
-			name:     "batch-test-cmd1",
-			resType:  resource.Command,
-			filename: "batch-test-cmd1.md",
-			content: `---
-description: Batch test command 1 from GitHub
----
-# Batch Test Command 1
-`,
+			name:        "batch-test-cmd1",
+			resType:     resource.Command,
+			description: "Batch test command 1 from GitHub",
 		},
 		{
-			name:     "batch-test-cmd2",
-			resType:  resource.Command,
-			filename: "batch-test-cmd2.md",
-			content: `---
-description: Batch test command 2 from GitHub
----
-# Batch Test Command 2
-`,
+			name:        "batch-test-cmd2",
+			resType:     resource.Command,
+			description: "Batch test command 2 from GitHub",
 		},
 		{
-			name:     "batch-test-cmd3",
-			resType:  resource.Command,
-			filename: "batch-test-cmd3.md",
-			content: `---
-description: Batch test command 3 from GitHub
----
-# Batch Test Command 3
-`,
+			name:        "batch-test-cmd3",
+			resType:     resource.Command,
+			description: "Batch test command 3 from GitHub",
 		},
 	}
 
 	// Create and add test resources
 	tempSourceDir := t.TempDir()
 	for _, res := range testResources {
-		sourcePath := filepath.Join(tempSourceDir, res.filename)
-		if err := os.WriteFile(sourcePath, []byte(res.content), 0644); err != nil {
-			t.Fatalf("Failed to create test resource %s: %v", res.name, err)
-		}
+		sourcePath := createTestCommandInDir(t, tempSourceDir, res.name, res.description)
 
 		// Add with GitHub source metadata
 		if err := manager.AddCommand(sourcePath, githubSource, "github"); err != nil {
@@ -132,46 +113,12 @@ func TestUpdateBatching_MixedSources(t *testing.T) {
 
 	// GitHub source resources (should be batched)
 	githubSource := "gh:anthropics/anthropic-quickstarts"
-	githubCmd1Path := filepath.Join(tempSourceDir, "github-cmd1.md")
-	githubCmd1Content := `---
-description: GitHub command 1
----
-# GitHub Command 1
-`
-	if err := os.WriteFile(githubCmd1Path, []byte(githubCmd1Content), 0644); err != nil {
-		t.Fatalf("Failed to create GitHub command 1: %v", err)
-	}
-
-	githubCmd2Path := filepath.Join(tempSourceDir, "github-cmd2.md")
-	githubCmd2Content := `---
-description: GitHub command 2
----
-# GitHub Command 2
-`
-	if err := os.WriteFile(githubCmd2Path, []byte(githubCmd2Content), 0644); err != nil {
-		t.Fatalf("Failed to create GitHub command 2: %v", err)
-	}
+	githubCmd1Path := createTestCommandInDir(t, tempSourceDir, "github-cmd1", "GitHub command 1")
+	githubCmd2Path := createTestCommandInDir(t, tempSourceDir, "github-cmd2", "GitHub command 2")
 
 	// Local source resources (should NOT be batched)
-	localCmd1Path := filepath.Join(tempSourceDir, "local-cmd1.md")
-	localCmd1Content := `---
-description: Local command 1
----
-# Local Command 1
-`
-	if err := os.WriteFile(localCmd1Path, []byte(localCmd1Content), 0644); err != nil {
-		t.Fatalf("Failed to create local command 1: %v", err)
-	}
-
-	localCmd2Path := filepath.Join(tempSourceDir, "local-cmd2.md")
-	localCmd2Content := `---
-description: Local command 2
----
-# Local Command 2
-`
-	if err := os.WriteFile(localCmd2Path, []byte(localCmd2Content), 0644); err != nil {
-		t.Fatalf("Failed to create local command 2: %v", err)
-	}
+	localCmd1Path := createTestCommandInDir(t, tempSourceDir, "local-cmd1", "Local command 1")
+	localCmd2Path := createTestCommandInDir(t, tempSourceDir, "local-cmd2", "Local command 2")
 
 	// Add GitHub resources
 	if err := manager.AddCommand(githubCmd1Path, githubSource, "github"); err != nil {
@@ -249,44 +196,13 @@ func TestUpdateBatching_MultipleResourceTypes(t *testing.T) {
 	tempSourceDir := t.TempDir()
 
 	// Create command
-	cmdPath := filepath.Join(tempSourceDir, "multi-type-cmd.md")
-	cmdContent := `---
-description: Multi-type test command
----
-# Multi-type Test Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create command: %v", err)
-	}
+	cmdPath := createTestCommandInDir(t, tempSourceDir, "multi-type-cmd", "Multi-type test command")
 
 	// Create skill
-	skillDir := filepath.Join(tempSourceDir, "multi-type-skill")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-
-	skillMdPath := filepath.Join(skillDir, "SKILL.md")
-	skillContent := `---
-name: multi-type-skill
-description: Multi-type test skill
-license: MIT
----
-# Multi-type Test Skill
-`
-	if err := os.WriteFile(skillMdPath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create SKILL.md: %v", err)
-	}
+	skillDir := createTestSkillInDir(t, tempSourceDir, "multi-type-skill", "Multi-type test skill")
 
 	// Create agent
-	agentPath := filepath.Join(tempSourceDir, "multi-type-agent.md")
-	agentContent := `---
-description: Multi-type test agent
----
-# Multi-type Test Agent
-`
-	if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
-		t.Fatalf("Failed to create agent: %v", err)
-	}
+	agentPath := createTestAgentInDir(t, tempSourceDir, "multi-type-agent", "Multi-type test agent")
 
 	// Add all resources with same GitHub source
 	if err := manager.AddCommand(cmdPath, githubSource, "github"); err != nil {
@@ -342,32 +258,21 @@ func TestUpdateBatching_DryRun(t *testing.T) {
 	tempSourceDir := t.TempDir()
 
 	resources := []struct {
-		name    string
-		content string
+		name        string
+		description string
 	}{
 		{
-			name: "dryrun-cmd1",
-			content: `---
-description: Dry run test command 1
----
-# Dry Run Command 1
-`,
+			name:        "dryrun-cmd1",
+			description: "Dry run test command 1",
 		},
 		{
-			name: "dryrun-cmd2",
-			content: `---
-description: Dry run test command 2
----
-# Dry Run Command 2
-`,
+			name:        "dryrun-cmd2",
+			description: "Dry run test command 2",
 		},
 	}
 
 	for _, res := range resources {
-		sourcePath := filepath.Join(tempSourceDir, res.name+".md")
-		if err := os.WriteFile(sourcePath, []byte(res.content), 0644); err != nil {
-			t.Fatalf("Failed to create test resource %s: %v", res.name, err)
-		}
+		sourcePath := createTestCommandInDir(t, tempSourceDir, res.name, res.description)
 
 		if err := manager.AddCommand(sourcePath, githubSource, "github"); err != nil {
 			t.Fatalf("Failed to add resource %s: %v", res.name, err)
@@ -429,15 +334,7 @@ func TestUpdateBatching_VerifyGrouping(t *testing.T) {
 
 	for _, source := range sources {
 		for _, name := range source.names {
-			sourcePath := filepath.Join(tempSourceDir, name+".md")
-			content := fmt.Sprintf(`---
-description: Test command %s
----
-# Test Command %s
-`, name, name)
-			if err := os.WriteFile(sourcePath, []byte(content), 0644); err != nil {
-				t.Fatalf("Failed to create test resource %s: %v", name, err)
-			}
+			sourcePath := createTestCommandInDir(t, tempSourceDir, name, fmt.Sprintf("Test command %s", name))
 
 			if err := manager.AddCommand(sourcePath, source.sourceURL, source.sourceType); err != nil {
 				t.Fatalf("Failed to add resource %s: %v", name, err)
@@ -510,16 +407,7 @@ func TestCLIUpdateBatching_LocalSources(t *testing.T) {
 
 	// Create three local commands
 	for i := 1; i <= 3; i++ {
-		cmdPath := filepath.Join(testDir, fmt.Sprintf("local-%d.md", i))
-		content := fmt.Sprintf(`---
-description: Local command %d
-version: "1.0.0"
----
-# Local Command %d
-`, i, i)
-		if err := os.WriteFile(cmdPath, []byte(content), 0644); err != nil {
-			t.Fatalf("Failed to create command: %v", err)
-		}
+		cmdPath := createTestCommandInDir(t, testDir, fmt.Sprintf("local-%d", i), fmt.Sprintf("Local command %d", i))
 
 		_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 		if err != nil {
@@ -527,9 +415,10 @@ version: "1.0.0"
 		}
 	}
 
-	// Update source files
+	// Update source files - need to recreate them with updated content
 	for i := 1; i <= 3; i++ {
-		cmdPath := filepath.Join(testDir, fmt.Sprintf("local-%d.md", i))
+		name := fmt.Sprintf("local-%d", i)
+		cmdPath := filepath.Join(testDir, "commands", name+".md")
 		content := fmt.Sprintf(`---
 description: Local command %d updated
 version: "2.0.0"
