@@ -570,3 +570,106 @@ func TestDeduplicateStrings(t *testing.T) {
 		})
 	}
 }
+
+func TestUninstallAll(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install multiple resources
+	installSymlink(t, projectPath, repoPath, resource.Command, "test-command")
+	installSymlink(t, projectPath, repoPath, resource.Command, "pdf-command")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "test-skill")
+	installSymlink(t, projectPath, repoPath, resource.Agent, "code-reviewer")
+
+	// Run uninstallAll
+	err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
+	if err != nil {
+		t.Fatalf("uninstallAll() failed: %v", err)
+	}
+
+	// Verify all symlinks were removed
+	commandsDir := filepath.Join(projectPath, ".claude", "commands")
+	skillsDir := filepath.Join(projectPath, ".claude", "skills")
+	agentsDir := filepath.Join(projectPath, ".claude", "agents")
+
+	// Check commands
+	if _, err := os.Lstat(filepath.Join(commandsDir, "test-command.md")); !os.IsNotExist(err) {
+		t.Error("uninstallAll() did not remove test-command.md")
+	}
+	if _, err := os.Lstat(filepath.Join(commandsDir, "pdf-command.md")); !os.IsNotExist(err) {
+		t.Error("uninstallAll() did not remove pdf-command.md")
+	}
+
+	// Check skills
+	if _, err := os.Lstat(filepath.Join(skillsDir, "pdf-processing")); !os.IsNotExist(err) {
+		t.Error("uninstallAll() did not remove pdf-processing")
+	}
+	if _, err := os.Lstat(filepath.Join(skillsDir, "test-skill")); !os.IsNotExist(err) {
+		t.Error("uninstallAll() did not remove test-skill")
+	}
+
+	// Check agents
+	if _, err := os.Lstat(filepath.Join(agentsDir, "code-reviewer.md")); !os.IsNotExist(err) {
+		t.Error("uninstallAll() did not remove code-reviewer.md")
+	}
+}
+
+func TestUninstallAll_OnlyRemovesManagedSymlinks(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	commandsDir := filepath.Join(projectPath, ".claude", "commands")
+
+	// Install a managed symlink
+	installSymlink(t, projectPath, repoPath, resource.Command, "test-command")
+
+	// Create an unmanaged symlink (points outside repo)
+	otherDir := t.TempDir()
+	unmanagedFile := filepath.Join(otherDir, "unmanaged.md")
+	if err := os.WriteFile(unmanagedFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to create unmanaged file: %v", err)
+	}
+	unmanagedSymlink := filepath.Join(commandsDir, "unmanaged.md")
+	if err := os.Symlink(unmanagedFile, unmanagedSymlink); err != nil {
+		t.Fatalf("failed to create unmanaged symlink: %v", err)
+	}
+
+	// Create a regular file (not a symlink)
+	regularFile := filepath.Join(commandsDir, "regular.md")
+	if err := os.WriteFile(regularFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to create regular file: %v", err)
+	}
+
+	// Run uninstallAll
+	err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
+	if err != nil {
+		t.Fatalf("uninstallAll() failed: %v", err)
+	}
+
+	// Verify managed symlink was removed
+	if _, err := os.Lstat(filepath.Join(commandsDir, "test-command.md")); !os.IsNotExist(err) {
+		t.Error("uninstallAll() did not remove managed symlink")
+	}
+
+	// Verify unmanaged symlink was NOT removed
+	if _, err := os.Lstat(unmanagedSymlink); err != nil {
+		t.Error("uninstallAll() removed unmanaged symlink, should have skipped it")
+	}
+
+	// Verify regular file was NOT removed
+	if _, err := os.Stat(regularFile); err != nil {
+		t.Error("uninstallAll() removed regular file, should have skipped it")
+	}
+}
+
+func TestUninstallAll_EmptyDirectory(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Run uninstallAll on empty directories
+	err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
+	if err != nil {
+		t.Fatalf("uninstallAll() failed on empty directories: %v", err)
+	}
+}

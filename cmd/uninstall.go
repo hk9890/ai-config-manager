@@ -31,9 +31,12 @@ type uninstallResult struct {
 
 // uninstallCmd represents the uninstall command
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall <resource>...",
+	Use:   "uninstall [resource]...",
 	Short: "Uninstall resources from a project",
 	Long: `Uninstall one or more resources (commands, skills, or agents) from a project.
+
+If no resources are specified, uninstalls all resources that are currently installed
+(all symlinks pointing to the aimgr repository).
 
 Resources are specified using the format 'type/name':
   - command/name (or commands/name)
@@ -59,6 +62,9 @@ Multi-tool behavior:
   - Shows summary of what was removed from where
 
 Examples:
+  # Uninstall all installed resources
+  aimgr uninstall
+
   # Uninstall a single skill
   aimgr uninstall skill/pdf-processing
 
@@ -82,39 +88,9 @@ Examples:
 
   # Force uninstall (placeholder for future confirmation prompts)
   aimgr uninstall command/review --force`,
-	Args:              cobra.MinimumNArgs(1),
+	Args:              cobra.ArbitraryArgs, // Allow 0 or more args
 	ValidArgsFunction: completeResourceArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check if uninstalling a package
-		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
-			packageName := strings.TrimPrefix(args[0], "package/")
-
-			// Get project path
-			projectPath := uninstallProjectPathFlag
-			if projectPath == "" {
-				var err error
-				projectPath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
-			}
-
-			// Create installer (auto-detect existing tools)
-			installer, err := install.NewInstaller(projectPath, nil)
-			if err != nil {
-				return fmt.Errorf("failed to create installer: %w", err)
-			}
-
-			// Create repo manager
-			manager, err := repo.NewManager()
-			if err != nil {
-				return fmt.Errorf("failed to create repository manager: %w", err)
-			}
-
-			// Uninstall package
-			return uninstallPackage(packageName, installer, manager)
-		}
-
 		// Get project path (current directory or flag)
 		projectPath := uninstallProjectPathFlag
 		if projectPath == "" {
@@ -136,6 +112,18 @@ Examples:
 		installer, err := install.NewInstaller(projectPath, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create installer: %w", err)
+		}
+
+		// Handle zero-arg uninstall (uninstall all)
+		if len(args) == 0 {
+			return uninstallAll(projectPath, repoPath, installer.GetTargetTools())
+		}
+
+		// Check if uninstalling a package
+		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
+			packageName := strings.TrimPrefix(args[0], "package/")
+			// Uninstall package
+			return uninstallPackage(packageName, installer, manager)
 		}
 
 		// Expand patterns in arguments
@@ -183,6 +171,135 @@ Examples:
 
 		return nil
 	},
+}
+
+
+// uninstallAll uninstalls all resources currently installed in the project
+func uninstallAll(projectPath string, repoPath string, targetTools []tools.Tool) error {
+	fmt.Println("Uninstalling all resources from project...")
+	fmt.Println()
+
+	var results []uninstallResult
+
+	// Scan each tool directory
+	for _, tool := range targetTools {
+		toolInfo := tools.GetToolInfo(tool)
+
+		// Scan commands
+		if toolInfo.SupportsCommands {
+			commandsResults := uninstallAllFromDir(projectPath, repoPath, toolInfo.CommandsDir, resource.Command, tool)
+			results = append(results, commandsResults...)
+		}
+
+		// Scan skills
+		if toolInfo.SupportsSkills {
+			skillsResults := uninstallAllFromDir(projectPath, repoPath, toolInfo.SkillsDir, resource.Skill, tool)
+			results = append(results, skillsResults...)
+		}
+
+		// Scan agents
+		if toolInfo.SupportsAgents {
+			agentsResults := uninstallAllFromDir(projectPath, repoPath, toolInfo.AgentsDir, resource.Agent, tool)
+			results = append(results, agentsResults...)
+		}
+	}
+
+	// Print results
+	printUninstallSummary(results)
+
+	// Return error if any resource failed
+	for _, result := range results {
+		if !result.success && !result.skipped {
+			return fmt.Errorf("some resources failed to uninstall")
+		}
+	}
+
+	return nil
+}
+
+// uninstallAllFromDir scans a tool directory and uninstalls all symlinks pointing to the repo
+func uninstallAllFromDir(projectPath, repoPath, toolDir string, resourceType resource.ResourceType, tool tools.Tool) []uninstallResult {
+	var results []uninstallResult
+
+	// Build full path
+	fullPath := filepath.Join(projectPath, toolDir)
+
+	// Read directory
+	entries, err := os.ReadDir(fullPath)
+	if err != nil {
+		// Directory doesn't exist or can't be read, skip
+		return nil
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		entryPath := filepath.Join(fullPath, name)
+
+		// Get entry info
+		info, err := os.Lstat(entryPath)
+		if err != nil {
+			continue
+		}
+
+		// Check if it's a symlink
+		if info.Mode()&os.ModeSymlink == 0 {
+			// Not a symlink, skip
+			continue
+		}
+
+		// Read symlink target
+		target, err := os.Readlink(entryPath)
+		if err != nil {
+			continue
+		}
+
+		// Resolve to absolute path for comparison
+		absTarget, err := filepath.Abs(target)
+		if err != nil {
+			absTarget = target
+		}
+
+		// Check if target points to our repository
+		if !strings.HasPrefix(absTarget, repoPath) {
+			// Not managed by aimgr, skip
+			continue
+		}
+
+		// Extract resource name
+		var resourceName string
+		if resourceType == resource.Command || resourceType == resource.Agent {
+			// Remove .md extension
+			if strings.HasSuffix(name, ".md") {
+				resourceName = strings.TrimSuffix(name, ".md")
+			} else {
+				continue
+			}
+		} else {
+			// Skill - name is the directory name
+			resourceName = name
+		}
+
+		// Remove the symlink
+		if err := os.Remove(entryPath); err != nil {
+			results = append(results, uninstallResult{
+				resourceType: resourceType,
+				name:         resourceName,
+				success:      false,
+				message:      fmt.Sprintf("failed to remove: %v", err),
+			})
+			continue
+		}
+
+		// Record success
+		results = append(results, uninstallResult{
+			resourceType: resourceType,
+			name:         resourceName,
+			success:      true,
+			toolsRemoved: []tools.Tool{tool},
+		})
+	}
+
+	return results
 }
 
 // processUninstall processes uninstalling a single resource

@@ -104,20 +104,20 @@ func runSync(cmd *cobra.Command, args []string) error {
 	originalForceFlag := forceFlag
 	originalDryRunFlag := dryRunFlag
 	originalSkipExistingFlag := skipExistingFlag
-	originalAddFormatFlag := addFormatFlag
+	originalImportFormatFlag := importFormatFlag
 
 	// Default to force=true unless --skip-existing specified
 	forceFlag = !syncSkipExistingFlag
 	skipExistingFlag = syncSkipExistingFlag
 	dryRunFlag = syncDryRunFlag
-	addFormatFlag = syncFormatFlag
+	importFormatFlag = syncFormatFlag
 
 	// Restore original flags when done
 	defer func() {
 		forceFlag = originalForceFlag
 		dryRunFlag = originalDryRunFlag
 		skipExistingFlag = originalSkipExistingFlag
-		addFormatFlag = originalAddFormatFlag
+		importFormatFlag = originalImportFormatFlag
 	}()
 
 	// Process each source

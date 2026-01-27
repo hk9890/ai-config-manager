@@ -28,11 +28,11 @@ var (
 	addFormatFlag    string
 )
 
-// addCmd represents the add command
-var addCmd = &cobra.Command{
-	Use:   "add <source>",
-	Short: "Add resources to the repository",
-	Long: `Add resources to the aimgr repository.
+// repoImportCmd represents the import command
+var repoImportCmd = &cobra.Command{
+	Use:   "import <source>",
+	Short: "Import resources to the repository",
+	Long: `Import resources to the aimgr repository.
 
 This command auto-discovers and imports all resources (commands, skills, agents, packages)
 from the specified source location. It also automatically detects and imports marketplace.json
@@ -109,14 +109,14 @@ Examples:
 }
 
 func init() {
-	repoCmd.AddCommand(addCmd)
+	repoCmd.AddCommand(repoImportCmd)
 
 	// Add flags
-	addCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resources")
-	addCmd.Flags().BoolVar(&skipExistingFlag, "skip-existing", false, "Skip conflicts silently")
-	addCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without importing")
-	addCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
-	addCmd.Flags().StringVar(&addFormatFlag, "format", "table", "Output format: table, json, yaml")
+	repoImportCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resources")
+	repoImportCmd.Flags().BoolVar(&skipExistingFlag, "skip-existing", false, "Skip conflicts silently")
+	repoImportCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without importing")
+	repoImportCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
+	repoImportCmd.Flags().StringVar(&addFormatFlag, "format", "table", "Output format: table, json, yaml")
 }
 
 // Helper functions for bulk add integration
