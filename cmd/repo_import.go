@@ -25,7 +25,7 @@ var (
 	skipExistingFlag bool
 	dryRunFlag       bool
 	filterFlag       string
-	importFormatFlag    string
+	importFormatFlag string
 )
 
 // repoImportCmd represents the import command
@@ -356,29 +356,17 @@ func applyFilter(filterPattern string, commands, skills, agents []*resource.Reso
 	return filteredCommands, filteredSkills, filteredAgents, filteredPackages, nil
 }
 
-// addBulkFromLocal handles bulk add from a local folder or single file
-func addBulkFromLocal(localPath string, manager *repo.Manager) error {
-	return addBulkFromLocalWithFilter(localPath, manager, filterFlag)
-}
-
-// addBulkFromLocalWithFilter handles bulk add from a local folder or single file with a custom filter
-func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter string) error {
-	// Validate path exists
-	if _, err := os.Stat(localPath); err != nil {
-		return fmt.Errorf("path does not exist: %s", localPath)
-	}
-
-	// Check if it's a file or directory
-	info, err := os.Stat(localPath)
-	if err != nil {
-		return err
-	}
-
-	// If it's a single file, handle it specially
-	if !info.IsDir() {
-		return addSingleResource(localPath, manager)
-	}
-
+// importFromLocalPath performs the core import logic from a local directory.
+// This function is used by both local imports and remote imports (after cloning to workspace).
+// It discovers resources, applies filters, and imports them into the repository.
+func importFromLocalPath(
+	localPath string, // Local directory to import from
+	manager *repo.Manager, // Repository manager
+	filter string, // Optional filter pattern (empty string = no filter)
+	sourceURL string, // Source URL for metadata tracking
+	sourceType string, // "local", "github", "git-url", "test"
+	ref string, // Git ref (empty for local/test)
+) error {
 	// Discover all resources (with error collection)
 	commands, err := discovery.DiscoverCommands(localPath, "")
 	if err != nil {
@@ -416,16 +404,8 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		return fmt.Errorf("no resources found in: %s\nExpected commands (*.md), skills (*/SKILL.md), agents (*.md), packages (*.package.json), or marketplace.json", localPath)
 	}
 
-	// Print header
+	// Get absolute path for display
 	absPath, _ := filepath.Abs(localPath)
-	fmt.Printf("Importing from: %s\n", absPath)
-	if dryRunFlag {
-		fmt.Println("  Mode: DRY RUN (preview only)")
-	}
-	if filter != "" {
-		fmt.Printf("  Filter: %s\n", filter)
-	}
-	fmt.Println()
 
 	// Store original counts for reporting
 	origCommandCount := len(commands)
@@ -532,6 +512,9 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 		Force:        forceFlag,
 		SkipExisting: skipExistingFlag,
 		DryRun:       dryRunFlag,
+		SourceURL:    sourceURL,
+		SourceType:   sourceType,
+		Ref:          ref,
 	}
 
 	result, err := manager.AddBulk(allPaths, opts)
@@ -569,6 +552,48 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 	return nil
 }
 
+// addBulkFromLocal handles bulk add from a local folder or single file
+func addBulkFromLocal(localPath string, manager *repo.Manager) error {
+	return addBulkFromLocalWithFilter(localPath, manager, filterFlag)
+}
+
+// addBulkFromLocalWithFilter handles bulk add from a local folder or single file with a custom filter
+func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter string) error {
+	// Validate path exists
+	if _, err := os.Stat(localPath); err != nil {
+		return fmt.Errorf("path does not exist: %s", localPath)
+	}
+
+	// Check if it's a file or directory
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return err
+	}
+
+	// If it's a single file, handle it specially
+	if !info.IsDir() {
+		return addSingleResource(localPath, manager)
+	}
+
+	// Print header (LOCAL-SPECIFIC)
+	absPath, _ := filepath.Abs(localPath)
+	fmt.Printf("Importing from: %s\n", absPath)
+	if dryRunFlag {
+		fmt.Println("  Mode: DRY RUN (preview only)")
+	}
+	if filter != "" {
+		fmt.Printf("  Filter: %s\n", filter)
+	}
+	fmt.Println()
+
+	// Determine source info
+	sourceURL := "file://" + absPath
+	sourceType := "local"
+
+	// Call common import function
+	return importFromLocalPath(localPath, manager, filter, sourceURL, sourceType, "")
+}
+
 // addBulkFromGitHub handles bulk add from a GitHub repository
 func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error {
 	return addBulkFromGitHubWithFilter(parsed, manager, filterFlag)
@@ -576,7 +601,7 @@ func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error
 
 // addBulkFromGitHubWithFilter handles bulk add from a GitHub repository with a custom filter
 func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Manager, filter string) error {
-	// Clone repository to temp directory
+	// Clone repository to workspace
 	cloneURL, err := source.GetCloneURL(parsed)
 	if err != nil {
 		return fmt.Errorf("failed to get clone URL: %w", err)
@@ -595,10 +620,7 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 	}
 
 	// Update cached repository to latest changes
-	// This ensures repo sync always pulls the latest code from Git remotes
 	if err := workspaceManager.Update(cloneURL, parsed.Ref); err != nil {
-		// If update fails, log warning but continue with existing cache
-		// This handles cases like network failures where cache is still usable
 		fmt.Fprintf(os.Stderr, "warning: failed to update cached repo (using existing cache): %v\n", err)
 	}
 
@@ -608,44 +630,7 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		searchPath = filepath.Join(cachePath, parsed.Subpath)
 	}
 
-	// Discover all resources (with error collection)
-	commands, err := discovery.DiscoverCommands(searchPath, "")
-	if err != nil {
-		return fmt.Errorf("failed to discover commands: %w", err)
-	}
-
-	skills, skillErrors, err := discovery.DiscoverSkillsWithErrors(searchPath, "")
-	if err != nil {
-		return fmt.Errorf("failed to discover skills: %w", err)
-	}
-
-	agents, err := discovery.DiscoverAgents(searchPath, "")
-	if err != nil {
-		return fmt.Errorf("failed to discover agents: %w", err)
-	}
-
-	packages, err := discovery.DiscoverPackages(searchPath, "")
-	if err != nil {
-		return fmt.Errorf("failed to discover packages: %w", err)
-	}
-
-	// Collect all discovery errors
-	var discoveryErrors []discovery.DiscoveryError
-	discoveryErrors = append(discoveryErrors, skillErrors...)
-
-	// Discover marketplace.json
-	marketplaceConfig, marketplacePath, err := marketplace.DiscoverMarketplace(searchPath, "")
-	if err != nil {
-		return fmt.Errorf("failed to parse marketplace: %w", err)
-	}
-
-	// Check if any resources found
-	totalResources := len(commands) + len(skills) + len(agents) + len(packages)
-	if totalResources == 0 && marketplaceConfig == nil {
-		return fmt.Errorf("no resources found in repository: %s\nExpected commands (*.md), skills (*/SKILL.md), agents (*.md), packages (*.package.json), or marketplace.json", parsed.URL)
-	}
-
-	// Print header
+	// Print header (GitHub-specific)
 	fmt.Printf("Importing from: %s\n", parsed.URL)
 	if parsed.Ref != "" {
 		fmt.Printf("  Branch/Tag: %s\n", parsed.Ref)
@@ -661,155 +646,14 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 	}
 	fmt.Println()
 
-	// Store original counts for reporting
-	origCommandCount := len(commands)
-	origSkillCount := len(skills)
-	origAgentCount := len(agents)
-	origPackageCount := len(packages)
-
-	// Apply filter if specified
-	if filter != "" {
-		var err error
-		commands, skills, agents, packages, err = applyFilter(filter, commands, skills, agents, packages)
-		if err != nil {
-			return err
-		}
-
-		// Check if filter matched any resources
-		filteredTotal := len(commands) + len(skills) + len(agents) + len(packages)
-		if filteredTotal == 0 {
-			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filter, totalResources)
-			return nil
-		}
-
-		// Show filtered counts
-		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages", origCommandCount, origSkillCount, origAgentCount, origPackageCount)
-		if filteredTotal < totalResources {
-			fmt.Printf(" (filtered to %d matching '%s')\n", filteredTotal, filter)
-		} else {
-			fmt.Println()
-		}
-	} else {
-		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n", len(commands), len(skills), len(agents), len(packages))
-	}
-
-	// Display marketplace info if found
-	var marketplacePackages []*marketplace.PackageInfo
-	if marketplaceConfig != nil {
-		relPath := strings.TrimPrefix(marketplacePath, searchPath)
-		if relPath == "" {
-			relPath = "marketplace.json"
-		} else {
-			relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
-		}
-		fmt.Printf("Found marketplace: %s (%d plugins)\n", relPath, len(marketplaceConfig.Plugins))
-
-		// Generate packages from marketplace
-		fmt.Println("\nGenerating packages from marketplace:")
-		basePath := filepath.Dir(marketplacePath)
-		marketplacePackages, err = marketplace.GeneratePackages(marketplaceConfig, basePath)
-		if err != nil {
-			return fmt.Errorf("failed to generate packages from marketplace: %w", err)
-		}
-
-		for _, pkgInfo := range marketplacePackages {
-			fmt.Printf("  ✓ %s (%d resources)\n", pkgInfo.Package.Name, len(pkgInfo.Package.Resources))
-		}
-	}
-
-	fmt.Println()
-
-	// Collect all resource paths
-	var allPaths []string
-
-	// Add commands - use discovered paths directly
-	for _, cmd := range commands {
-		allPaths = append(allPaths, cmd.Path)
-	}
-
-	// Add skills - use discovered paths directly
-	for _, skill := range skills {
-		allPaths = append(allPaths, skill.Path)
-	}
-
-	// Add agents - use discovered paths directly
-	for _, agent := range agents {
-		allPaths = append(allPaths, agent.Path)
-	}
-
-	// Add packages
-	for _, pkg := range packages {
-		pkgPath, err := findPackageFile(searchPath, pkg.Name)
-		if err == nil {
-			allPaths = append(allPaths, pkgPath)
-		}
-	}
-
-	// Add resources from marketplace-generated packages
-	for _, pkgInfo := range marketplacePackages {
-		// Import resources for this package
-		for _, resRef := range pkgInfo.Package.Resources {
-			resType, resName, err := resource.ParseResourceReference(resRef)
-			if err != nil {
-				continue // Skip invalid references
-			}
-
-			// Find the resource file in the plugin source directory
-			resPath, err := findResourceInPath(pkgInfo.SourcePath, resType, resName)
-			if err == nil {
-				allPaths = append(allPaths, resPath)
-			}
-		}
-	}
-
 	// Determine source type
 	sourceType := "github"
 	if parsed.Type == source.GitURL {
 		sourceType = "git-url"
 	}
 
-	// Import using bulk add with original source URL and ref
-	opts := repo.BulkImportOptions{
-		Force:        forceFlag,
-		SkipExisting: skipExistingFlag,
-		DryRun:       dryRunFlag,
-		SourceURL:    parsed.URL,
-		SourceType:   sourceType,
-		Ref:          parsed.Ref,
-	}
-
-	result, err := manager.AddBulk(allPaths, opts)
-	if err != nil && !skipExistingFlag {
-		// Print partial results before error
-		printImportResults(result)
-		return err
-	}
-
-	// Save marketplace-generated packages if not in dry-run mode
-	if !dryRunFlag {
-		for _, pkgInfo := range marketplacePackages {
-			// Save package to repository
-			if err := resource.SavePackage(pkgInfo.Package, manager.GetRepoPath()); err != nil {
-				fmt.Printf("⚠ Warning: Failed to save package %s: %v\n", pkgInfo.Package.Name, err)
-				continue
-			}
-		}
-	}
-	// Print discovery errors if any
-	if len(discoveryErrors) > 0 {
-		printDiscoveryErrors(discoveryErrors)
-		fmt.Println()
-	}
-
-	// Print results
-	printImportResults(result)
-
-	// Exit with error if there were failures
-	if len(result.Failed) > 0 {
-		return fmt.Errorf("failed to import %d resource(s)", len(result.Failed))
-	}
-
-	return nil
+	// Call common import function with workspace path
+	return importFromLocalPath(searchPath, manager, filter, parsed.URL, sourceType, parsed.Ref)
 }
 
 // selectResource handles resource selection when multiple resources are found
