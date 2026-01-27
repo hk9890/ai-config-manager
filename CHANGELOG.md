@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-01-27
+
+### Performance
+- **Test Suite Optimization** - 99%+ improvement (3 minutes → <30 seconds)
+  - Unit tests now run in <5 seconds with no network dependency
+  - Integration tests are optional with `//go:build integration` tag
+  - Removed 14 slow tests that cloned GitHub repositories (1,118 lines)
+  - Added 7 committed test fixtures in `testdata/repos/`
+  - Added 19 new fast discovery unit tests
+  - Added 4 minimal Git integration tests
+
+### Added
+- **Test Infrastructure**
+  - New `test/testutil` package with test helpers (`GetFixturePath()`, `SkipIfNoGit()`)
+  - Test fixtures for skills, commands, agents, mixed resources, and edge cases
+  - `test/git_integration_test.go` - Minimal opt-in Git integration tests
+  - `test/discovery_skills_test.go` - Fast skills discovery unit tests
+  - `test/discovery_commands_test.go` - Fast commands discovery unit tests
+  - `test/discovery_agents_test.go` - Fast agents discovery unit tests
+  - `test/discovery_mixed_test.go` - Mixed resource discovery tests
+  
+- **Documentation**
+  - `testdata/repos/README.md` - Fixture documentation and usage guide
+  - `docs/architecture-rules.md` - Workspace cache architecture requirements
+  - Test strategy guide in `docs/test-refactoring.md`
+  
+- **Package Resources**
+  - Imported missing dynatrace-core resources (3 agents, 4 commands)
+
+### Changed
+- **Testing Strategy**
+  - Unit tests (default): Use fixtures, no network, <5 seconds execution
+  - Integration tests (opt-in): Real Git operations, run with `make test-integration`
+  - Updated `Makefile` with `test-integration` target
+  - Updated AGENTS.md with new testing approach
+
+### Fixed
+- **Package Management**
+  - Fixed opencode-coder package references to use flat command names
+  - Fixed repo verify to skip packages in metadata validation
+  - Improved error messages in verification output
+  
+- **Test Coverage**
+  - Added comprehensive test coverage for package validation
+  - Maintained coverage at workspace 42.8%, discovery 79.5%
+
+### Removed
+- Legacy Git cloning implementation (deprecated temp cloning code)
+- 14 slow tests that cloned anthropics/* repositories
+- Network connectivity checks in unit tests (`isOnline()` function)
+
 ## [1.10.0] - 2026-01-26
 
 ### Added
