@@ -662,7 +662,7 @@ description: A command for CLI package testing
 	}
 
 	// Add command to repo
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}

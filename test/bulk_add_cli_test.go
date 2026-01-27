@@ -57,7 +57,7 @@ func TestCLIBulkAdd(t *testing.T) {
 	}
 
 	// Test: aimgr repo add (unified command)
-	output, err := runAimgr(t, "repo", "add", resourcesDir)
+	output, err := runAimgr(t, "repo", "import", resourcesDir)
 	if err != nil {
 		t.Fatalf("Failed to add resources: %v\nOutput: %s", err, output)
 	}
@@ -99,7 +99,7 @@ func TestCLIBulkAddForce(t *testing.T) {
 		t.Fatalf("Failed to write command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", cmdPath)
+	_, err := runAimgr(t, "repo", "import", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command first time: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestCLIBulkAddForce(t *testing.T) {
 	}
 
 	// Try unified add with force
-	output, err := runAimgr(t, "repo", "add", "--force", resourcesDir)
+	output, err := runAimgr(t, "repo", "import", "--force", resourcesDir)
 	if err != nil {
 		t.Fatalf("Force add failed: %v\nOutput: %s", err, output)
 	}
@@ -142,7 +142,7 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 		t.Fatalf("Failed to write command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", cmdPath)
+	_, err := runAimgr(t, "repo", "import", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 	}
 
 	// Try unified add with skip-existing
-	output, err := runAimgr(t, "repo", "add", "--skip-existing", resourcesDir)
+	output, err := runAimgr(t, "repo", "import", "--skip-existing", resourcesDir)
 	if err != nil {
 		t.Fatalf("Skip-existing add failed: %v\nOutput: %s", err, output)
 	}
@@ -187,7 +187,7 @@ func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 		t.Fatalf("Failed to write command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", cmdPath)
+	_, err := runAimgr(t, "repo", "import", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 	}
 
 	// Try unified add without flags (should fail)
-	_, err = runAimgr(t, "repo", "add", resourcesDir)
+	_, err = runAimgr(t, "repo", "import", resourcesDir)
 	if err == nil {
 		t.Error("Expected error on conflict without flags, got nil")
 	}
@@ -232,7 +232,7 @@ func TestCLIBulkAddDryRun(t *testing.T) {
 	}
 
 	// Test unified add with dry-run
-	output, err := runAimgr(t, "repo", "add", "--dry-run", resourcesDir)
+	output, err := runAimgr(t, "repo", "import", "--dry-run", resourcesDir)
 	if err != nil {
 		t.Fatalf("Dry run add failed: %v\nOutput: %s", err, output)
 	}
@@ -270,7 +270,7 @@ func TestCLIBulkAddEmptyFolder(t *testing.T) {
 	}
 
 	// Test unified add on empty folder (should fail)
-	_, err := runAimgr(t, "repo", "add", resourcesDir)
+	_, err := runAimgr(t, "repo", "import", resourcesDir)
 	if err == nil {
 		t.Error("Expected error on empty folder, got nil")
 	}
@@ -291,7 +291,7 @@ func TestCLIAddSingleFile(t *testing.T) {
 	}
 
 	// Test unified add on single file (should succeed)
-	output, err := runAimgr(t, "repo", "add", cmdPath)
+	output, err := runAimgr(t, "repo", "import", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add single file: %v\nOutput: %s", err, output)
 	}

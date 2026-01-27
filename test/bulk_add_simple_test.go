@@ -32,7 +32,7 @@ func TestBulkAddSimple(t *testing.T) {
 	}
 
 	// Run unified add
-	output, err := runAimgr(t, "repo", "add", resourcesDir)
+	output, err := runAimgr(t, "repo", "import", resourcesDir)
 	if err != nil {
 		t.Fatalf("Add failed: %v\nOutput: %s", err, output)
 	}

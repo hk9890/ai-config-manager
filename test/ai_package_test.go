@@ -52,12 +52,12 @@ description: Test skill for zero-arg install
 	}
 
 	// Add resources to repository
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
 
-	_, err = runAimgr(t, "repo", "add", "--force", skillDir)
+	_, err = runAimgr(t, "repo", "import", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v", err)
 	}
@@ -124,7 +124,7 @@ description: Test command for save functionality
 	}
 
 	// Add to repository
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -173,7 +173,7 @@ description: Test skill for save functionality
 		t.Fatalf("Failed to create SKILL.md: %v", err)
 	}
 
-	_, err = runAimgr(t, "repo", "add", "--force", skillDir)
+	_, err = runAimgr(t, "repo", "import", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v", err)
 	}
@@ -226,7 +226,7 @@ description: Test command for no-save flag
 	}
 
 	// Add to repository
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -295,11 +295,11 @@ description: New command
 	}
 
 	// Add to repository
-	_, err := runAimgr(t, "repo", "add", "--force", cmd1Path)
+	_, err := runAimgr(t, "repo", "import", "--force", cmd1Path)
 	if err != nil {
 		t.Fatalf("Failed to add existing command: %v", err)
 	}
-	_, err = runAimgr(t, "repo", "add", "--force", cmd2Path)
+	_, err = runAimgr(t, "repo", "import", "--force", cmd2Path)
 	if err != nil {
 		t.Fatalf("Failed to add new command: %v", err)
 	}
@@ -436,7 +436,7 @@ description: Real command that exists
 	}
 
 	// Add to repository
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -499,7 +499,7 @@ description: Test command for backward compatibility
 	}
 
 	// Add to repository
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -627,7 +627,7 @@ description: Test command for target functionality
 	}
 
 	// Add to repository
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -698,11 +698,11 @@ description: Command 2
 	}
 
 	// Add to repository
-	_, err := runAimgr(t, "repo", "add", "--force", cmd1Path)
+	_, err := runAimgr(t, "repo", "import", "--force", cmd1Path)
 	if err != nil {
 		t.Fatalf("Failed to add command 1: %v", err)
 	}
-	_, err = runAimgr(t, "repo", "add", "--force", cmd2Path)
+	_, err = runAimgr(t, "repo", "import", "--force", cmd2Path)
 	if err != nil {
 		t.Fatalf("Failed to add command 2: %v", err)
 	}
@@ -786,7 +786,7 @@ func TestManifestPersistence(t *testing.T) {
 		if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
 			t.Fatalf("Failed to create %s: %v", name, err)
 		}
-		_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+		_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 		if err != nil {
 			t.Fatalf("Failed to add %s: %v", name, err)
 		}
@@ -871,7 +871,7 @@ description: Test command
 		t.Fatalf("Failed to create test command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}

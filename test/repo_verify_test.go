@@ -44,7 +44,7 @@ description: Valid command
 		t.Fatalf("Failed to create valid command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", validCmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", validCmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add valid command: %v", err)
 	}
@@ -206,7 +206,7 @@ description: Command for package
 		t.Fatalf("Failed to create command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -226,7 +226,7 @@ description: Skill for package
 		t.Fatalf("Failed to create skill: %v", err)
 	}
 
-	_, err = runAimgr(t, "repo", "add", "--force", skillPath)
+	_, err = runAimgr(t, "repo", "import", "--force", skillPath)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v", err)
 	}
@@ -468,7 +468,7 @@ description: Will become orphaned
 		t.Fatalf("Failed to create command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -515,7 +515,7 @@ description: Test missing source path
 		t.Fatalf("Failed to create command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -683,7 +683,7 @@ description: Test --fix with orphaned metadata
 		t.Fatalf("Failed to create command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -750,7 +750,7 @@ description: Test JSON output
 		t.Fatalf("Failed to create orphan command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", orphanPath)
+	_, err := runAimgr(t, "repo", "import", "--force", orphanPath)
 	if err != nil {
 		t.Fatalf("Failed to add orphan command: %v", err)
 	}
@@ -833,7 +833,7 @@ description: A healthy command
 		t.Fatalf("Failed to create command: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -1024,7 +1024,7 @@ description: Orphaned skill
 		t.Fatalf("Failed to create orphan skill: %v", err)
 	}
 
-	_, err := runAimgr(t, "repo", "add", "--force", orphanPath)
+	_, err := runAimgr(t, "repo", "import", "--force", orphanPath)
 	if err != nil {
 		t.Fatalf("Failed to add orphan skill: %v", err)
 	}
