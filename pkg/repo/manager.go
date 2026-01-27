@@ -99,7 +99,15 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 		parts := strings.Split(cleanPath, string(filepath.Separator))
 		for i, part := range parts {
 			if part == "commands" {
-				basePath = filepath.Join(parts[:i+1]...)
+				// Reconstruct path up to and including "commands"
+				// If the original path is absolute, preserve that
+				if filepath.IsAbs(cleanPath) {
+					basePath = string(filepath.Separator) + filepath.Join(parts[:i+1]...)
+				} else {
+					basePath = filepath.Join(parts[:i+1]...)
+				}
+				// Clean to normalize the path
+				basePath = filepath.Clean(basePath)
 				break
 			}
 		}
