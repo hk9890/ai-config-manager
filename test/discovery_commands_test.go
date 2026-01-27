@@ -22,9 +22,9 @@ func TestDiscoverCommands_StandardLocation(t *testing.T) {
 
 	// Verify we found the expected commands
 	expectedNames := map[string]bool{
-		"build":         true,
-		"test":          true,
-		"nested/deploy": true,
+		"build":  true,
+		"test":   true,
+		"deploy": true,
 	}
 
 	foundNames := make(map[string]bool)
@@ -50,7 +50,7 @@ func TestDiscoverCommands_NestedCommands(t *testing.T) {
 	// Verify nested command is found
 	foundNested := false
 	for _, cmd := range commands {
-		if cmd.Name == "nested/deploy" {
+		if cmd.Name == "deploy" {
 			foundNested = true
 			if cmd.Description == "" {
 				t.Errorf("Nested command has empty description")
@@ -60,7 +60,7 @@ func TestDiscoverCommands_NestedCommands(t *testing.T) {
 	}
 
 	if !foundNested {
-		t.Errorf("Nested command 'nested/deploy' not found")
+		t.Errorf("Nested command 'deploy' not found")
 	}
 }
 

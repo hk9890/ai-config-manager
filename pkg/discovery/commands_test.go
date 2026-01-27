@@ -93,7 +93,7 @@ func TestDiscoverCommands_RecursiveFallback(t *testing.T) {
 				t.Errorf("Wrong description for top-level: %s", cmd.Description)
 			}
 		}
-		if cmd.Name == "nested/level2/level3/deep-command" {
+		if cmd.Name == "deep-command" {
 			foundDeep = true
 			if cmd.Description != "A command found through recursive search" {
 				t.Errorf("Wrong description for deep-command: %s", cmd.Description)
