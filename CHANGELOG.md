@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.12.0] - 2026-01-27
+
+### Breaking Changes
+- **Command Rename** - `aimgr repo add` is now `aimgr repo import`
+  - More intuitive name that reflects the operation
+  - All documentation and examples updated
+  - Test suite updated to use new command name
+- **Command Removal** - Removed `aimgr repo create-package` command
+  - Users should manually create `.package.json` files instead
+  - Simpler workflow with direct file editing
+  - See `docs/resource-formats.md` for package format specification
+
+### Added
+- **Uninstall All** - New functionality to uninstall all installed resources at once
+  - Use `aimgr uninstall` without arguments to remove all resources
+  - Prompts for confirmation before proceeding
+  - Efficient bulk removal operation
+  
+- **Nested Command Structure** - Commands can now be organized in nested directories
+  - Import commands from subdirectories (e.g., `commands/api/deploy.md`)
+  - Repository preserves directory structure: stored as `commands/api/deploy.md`
+  - Prevents name conflicts for same filename in different directories
+  - Backward compatible with flat command structure
+  - Example: `commands/dev/test.md` and `commands/prod/test.md` can coexist
+  - Discovery automatically detects nested commands during import
+  - Symlinks created with full nested path preserved
+
+### Fixed
+- **Nested Command Installation** - Fixed symlink creation to preserve nested structure
+  - Installer now creates parent directories as needed
+  - Absolute paths correctly preserved during basePath calculation
+  - All nested commands install to correct locations in tool directories
+
+### Testing
+- Added comprehensive tests for nested command workflows
+- Added tests for LoadCommandWithBase and RelativePath functionality
+- Integration tests verify end-to-end nested import and installation
+- Updated test suite to use `repo import` command name
+
+
 ## [1.11.0] - 2026-01-27
 
 ### Performance
