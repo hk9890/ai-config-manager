@@ -525,7 +525,9 @@ func (m *Manager) Get(name string, resourceType resource.ResourceType) (*resourc
 	// Load the resource
 	switch resourceType {
 	case resource.Command:
-		return resource.LoadCommand(path)
+		// Use LoadCommandWithBase to preserve nested names
+		commandsPath := filepath.Join(m.repoPath, "commands")
+		return resource.LoadCommandWithBase(path, commandsPath)
 	case resource.Skill:
 		return resource.LoadSkill(path)
 	case resource.Agent:
