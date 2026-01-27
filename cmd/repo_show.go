@@ -92,7 +92,7 @@ func showDetailedResource(manager *repo.Manager, resourceArg string) error {
 // showSkillDetails displays detailed information for a skill
 func showSkillDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
 	// Load full skill resource for additional details
-	skillPath := manager.GetPath(res.Name, resource.Skill)
+	skillPath := res.Path
 	skill, err := resource.LoadSkillResource(skillPath)
 	if err != nil {
 		return fmt.Errorf("failed to load skill details: %w", err)
@@ -153,7 +153,7 @@ func showSkillDetails(manager *repo.Manager, res *resource.Resource, metadataAva
 // showCommandDetails displays detailed information for a command
 func showCommandDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
 	// Load full command resource for additional details
-	commandPath := manager.GetPath(res.Name, resource.Command)
+	commandPath := res.Path
 	command, err := resource.LoadCommandResource(commandPath)
 	if err != nil {
 		return fmt.Errorf("failed to load command details: %w", err)
@@ -205,7 +205,7 @@ func showCommandDetails(manager *repo.Manager, res *resource.Resource, metadataA
 // showAgentDetails displays detailed information for an agent
 func showAgentDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
 	// Load full agent resource for additional details
-	agentPath := manager.GetPath(res.Name, resource.Agent)
+	agentPath := res.Path
 	agent, err := resource.LoadAgentResource(agentPath)
 	if err != nil {
 		return fmt.Errorf("failed to load agent details: %w", err)

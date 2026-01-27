@@ -93,7 +93,7 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 	// Strategy: Look for "commands" directory ancestor, or use source's parent dir
 	basePath := ""
 	cleanPath := filepath.Clean(sourcePath)
-	
+
 	// First try to find a "commands" directory in the path
 	if strings.Contains(cleanPath, "commands") {
 		parts := strings.Split(cleanPath, string(filepath.Separator))
@@ -112,7 +112,7 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 			}
 		}
 	}
-	
+
 	// If no "commands" directory found, try to find source repo root
 	// by looking for common markers (.git, .claude, etc.) or use file's grandparent
 	if basePath == "" {
@@ -139,7 +139,7 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 			}
 		}
 	}
-	
+
 	res, err := resource.LoadCommandWithBase(sourcePath, basePath)
 	if err != nil {
 		return fmt.Errorf("failed to load command: %w", err)
@@ -363,7 +363,7 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 				if err != nil {
 					return err
 				}
-				
+
 				// Skip directories and non-.md files
 				if info.IsDir() || !strings.HasSuffix(info.Name(), ".md") {
 					return nil
@@ -562,11 +562,11 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 }
 
 // GetPath returns the full path to a resource in the repository
-// For backward compatibility - does not handle nested paths
+// Handles nested paths for commands (e.g., "api/deploy" -> "commands/api/deploy.md")
 func (m *Manager) GetPath(name string, resourceType resource.ResourceType) string {
 	switch resourceType {
 	case resource.Command:
-		return filepath.Join(m.repoPath, "commands", name+".md")
+		return filepath.Join(m.repoPath, "commands", name) + ".md"
 	case resource.Skill:
 		return filepath.Join(m.repoPath, "skills", name)
 	case resource.Agent:

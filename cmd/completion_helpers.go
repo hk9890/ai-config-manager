@@ -12,7 +12,7 @@ import (
 // parseResourceArg parses a resource argument in the format "type/name"
 // Returns the resource type, name, and any error
 func parseResourceArg(arg string) (resource.ResourceType, string, error) {
-	parts := strings.Split(arg, "/")
+	parts := strings.SplitN(arg, "/", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid format: must be 'type/name' (e.g., skill/my-skill, command/my-command, agent/my-agent)")
 	}
@@ -297,6 +297,7 @@ func completeConfigSetArgs(cmd *cobra.Command, args []string, toComplete string)
 	}
 	return nil, cobra.ShellCompDirectiveNoFileComp
 }
+
 // completeToolNames provides completion for tool names (claude, opencode, copilot)
 func completeToolNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return []string{"claude", "opencode", "copilot"}, cobra.ShellCompDirectiveNoFileComp

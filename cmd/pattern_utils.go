@@ -55,7 +55,7 @@ func ExpandPattern(mgr *repo.Manager, resourceArg string) ([]string, error) {
 // Supports both singular and plural type names (e.g., "skill" and "skills").
 // Returns the resource type, name, and any error.
 func ParseResourceArg(arg string) (resource.ResourceType, string, error) {
-	parts := strings.Split(arg, "/")
+	parts := strings.SplitN(arg, "/", 2)
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid format: must be 'type/name' (e.g., skill/my-skill, command/my-command, agent/my-agent)")
 	}
