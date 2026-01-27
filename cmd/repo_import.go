@@ -492,20 +492,14 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 	for _, cmd := range commands {
 		allPaths = append(allPaths, cmd.Path)
 	}
-	// Add skills
+	// Add skills - use discovered paths directly
 	for _, skill := range skills {
-		skillPath, err := findSkillDir(localPath, skill.Name)
-		if err == nil {
-			allPaths = append(allPaths, skillPath)
-		}
+		allPaths = append(allPaths, skill.Path)
 	}
 
-	// Add agents
+	// Add agents - use discovered paths directly
 	for _, agent := range agents {
-		agentPath, err := findAgentFile(localPath, agent.Name)
-		if err == nil {
-			allPaths = append(allPaths, agentPath)
-		}
+		allPaths = append(allPaths, agent.Path)
 	}
 
 	// Add packages
@@ -728,28 +722,19 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 	// Collect all resource paths
 	var allPaths []string
 
-	// Add commands
+	// Add commands - use discovered paths directly
 	for _, cmd := range commands {
-		cmdPath, err := findCommandFile(searchPath, cmd.Name)
-		if err == nil {
-			allPaths = append(allPaths, cmdPath)
-		}
+		allPaths = append(allPaths, cmd.Path)
 	}
 
-	// Add skills
+	// Add skills - use discovered paths directly
 	for _, skill := range skills {
-		skillPath, err := findSkillDir(searchPath, skill.Name)
-		if err == nil {
-			allPaths = append(allPaths, skillPath)
-		}
+		allPaths = append(allPaths, skill.Path)
 	}
 
-	// Add agents
+	// Add agents - use discovered paths directly
 	for _, agent := range agents {
-		agentPath, err := findAgentFile(searchPath, agent.Name)
-		if err == nil {
-			allPaths = append(allPaths, agentPath)
-		}
+		allPaths = append(allPaths, agent.Path)
 	}
 
 	// Add packages
