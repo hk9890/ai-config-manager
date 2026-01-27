@@ -1,0 +1,10 @@
+{
+  "name": "test-package",
+  "description": "Test package with mixed resources",
+  "resources": [
+    "command/api/deploy",
+    "command/test",
+    "skill/skill-one",
+    "agent/agent-one"
+  ]
+}
