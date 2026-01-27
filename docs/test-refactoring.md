@@ -703,6 +703,31 @@ These test files are already fast (no external calls):
 
 ---
 
+## Running Integration Tests
+
+Integration tests use real GitHub repositories and require network connectivity. These tests are marked with `//go:build integration` and are skipped by default.
+
+### Running Integration Tests
+
+```bash
+# Run only integration tests
+make test-integration
+
+# Run all tests (unit + integration)
+go test -v -tags=integration ./...
+```
+
+### Integration Test Files
+
+- **test/git_integration_test.go**: Minimal Git integration tests that verify clone operations with real network
+  - Uses only `hk9890/ai-tools` repository (controlled, small)
+  - Tests basic clone, ref handling, error handling, and cache reuse
+  - Skipped automatically if Git is not available or network is unreachable
+
+Integration tests are opt-in and provide confidence that Git operations work correctly with real repositories, while the majority of tests use fixtures for fast feedback.
+
+---
+
 **Last Updated**: 2026-01-27  
 **Related Issues**: ai-config-manager-ed2t, ai-config-manager-eaze  
 **Next Review**: After Phase 1 completion
