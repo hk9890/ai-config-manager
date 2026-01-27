@@ -332,3 +332,120 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+// TestDetectType_NestedCommands tests detection of commands in nested directories
+// This test reproduces bug ai-config-manager-2tzg
+func TestDetectType_NestedCommands(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		wantType ResourceType
+	}{
+		{
+			name:     "flat command in commands/",
+			path:     "commands/build.md",
+			wantType: Command,
+		},
+		{
+			name:     "1-level nested command",
+			path:     "commands/nested/deploy.md",
+			wantType: Command,
+		},
+		{
+			name:     "2-level nested command",
+			path:     "commands/api/v2/deploy.md",
+			wantType: Command,
+		},
+		{
+			name:     "3-level nested command (opencode-coder example)",
+			path:     "commands/opencode-coder/api/doctor.md",
+			wantType: Command,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp file structure
+			tmpDir := t.TempDir()
+			fullPath := filepath.Join(tmpDir, tt.path)
+			
+			// Create directories
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				t.Fatalf("Failed to create dirs: %v", err)
+			}
+
+			// Create command file
+			content := "---\ndescription: Test command\n---\n# Test"
+			if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+				t.Fatalf("Failed to write file: %v", err)
+			}
+
+			// Test DetectType
+			gotType, err := DetectType(fullPath)
+			if err != nil {
+				t.Errorf("DetectType() unexpected error = %v", err)
+				return
+			}
+
+			if gotType != tt.wantType {
+				t.Errorf("DetectType() = %v, want %v", gotType, tt.wantType)
+			}
+		})
+	}
+}
+
+// TestDetectType_NestedAgents tests detection of agents in nested directories
+// Agents have the same bug as commands
+func TestDetectType_NestedAgents(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		wantType ResourceType
+	}{
+		{
+			name:     "flat agent in agents/",
+			path:     "agents/reviewer.md",
+			wantType: Agent,
+		},
+		{
+			name:     "1-level nested agent",
+			path:     "agents/code/reviewer.md",
+			wantType: Agent,
+		},
+		{
+			name:     "2-level nested agent",
+			path:     "agents/specialized/code/reviewer.md",
+			wantType: Agent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp file structure
+			tmpDir := t.TempDir()
+			fullPath := filepath.Join(tmpDir, tt.path)
+			
+			// Create directories
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				t.Fatalf("Failed to create dirs: %v", err)
+			}
+
+			// Create agent file
+			content := "---\ndescription: Test agent\n---\n# Test Agent"
+			if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+				t.Fatalf("Failed to write file: %v", err)
+			}
+
+			// Test DetectType
+			gotType, err := DetectType(fullPath)
+			if err != nil {
+				t.Errorf("DetectType() unexpected error = %v", err)
+				return
+			}
+
+			if gotType != tt.wantType {
+				t.Errorf("DetectType() = %v, want %v", gotType, tt.wantType)
+			}
+		})
+	}
+}

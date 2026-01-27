@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Load loads a resource from the filesystem
@@ -56,10 +57,14 @@ func DetectType(path string) (ResourceType, error) {
 		// Use path-based detection first (more reliable for bulk imports)
 		// Check if file is in agents/ or commands/ directory
 		cleanPath := filepath.ToSlash(filepath.Clean(path))
-		if filepath.Base(filepath.Dir(cleanPath)) == "agents" {
+		
+		// Check if path contains /agents/ anywhere (handles nested agents)
+		if strings.Contains(cleanPath, "/agents/") || strings.HasPrefix(cleanPath, "agents/") {
 			return Agent, nil
 		}
-		if filepath.Base(filepath.Dir(cleanPath)) == "commands" {
+		
+		// Check if path contains /commands/ anywhere (handles nested commands)
+		if strings.Contains(cleanPath, "/commands/") || strings.HasPrefix(cleanPath, "commands/") {
 			return Command, nil
 		}
 
