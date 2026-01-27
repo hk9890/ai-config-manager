@@ -25,7 +25,7 @@ var (
 	skipExistingFlag bool
 	dryRunFlag       bool
 	filterFlag       string
-	addFormatFlag    string
+	importFormatFlag    string
 )
 
 // repoImportCmd represents the import command
@@ -116,7 +116,7 @@ func init() {
 	repoImportCmd.Flags().BoolVar(&skipExistingFlag, "skip-existing", false, "Skip conflicts silently")
 	repoImportCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without importing")
 	repoImportCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
-	repoImportCmd.Flags().StringVar(&addFormatFlag, "format", "table", "Output format: table, json, yaml")
+	repoImportCmd.Flags().StringVar(&importFormatFlag, "format", "table", "Output format: table, json, yaml")
 }
 
 // Helper functions for bulk add integration
@@ -1154,7 +1154,7 @@ func formatGitHubShortURL(parsed *source.ParsedSource) string {
 // printImportResults prints a formatted summary of import results
 func printImportResults(result *repo.BulkImportResult) {
 	// Parse format flag
-	format, err := output.ParseFormat(addFormatFlag)
+	format, err := output.ParseFormat(importFormatFlag)
 	if err != nil {
 		// Fall back to default human-readable output if format is invalid
 		fmt.Fprintf(os.Stderr, "Warning: %v, using table format\n", err)
