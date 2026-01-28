@@ -180,8 +180,10 @@ func TestBulkImportConflicts(t *testing.T) {
 		repoPath := filepath.Join(tmpDir, "repo")
 		manager := repo.NewManagerWithPath(repoPath)
 
-		// Add first command
-		cmd1Path := filepath.Join(tmpDir, "conflict.md")
+		// Add first command in proper commands/ directory
+		commandsDir := filepath.Join(tmpDir, "commands")
+		os.MkdirAll(commandsDir, 0755)
+		cmd1Path := filepath.Join(commandsDir, "conflict.md")
 		os.WriteFile(cmd1Path, []byte("---\ndescription: Original\n---\n"), 0644)
 		if err := manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file"); err != nil {
 			t.Fatalf("Failed to add first command: %v", err)
@@ -203,8 +205,10 @@ func TestBulkImportConflicts(t *testing.T) {
 		repoPath := filepath.Join(tmpDir, "repo")
 		manager := repo.NewManagerWithPath(repoPath)
 
-		// Add first command
-		cmd1Path := filepath.Join(tmpDir, "skip.md")
+		// Add first command in proper commands/ directory
+		commandsDir := filepath.Join(tmpDir, "commands")
+		os.MkdirAll(commandsDir, 0755)
+		cmd1Path := filepath.Join(commandsDir, "skip.md")
 		os.WriteFile(cmd1Path, []byte("---\ndescription: Existing\n---\n"), 0644)
 		if err := manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file"); err != nil {
 			t.Fatalf("Failed to add first command: %v", err)
@@ -226,8 +230,10 @@ func TestBulkImportConflicts(t *testing.T) {
 		repoPath := filepath.Join(tmpDir, "repo")
 		manager := repo.NewManagerWithPath(repoPath)
 
-		// Add first command
-		cmd1Path := filepath.Join(tmpDir, "fail.md")
+		// Add first command in proper commands/ directory
+		commandsDir := filepath.Join(tmpDir, "commands")
+		os.MkdirAll(commandsDir, 0755)
+		cmd1Path := filepath.Join(commandsDir, "fail.md")
 		os.WriteFile(cmd1Path, []byte("---\ndescription: Existing\n---\n"), 0644)
 		if err := manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file"); err != nil {
 			t.Fatalf("Failed to add first command: %v", err)
@@ -249,8 +255,10 @@ func TestDryRunMode(t *testing.T) {
 	repoPath := filepath.Join(tmpDir, "repo")
 	manager := repo.NewManagerWithPath(repoPath)
 
-	// Create test command
-	cmdPath := filepath.Join(tmpDir, "dryrun.md")
+	// Create test command in proper commands/ directory
+	commandsDir := filepath.Join(tmpDir, "commands")
+	os.MkdirAll(commandsDir, 0755)
+	cmdPath := filepath.Join(commandsDir, "dryrun.md")
 	os.WriteFile(cmdPath, []byte("---\ndescription: Dry run test\n---\n"), 0644)
 
 	// Import with dry-run

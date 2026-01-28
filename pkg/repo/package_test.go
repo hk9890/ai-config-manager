@@ -229,8 +229,10 @@ func TestBulkImportMixedResourcesAndPackages(t *testing.T) {
 	repoPath := filepath.Join(tmpDir, "repo")
 	manager := NewManagerWithPath(repoPath)
 
-	// Create a command
-	cmdPath := filepath.Join(tmpDir, "cmd.md")
+	// Create a command in proper commands/ directory
+	commandsDir := filepath.Join(tmpDir, "commands")
+	os.MkdirAll(commandsDir, 0755)
+	cmdPath := filepath.Join(commandsDir, "cmd.md")
 	os.WriteFile(cmdPath, []byte("---\ndescription: Command\n---\n"), 0644)
 
 	// Create a skill
@@ -239,8 +241,10 @@ func TestBulkImportMixedResourcesAndPackages(t *testing.T) {
 	os.WriteFile(filepath.Join(skillDir, "SKILL.md"),
 		[]byte("---\nname: skill\ndescription: Skill\n---\n"), 0644)
 
-	// Create an agent (with agent-specific frontmatter to help detection)
-	agentPath := filepath.Join(tmpDir, "agent.md")
+	// Create an agent in proper agents/ directory
+	agentsDir := filepath.Join(tmpDir, "agents")
+	os.MkdirAll(agentsDir, 0755)
+	agentPath := filepath.Join(agentsDir, "agent.md")
 	os.WriteFile(agentPath, []byte("---\ndescription: Agent\ntype: test-agent\n---\n"), 0644)
 
 	// Create a package
