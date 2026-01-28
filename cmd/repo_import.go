@@ -724,6 +724,11 @@ func findCommandFile(searchPath, name string) (string, error) {
 			return err
 		}
 		if info.IsDir() {
+			// Skip tool installation directories
+			dirName := info.Name()
+			if dirName == ".claude" || dirName == ".opencode" || dirName == ".github" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filepath.Ext(path) != ".md" {
@@ -759,6 +764,11 @@ func findSkillDir(searchPath, name string) (string, error) {
 		if !info.IsDir() {
 			return nil
 		}
+		// Skip tool installation directories
+		dirName := info.Name()
+		if dirName == ".claude" || dirName == ".opencode" || dirName == ".github" {
+			return filepath.SkipDir
+		}
 		// Check if this directory contains SKILL.md
 		skillMdPath := filepath.Join(path, "SKILL.md")
 		if _, err := os.Stat(skillMdPath); err != nil {
@@ -792,6 +802,11 @@ func findAgentFile(searchPath, name string) (string, error) {
 			return err
 		}
 		if info.IsDir() {
+			// Skip tool installation directories
+			dirName := info.Name()
+			if dirName == ".claude" || dirName == ".opencode" || dirName == ".github" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filepath.Ext(path) != ".md" {
