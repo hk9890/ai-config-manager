@@ -29,20 +29,11 @@ func TestCLIRepoVerifyBasic(t *testing.T) {
 // TestCLIRepoVerifyPackageWithMissingRefs tests detection of packages with missing resource references
 func TestCLIRepoVerifyPackageWithMissingRefs(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a valid command resource that we'll reference in the package
-	validCmdPath := filepath.Join(testDir, "valid-cmd.md")
-	validCmdContent := `---
-description: Valid command
----
-# Valid Command
-`
-	if err := os.WriteFile(validCmdPath, []byte(validCmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create valid command: %v", err)
-	}
+	validCmdPath := createTestCommand(t, "valid-cmd", "Valid command")
 
 	_, err := runAimgr(t, "repo", "import", "--force", validCmdPath)
 	if err != nil {
@@ -191,40 +182,18 @@ func TestCLIRepoVerifyPackageJSON(t *testing.T) {
 // TestCLIRepoVerifyHealthyPackage tests verification of a package with all resources present
 func TestCLIRepoVerifyHealthyPackage(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create resources
-	cmdPath := filepath.Join(testDir, "pkg-cmd.md")
-	cmdContent := `---
-description: Command for package
----
-# Package Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "pkg-cmd", "Command for package")
 
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
 
-	skillPath := filepath.Join(testDir, "pkg-skill")
-	if err := os.MkdirAll(skillPath, 0755); err != nil {
-		t.Fatalf("Failed to create skill directory: %v", err)
-	}
-	skillFilePath := filepath.Join(skillPath, "SKILL.md")
-	skillContent := `---
-name: pkg-skill
-description: Skill for package
----
-# Package Skill
-`
-	if err := os.WriteFile(skillFilePath, []byte(skillContent), 0644); err != nil {
-		t.Fatalf("Failed to create skill: %v", err)
-	}
+	skillPath := createTestSkill(t, "pkg-skill", "Skill for package")
 
 	_, err = runAimgr(t, "repo", "import", "--force", skillPath)
 	if err != nil {
@@ -453,20 +422,11 @@ description: Command without metadata
 // TestCLIRepoVerifyOrphanedMetadata tests detection of orphaned metadata
 func TestCLIRepoVerifyOrphanedMetadata(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a resource
-	cmdPath := filepath.Join(testDir, "orphan-test.md")
-	cmdContent := `---
-description: Will become orphaned
----
-# Orphan Test
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "orphan-test", "Will become orphaned")
 
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
@@ -500,20 +460,11 @@ description: Will become orphaned
 // TestCLIRepoVerifyMissingSourcePaths tests detection of missing source paths
 func TestCLIRepoVerifyMissingSourcePaths(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a resource with local source
-	cmdPath := filepath.Join(testDir, "source-test.md")
-	cmdContent := `---
-description: Test missing source path
----
-# Source Test
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "source-test", "Test missing source path")
 
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
@@ -668,20 +619,11 @@ description: Test --fix flag
 // TestCLIRepoVerifyFixOrphanedMetadata tests --fix removes orphaned metadata
 func TestCLIRepoVerifyFixOrphanedMetadata(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a resource
-	cmdPath := filepath.Join(testDir, "fix-orphan.md")
-	cmdContent := `---
-description: Test --fix with orphaned metadata
----
-# Fix Orphan
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "fix-orphan", "Test --fix with orphaned metadata")
 
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
@@ -722,7 +664,6 @@ description: Test --fix with orphaned metadata
 // TestCLIRepoVerifyJSONWithIssues tests JSON output with actual issues
 func TestCLIRepoVerifyJSONWithIssues(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -745,10 +686,7 @@ description: Test JSON output
 	}
 
 	// Create orphaned metadata
-	orphanPath := filepath.Join(testDir, "orphan-json.md")
-	if err := os.WriteFile(orphanPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create orphan command: %v", err)
-	}
+	orphanPath := createTestCommand(t, "orphan-json", "Test JSON output")
 
 	_, err := runAimgr(t, "repo", "import", "--force", orphanPath)
 	if err != nil {
@@ -818,20 +756,11 @@ description: Test JSON output
 // TestCLIRepoVerifyHealthyRepo tests verification of a healthy repository
 func TestCLIRepoVerifyHealthyRepo(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a valid resource
-	cmdPath := filepath.Join(testDir, "healthy-cmd.md")
-	cmdContent := `---
-description: A healthy command
----
-# Healthy Command
-`
-	if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
-		t.Fatalf("Failed to create command: %v", err)
-	}
+	cmdPath := createTestCommand(t, "healthy-cmd", "A healthy command")
 
 	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
 	if err != nil {
@@ -988,7 +917,6 @@ func TestCLIRepoVerifyEmptyRepo(t *testing.T) {
 // TestCLIRepoVerifyMultipleIssues tests verify with multiple types of issues
 func TestCLIRepoVerifyMultipleIssues(t *testing.T) {
 	repoDir := t.TempDir()
-	testDir := t.TempDir()
 
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -1010,19 +938,7 @@ description: No metadata
 	}
 
 	// Issue 2: Orphaned metadata (skill)
-	orphanPath := filepath.Join(testDir, "orphan-skill")
-	if err := os.MkdirAll(orphanPath, 0755); err != nil {
-		t.Fatalf("Failed to create orphan skill dir: %v", err)
-	}
-	skillPath := filepath.Join(orphanPath, "SKILL.md")
-	if err := os.WriteFile(skillPath, []byte(`---
-name: orphan-skill
-description: Orphaned skill
----
-# Orphan
-`), 0644); err != nil {
-		t.Fatalf("Failed to create orphan skill: %v", err)
-	}
+	orphanPath := createTestSkill(t, "orphan-skill", "Orphaned skill")
 
 	_, err := runAimgr(t, "repo", "import", "--force", orphanPath)
 	if err != nil {
