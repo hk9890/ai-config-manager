@@ -1,8 +1,8 @@
 package test
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -995,7 +995,7 @@ func TestCLIRepoVerifyNestedPaths(t *testing.T) {
 
 	// Create nested commands individually and import them
 	tempDir := t.TempDir()
-	
+
 	// Create command files with nested paths (properly structured)
 	nestedCommands := []struct {
 		path string
@@ -1015,7 +1015,7 @@ description: Test nested command %s
 # %s
 Test nested command content.
 `, cmd.name, cmd.name)
-		
+
 		if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
 			t.Fatalf("Failed to create command file %s: %v", cmdPath, err)
 		}
@@ -1045,7 +1045,7 @@ Test nested command content.
 		"dt-critical-incident-global-health-check",
 		"opencode-coder-doctor",
 	}
-	
+
 	for _, pattern := range orphanedPatterns {
 		if strings.Contains(verifyOutput, pattern) {
 			t.Errorf("Verify incorrectly reports '%s' as orphaned (should use name from metadata content, not filename)", pattern)
@@ -1054,7 +1054,7 @@ Test nested command content.
 
 	// Verify in JSON format to check detailed results
 	jsonOutput, _ := runAimgr(t, "repo", "verify", "--json")
-	
+
 	var result struct {
 		OrphanedMetadata []struct {
 			Name string `json:"name"`

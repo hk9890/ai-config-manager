@@ -367,7 +367,7 @@ func installFromManifest(cmd *cobra.Command) error {
 		// Check if this is a package reference
 		if strings.HasPrefix(resourceRef, "package/") {
 			packageName := strings.TrimPrefix(resourceRef, "package/")
-			
+
 			// Load package
 			repoPath := manager.GetRepoPath()
 			pkgPath := resource.GetPackagePath(packageName, repoPath)
@@ -382,9 +382,9 @@ func installFromManifest(cmd *cobra.Command) error {
 				results = append(results, result)
 				continue
 			}
-			
+
 			fmt.Printf("Expanding package '%s' (%d resources)...\n", packageName, len(pkg.Resources))
-			
+
 			// Install each resource from the package
 			for _, pkgResourceRef := range pkg.Resources {
 				result := processInstall(pkgResourceRef, installer, manager)
@@ -650,7 +650,6 @@ func installPackage(packageName string, projectPath string, installer *install.I
 	if len(errors) > 0 {
 		return fmt.Errorf("package installation completed with errors")
 	}
-
 
 	// Update manifest with package reference if successful installations
 	if installed > 0 {

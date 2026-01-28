@@ -95,7 +95,7 @@ Backs up the database.
 	// Verify no name conflicts - both deploy.md files should exist
 	apiDeploy := filepath.Join(repoPath, "commands", "api", "deploy.md")
 	dbDeploy := filepath.Join(repoPath, "commands", "db", "deploy.md")
-	
+
 	if _, err := os.Stat(apiDeploy); os.IsNotExist(err) {
 		t.Error("API deploy command missing")
 	}

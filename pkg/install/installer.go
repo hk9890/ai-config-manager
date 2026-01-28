@@ -121,7 +121,7 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 		// Determine symlink path using resource name (supports nested structure)
 		// For nested commands (e.g., name="api/deploy"), create nested directories
 		symlinkPath := filepath.Join(commandsDir, res.Name+".md")
-		
+
 		// Create parent directories if needed (for nested structure)
 		if err := os.MkdirAll(filepath.Dir(symlinkPath), 0755); err != nil {
 			return fmt.Errorf("failed to create directory for %s: %w", tool, err)

@@ -143,7 +143,6 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 		}
 	}
 
-
 	res, err := resource.LoadCommandWithBase(sourcePath, basePath)
 	if err != nil {
 		return fmt.Errorf("failed to load command: %w", err)

@@ -119,9 +119,10 @@ func TestImportNestedCommands_EndToEnd(t *testing.T) {
 		}
 	}
 
-	t.Logf("✓ Import test complete: %d commands discovered, %d imported, all files and metadata verified", 
+	t.Logf("✓ Import test complete: %d commands discovered, %d imported, all files and metadata verified",
 		len(commands), result.CommandCount)
 }
+
 // TestImportNestedSkills_EndToEnd verifies the complete import workflow for skills:
 // 1. Start with git repo on disk layout
 // 2. Import using discovery + AddBulk
@@ -370,7 +371,7 @@ func TestImportPackageWithAllResourceTypes_EndToEnd(t *testing.T) {
 
 	// 3. First, discover and import all resources that the package references
 	// (In real workflow, user would: aimgr repo import <dir>, which imports everything)
-	
+
 	// Discover and import commands
 	commands, err := discovery.DiscoverCommands(fixtureDir, "")
 	if err != nil {
@@ -380,7 +381,7 @@ func TestImportPackageWithAllResourceTypes_EndToEnd(t *testing.T) {
 	for _, cmd := range commands {
 		commandPaths = append(commandPaths, cmd.Path)
 	}
-	
+
 	// Discover and import skills
 	skills, err := discovery.DiscoverSkills(fixtureDir, "")
 	if err != nil {
@@ -390,7 +391,7 @@ func TestImportPackageWithAllResourceTypes_EndToEnd(t *testing.T) {
 	for _, skill := range skills {
 		skillPaths = append(skillPaths, skill.Path)
 	}
-	
+
 	// Discover and import agents
 	agents, err := discovery.DiscoverAgents(fixtureDir, "")
 	if err != nil {
@@ -404,7 +405,7 @@ func TestImportPackageWithAllResourceTypes_EndToEnd(t *testing.T) {
 	// Import all resources
 	allPaths := append(commandPaths, skillPaths...)
 	allPaths = append(allPaths, agentPaths...)
-	
+
 	result, err := mgr.AddBulk(allPaths, BulkImportOptions{})
 	if err != nil {
 		t.Fatalf("AddBulk failed for resources: %v", err)
@@ -415,7 +416,7 @@ func TestImportPackageWithAllResourceTypes_EndToEnd(t *testing.T) {
 
 	// 4. Now import the package that references these resources
 	packagePath := filepath.Join(fixtureDir, "packages", "test-package.package.json")
-	
+
 	// Verify package file exists
 	if _, err := os.Stat(packagePath); err != nil {
 		t.Fatalf("Package file not found: %s (error: %v)", packagePath, err)

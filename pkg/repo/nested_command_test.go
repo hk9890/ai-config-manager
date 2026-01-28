@@ -41,7 +41,7 @@ description: Deploy API v2
 	expectedPath := filepath.Join(repoPath, "commands", "api", "v2", "deploy.md")
 	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
 		t.Errorf("Command not stored in nested structure. Expected: %s", expectedPath)
-		
+
 		// Check if it was stored flat (the bug)
 		flatPath := filepath.Join(repoPath, "commands", "deploy.md")
 		if _, err := os.Stat(flatPath); err == nil {

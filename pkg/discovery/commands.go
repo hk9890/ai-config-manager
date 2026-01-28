@@ -24,7 +24,7 @@ func DiscoverCommands(basePath string, subpath string) ([]*resource.Resource, er
 // to find commands outside of priority directories
 func DiscoverCommandsWithErrors(basePath string, subpath string) ([]*resource.Resource, []DiscoveryError, error) {
 	var allErrors []DiscoveryError
-	
+
 	searchPath := basePath
 	if subpath != "" {
 		searchPath = filepath.Join(basePath, subpath)

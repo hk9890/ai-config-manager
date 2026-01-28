@@ -16,7 +16,7 @@ const (
 
 // Manifest represents a project's AI resource dependencies
 // Similar to npm's package.json, it declares which resources should be installed
-// InstallConfig holds installation-related configuration  
+// InstallConfig holds installation-related configuration
 type InstallConfig struct {
 	// Targets specifies which AI tools to install to
 	// Valid values: claude, opencode, copilot
@@ -55,7 +55,7 @@ func Load(path string) (*Manifest, error) {
 	// Migrate from old format if needed
 	if len(m.Targets) > 0 && len(m.Install.Targets) == 0 {
 		m.Install.Targets = m.Targets
-		m.Targets = nil  // Clear old field
+		m.Targets = nil // Clear old field
 	}
 
 	// Validate the manifest
@@ -130,7 +130,7 @@ func (m *Manifest) Validate() error {
 			return fmt.Errorf("invalid install.targets '%s': must be 'claude', 'opencode', or 'copilot'", target)
 		}
 	}
-	
+
 	// Also validate old Targets field if present (backward compatibility)
 	for _, target := range m.Targets {
 		if !isValidTarget(target) {

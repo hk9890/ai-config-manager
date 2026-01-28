@@ -368,7 +368,7 @@ func TestDetectType_NestedCommands(t *testing.T) {
 			// Create temp file structure
 			tmpDir := t.TempDir()
 			fullPath := filepath.Join(tmpDir, tt.path)
-			
+
 			// Create directories
 			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 				t.Fatalf("Failed to create dirs: %v", err)
@@ -424,7 +424,7 @@ func TestDetectType_NestedAgents(t *testing.T) {
 			// Create temp file structure
 			tmpDir := t.TempDir()
 			fullPath := filepath.Join(tmpDir, tt.path)
-			
+
 			// Create directories
 			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 				t.Fatalf("Failed to create dirs: %v", err)

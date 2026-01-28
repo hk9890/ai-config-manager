@@ -86,9 +86,9 @@ func TestResource(t *testing.T) {
 
 func TestGetCategory(t *testing.T) {
 	tests := []struct {
-		name     string
-		err      error
-		wantCat  ErrorCategory
+		name    string
+		err     error
+		wantCat ErrorCategory
 	}{
 		{
 			name:    "fatal error",
@@ -243,9 +243,9 @@ func TestIsResource(t *testing.T) {
 
 func TestTypedErrorMessage(t *testing.T) {
 	tests := []struct {
-		name    string
-		err     error
-		want    string
+		name string
+		err  error
+		want string
 	}{
 		{
 			name: "with context",

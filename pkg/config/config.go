@@ -25,7 +25,6 @@ type Config struct {
 
 	// Sync configuration for syncing resources from external sources
 	Sync SyncConfig `yaml:"sync"`
-
 }
 
 // InstallConfig holds installation-related configuration
@@ -75,11 +74,11 @@ func Load(projectPath string) (*Config, error) {
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// No config file - return error
-		return nil, fmt.Errorf("no config file found at: %s\n\n" +
-			"Expected format:\n" +
-			"  install:\n" +
-			"    targets:\n" +
-			"      - claude\n" +
+		return nil, fmt.Errorf("no config file found at: %s\n\n"+
+			"Expected format:\n"+
+			"  install:\n"+
+			"    targets:\n"+
+			"      - claude\n"+
 			"      - opencode", configPath)
 	}
 
@@ -97,12 +96,12 @@ func Load(projectPath string) (*Config, error) {
 
 	// Require install.targets
 	if len(config.Install.Targets) == 0 {
-		return nil, fmt.Errorf("install.targets is required\n\n" +
-			"Expected format:\n" +
-			"  install:\n" +
-			"    targets:\n" +
-			"      - claude\n" +
-			"      - opencode\n\n" +
+		return nil, fmt.Errorf("install.targets is required\n\n"+
+			"Expected format:\n"+
+			"  install:\n"+
+			"    targets:\n"+
+			"      - claude\n"+
+			"      - opencode\n\n"+
 			"Config location: %s", configPath)
 	}
 
@@ -142,12 +141,12 @@ func LoadGlobal() (*Config, error) {
 		} else {
 			// No config exists - return default
 			// No config exists - return error
-			return nil, fmt.Errorf("no config found\n\n" +
-				"Please create a config file at: %s\n\n" +
-				"Example:\n" +
-				"  install:\n" +
-				"    targets:\n" +
-				"      - claude\n" +
+			return nil, fmt.Errorf("no config found\n\n"+
+				"Please create a config file at: %s\n\n"+
+				"Example:\n"+
+				"  install:\n"+
+				"    targets:\n"+
+				"      - claude\n"+
 				"      - opencode", configPath)
 		}
 	}
@@ -166,12 +165,12 @@ func LoadGlobal() (*Config, error) {
 
 	// Require install.targets
 	if len(config.Install.Targets) == 0 {
-		return nil, fmt.Errorf("install.targets is required\n\n" +
-			"Expected format:\n" +
-			"  install:\n" +
-			"    targets:\n" +
-			"      - claude\n" +
-			"      - opencode\n\n" +
+		return nil, fmt.Errorf("install.targets is required\n\n"+
+			"Expected format:\n"+
+			"  install:\n"+
+			"    targets:\n"+
+			"      - claude\n"+
+			"      - opencode\n\n"+
 			"Config location: %s", configPath)
 	}
 
@@ -229,7 +228,6 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
-
 
 	return nil
 }

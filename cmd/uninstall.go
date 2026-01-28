@@ -173,7 +173,6 @@ Examples:
 	},
 }
 
-
 // uninstallAll uninstalls all resources currently installed in the project
 func uninstallAll(projectPath string, repoPath string, targetTools []tools.Tool) error {
 	fmt.Println("Uninstalling all resources from project...")

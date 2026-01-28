@@ -108,13 +108,13 @@ func extractResourceName(path string) string {
 	if path == "" || strings.HasSuffix(path, "/") || strings.HasSuffix(path, "\\") {
 		return ""
 	}
-	
+
 	// Normalize path separators
 	path = strings.ReplaceAll(path, "\\", "/")
-	
+
 	// Find the resource type directory (commands/, skills/, agents/, packages/)
 	var relPath string
-	
+
 	if idx := strings.Index(path, "/commands/"); idx != -1 {
 		relPath = path[idx+len("/commands/"):]
 	} else if idx := strings.Index(path, "/skills/"); idx != -1 {
@@ -131,11 +131,11 @@ func extractResourceName(path string) string {
 			relPath = path
 		}
 	}
-	
+
 	// Remove file extensions
 	relPath = strings.TrimSuffix(relPath, ".md")
 	relPath = strings.TrimSuffix(relPath, ".package.json")
-	
+
 	return relPath
 }
 
