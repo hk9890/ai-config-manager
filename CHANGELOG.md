@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.13.0] - 2026-01-28
+
+### Fixed
+- **Nested Command Path Detection** - Fixed multiple bugs in nested command path handling
+  - Fixed `DetectType()` to correctly handle nested command and agent paths
+  - Fixed `repo Get()` to use `LoadCommandWithBase` for proper nested names
+  - Fixed `repo show` command to support nested paths correctly
+  - Fixed `repo verify` nested paths bug
+  - Commands now correctly use nested paths in Name field throughout the system
+  
+- **Import and Display** - Fixed nested command path display issues
+  - Fixed display of nested command paths in sync/import output
+  - Consolidated import logic to use discovered `.Path` directly as single source of truth
+  - Fixed basePath detection from incorrectly using system directories in tests
+
+### Changed
+- **Test Infrastructure** - Major test suite refactoring for improved maintainability
+  - Migrated to unified fixture service helpers across test suite
+  - Refactored tests to use fixture helpers: `repo_verify_test`, `repo_update_batching_test`, CLI integration tests, `filter_test`, `package_test`, `marketplace_test`
+  - Added comprehensive test fixtures for nested resources
+  - Improved test reliability and reduced code duplication
+  - Enhanced integration tests with file and metadata validation
+
+### Testing
+- Added integration test for nested command layout verification
+- Enhanced integration tests to verify both files and metadata
+- Added test helper functions for creating resources with valid names
+- Improved test coverage for nested command workflows
+
 ## [1.12.0] - 2026-01-27
 
 ### Breaking Changes
