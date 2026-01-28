@@ -552,20 +552,39 @@ func updateFromLocalSource(manager *repo.Manager, name string, resourceType reso
 		return true, fmt.Errorf("source path no longer exists (consider running 'aimgr repo prune' to clean up orphaned metadata)")
 	}
 
+	// Find the specific resource within the source directory
+	// This uses the same logic as Git sources to search for the resource by name
+	var resourcePath string
+	var findErr error
+	switch resourceType {
+	case resource.Command:
+		resourcePath, findErr = findCommandFile(localPath, name)
+	case resource.Skill:
+		resourcePath, findErr = findSkillDir(localPath, name)
+	case resource.Agent:
+		resourcePath, findErr = findAgentFile(localPath, name)
+	default:
+		return false, fmt.Errorf("unsupported resource type: %s", resourceType)
+	}
+
+	if findErr != nil {
+		return false, fmt.Errorf("resource not found in source: %w", findErr)
+	}
+
 	// Remove existing resource (force mode is implicit for update)
 	if err := manager.Remove(name, resourceType); err != nil {
 		return false, fmt.Errorf("failed to remove existing resource: %w", err)
 	}
 
-	// Re-add from local source
+	// Re-add from local source using the found resource path
 	var addErr error
 	switch resourceType {
 	case resource.Command:
-		addErr = manager.AddCommand(localPath, meta.SourceURL, meta.SourceType)
+		addErr = manager.AddCommand(resourcePath, meta.SourceURL, meta.SourceType)
 	case resource.Skill:
-		addErr = manager.AddSkill(localPath, meta.SourceURL, meta.SourceType)
+		addErr = manager.AddSkill(resourcePath, meta.SourceURL, meta.SourceType)
 	case resource.Agent:
-		addErr = manager.AddAgent(localPath, meta.SourceURL, meta.SourceType)
+		addErr = manager.AddAgent(resourcePath, meta.SourceURL, meta.SourceType)
 	default:
 		addErr = fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
