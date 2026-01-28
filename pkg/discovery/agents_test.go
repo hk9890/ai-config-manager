@@ -306,7 +306,7 @@ func TestDiscoverAgentsRecursive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			agents, err := discoverAgentsRecursive(tt.dirPath, tt.currentDepth)
+			agents, _, err := discoverAgentsRecursive(tt.dirPath, tt.currentDepth)
 			if err != nil {
 				t.Errorf("discoverAgentsRecursive() error = %v", err)
 				return
@@ -433,9 +433,9 @@ func TestDiscoverAgentsInDirectory_NotADirectory(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	_, err = discoverAgentsInDirectory(filePath, false)
-	if err == nil {
-		t.Error("discoverAgentsInDirectory() expected error for non-directory path, got nil")
+	_, errors := discoverAgentsInDirectory(filePath, false)
+	if len(errors) == 0 {
+		t.Error("discoverAgentsInDirectory() expected error for non-directory path, got none")
 	}
 }
 

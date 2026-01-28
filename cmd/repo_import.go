@@ -378,7 +378,7 @@ func importFromLocalPath(
 		return fmt.Errorf("failed to discover skills: %w", err)
 	}
 
-	agents, err := discovery.DiscoverAgents(localPath, "")
+	agents, agentErrors, err := discovery.DiscoverAgentsWithErrors(localPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to discover agents: %w", err)
 	}
@@ -391,6 +391,7 @@ func importFromLocalPath(
 	// Collect all discovery errors
 	var discoveryErrors []discovery.DiscoveryError
 	discoveryErrors = append(discoveryErrors, skillErrors...)
+	discoveryErrors = append(discoveryErrors, agentErrors...)
 
 	// Discover marketplace.json
 	marketplaceConfig, marketplacePath, err := marketplace.DiscoverMarketplace(localPath, "")

@@ -28,9 +28,19 @@ const (
 //
 // Returns deduplicated list of agents by agent name.
 func DiscoverAgents(basePath string, subpath string) ([]*resource.Resource, error) {
+	resources, _, err := DiscoverAgentsWithErrors(basePath, subpath)
+	return resources, err
+}
+
+// DiscoverAgentsWithErrors discovers agent resources and returns both successful discoveries and errors
+// It searches in priority locations first, then falls back to recursive search
+// if no agents are found.
+func DiscoverAgentsWithErrors(basePath string, subpath string) ([]*resource.Resource, []DiscoveryError, error) {
 	if basePath == "" {
-		return nil, fmt.Errorf("basePath cannot be empty")
+		return nil, nil, fmt.Errorf("basePath cannot be empty")
 	}
+
+	var allErrors []DiscoveryError
 
 	// Build full search path
 	searchPath := basePath
@@ -62,11 +72,11 @@ func DiscoverAgents(basePath string, subpath string) ([]*resource.Resource, erro
 
 	// Check if search path exists (after trying to find a valid parent)
 	if searchPathErr != nil {
-		return nil, fmt.Errorf("search path does not exist: %w", searchPathErr)
+		return nil, allErrors, fmt.Errorf("search path does not exist: %w", searchPathErr)
 	}
 
 	if !searchPathInfo.IsDir() {
-		return nil, fmt.Errorf("search path is not a directory: %s", searchPath)
+		return nil, allErrors, fmt.Errorf("search path is not a directory: %s", searchPath)
 	}
 
 	// Priority locations to search
@@ -79,32 +89,31 @@ func DiscoverAgents(basePath string, subpath string) ([]*resource.Resource, erro
 	// Try priority locations first (with recursive search within them)
 	agents := make([]*resource.Resource, 0)
 	for _, location := range priorityLocations {
-		found, err := searchAgentsInDirectory(location, 0)
-		if err != nil {
-			// Log but continue - directory might not exist
-			continue
-		}
+		found, errors := searchAgentsInDirectory(location, 0)
 		agents = append(agents, found...)
+		allErrors = append(allErrors, errors...)
 	}
 
 	// If no agents found in priority locations, do recursive search
 	if len(agents) == 0 {
-		found, err := discoverAgentsRecursive(searchPath, 0)
+		found, errors, err := discoverAgentsRecursive(searchPath, 0)
 		if err != nil {
-			return nil, fmt.Errorf("recursive search failed: %w", err)
+			return nil, allErrors, fmt.Errorf("recursive search failed: %w", err)
 		}
 		agents = append(agents, found...)
+		allErrors = append(allErrors, errors...)
 	}
 
 	// Deduplicate by agent name (keep first occurrence)
 	agents = deduplicateAgents(agents)
 
-	return agents, nil
+	return agents, allErrors, nil
 }
 
 // searchAgentsInDirectory recursively searches for agent .md files within a directory
 // This is used for priority locations to find agents at any depth within that location
-func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, error) {
+// Returns both successfully loaded agents and any errors encountered
+func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, []DiscoveryError) {
 	if depth > MaxRecursiveDepth {
 		return nil, nil
 	}
@@ -115,19 +124,29 @@ func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, error
 		if os.IsNotExist(err) {
 			return nil, nil // Directory doesn't exist, not an error
 		}
-		return nil, fmt.Errorf("failed to stat directory: %w", err)
+		return nil, []DiscoveryError{{
+			Path:  dir,
+			Error: fmt.Errorf("failed to stat directory: %w", err),
+		}}
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("path is not a directory: %s", dir)
+		return nil, []DiscoveryError{{
+			Path:  dir,
+			Error: fmt.Errorf("path is not a directory: %s", dir),
+		}}
 	}
 
 	agents := make([]*resource.Resource, 0)
+	var errors []DiscoveryError
 
 	// Read directory entries
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read directory: %w", err)
+		return nil, []DiscoveryError{{
+			Path:  dir,
+			Error: fmt.Errorf("failed to read directory: %w", err),
+		}}
 	}
 
 	for _, entry := range entries {
@@ -135,10 +154,9 @@ func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, error
 
 		if entry.IsDir() {
 			// Recursively search subdirectories
-			subAgents, err := searchAgentsInDirectory(entryPath, depth+1)
-			if err == nil {
-				agents = append(agents, subAgents...)
-			}
+			subAgents, subErrors := searchAgentsInDirectory(entryPath, depth+1)
+			agents = append(agents, subAgents...)
+			errors = append(errors, subErrors...)
 			continue
 		}
 
@@ -146,38 +164,53 @@ func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, error
 		if filepath.Ext(entry.Name()) == ".md" {
 			agent, err := resource.LoadAgent(entryPath)
 			if err != nil {
-				// Skip invalid agents
+				// Collect error instead of silently skipping
+				errors = append(errors, DiscoveryError{
+					Path:  entryPath,
+					Error: err,
+				})
 				continue
 			}
 			agents = append(agents, agent)
 		}
 	}
 
-	return agents, nil
+	return agents, errors
 }
 
 // discoverAgentsInDirectory finds agent .md files in a specific directory
 // If recursive is true, it will search subdirectories up to MaxRecursiveDepth
-func discoverAgentsInDirectory(dirPath string, recursive bool) ([]*resource.Resource, error) {
+// Returns both successfully loaded agents and any errors encountered
+func discoverAgentsInDirectory(dirPath string, recursive bool) ([]*resource.Resource, []DiscoveryError) {
 	// Check if directory exists
 	info, err := os.Stat(dirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil // Directory doesn't exist, not an error
 		}
-		return nil, fmt.Errorf("failed to stat directory: %w", err)
+		return nil, []DiscoveryError{{
+			Path:  dirPath,
+			Error: fmt.Errorf("failed to stat directory: %w", err),
+		}}
 	}
 
 	if !info.IsDir() {
-		return nil, fmt.Errorf("path is not a directory: %s", dirPath)
+		return nil, []DiscoveryError{{
+			Path:  dirPath,
+			Error: fmt.Errorf("path is not a directory: %s", dirPath),
+		}}
 	}
 
 	agents := make([]*resource.Resource, 0)
+	var errors []DiscoveryError
 
 	// Read directory entries
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read directory: %w", err)
+		return nil, []DiscoveryError{{
+			Path:  dirPath,
+			Error: fmt.Errorf("failed to read directory: %w", err),
+		}}
 	}
 
 	for _, entry := range entries {
@@ -192,51 +225,54 @@ func discoverAgentsInDirectory(dirPath string, recursive bool) ([]*resource.Reso
 		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".md" {
 			agent, err := resource.LoadAgent(entryPath)
 			if err != nil {
-				// Skip invalid agents
+				// Collect error instead of silently skipping
+				errors = append(errors, DiscoveryError{
+					Path:  entryPath,
+					Error: err,
+				})
 				continue
 			}
 			agents = append(agents, agent)
 		}
 	}
 
-	return agents, nil
+	return agents, errors
 }
 
 // discoverAgentsRecursive performs recursive search for agent files
 // up to MaxRecursiveDepth
-func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Resource, error) {
+// Returns both successfully loaded agents and any errors encountered
+func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Resource, []DiscoveryError, error) {
 	// Check depth limit
 	if currentDepth > MaxRecursiveDepth {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// Check if directory exists
 	info, err := os.Stat(dirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, fmt.Errorf("failed to stat directory: %w", err)
+		return nil, nil, fmt.Errorf("failed to stat directory: %w", err)
 	}
 
 	if !info.IsDir() {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	agents := make([]*resource.Resource, 0)
+	var allErrors []DiscoveryError
 
 	// Find agents in current directory
-	found, err := discoverAgentsInDirectory(dirPath, true)
-	if err != nil {
-		// Continue on error, might be permission issues
-		return agents, nil
-	}
+	found, errors := discoverAgentsInDirectory(dirPath, true)
 	agents = append(agents, found...)
+	allErrors = append(allErrors, errors...)
 
 	// Recursively search subdirectories
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		return agents, nil // Return what we have so far
+		return agents, allErrors, nil // Return what we have so far
 	}
 
 	for _, entry := range entries {
@@ -250,15 +286,16 @@ func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Reso
 		}
 
 		subPath := filepath.Join(dirPath, entry.Name())
-		subAgents, err := discoverAgentsRecursive(subPath, currentDepth+1)
+		subAgents, subErrors, err := discoverAgentsRecursive(subPath, currentDepth+1)
 		if err != nil {
 			// Continue on error
 			continue
 		}
 		agents = append(agents, subAgents...)
+		allErrors = append(allErrors, subErrors...)
 	}
 
-	return agents, nil
+	return agents, allErrors, nil
 }
 
 // shouldSkipDirectory returns true if the directory should be skipped during recursive search
