@@ -57,12 +57,12 @@ func DetectType(path string) (ResourceType, error) {
 		// Use path-based detection first (more reliable for bulk imports)
 		// Check if file is in agents/ or commands/ directory
 		cleanPath := filepath.ToSlash(filepath.Clean(path))
-		
+
 		// Check if path contains /agents/ anywhere (handles nested agents)
 		if strings.Contains(cleanPath, "/agents/") || strings.HasPrefix(cleanPath, "agents/") {
 			return Agent, nil
 		}
-		
+
 		// Check if path contains /commands/ anywhere (handles nested commands)
 		if strings.Contains(cleanPath, "/commands/") || strings.HasPrefix(cleanPath, "commands/") {
 			return Command, nil
@@ -93,16 +93,8 @@ func DetectType(path string) (ResourceType, error) {
 			return Command, nil
 		}
 
-		// If we can't determine from path or fields, try loading as both
-		// Prefer command if both succeed (backward compatibility and more common)
-		if _, cmdErr := LoadCommand(path); cmdErr == nil {
-			return Command, nil
-		}
-		if _, agentErr := LoadAgent(path); agentErr == nil {
-			return Agent, nil
-		}
-
 		// Default to command for backward compatibility
+		// (Most .md files without specific agent fields are commands)
 		return Command, nil
 	}
 
