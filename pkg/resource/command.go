@@ -16,10 +16,48 @@ type CommandResource struct {
 	Content      string   `yaml:"-"` // The markdown content
 }
 
+// autoDetectCommandsBase finds the commands/ directory containing the given file
+// Returns empty string if no commands/ directory is found in the path
+func autoDetectCommandsBase(filePath string) string {
+	// Clean and normalize path
+	cleanPath := filepath.Clean(filePath)
+
+	// Walk up the path looking for a "commands" directory
+	dir := filepath.Dir(cleanPath)
+	for {
+		// Check if current directory is named "commands"
+		if filepath.Base(dir) == "commands" {
+			return dir
+		}
+
+		// Check if parent is "commands" (we're one level nested)
+		parent := filepath.Dir(dir)
+		if filepath.Base(parent) == "commands" {
+			return parent
+		}
+
+		// Stop at filesystem root or after reasonable depth
+		if dir == "." || dir == "/" || strings.Count(dir, string(filepath.Separator)) < 2 {
+			break
+		}
+
+		dir = parent
+	}
+
+	return "" // Not found
+}
+
 // LoadCommand loads a command resource from a markdown file
-// For flat commands without nested structure
+// Automatically detects the commands/ base directory and preserves nested structure
+// Returns error if file is not in a commands/ directory
 func LoadCommand(filePath string) (*Resource, error) {
-	return LoadCommandWithBase(filePath, "")
+	basePath := autoDetectCommandsBase(filePath)
+
+	if basePath == "" {
+		return nil, fmt.Errorf("command file must be in a 'commands/' directory (e.g., 'commands/', '.claude/commands/', '.opencode/commands/'): %s", filePath)
+	}
+
+	return LoadCommandWithBase(filePath, basePath)
 }
 
 // LoadCommandWithBase loads a command resource and calculates nested name if basePath is provided
@@ -51,7 +89,7 @@ func LoadCommandWithBase(filePath string, basePath string) (*Resource, error) {
 		// Clean paths for consistent comparison
 		cleanFilePath := filepath.Clean(filePath)
 		cleanBasePath := filepath.Clean(basePath)
-		
+
 		// Get relative path from basePath to filePath
 		relPath, err := filepath.Rel(cleanBasePath, cleanFilePath)
 		if err == nil && !strings.HasPrefix(relPath, "..") {
@@ -115,7 +153,7 @@ func LoadCommandResourceWithBase(filePath string, basePath string) (*CommandReso
 	if basePath != "" {
 		cleanFilePath := filepath.Clean(filePath)
 		cleanBasePath := filepath.Clean(basePath)
-		
+
 		relPath, err := filepath.Rel(cleanBasePath, cleanFilePath)
 		if err == nil && !strings.HasPrefix(relPath, "..") {
 			relativePath := strings.TrimSuffix(relPath, ".md")
