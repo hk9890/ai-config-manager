@@ -185,12 +185,26 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 			continue
 		}
 
-		// Skip priority command directories to avoid duplicates
+		subdirPath := filepath.Join(currentPath, entry.Name())
+
+		// Handle 'commands' directories specially
 		if entry.Name() == "commands" {
+			// Skip root-level 'commands' (already handled by priority search)
+			if depth == 0 {
+				continue
+			}
+			// For nested 'commands' directories (depth > 0):
+			// Search them recursively using the 'commands' directory as basePath
+			// (similar to how priority search works)
+			cmdDirCommands, err := searchCommandsInDirectory(subdirPath, 0, subdirPath)
+			if err == nil {
+				allCommands = append(allCommands, cmdDirCommands...)
+			}
+			// Don't recurse into this 'commands' directory again with recursiveSearchCommands
 			continue
 		}
 
-		subdirPath := filepath.Join(currentPath, entry.Name())
+		// For non-'commands' directories, continue recursive search
 		subCommands, err := recursiveSearchCommands(subdirPath, depth+1, basePath)
 		if err == nil {
 			allCommands = append(allCommands, subCommands...)
