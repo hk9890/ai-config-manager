@@ -63,11 +63,7 @@ LoadCommand(path) → Auto-detects commands/ directory, returns nested path
    ```
    **Decision:** Document that ad-hoc imports must use proper structure.
 
-2. **cmd/repo_import.go:738** - Verify findCommandFile fix:
-   ```bash
-   # This was BROKEN before, should work now:
-   aimgr repo update command/opencode-coder/doctor
-   ```
+2. **cmd/repo_import.go:738** - Verify findCommandFile fix (if applicable)
 
 3. **All tests** - Run full suite and fix any that fail:
    ```bash
@@ -228,7 +224,6 @@ make test-integration
 
 # Manual verification
 aimgr repo import ~/.opencode              # Nested commands work
-aimgr repo update command/nested/test      # Update works
 aimgr repo sync                            # Sync works
 aimgr install command/nested/test          # Install works
 aimgr repo import /tmp/test.md             # Fails with clear error (expected)
@@ -262,7 +257,6 @@ aimgr repo import /tmp/test.md             # Fails with clear error (expected)
    - **BREAKING:** LoadCommandResourceWithBase removed
    
    ### Fixed
-   - Nested commands work correctly in `repo update`
    - Command identity is consistent regardless of load context
    ```
 

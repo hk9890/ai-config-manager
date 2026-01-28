@@ -200,7 +200,6 @@ LoadCommandResourceWithBase(path, base) → *CommandResource
 
 **Acceptance Criteria:**
 - All tests pass
-- `repo update` works for nested commands
 - `repo import` works for nested commands
 - No emergency reverts needed
 
@@ -351,7 +350,6 @@ func LoadAgentWithBase(filePath string, basePath string) (*Resource, error) {
 - LoadCommandWithBase: Use LoadCommand instead (removal in v2.0.0)
 
 ### Fixed
-- Nested commands now work correctly in `repo update`
 - Import logic consolidated (no more duplicate code paths)
 ```
 
@@ -367,7 +365,6 @@ make test-integration
 
 # Manual verification
 aimgr repo import ~/.opencode     # Nested commands work
-aimgr repo update command/test    # Update works
 aimgr repo sync                   # Sync works
 aimgr install skill/test          # Install works
 

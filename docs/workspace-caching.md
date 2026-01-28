@@ -8,7 +8,7 @@ Git repositories are cached in the `.workspace/` directory for efficient reuse a
 
 ## Performance Benefits
 
-- **First operation** (`repo import`, `repo sync`, `repo update`): Full git clone (creates cache)
+- **First operation** (`repo import`, `repo sync`): Full git clone (creates cache)
 - **Subsequent operations**: Reuse cached repository (10-50x faster)
 - **Automatic cache management** with SHA256 hash-based storage
 - **Shared across all resources** from the same source repository
@@ -27,13 +27,6 @@ Syncs from configured sources using cached clones:
 ```bash
 aimgr repo sync
 aimgr repo sync --format=json
-```
-
-### repo update
-Updates resources using cached clones (git pull):
-```bash
-aimgr repo update
-aimgr repo update skill/name
 ```
 
 ## Batching Performance
@@ -147,22 +140,6 @@ aimgr repo import gh:owner/repo --filter "skill/*"
 
 **Result**: 10-50x faster than re-cloning
 
-### 3. Updates
-
-When you update resources from a Git repository:
-
-```bash
-aimgr repo update
-```
-
-1. Identify Git sources from resource metadata
-2. For each unique source, find cached repository
-3. Run `git pull` in the cached repository
-4. Extract updated resources
-5. Update resources in the main repository
-
-**Result**: Fast updates without full re-clone
-
 ## Cache Lifecycle
 
 ### Creation
@@ -172,10 +149,6 @@ aimgr repo update
 ### Reuse
 - Cache reused for all subsequent operations on the same source
 - No network operations for resource extraction
-
-### Update
-- Cache updated with `git pull` during `repo update`
-- Incremental network operations only
 
 ### Pruning
 - Cache removed if no resources reference it
@@ -244,10 +217,7 @@ The cache will be recreated on the next operation.
 If a cached repository has outdated content:
 
 ```bash
-# Update all cached repositories
-aimgr repo update
-
-# Or force a fresh clone by removing the cache
+# Force a fresh clone by removing the cache
 rm -rf ~/.local/share/ai-config/repo/.workspace/
 ```
 

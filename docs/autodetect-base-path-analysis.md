@@ -26,7 +26,6 @@ Found **17 callsites** that use `LoadCommand` directly:
 | **pkg/repo/manager.go** | 755 | `importResource()` | ❌ **BUG**: Nested commands get wrong name |
 | **cmd/repo_import.go** | 145 | Direct file import | ⚠️ May be wrong |
 | **cmd/repo_import.go** | 165 | Auto-detect type | ⚠️ May be wrong |
-| **cmd/repo_import.go** | 738 | `findCommandFile()` | ❌ **BUG**: Causes update to fail |
 | pkg/install/installer.go | 330 | Loading installed file | ✅ OK (installed files are flat) |
 | pkg/resource/command.go | 157 | ValidateCommand | ✅ OK (just validation) |
 | pkg/resource/resource.go | 33 | LoadResource | ⚠️ Delegates, may be wrong |
@@ -35,7 +34,6 @@ Found **17 callsites** that use `LoadCommand` directly:
 
 **Confirmed bugs:**
 1. ❌ `pkg/repo/manager.go:755` - `importResource()` - used by bulk operations
-2. ❌ `cmd/repo_import.go:738` - `findCommandFile()` - used by repo update
 
 ---
 
@@ -137,25 +135,7 @@ case resource.Command:
 
 **Test case:** Import commands from various directories
 
-#### 2. cmd/repo_import.go:738 - findCommandFile()
-
-**Current:**
-```go
-cmd, err := resource.LoadCommand(path)
-if cmd.Name == name {
-    found = path
-}
-```
-
-**After auto-detect:** ✅ **WILL FIX THE BUG**
-- filepath.Walk provides full paths like `repo/commands/opencode-coder/doctor.md`
-- Auto-detect finds basePath = `repo/commands`
-- Returns name = `opencode-coder/doctor`
-- Comparison now works correctly
-
-**Test case:** `repo update` for nested commands
-
-#### 3. cmd/repo_import.go:145 - Direct file import
+#### 2. cmd/repo_import.go:145 - Direct file import
 
 **Current:**
 ```go
@@ -173,7 +153,7 @@ if parentDir == "commands" {
 - **After auto-detect:** ❌ Error "must be in commands/ directory"
 - **Question:** Is this acceptable?
 
-#### 4. cmd/repo_import.go:165 - Auto-detect type
+#### 3. cmd/repo_import.go:165 - Auto-detect type
 
 **Current:**
 ```go
@@ -190,7 +170,7 @@ if cmdErr == nil {
 
 **Need to check:** What is the expected behavior for ad-hoc file imports?
 
-#### 5. pkg/install/installer.go:330 - Loading installed file
+#### 4. pkg/install/installer.go:330 - Loading installed file
 
 **Current:**
 ```go
@@ -202,7 +182,7 @@ res, err := resource.LoadCommand(target)
 - Auto-detect will find these directories
 - Will return correct name (flat, since installations are flat)
 
-#### 6. pkg/resource/resource.go:33 - LoadResource()
+#### 5. pkg/resource/resource.go:33 - LoadResource()
 
 **Current:**
 ```go
@@ -215,7 +195,7 @@ case Command:
 - Need to trace all LoadResource callers
 - If any caller passes non-commands/ paths, will break
 
-#### 7. pkg/resource/resource.go:98 - DetectType()
+#### 6. pkg/resource/resource.go:98 - DetectType()
 
 **Current:**
 ```go
@@ -305,25 +285,13 @@ func TestLoadCommand_AutoDetect(t *testing.T) {
 
 ### Integration Tests
 
-1. **repo update with nested commands**
-   ```bash
-   aimgr repo update command/opencode-coder/doctor
-   # Should succeed
-   ```
-
-2. **repo import from directory**
+1. **repo import from directory**
    ```bash
    aimgr repo import ~/.opencode/
    # Should discover and import nested commands correctly
    ```
 
-3. **repo import single file in commands/**
-   ```bash
-   aimgr repo import ~/project/commands/test.md
-   # Should succeed
-   ```
-
-4. **repo import single file NOT in commands/**
+2. **repo import single file NOT in commands/**
    ```bash
    aimgr repo import /tmp/test.md
    # Should FAIL with clear error

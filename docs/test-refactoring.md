@@ -51,8 +51,7 @@
 1. 🔥 **test/workspace_cache_test.go** (8 tests, ~56s)
 2. 🔥 **test/github_sources_test.go** (11 tests, ~45-90s)
 3. 🔥 **test/workspace_add_sync_test.go** (6 tests, ~30s)
-4. 🔴 **test/repo_update_batching_test.go** (6 tests, ~15-25s)
-5. 🟡 **test/cli_integration_test.go** (depends on CLI commands tested)
+4. 🟡 **test/cli_integration_test.go** (depends on CLI commands tested)
 
 ---
 
@@ -192,27 +191,7 @@ cachePath, err := workspaceManager.GetOrClone(testURL, testRef)
 
 ---
 
-#### 6. `test/repo_update_batching_test.go` 🔴
-
-**Estimated time**: ~15-25 seconds (6 tests)  
-**Primary bottleneck**: Uses `anthropics/quickstarts` and `openai/cookbook` for batching tests
-
-| Test Name | External Calls | Purpose | Refactor Strategy |
-|-----------|----------------|---------|-------------------|
-| `TestUpdateBatching` | Metadata only (gh:anthropics/quickstarts) | Test batching setup | ✅ Keep (no actual clone) |
-| `TestUpdateBatching_MixedSources` | Metadata only | Test mixed Git/local | ✅ Keep (no actual clone) |
-| `TestUpdateBatching_MultipleResourceTypes` | Metadata only | Test batching across types | ✅ Keep (no actual clone) |
-| `TestUpdateBatching_DryRun` | Metadata only | Test dry-run flag | ✅ Keep (no actual clone) |
-| `TestUpdateBatching_VerifyGrouping` | Metadata only | Test grouping logic | ✅ Keep (no actual clone) |
-| `TestCLIUpdateBatching_LocalSources` | Local sources + CLI | Test CLI update | ✅ Keep (no network) |
-
-**Note**: These tests mostly set up metadata without actually cloning. May not need refactoring if they're already fast.
-
-**Verification needed**: Run `go test -v ./test -run TestUpdateBatching` to measure actual time.
-
----
-
-#### 7. `test/cli_integration_test.go`
+#### 6. `test/cli_integration_test.go`
 
 **External calls**: `exec.Command(binPath, args...)` - depends on which CLI commands are tested
 
@@ -226,12 +205,11 @@ cachePath, err := workspaceManager.GetOrClone(testURL, testRef)
 
 | Repository | Used In | Frequency | Purpose | Replace With |
 |------------|---------|-----------|---------|--------------|
-| `gh:anthropics/anthropic-quickstarts` | workspace_cache, github_sources, repo_update_batching | ~30+ calls | General testing, caching, parsing | Local Git repo with test structure |
+| `gh:anthropics/anthropic-quickstarts` | workspace_cache, github_sources | ~30+ calls | General testing, caching, parsing | Local Git repo with test structure |
 | `gh:anthropics/skills` | workspace_add_sync, workspace_cache | ~10+ calls | Skill discovery, sync testing | Local Git repo with skill dirs |
 | `gh:hk9890/ai-config-manager` | workspace_cache, workspace_add_sync | ~5 calls | Multi-repo testing | Local Git repo #2 |
 | `https://github.com/hk9890/ai-config-manager-test-repo` | pkg/workspace/manager_integration_test.go | 4 tests | Integration testing | ✅ Keep for integration tests |
 | `https://github.com/github/gitignore` | pkg/source/git_integration_test.go | 2 calls | Clone testing | ✅ Keep for integration tests |
-| `gh:openai/openai-cookbook` | repo_update_batching | 1 call | Grouping tests | Local Git repo #3 (if needed) |
 | `gh:hk9890/ai-tools` | workspace_add_sync | 1 call | Multi-repo sync | Local Git repo #4 (if needed) |
 
 ### Network Checks
@@ -239,7 +217,7 @@ cachePath, err := workspaceManager.GetOrClone(testURL, testRef)
 | Check | Implementation | Used In | Refactor To |
 |-------|----------------|---------|-------------|
 | `isOnline()` | `net.DialTimeout("tcp", "github.com:443", ...)` | workspace_cache, github_sources (16+ places) | `skipIfNoGit(t)` - only check git binary |
-| `isGitAvailable()` | `exec.Command("git", "--version").Run()` | repo_update_batching, git_test, workspace tests | ✅ Keep |
+| `isGitAvailable()` | `exec.Command("git", "--version").Run()` | git_test, workspace tests | ✅ Keep |
 
 ---
 
