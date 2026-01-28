@@ -368,7 +368,7 @@ func importFromLocalPath(
 	ref string, // Git ref (empty for local/test)
 ) error {
 	// Discover all resources (with error collection)
-	commands, err := discovery.DiscoverCommands(localPath, "")
+	commands, commandErrors, err := discovery.DiscoverCommandsWithErrors(localPath, "")
 	if err != nil {
 		return fmt.Errorf("failed to discover commands: %w", err)
 	}
@@ -390,6 +390,7 @@ func importFromLocalPath(
 
 	// Collect all discovery errors
 	var discoveryErrors []discovery.DiscoveryError
+	discoveryErrors = append(discoveryErrors, commandErrors...)
 	discoveryErrors = append(discoveryErrors, skillErrors...)
 	discoveryErrors = append(discoveryErrors, agentErrors...)
 
