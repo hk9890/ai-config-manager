@@ -29,6 +29,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved test reliability and reduced code duplication
   - Enhanced integration tests with file and metadata validation
 
+- **LoadCommand API** - Improved command loading with auto-detection
+  - `LoadCommand` now auto-detects base path by finding nearest commands/ directory
+  - Commands must be in a `commands/` directory (or tool-specific variant like `.claude/commands/`)
+  - Clear error messages when commands are not in proper structure
+  - Nested command structure automatically preserved
+
+### Deprecated
+- **LoadCommandWithBase** - Use `LoadCommand` instead (auto-detects base path)
+  - `LoadCommand` now handles base path detection automatically
+  - Scheduled for removal in v2.0.0
+- **LoadCommandResourceWithBase** - Use `LoadCommandResource` instead
+  - Uses `LoadCommand` internally which auto-detects base path
+  - Scheduled for removal in v2.0.0
+
 ### Testing
 - Added integration test for nested command layout verification
 - Enhanced integration tests to verify both files and metadata

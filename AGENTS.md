@@ -153,10 +153,31 @@ Tests are split into fast unit tests (default) and slow integration tests (opt-i
 ## Common Patterns
 
 ### Loading Resources
-```go
-// Commands: single .md file
-res, err := resource.LoadCommand("path/to/command.md")
 
+#### Commands
+Commands are loaded using `LoadCommand(filePath)` which automatically detects
+the base path by finding the nearest `commands/` directory in the path.
+
+Commands **MUST** be in a directory named `commands/` (or `.claude/commands/`,
+`.opencode/commands/`, etc.). This ensures proper namespacing and nested structure.
+
+```go
+// LoadCommand auto-detects base path and preserves nested structure
+res, err := resource.LoadCommand("path/to/commands/test.md")
+// → name = "test"
+
+res, err := resource.LoadCommand("path/to/commands/api/deploy.md")
+// → name = "api/deploy"
+
+res, err := resource.LoadCommand(".claude/commands/test.md")
+// → name = "test"
+
+// LoadCommandWithBase is deprecated - use LoadCommand instead
+// res, err := resource.LoadCommandWithBase(filePath, basePath)  // Deprecated
+```
+
+#### Skills, Agents, and Packages
+```go
 // Skills: directory with SKILL.md
 res, err := resource.LoadSkill("path/to/skill-dir")
 
