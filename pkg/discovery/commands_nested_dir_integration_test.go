@@ -72,11 +72,17 @@ This is a test command in a deeply nested commands directory.
 		t.Fatalf("Command 'dt/critical-incident/test-cmd' not found. Found: %v", foundNames)
 	}
 
-	// Step 2: Import via AddBulk
+	// Step 2: Import via AddBulk (using discovered file paths, not directory)
 	t.Log("Step 2: Importing commands")
 	mgr := repo.NewManagerWithPath(repoDir)
 	if err := mgr.Init(); err != nil {
 		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Extract file paths from discovered commands (this is what CLI does)
+	var commandPaths []string
+	for _, cmd := range commands {
+		commandPaths = append(commandPaths, cmd.Path)
 	}
 
 	opts := repo.BulkImportOptions{
@@ -85,7 +91,7 @@ This is a test command in a deeply nested commands directory.
 		DryRun:       false,
 	}
 
-	result, err := mgr.AddBulk([]string{sourceDir}, opts)
+	result, err := mgr.AddBulk(commandPaths, opts)
 	if err != nil {
 		t.Fatalf("AddBulk failed: %v", err)
 	}
