@@ -123,7 +123,6 @@ corruption from concurrent access.
 ## Performance Considerations
 
 - Caching: Significantly reduces clone time for repeated accesses
-- Batching: repo update command batches resources from same URL
 - Incremental updates: git pull only fetches changed objects
 - Lazy loading: Caches created on-demand, not pre-populated
 

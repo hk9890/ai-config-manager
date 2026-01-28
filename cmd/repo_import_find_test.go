@@ -7,7 +7,7 @@ import (
 )
 
 // TestFindAgentFile_SkipsToolDirectories tests that findAgentFile skips .claude, .opencode, .github directories
-// This fixes the bug where repo update would fail when the source directory contains tool installation directories
+// This ensures that repo import correctly identifies source resources vs installed resources
 func TestFindAgentFile_SkipsToolDirectories(t *testing.T) {
 	// Create a temporary directory structure that mimics a project with tool installations
 	tempDir := t.TempDir()
@@ -175,9 +175,9 @@ This is the real source skill.
 	}
 }
 
-// TestFindAgentFile_AfterRemove tests the specific bug scenario:
-// When a source directory contains .claude/agents/, and repo update removes the installed file,
-// findAgentFile should not try to load the deleted file
+// TestFindAgentFile_AfterRemove tests the specific scenario:
+// When a source directory contains .claude/agents/, findAgentFile should only find
+// the source agent and not any installed files
 func TestFindAgentFile_AfterRemove(t *testing.T) {
 	tempDir := t.TempDir()
 
