@@ -79,6 +79,11 @@ func TestCLIBulkAdd(t *testing.T) {
 			t.Errorf("List should contain '%s', got: %s", resource, listOutput)
 		}
 	}
+
+	// Verify repository integrity after import
+	// This catches bugs where import succeeds but verify reports issues
+	t.Log("Verifying repository integrity after import")
+	AssertVerifyClean(t)
 }
 
 // TestCLIBulkAddForce tests bulk add with force flag

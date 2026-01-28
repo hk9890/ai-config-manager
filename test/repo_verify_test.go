@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -978,5 +979,104 @@ description: No metadata
 	// Should suggest --fix
 	if !strings.Contains(output, "--fix") {
 		t.Errorf("Expected suggestion to use --fix, got: %s", output)
+	}
+}
+
+// TestCLIRepoVerifyNestedPaths tests that verify correctly handles nested command paths
+// This is a regression test for bug where verify used metadata filename instead of content
+// for lookups, causing false "orphaned metadata" reports for nested paths like "dt/cluster/overview"
+
+// TestCLIRepoVerifyNestedPaths tests that verify correctly handles nested command paths
+// This is a regression test for bug where verify used metadata filename instead of content
+// for lookups, causing false "orphaned metadata" reports for nested paths like "dt/cluster/overview"
+func TestCLIRepoVerifyNestedPaths(t *testing.T) {
+	repoDir := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Create nested commands individually and import them
+	tempDir := t.TempDir()
+	
+	// Create command files with nested paths (properly structured)
+	nestedCommands := []struct {
+		path string
+		name string
+	}{
+		{"dt-cluster-overview.md", "dt/cluster/overview"},
+		{"dt-critical-incident-global-health-check.md", "dt/critical-incident/global-health-check"},
+		{"opencode-coder-doctor.md", "opencode-coder/doctor"},
+	}
+
+	var commandPaths []string
+	for _, cmd := range nestedCommands {
+		cmdPath := filepath.Join(tempDir, cmd.path)
+		cmdContent := fmt.Sprintf(`---
+description: Test nested command %s
+---
+# %s
+Test nested command content.
+`, cmd.name, cmd.name)
+		
+		if err := os.WriteFile(cmdPath, []byte(cmdContent), 0644); err != nil {
+			t.Fatalf("Failed to create command file %s: %v", cmdPath, err)
+		}
+		commandPaths = append(commandPaths, cmdPath)
+	}
+
+	// Import each command
+	for _, cmdPath := range commandPaths {
+		_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
+		if err != nil {
+			t.Fatalf("Failed to import command %s: %v", cmdPath, err)
+		}
+	}
+
+	// Now run verify - should report NO orphaned metadata
+	verifyOutput, _ := runAimgr(t, "repo", "verify")
+
+	// Should NOT contain "Orphaned metadata" section
+	if strings.Contains(verifyOutput, "Orphaned metadata") {
+		t.Errorf("Verify incorrectly reports orphaned metadata for nested commands.\nOutput: %s", verifyOutput)
+	}
+
+	// Should NOT contain any of our nested command names as orphaned
+	// These are the WRONG keys (from filename) that the bug would generate
+	orphanedPatterns := []string{
+		"dt-cluster-overview",
+		"dt-critical-incident-global-health-check",
+		"opencode-coder-doctor",
+	}
+	
+	for _, pattern := range orphanedPatterns {
+		if strings.Contains(verifyOutput, pattern) {
+			t.Errorf("Verify incorrectly reports '%s' as orphaned (should use name from metadata content, not filename)", pattern)
+		}
+	}
+
+	// Verify in JSON format to check detailed results
+	jsonOutput, _ := runAimgr(t, "repo", "verify", "--json")
+	
+	var result struct {
+		OrphanedMetadata []struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"orphaned_metadata"`
+		HasErrors bool `json:"has_errors"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonOutput), &result); err != nil {
+		t.Fatalf("Failed to parse verify JSON: %v\nOutput: %s", err, jsonOutput)
+	}
+
+	// Should have NO orphaned metadata
+	if len(result.OrphanedMetadata) > 0 {
+		t.Errorf("Expected no orphaned metadata, but found %d issues:", len(result.OrphanedMetadata))
+		for _, issue := range result.OrphanedMetadata {
+			t.Errorf("  - %s (%s)", issue.Name, issue.Type)
+		}
+	}
+
+	// Should have no errors (clean verify)
+	if result.HasErrors {
+		t.Errorf("Expected has_errors=false for nested commands, got true.\nOutput: %s", verifyOutput)
 	}
 }

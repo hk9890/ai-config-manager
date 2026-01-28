@@ -269,13 +269,24 @@ func findVerifyOrphanedMetadata(manager *repo.Manager, resourceMap map[string]re
 				continue
 			}
 
-			// Extract resource name from filename
-			name := strings.TrimSuffix(entry.Name(), "-metadata.json")
+			// Read metadata file to get actual resource name
+			// This handles nested paths correctly (e.g., "dt/cluster/overview")
+			// Filename uses hyphens but metadata content preserves slashes
+			metaPath := filepath.Join(typeDir, entry.Name())
+			data, err := os.ReadFile(metaPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read metadata file %s: %w", metaPath, err)
+			}
+			var meta metadata.ResourceMetadata
+			if err := json.Unmarshal(data, &meta); err != nil {
+				return nil, fmt.Errorf("failed to parse metadata file %s: %w", metaPath, err)
+			}
+
+			name := meta.Name
 			key := fmt.Sprintf("%s:%s", resType, name)
 
 			// Check if corresponding resource exists
 			if _, exists := resourceMap[key]; !exists {
-				metaPath := filepath.Join(typeDir, entry.Name())
 				issue := MetadataIssue{
 					Name: name,
 					Type: resType,

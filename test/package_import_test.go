@@ -16,6 +16,7 @@ func TestPackageAutoImportFromLocalDir(t *testing.T) {
 	// Create temporary directories
 	repoDir := t.TempDir()
 	sourceDir := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a directory structure with packages
 	packagesDir := filepath.Join(sourceDir, "packages")
@@ -145,6 +146,10 @@ func TestPackageAutoImportFromLocalDir(t *testing.T) {
 	if len(pkgList) > 0 && pkgList[0].Name != "test-package" {
 		t.Errorf("Package name = %v, want test-package", pkgList[0].Name)
 	}
+
+	// Verify repository integrity after package import
+	t.Log("Verifying repository integrity")
+	AssertVerifyClean(t)
 }
 
 // TestPackageAutoImportWithFilter tests filtering packages during import
