@@ -8,7 +8,7 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 - 🔗 **Symlink-based Installation**: Install resources in projects without duplication
 - 🤖 **Multi-Tool Support**: Works with Claude Code, OpenCode, and GitHub Copilot
 - 🤖 **Agent Support**: Manage AI agents with specialized roles and capabilities
-- ⚡ **Workspace Caching**: Git repositories cached for 10-50x faster subsequent updates
+- ⚡ **Workspace Caching**: Git repositories cached for 10-50x faster subsequent operations
 - 🧹 **Cache Management**: `repo prune` command to clean up unused Git caches
 - ✅ **Format Validation**: Automatic validation of command, skill, and agent formats
 - 🎯 **Type Safety**: Strong validation following agentskills.io and Claude Code specifications
@@ -847,7 +847,6 @@ The `--format` flag is available on these commands:
 aimgr repo import <source> --format=json
 aimgr repo sync --format=json
 aimgr repo list --format=json
-aimgr repo update --format=json
 
 # Project operations
 aimgr list --format=json
@@ -1294,63 +1293,9 @@ aimgr repo show agent code-reviewer
 
 **Use cases:**
 - Check resource metadata before installing
-- Verify resource source for updates
+- Verify resource source information
 - Review resource details and documentation
 - Debug installation issues
-
-### `aimgr repo update`
-
-Update resources from their original sources (requires metadata tracking).
-
-```bash
-# Update all resources
-aimgr repo update
-
-# Update specific skill
-aimgr repo update skill pdf-processing
-
-# Update specific command
-aimgr repo update command test
-
-# Update specific agent
-aimgr repo update agent code-reviewer
-
-# Preview updates without applying (dry run)
-aimgr repo update --dry-run
-
-# Force update, overwriting local changes
-aimgr repo update --force
-```
-
-**Workspace Caching:**
-Git repositories are cached in `.workspace/` for efficient reuse:
-- **First update**: Full git clone (creates cache)
-- **Subsequent updates**: Git pull only (10-50x faster)
-- Caches automatically shared across resources from the same source
-- Dramatically improves performance for bulk updates
-
-**How it works:**
-1. Reads source information from resource metadata (stored in `.metadata/` directory)
-2. Fetches latest version from original source (GitHub, local path, etc.)
-3. Uses cached Git repository if available (much faster)
-4. Updates the repository copy
-5. Preserves existing symlinks to projects
-
-**Supported sources:**
-- **GitHub**: Uses workspace cache for fast updates
-- **Local**: Copies latest version from local path
-- **File**: Re-copies from original file location
-
-**Metadata tracking:**
-Resources added from GitHub or other sources automatically store metadata including:
-- Source type (github, local, file)
-- Source URL or path
-- Git reference (branch/tag)
-- Added and updated timestamps
-
-**Flags:**
-- `--dry-run`: Preview what would be updated without making changes
-- `--force`: Force update even if local changes detected
 
 ### `aimgr repo prune`
 
@@ -1858,12 +1803,6 @@ Imported packages and resources are tracked with metadata:
 ```bash
 # View package metadata
 aimgr repo show package/web-dev-tools
-
-# Update all marketplace-imported resources
-aimgr repo update
-
-# Update specific package resources
-aimgr repo update skill/typescript-helper
 ```
 
 Metadata includes:
@@ -2095,7 +2034,7 @@ Commands, skills, and agents must follow these naming rules:
 
 ## Metadata Tracking
 
-aimgr automatically tracks metadata about resource sources, enabling features like `repo update` and `repo show`.
+aimgr automatically tracks metadata about resource sources, enabling features like `repo show`.
 
 ### What is Tracked
 
@@ -2151,8 +2090,6 @@ Metadata files are stored in JSON format for better performance and tooling supp
 | `local` | Local directory | `./my-skill` or `/path/to/skill` |
 | `file` | Direct file copy | `~/commands/test.md` |
 
-**Note:** The `source_type` and `source_url` fields are used for update tracking.
-
 ### Using Metadata
 
 **View metadata:**
@@ -2163,49 +2100,12 @@ aimgr repo show command test
 aimgr repo show agent code-reviewer
 ```
 
-**Update from source:**
-```bash
-# Update specific resource from its original source
-aimgr repo update skill pdf-processing
-
-# Update all resources that have source metadata
-aimgr repo update
-
-# Preview what would be updated
-aimgr repo update --dry-run
-```
-
-### Manual Metadata
-
-For resources added before metadata tracking or from sources without auto-tracking, you can manually create metadata files to enable updates.
-
-**Example: Add metadata for a local skill**
-
-Create `~/.local/share/ai-config/repo/.metadata/skills/my-skill-metadata.json`:
-
-```json
-{
-  "name": "my-skill",
-  "type": "skill",
-  "source_type": "local",
-  "source_url": "file:///home/user/projects/my-skill",
-  "first_installed": "2026-01-22T10:00:00Z",
-  "last_updated": "2026-01-22T10:00:00Z"
-}
-```
-
-Then run:
-```bash
-aimgr repo update skill my-skill
-```
-
 ### Metadata Best Practices
 
-1. **Add from GitHub when possible** - Enables automatic updates
+1. **Add from GitHub when possible** - Enables better source tracking
 2. **Use specific refs** - Tag versions (e.g., `@v1.0.0`) for stability
-3. **Keep local sources accessible** - Update requires access to original path
-4. **Check metadata with `repo show`** - Verify source info before updating
-5. **Use `--dry-run`** - Preview updates before applying
+3. **Keep local sources accessible** - Maintain access to original paths
+4. **Check metadata with `repo show`** - Verify source info
 
 ### Metadata Privacy
 
@@ -2241,7 +2141,7 @@ Resources are stored in `~/.local/share/ai-config/repo/` (XDG data directory):
     └── qa-tester.md
 ```
 
-The `.metadata/` directory contains JSON files with source tracking information (GitHub URLs, local paths, timestamps) used for resource updates.
+The `.metadata/` directory contains JSON files with source tracking information (GitHub URLs, local paths, timestamps).
 
 ## Project Installation
 
