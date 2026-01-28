@@ -142,7 +142,7 @@ ai-config-manager/
 │   │   └── version.go     # Embedded at build time
 │   │
 │   └── workspace/         # Workspace caching
-│       └── cache.go       # Git repository caching for updates
+│       └── cache.go       # Git repository caching for repo operations
 │
 ├── test/                   # Integration tests
 │   ├── integration_test.go       # End-to-end workflow tests

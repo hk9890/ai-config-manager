@@ -8,7 +8,7 @@ This guide helps you migrate from the old `ai-repo` command to the new `aimgr` (
 - Binary renamed from `ai-repo` to `aimgr`
 - Commands reorganized under `repo` subcommand group
 - New install/uninstall syntax with type prefixes (e.g., `skill/name`)
-- New commands: `repo show`, `repo update`
+- New commands: `repo show`
 - Metadata tracking for resource sources
 
 ## Quick Reference
@@ -25,7 +25,6 @@ This guide helps you migrate from the old `ai-repo` command to the new `aimgr` (
 | `ai-repo install command bar` | `aimgr install command/bar` |
 | `ai-repo install agent reviewer` | `aimgr install agent/reviewer` |
 | N/A | `aimgr repo show skill foo` |
-| N/A | `aimgr repo update` |
 
 ## Breaking Changes
 
@@ -144,34 +143,7 @@ aimgr repo show agent code-reviewer
 - Installation locations
 - Full frontmatter metadata
 
-### 2. `repo update` Command
-
-Update resources from their original sources (GitHub, local paths).
-
-```bash
-# Update all resources
-aimgr repo update
-
-# Update specific skill
-aimgr repo update skill pdf-processing
-
-# Update specific command
-aimgr repo update command test
-
-# Preview updates without applying
-aimgr repo update --dry-run
-
-# Force update, overwriting local changes
-aimgr repo update --force
-```
-
-**How it works:**
-- Tracks source information in metadata files (stored in `.metadata/` directory)
-- Fetches latest version from original source
-- Updates repository copy
-- Preserves symlinks to projects
-
-### 3. Metadata Tracking
+### 2. Metadata Tracking
 
 Resources now store metadata about their sources for updates in a centralized `.metadata/` directory.
 
@@ -222,7 +194,7 @@ The migration command (v1.3.x) performed:
 3. Moved files to the new `.metadata/` directory structure
 4. Cleaned up old metadata files after successful migration
 
-### 4. Batch Installation
+### 3. Batch Installation
 
 Install multiple resources in a single command.
 
@@ -237,7 +209,7 @@ ai-repo install agent reviewer
 aimgr install skill/foo skill/bar command/test agent/reviewer
 ```
 
-### 5. Uninstall Command
+### 4. Uninstall Command
 
 New dedicated `uninstall` command (replaces manual removal).
 
@@ -515,6 +487,6 @@ The migration from `ai-repo` to `aimgr` is straightforward:
 2. ✅ Add `repo` for repository commands: `aimgr repo import/list/remove`
 3. ✅ Use type prefixes for install: `aimgr install skill/name`
 4. ✅ Update shell completion and scripts
-5. ✅ Enjoy new features: `repo show`, `repo update`, metadata tracking
+5. ✅ Enjoy new features: `repo show`, metadata tracking
 
 Your existing repository and symlinks continue to work without changes!

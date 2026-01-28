@@ -251,7 +251,7 @@ aimgr repo import ~/resources/ --format=yaml
 ```
 
 **Commands supporting --format:**
-- `repo import`, `repo sync`, `repo list`, `repo update`
+- `repo import`, `repo sync`, `repo list`
 - `list`, `install`, `uninstall`
 
 See [docs/output-formats.md](docs/output-formats.md) for comprehensive documentation.
@@ -261,7 +261,7 @@ See [docs/output-formats.md](docs/output-formats.md) for comprehensive documenta
 Git repositories are cached in `.workspace/` for efficient reuse:
 - **First operation**: Full clone (creates cache)
 - **Subsequent operations**: Reuse cache (10-50x faster)
-- **Commands**: `repo import`, `repo sync`, `repo update`
+- **Commands**: `repo import`, `repo sync`
 - **Cache management**: `aimgr repo prune`
 
 See [docs/workspace-caching.md](docs/workspace-caching.md) for details.
