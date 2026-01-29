@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [1.15.0] - 2026-01-29
+
+### Fixed
+- **Repo sync idempotency** - Fixed critical bug where `repo sync` incorrectly reported existing commands as "Added"
+  - Commands now correctly show "Updated" status when already present in repository
+  - Fixed duplicate existence checks that caused incorrect status reporting
+  - Improved test coverage with CLI-based integration tests
+  - Ensures accurate reporting for idempotent sync operations
+
+### Documentation
+- **Major documentation restructure** - Reorganized documentation for better discoverability
+  - Added `docs/user-guide/getting-started.md` - Comprehensive getting started guide
+  - Added `docs/user-guide/testing.md` - Testing guide consolidated from TEST_ISOLATION.md
+  - Created `docs/architecture/` structure for architectural documentation
+  - Created `docs/planning/archive/` for historical planning documents
+  - Streamlined AGENTS.md for AI agent workflows
+
+### Changed
+- **Repository cleanup** - Prepared repository for public release
+  - Updated .gitignore for build artifacts
+  - Moved dev-completion.sh to scripts/ directory
+  - Archived historical planning documents
+  - All beads issues resolved
+
 ## [1.14.0] - 2026-01-29
 
 ### Breaking Changes
