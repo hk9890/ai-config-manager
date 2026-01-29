@@ -45,6 +45,13 @@ For detailed setup instructions, code style guidelines, and development workflow
   - Release workflow
   - Troubleshooting
 
+- **[Testing Guide](testing.md)** - Comprehensive testing documentation
+  - Running tests (unit, integration)
+  - Test isolation principles
+  - Writing new tests
+  - Test fixtures and helpers
+  - Best practices and troubleshooting
+
 ### Architecture Documentation
 
 - **[Architecture Overview](architecture.md)** - High-level architecture overview for contributors
