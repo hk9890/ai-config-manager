@@ -363,6 +363,7 @@ func TestPackageAutoImportConflicts(t *testing.T) {
 		force        bool
 		skipExisting bool
 		wantAdded    int
+		wantUpdated  int
 		wantSkipped  int
 		wantFailed   int
 		secondImport bool // whether to test second import attempt
@@ -372,6 +373,7 @@ func TestPackageAutoImportConflicts(t *testing.T) {
 			force:        false,
 			skipExisting: false,
 			wantAdded:    0,
+			wantUpdated:  0,
 			wantSkipped:  0,
 			wantFailed:   1,
 			secondImport: true,
@@ -380,7 +382,8 @@ func TestPackageAutoImportConflicts(t *testing.T) {
 			name:         "conflict with force succeeds",
 			force:        true,
 			skipExisting: false,
-			wantAdded:    1,
+			wantAdded:    0,
+			wantUpdated:  1,
 			wantSkipped:  0,
 			wantFailed:   0,
 			secondImport: true,
@@ -390,6 +393,7 @@ func TestPackageAutoImportConflicts(t *testing.T) {
 			force:        false,
 			skipExisting: true,
 			wantAdded:    0,
+			wantUpdated:  0,
 			wantSkipped:  1,
 			wantFailed:   0,
 			secondImport: true,
@@ -450,6 +454,9 @@ func TestPackageAutoImportConflicts(t *testing.T) {
 
 			if len(result.Added) != tt.wantAdded {
 				t.Errorf("Added = %d, want %d", len(result.Added), tt.wantAdded)
+			}
+			if len(result.Updated) != tt.wantUpdated {
+				t.Errorf("Updated = %d, want %d", len(result.Updated), tt.wantUpdated)
 			}
 			if len(result.Skipped) != tt.wantSkipped {
 				t.Errorf("Skipped = %d, want %d", len(result.Skipped), tt.wantSkipped)
@@ -727,8 +734,11 @@ func TestPackageAutoImportUpdateWorkflow(t *testing.T) {
 		t.Fatalf("Failed to update package: %v", err)
 	}
 
-	if len(result.Added) != 1 {
-		t.Errorf("Expected 1 added (updated), got %d", len(result.Added))
+	if len(result.Updated) != 1 {
+		t.Errorf("Expected 1 updated (not added), got %d", len(result.Updated))
+	}
+	if len(result.Added) != 0 {
+		t.Errorf("Expected 0 added (should be updated), got %d", len(result.Added))
 	}
 
 	// Verify package was updated

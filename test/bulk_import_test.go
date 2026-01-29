@@ -195,8 +195,11 @@ func TestBulkImportConflicts(t *testing.T) {
 			t.Fatalf("Force import failed: %v", err)
 		}
 
-		if len(result.Added) != 1 {
-			t.Errorf("Expected 1 added with force, got %d", len(result.Added))
+		if len(result.Updated) != 1 {
+			t.Errorf("Expected 1 updated with force (not added), got %d", len(result.Updated))
+		}
+		if len(result.Added) != 0 {
+			t.Errorf("Expected 0 added (should be updated instead), got %d", len(result.Added))
 		}
 	})
 

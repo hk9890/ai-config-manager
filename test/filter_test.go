@@ -234,9 +234,9 @@ func TestFilterWithForce(t *testing.T) {
 		t.Fatalf("Failed to add with filter and force: %v\nOutput: %s", err, output)
 	}
 
-	// Should show 1 command added
-	if !strings.Contains(output, "Summary: 1 added") {
-		t.Errorf("Should add 1 command, got: %s", output)
+	// Should show 1 command updated (not added, since it already existed)
+	if !strings.Contains(output, "Summary: 0 added, 1 updated") {
+		t.Errorf("Should update 1 command (not add), got: %s", output)
 	}
 
 	// Verify repository contains updated version

@@ -260,10 +260,17 @@ description: A duplicate command
 			t.Fatalf("Failed to add command: %v", err)
 		}
 
-		// Try to add again - should fail
-		err := manager.AddCommand(testCmdPath, "file://"+testCmdPath, "file")
-		if err == nil {
-			t.Error("Expected error for duplicate resource, got nil")
+		// AddCommand overwrites by design - use AddBulk for duplicate detection
+		// Try to add again with AddBulk and Force=false
+		result, err := manager.AddBulk([]string{testCmdPath}, repo.BulkImportOptions{
+			Force:        false,
+			SkipExisting: false,
+		})
+		if err != nil {
+			t.Fatalf("AddBulk failed: %v", err)
+		}
+		if len(result.Failed) == 0 {
+			t.Error("Expected duplicate error in AddBulk, got none")
 		}
 	})
 }

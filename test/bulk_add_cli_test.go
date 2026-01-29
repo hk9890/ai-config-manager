@@ -118,8 +118,8 @@ func TestCLIBulkAddForce(t *testing.T) {
 		t.Fatalf("Force add failed: %v\nOutput: %s", err, output)
 	}
 
-	if !strings.Contains(output, "Summary: 1 added") {
-		t.Errorf("Should overwrite with force flag, got: %s", output)
+	if !strings.Contains(output, "Summary: 0 added, 1 updated") {
+		t.Errorf("Should show updated (not added) when overwriting with force flag, got: %s", output)
 	}
 }
 

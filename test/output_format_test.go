@@ -46,8 +46,8 @@ func TestOutputFormatTable(t *testing.T) {
 		t.Errorf("Table should show SUCCESS status, got: %s", output)
 	}
 
-	// Verify summary line
-	summaryPattern := regexp.MustCompile(`Summary: (\d+) added, (\d+) failed, (\d+) skipped \((\d+) total\)`)
+	// Verify summary line (now includes "updated" count)
+	summaryPattern := regexp.MustCompile(`Summary: (\d+) added, (\d+) updated, (\d+) failed, (\d+) skipped \((\d+) total\)`)
 	if !summaryPattern.MatchString(output) {
 		t.Errorf("Table output should contain summary line, got: %s", output)
 	}
