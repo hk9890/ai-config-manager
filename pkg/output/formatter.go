@@ -37,6 +37,7 @@ func ParseFormat(s string) (Format, error) {
 // BulkOperationResult represents the result of a bulk repository operation
 type BulkOperationResult struct {
 	Added        []ResourceResult `json:"added" yaml:"added"`
+	Updated      []ResourceResult `json:"updated" yaml:"updated"`
 	Skipped      []ResourceResult `json:"skipped" yaml:"skipped"`
 	Failed       []ResourceResult `json:"failed" yaml:"failed"`
 	CommandCount int              `json:"command_count" yaml:"command_count"`
@@ -57,6 +58,7 @@ type ResourceResult struct {
 func FromBulkImportResult(result *repo.BulkImportResult) *BulkOperationResult {
 	bor := &BulkOperationResult{
 		Added:        make([]ResourceResult, 0, len(result.Added)),
+		Updated:      make([]ResourceResult, 0, len(result.Updated)),
 		Skipped:      make([]ResourceResult, 0, len(result.Skipped)),
 		Failed:       make([]ResourceResult, 0, len(result.Failed)),
 		CommandCount: result.CommandCount,
@@ -68,6 +70,15 @@ func FromBulkImportResult(result *repo.BulkImportResult) *BulkOperationResult {
 	// Convert added resources
 	for _, path := range result.Added {
 		bor.Added = append(bor.Added, ResourceResult{
+			Name: extractResourceName(path),
+			Type: extractResourceType(path),
+			Path: path,
+		})
+	}
+
+	// Convert updated resources
+	for _, path := range result.Updated {
+		bor.Updated = append(bor.Updated, ResourceResult{
 			Name: extractResourceName(path),
 			Type: extractResourceType(path),
 			Path: path,
@@ -198,6 +209,19 @@ func formatAsTable(result *BulkOperationResult) error {
 		hasContent = true
 	}
 
+	// Add updated resources
+	for _, res := range result.Updated {
+		status := "SUCCESS"
+		message := res.Message
+		if message == "" {
+			message = "Updated in repository"
+		}
+		if err := table.Append(fmt.Sprintf("%s/%s", res.Type, res.Name), status, message); err != nil {
+			return fmt.Errorf("failed to append row: %w", err)
+		}
+		hasContent = true
+	}
+
 	// Add skipped resources
 	for _, res := range result.Skipped {
 		status := "SKIPPED"
@@ -234,15 +258,16 @@ func formatAsTable(result *BulkOperationResult) error {
 
 	// Print summary line
 	totalAdded := len(result.Added)
+	totalUpdated := len(result.Updated)
 	totalSkipped := len(result.Skipped)
 	totalFailed := len(result.Failed)
-	totalResources := totalAdded + totalSkipped + totalFailed
+	totalResources := totalAdded + totalUpdated + totalSkipped + totalFailed
 
 	if totalResources == 0 {
 		fmt.Println("No resources to process")
 	} else {
-		fmt.Printf("Summary: %d added, %d failed, %d skipped (%d total)\n",
-			totalAdded, totalFailed, totalSkipped, totalResources)
+		fmt.Printf("Summary: %d added, %d updated, %d failed, %d skipped (%d total)\n",
+			totalAdded, totalUpdated, totalFailed, totalSkipped, totalResources)
 	}
 
 	// Show tip about JSON format if there are failures

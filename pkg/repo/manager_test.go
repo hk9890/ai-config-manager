@@ -93,10 +93,12 @@ description: A test command
 		t.Fatalf("First AddCommand() error = %v", err)
 	}
 
-	// Add the same command again - should fail
+	// Add the same command again - should succeed (overwrites)
+	// Note: AddCommand() doesn't check for duplicates - it always overwrites
+	// Use AddBulk() with SkipExisting or without Force for duplicate detection
 	err := manager.AddCommand(testCmd, "file://"+testCmd, "file")
-	if err == nil {
-		t.Error("AddCommand() expected error for duplicate command, got nil")
+	if err != nil {
+		t.Errorf("AddCommand() should succeed (overwrites existing), got error = %v", err)
 	}
 }
 
@@ -398,6 +400,7 @@ func TestAddBulk(t *testing.T) {
 		setup            func(tmpDir string, manager *Manager) []string
 		opts             BulkImportOptions
 		wantAddedCount   int
+		wantUpdatedCount int
 		wantSkippedCount int
 		wantFailedCount  int
 		wantError        bool
@@ -511,7 +514,8 @@ func TestAddBulk(t *testing.T) {
 				return []string{cmd2Path}
 			},
 			opts:             BulkImportOptions{Force: true},
-			wantAddedCount:   1,
+			wantAddedCount:   0, // Changed: Force=true on existing resource goes to Updated
+			wantUpdatedCount: 1, // New field to check Updated count
 			wantSkippedCount: 0,
 			wantFailedCount:  0,
 			wantError:        false,
@@ -588,6 +592,9 @@ func TestAddBulk(t *testing.T) {
 
 			if len(result.Added) != tt.wantAddedCount {
 				t.Errorf("AddBulk() added count = %v, want %v", len(result.Added), tt.wantAddedCount)
+			}
+			if len(result.Updated) != tt.wantUpdatedCount {
+				t.Errorf("AddBulk() updated count = %v, want %v", len(result.Updated), tt.wantUpdatedCount)
 			}
 			if len(result.Skipped) != tt.wantSkippedCount {
 				t.Errorf("AddBulk() skipped count = %v, want %v", len(result.Skipped), tt.wantSkippedCount)

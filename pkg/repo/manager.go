@@ -674,7 +674,8 @@ type ImportError struct {
 
 // BulkImportResult contains the results of a bulk import operation
 type BulkImportResult struct {
-	Added        []string      // Successfully added resources
+	Added        []string      // Successfully added resources (new)
+	Updated      []string      // Successfully updated resources (already existed, re-added with Force)
 	Skipped      []string      // Skipped due to conflicts
 	Failed       []ImportError // Failed imports with reasons
 	CommandCount int           // Number of commands imported
@@ -687,6 +688,7 @@ type BulkImportResult struct {
 func (m *Manager) AddBulk(sources []string, opts BulkImportOptions) (*BulkImportResult, error) {
 	result := &BulkImportResult{
 		Added:        []string{},
+		Updated:      []string{},
 		Skipped:      []string{},
 		Failed:       []ImportError{},
 		CommandCount: 0,
@@ -845,7 +847,12 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 		result.AgentCount++
 	}
 
-	result.Added = append(result.Added, sourcePath)
+	// Track whether this was an update (existed before) or a new addition
+	if exists && opts.Force {
+		result.Updated = append(result.Updated, sourcePath)
+	} else {
+		result.Added = append(result.Added, sourcePath)
+	}
 	return nil
 }
 
@@ -948,7 +955,12 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 	// Increment package counter (count in both dry-run and real mode)
 	result.PackageCount++
 
-	result.Added = append(result.Added, sourcePath)
+	// Track whether this was an update (existed before) or a new addition
+	if exists && opts.Force {
+		result.Updated = append(result.Updated, sourcePath)
+	} else {
+		result.Added = append(result.Added, sourcePath)
+	}
 	return nil
 }
 
