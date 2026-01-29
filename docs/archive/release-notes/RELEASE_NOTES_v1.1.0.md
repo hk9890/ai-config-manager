@@ -67,7 +67,7 @@ Shows:
 ### New Documentation
 - **`removed in v1.9.0`** - Comprehensive guide for the new `list` command
 - **`docs/shell-completion-troubleshooting.md`** - Troubleshooting guide for shell completion issues
-- **`dev-completion.sh`** - Development helper script for enabling completion with `./aimgr`
+- **`scripts/dev-completion.sh`** - Development helper script for enabling completion with `./aimgr`
 
 ### Updated Documentation
 - README.md - Added `aimgr list` command reference
@@ -77,8 +77,8 @@ Shows:
 ## 🔧 Improvements
 
 - **Better UI**: Multi-resource selection now uses table format for improved readability
-- **Development Workflow**: Added `dev-completion.sh` script for easier development
-  - Usage: `source dev-completion.sh` to enable completion for `./aimgr`
+- **Development Workflow**: Added `scripts/dev-completion.sh` script for easier development
+  - Usage: `source scripts/dev-completion.sh` to enable completion for `./aimgr`
   - Works with both bash and zsh
 
 ## 📦 Installation

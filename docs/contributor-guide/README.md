@@ -47,10 +47,18 @@ For detailed setup instructions, code style guidelines, and development workflow
 
 ### Architecture Documentation
 
-- **[Architecture Overview](../architecture/)** - Detailed architecture documentation
-  - System design
-  - Component interactions
-  - Design patterns
+- **[Architecture Overview](architecture.md)** - High-level architecture overview for contributors
+  - System overview and resource types
+  - Package structure explanation
+  - Key concepts (repository, symlinks, metadata, workspace caching)
+  - Data flow through the system
+  - Directory layout
+
+- **[Architecture Rules](../architecture/architecture-rules.md)** - Detailed architecture rules and patterns
+  - Git operations with workspace cache
+  - XDG directory specification
+  - Build tags for test categories
+  - Error wrapping requirements
 
 ### Additional Resources
 
