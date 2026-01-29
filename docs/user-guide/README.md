@@ -13,6 +13,17 @@ The user guide provides comprehensive documentation for:
 
 ## Documentation Index
 
+### [Getting Started](getting-started.md)
+**Start here if you're new to aimgr!** This guide covers installation, first steps, common operations, and practical workflows.
+
+**Key Topics:**
+- Installation on Linux, macOS, and Windows
+- Configuring your AI tool targets
+- Adding your first resources
+- Common operations (install, uninstall, list)
+- Practical workflows and examples
+- Troubleshooting tips
+
 ### [Pattern Matching](pattern-matching.md)
 Learn how to use pattern matching to filter resources when listing, installing, or removing them. Covers syntax, wildcards, type-specific patterns, and practical examples.
 
@@ -65,27 +76,30 @@ Understanding workspace caching for Git repositories, which dramatically improve
 
 ## Getting Started
 
-New to aimgr? Start with these steps:
+New to aimgr? **Read the [Getting Started Guide](getting-started.md)** for a complete tutorial.
 
-1. **Install aimgr**: Build and install the CLI tool
+Quick start:
+
+1. **Install aimgr**: Download binary or build from source
    ```bash
    make install
    ```
 
-2. **Initialize your first resource**: Import resources from a directory or GitHub
+2. **Configure your AI tool**: Set your installation targets
    ```bash
-   aimgr repo import ~/.opencode
+   aimgr config set install.targets claude
+   ```
+
+3. **Import resources**: Add resources from a directory or GitHub
+   ```bash
+   aimgr repo import ~/.claude
    aimgr repo import gh:owner/repo
    ```
 
-3. **List available resources**: See what's in your repository
+4. **Install resources**: Install resources to your projects
    ```bash
-   aimgr repo list
-   ```
-
-4. **Install resources**: Install resources to your AI tools
-   ```bash
-   aimgr install skill/pdf-processing --tool=claude
+   cd ~/my-project
+   aimgr install skill/pdf-processing
    ```
 
 ## Quick Reference
