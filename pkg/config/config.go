@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/adrg/xdg"
@@ -18,6 +19,52 @@ const (
 	// OldConfigFileName is the legacy config file name in home directory (ai-repo for migration)
 	OldConfigFileName = ".ai-repo.yaml"
 )
+
+// envVarPattern matches Docker Compose-style environment variable syntax.
+// Matches ${VAR} or ${VAR:-default} with whitelisted variable names.
+// Variable names must start with a letter or underscore and contain only
+// alphanumeric characters or underscores.
+var envVarPattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)(:-([^}]*))?\}`)
+
+// expandEnvVars expands environment variables in a string using Docker Compose-style syntax.
+//
+// Supported syntax:
+//   - ${VAR}          - Expands to the value of VAR, or empty string if unset
+//   - ${VAR:-default} - Expands to the value of VAR, or "default" if unset/empty
+//
+// Variable names must start with a letter or underscore and contain only
+// alphanumeric characters or underscores (matching pattern [A-Za-z_][A-Za-z0-9_]*).
+//
+// Examples:
+//
+//	expandEnvVars("${HOME}/config")           → "/home/user/config"
+//	expandEnvVars("${UNSET_VAR}")             → ""
+//	expandEnvVars("${UNSET_VAR:-fallback}")   → "fallback"
+//	expandEnvVars("${HOME:-/default}/config") → "/home/user/config"
+//
+// If a variable reference cannot be parsed (malformed syntax), the original
+// text is preserved for safety.
+func expandEnvVars(s string) string {
+	return envVarPattern.ReplaceAllStringFunc(s, func(match string) string {
+		// Extract submatches: [full_match, var_name, optional_default_with_:-, default_value]
+		submatches := envVarPattern.FindStringSubmatch(match)
+		if len(submatches) < 2 {
+			// Should never happen with valid regex, but be safe
+			return match
+		}
+
+		varName := submatches[1]
+		value := os.Getenv(varName)
+
+		// If variable is unset or empty, use default if provided
+		if value == "" && len(submatches) >= 4 {
+			// submatches[3] contains the default value (text after :-)
+			return submatches[3]
+		}
+
+		return value
+	})
+}
 
 // Config represents the application configuration
 type Config struct {
@@ -98,9 +145,12 @@ func Load(projectPath string) (*Config, error) {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 
+	// Expand environment variables
+	expanded := expandEnvVars(string(data))
+
 	// Parse YAML
 	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := yaml.Unmarshal([]byte(expanded), &config); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
@@ -167,9 +217,12 @@ func LoadGlobal() (*Config, error) {
 		return nil, fmt.Errorf("reading config file: %w", err)
 	}
 
+	// Expand environment variables
+	expanded := expandEnvVars(string(data))
+
 	// Parse YAML
 	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := yaml.Unmarshal([]byte(expanded), &config); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
