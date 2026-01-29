@@ -1,15 +1,6 @@
 # AGENTS.md
 
-This document provides essential guidelines for AI coding agents working in the ai-config-manager repository.
-
-## Table of Contents
-- [Project Overview](#project-overview)
-- [Build & Test Commands](#build--test-commands)
-- [Code Style Guidelines](#code-style-guidelines)
-- [Common Patterns](#common-patterns)
-- [Resource Formats Quick Reference](#resource-formats-quick-reference)
-- [Version & Dependencies](#version--dependencies)
-- [Detailed Documentation](#detailed-documentation)
+**This document provides essential guidelines for AI coding agents working in the ai-config-manager repository.**
 
 ---
 
@@ -17,64 +8,74 @@ This document provides essential guidelines for AI coding agents working in the 
 
 **aimgr** is a CLI tool for managing AI resources (commands, skills, and agents) across multiple AI coding tools (Claude Code, OpenCode, GitHub Copilot). It uses a centralized repository with symlink-based installation.
 
+**Key Concepts:**
 - **Language**: Go 1.25.6
-- **Architecture**: CLI built with Cobra, resource management with symlinks
+- **Architecture**: CLI built with Cobra, resource management with symlinks  
 - **Storage**: `~/.local/share/ai-config/repo/` (XDG data directory)
 - **Supported Resources**: Commands, Skills, Agents, Packages
 
-### Package Structure
+The tool discovers resources from various sources (local directories, Git repositories, GitHub), stores them in a central repository, and installs them via symlinks to tool-specific directories (`.claude/`, `.opencode/`, etc.).
+
+---
+
+## Repository Structure
+
 ```
 ai-config-manager/
-├── cmd/              # Cobra command definitions
-├── pkg/
-│   ├── config/       # Configuration management
-│   ├── discovery/    # Auto-discovery of resources
-│   ├── install/      # Installation/symlink logic
-│   ├── manifest/     # ai.package.yaml handling
-│   ├── marketplace/  # Marketplace parsing and generation
-│   ├── metadata/     # Metadata tracking and migration
-│   ├── pattern/      # Pattern matching for resources
-│   ├── repo/         # Repository management
-│   ├── resource/     # Resource types (command, skill, agent, package)
-│   ├── source/       # Source parsing and Git operations
-│   ├── tools/        # Tool-specific info (Claude, OpenCode, Copilot)
-│   ├── version/      # Version information
-│   └── workspace/    # Workspace caching for Git repos
+├── cmd/              # Cobra command definitions (CLI entry points)
+├── pkg/              # Core business logic (see breakdown below)
 ├── test/             # Integration tests
+├── docs/             # Documentation (user-guide/, contributor-guide/, architecture/)
 ├── examples/         # Example resources
 └── main.go           # Entry point
 ```
 
+### Key Packages (pkg/)
+
+| Package | Purpose |
+|---------|---------|
+| `config/` | Configuration management |
+| `discovery/` | Auto-discovery of resources from directories/repos |
+| `install/` | Installation/symlink logic |
+| `manifest/` | ai.package.yaml handling |
+| `repo/` | Repository management (add, list, remove) |
+| `resource/` | Resource types (command, skill, agent, package) |
+| `source/` | Source parsing and Git operations |
+| `tools/` | Tool-specific info (Claude, OpenCode, Copilot) |
+| `workspace/` | Workspace caching for Git repos (10-50x faster) |
+
+**For detailed architecture:** See `docs/architecture/architecture-rules.md`
+
 ---
 
-## Build & Test Commands
+## Quick Reference
 
-### Building
+### Build Commands
 ```bash
 make build      # Build binary
 make install    # Build and install to ~/bin
-make all        # Run all checks and build
+make test       # Run all tests (unit + integration + vet)
+make fmt        # Format all Go code
+make vet        # Run go vet
 ```
 
-### Testing
+### Run Tests
 ```bash
-make test       # Run all tests (unit + integration + vet)
-make unit-test  # Run only unit tests
-make integration-test  # Run only integration tests
+make test                # All tests
+make unit-test           # Fast unit tests only (<5 seconds)
+make integration-test    # Slow integration tests (~30 seconds)
 
 # Run specific tests
 go test -v ./pkg/resource/command_test.go
 go test -v ./pkg/config -run TestLoad_ValidConfig
-go test -v -cover ./pkg/...
 ```
 
-### Linting & Formatting
-```bash
-make fmt        # Format all Go code
-make vet        # Run go vet
-make deps       # Download dependencies
-make clean      # Clean build artifacts
-```
+### Documentation Locations
+
+- **User Guide**: `docs/user-guide/` - Resource formats, pattern matching, output formats
+- **Architecture**: `docs/architecture/architecture-rules.md` - Strict architectural rules
+- **Contributor Guide**: `docs/contributor-guide/release-process.md`
+- **Planning/Archive**: `docs/planning/`, `docs/archive/`
 
 ---
 
@@ -116,32 +117,6 @@ if err != nil {
 }
 ```
 
-### Testing
-
-Tests are split into fast unit tests (default) and slow integration tests (opt-in).
-
-**Unit tests** (fixtures):
-- Use committed fixtures in `testdata/repos/`
-- No network calls
-- Run by default: `make test`
-- Execution time: <5 seconds
-
-**Integration tests** (network):
-- Tag: `//go:build integration`
-- Use real GitHub repos (hk9890/ai-tools)
-- Run with: `make test-integration`
-- Execution time: ~30 seconds
-
-**Adding tests**:
-- Prefer unit tests with fixtures
-- Only add integration tests for new Git features
-- See docs/test-refactoring.md for details
-
-**Best practices**:
-- Use table-driven tests
-- Use `t.TempDir()` for temporary directories
-- Test both success and error cases
-
 ### File Operations
 - Use `filepath.Join()` for path construction
 - Check existence with `os.Stat(path)`
@@ -158,9 +133,6 @@ Tests are split into fast unit tests (default) and slow integration tests (opt-i
 Commands are loaded using `LoadCommand(filePath)` which automatically detects
 the base path by finding the nearest `commands/` directory in the path.
 
-Commands **MUST** be in a directory named `commands/` (or `.claude/commands/`,
-`.opencode/commands/`, etc.). This ensures proper namespacing and nested structure.
-
 ```go
 // LoadCommand auto-detects base path and preserves nested structure
 res, err := resource.LoadCommand("path/to/commands/test.md")
@@ -169,11 +141,8 @@ res, err := resource.LoadCommand("path/to/commands/test.md")
 res, err := resource.LoadCommand("path/to/commands/api/deploy.md")
 // → name = "api/deploy"
 
-res, err := resource.LoadCommand(".claude/commands/test.md")
-// → name = "test"
-
-// LoadCommandWithBase is deprecated - use LoadCommand instead
-// res, err := resource.LoadCommandWithBase(filePath, basePath)  // Deprecated
+// Commands MUST be in a directory named `commands/`
+// (or `.claude/commands/`, `.opencode/commands/`, etc.)
 ```
 
 #### Skills, Agents, and Packages
@@ -226,197 +195,80 @@ if matcher.Match(res) {
 }
 ```
 
-See [docs/pattern-matching.md](docs/pattern-matching.md) for detailed examples.
+See [docs/user-guide/pattern-matching.md](docs/user-guide/pattern-matching.md) for detailed examples.
 
-### Output Formats
+### Workspace Caching (Critical)
+
+**All Git operations MUST use `pkg/workspace` cache** (see Architecture Rule 1):
+
+```go
+import "github.com/hk9890/ai-config-manager/pkg/workspace"
+
+// Get repository path (clone if needed, reuse if cached)
+mgr, err := workspace.NewManager(repoPath)
+if err != nil {
+    return fmt.Errorf("failed to create workspace manager: %w", err)
+}
+
+// GetOrClone returns cached path or clones if needed
+clonePath, err := mgr.GetOrClone(gitURL, ref)
+if err != nil {
+    return fmt.Errorf("failed to get repository: %w", err)
+}
+
+// Use clonePath to access repository contents
+// No cleanup needed - cache is managed automatically
+```
+
+**Performance:** First clone is slow, subsequent operations are 10-50x faster.  
+**Commands:** `repo import`, `repo sync` use this automatically.  
+**See:** `docs/user-guide/workspace-caching.md`
+
+---
+
+## Testing
+
+Tests are split into fast unit tests (default) and slow integration tests (opt-in).
+
+### Unit Tests (fixtures)
+- Use committed fixtures in `testdata/repos/`
+- No network calls
+- Run by default: `make test`
+- Execution time: <5 seconds
+- Build tag: `//go:build unit`
+
+### Integration Tests (network)
+- Use real GitHub repos (hk9890/ai-tools)
+- Run with: `make integration-test`
+- Execution time: ~30 seconds
+- Build tag: `//go:build integration`
+
+### Best Practices
+- Use table-driven tests
+- Use `t.TempDir()` for temporary directories
+- Test both success and error cases
+- Prefer unit tests with fixtures
+- Only add integration tests for new Git features
+
+**See:** `docs/planning/test-refactoring.md`
+
+---
+
+## Output Formats
 
 Commands support multiple output formats via `--format` flag:
 
-**Table (default)**:
 ```bash
-aimgr repo import ~/resources/
-# Shows human-readable table with results
-```
-
-**JSON (for scripting)**:
-```bash
-aimgr repo import ~/resources/ --format=json
-# Returns structured JSON output
-```
-
-**YAML (structured, human-readable)**:
-```bash
-aimgr repo import ~/resources/ --format=yaml
-# Returns YAML output
+aimgr repo import ~/resources/               # Table (default, human-readable)
+aimgr repo import ~/resources/ --format=json # JSON (for scripting)
+aimgr repo import ~/resources/ --format=yaml # YAML (structured)
 ```
 
 **Commands supporting --format:**
 - `repo import`, `repo sync`, `repo list`
 - `list`, `install`, `uninstall`
 
-See [docs/output-formats.md](docs/output-formats.md) for comprehensive documentation.
-
-### Workspace Caching
-
-Git repositories are cached in `.workspace/` for efficient reuse:
-- **First operation**: Full clone (creates cache)
-- **Subsequent operations**: Reuse cache (10-50x faster)
-- **Commands**: `repo import`, `repo sync`
-- **Cache management**: `aimgr repo prune`
-
-See [docs/workspace-caching.md](docs/workspace-caching.md) for details.
-
----
-
-## Resource Formats Quick Reference
-
-### Package Format
-
-**File**: `packages/<name>.package.json`
-
-```json
-{
-  "name": "package-name",
-  "description": "Package description",
-  "resources": [
-    "command/build",
-    "skill/typescript-helper",
-    "agent/code-reviewer"
-  ]
-}
-```
-
-**Code**:
-```go
-type Package struct {
-    Name        string   `json:"name"`
-    Description string   `json:"description"`
-    Resources   []string `json:"resources"`
-}
-```
-
-### Agent Format
-
-**File**: `agents/<name>.md` with YAML frontmatter
-
-```yaml
----
-description: Agent description (required)
-type: code-reviewer (optional, OpenCode)
-capabilities: [static-analysis, security] (optional, OpenCode)
-version: "1.0.0" (optional)
----
-
-# Agent Name
-
-Agent instructions and documentation here.
-```
-
-**Code**:
-```go
-type AgentResource struct {
-    Resource
-    Type         string   `yaml:"type,omitempty"`
-    Instructions string   `yaml:"instructions,omitempty"`
-    Capabilities []string `yaml:"capabilities,omitempty"`
-    Content      string   `yaml:"-"`
-}
-```
-
-### Marketplace Format
-
-**File**: `marketplace.json`
-
-```json
-{
-  "name": "marketplace-name",
-  "plugins": [
-    {
-      "name": "plugin-name",
-      "description": "Plugin description",
-      "source": "path/to/plugin"
-    }
-  ]
-}
-```
-
-**Import**:
-```bash
-aimgr marketplace import marketplace.json
-```
-
-### Project Manifest
-
-**File**: `ai.package.yaml` (project root)
-
-```yaml
-resources:
-  - skill/pdf-processing
-  - command/test
-  - agent/code-reviewer
-  - package/web-tools
-
-targets:  # Optional
-  - claude
-  - opencode
-```
-
-**Usage**:
-```bash
-aimgr install                    # Install all from manifest
-aimgr install skill/test         # Install and add to manifest
-aimgr install skill/test --no-save  # Install without adding
-```
-
-### Tool Directories
-
-| Tool | Commands | Skills | Agents |
-|------|----------|--------|--------|
-| Claude Code | `.claude/commands/` | `.claude/skills/` | `.claude/agents/` |
-| OpenCode | `.opencode/commands/` | `.opencode/skills/` | `.opencode/agents/` |
-| GitHub Copilot | N/A | `.github/skills/` | N/A |
-
-### Bulk Import
-
-Import from directories with auto-discovery:
-```bash
-aimgr repo import ~/.opencode
-aimgr repo import ~/.claude
-aimgr repo import gh:owner/repo --filter "skill/*"
-```
-
-See [docs/resource-formats.md](docs/resource-formats.md) for complete specifications.
-
----
-
-## Version & Dependencies
-
-### Version Information
-Version embedded at build time via ldflags in Makefile:
-- `Version`, `GitCommit`, `BuildDate` in `pkg/version/version.go`
-
-### Key Dependencies
-- `github.com/spf13/cobra` - CLI framework
-- `gopkg.in/yaml.v3` - YAML parsing
-- `github.com/adrg/xdg` - XDG base directory support
-- `github.com/olekukonko/tablewriter` - Table output formatting
-
-### Testing Philosophy
-- Unit tests in `pkg/*/` packages
-- Integration tests in `test/`
-- Use testdata directories for fixtures
-- Mock filesystem operations (use temp dirs)
-
----
-
-## Detailed Documentation
-
-For comprehensive information, see:
-
-- **[docs/resource-formats.md](docs/resource-formats.md)** - Complete format specifications for all resource types (packages, agents, marketplaces, manifests)
-- **[docs/workspace-caching.md](docs/workspace-caching.md)** - Git repository caching, performance optimization, cache management
-- **[docs/pattern-matching.md](docs/pattern-matching.md)** - Pattern matching syntax, examples, and use cases
-- **[docs/output-formats.md](docs/output-formats.md)** - CLI output formats (JSON, YAML, table) with scripting examples
+**See:** [docs/user-guide/output-formats.md](docs/user-guide/output-formats.md)
 
 ---
 
@@ -427,3 +279,18 @@ For comprehensive information, see:
 3. Add tests for new functionality
 4. Update documentation if adding user-facing features
 5. Follow existing code patterns and conventions
+6. Ensure Git operations use `pkg/workspace` (Architecture Rule 1)
+
+---
+
+## Detailed Documentation
+
+For comprehensive information, see:
+
+- **[docs/architecture/architecture-rules.md](docs/architecture/architecture-rules.md)** - Strict architectural rules (Git workspace, XDG, error wrapping, build tags)
+- **[docs/user-guide/resource-formats.md](docs/user-guide/resource-formats.md)** - Complete format specifications for all resource types
+- **[docs/user-guide/workspace-caching.md](docs/user-guide/workspace-caching.md)** - Git repository caching, performance optimization
+- **[docs/user-guide/pattern-matching.md](docs/user-guide/pattern-matching.md)** - Pattern matching syntax, examples
+- **[docs/user-guide/output-formats.md](docs/user-guide/output-formats.md)** - CLI output formats with scripting examples
+- **[docs/user-guide/github-sources.md](docs/user-guide/github-sources.md)** - Adding resources from GitHub repositories
+- **[docs/contributor-guide/release-process.md](docs/contributor-guide/release-process.md)** - Release workflow and GoReleaser configuration
