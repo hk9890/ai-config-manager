@@ -137,7 +137,7 @@ func addSingleResource(filePath string, manager *repo.Manager) error {
 		if err != nil {
 			return fmt.Errorf("invalid agent resource: %w", err)
 		}
-		return addAgentFile(filePath, agent, manager)
+		return addResourceFile(filePath, agent, resource.Agent, manager)
 	}
 
 	// If in commands/ directory, treat as command
@@ -146,7 +146,7 @@ func addSingleResource(filePath string, manager *repo.Manager) error {
 		if err != nil {
 			return fmt.Errorf("invalid command resource: %w", err)
 		}
-		return addCommandFile(filePath, cmd, manager)
+		return addResourceFile(filePath, cmd, resource.Command, manager)
 	}
 
 	// Otherwise, try to determine by content
@@ -157,7 +157,7 @@ func addSingleResource(filePath string, manager *repo.Manager) error {
 		agentRes, err := resource.LoadAgentResource(filePath)
 		if err == nil && (agentRes.Type != "" || agentRes.Instructions != "" || len(agentRes.Capabilities) > 0) {
 			// Has agent-specific fields, treat as agent
-			return addAgentFile(filePath, agent, manager)
+			return addResourceFile(filePath, agent, resource.Agent, manager)
 		}
 	}
 
@@ -165,24 +165,25 @@ func addSingleResource(filePath string, manager *repo.Manager) error {
 	cmd, cmdErr := resource.LoadCommand(filePath)
 	if cmdErr == nil {
 		// It's a command
-		return addCommandFile(filePath, cmd, manager)
+		return addResourceFile(filePath, cmd, resource.Command, manager)
 	}
 
 	// Neither worked, return both errors
 	return fmt.Errorf("invalid resource file (tried as agent: %v; tried as command: %v)", agentErr, cmdErr)
 }
 
-// addCommandFile adds a single command file to the repository
-func addCommandFile(filePath string, res *resource.Resource, manager *repo.Manager) error {
+// addResourceFile adds a single resource file to the repository.
+// This is a generic function that handles commands, agents, and skills.
+func addResourceFile(filePath string, res *resource.Resource, resType resource.ResourceType, manager *repo.Manager) error {
 	// Check if already exists (if not force mode)
 	if !forceFlag {
-		existing, _ := manager.Get(res.Name, resource.Command)
+		existing, _ := manager.Get(res.Name, resType)
 		if existing != nil {
-			return fmt.Errorf("command '%s' already exists in repository (use --force to overwrite)", res.Name)
+			return fmt.Errorf("%s '%s' already exists in repository (use --force to overwrite)", resType, res.Name)
 		}
 	} else {
 		// Remove existing if force mode
-		_ = manager.Remove(res.Name, resource.Command)
+		_ = manager.Remove(res.Name, resType)
 	}
 
 	// Determine source info
@@ -192,47 +193,26 @@ func addCommandFile(filePath string, res *resource.Resource, manager *repo.Manag
 	}
 	sourceURL := "file://" + absPath
 
-	// Add the command
-	if err := manager.AddCommand(filePath, sourceURL, "file"); err != nil {
-		return fmt.Errorf("failed to add command: %w", err)
-	}
-
-	// Success message
-	fmt.Printf("✓ Added command '%s' to repository\n", res.Name)
-	if res.Description != "" {
-		fmt.Printf("  Description: %s\n", res.Description)
-	}
-
-	return nil
-}
-
-// addAgentFile adds a single agent file to the repository
-func addAgentFile(filePath string, res *resource.Resource, manager *repo.Manager) error {
-	// Check if already exists (if not force mode)
-	if !forceFlag {
-		existing, _ := manager.Get(res.Name, resource.Agent)
-		if existing != nil {
-			return fmt.Errorf("agent '%s' already exists in repository (use --force to overwrite)", res.Name)
+	// Add the resource based on type
+	switch resType {
+	case resource.Command:
+		if err := manager.AddCommand(filePath, sourceURL, "file"); err != nil {
+			return fmt.Errorf("failed to add command: %w", err)
 		}
-	} else {
-		// Remove existing if force mode
-		_ = manager.Remove(res.Name, resource.Agent)
-	}
-
-	// Determine source info
-	absPath, err := filepath.Abs(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path: %w", err)
-	}
-	sourceURL := "file://" + absPath
-
-	// Add the agent
-	if err := manager.AddAgent(filePath, sourceURL, "file"); err != nil {
-		return fmt.Errorf("failed to add agent: %w", err)
+	case resource.Agent:
+		if err := manager.AddAgent(filePath, sourceURL, "file"); err != nil {
+			return fmt.Errorf("failed to add agent: %w", err)
+		}
+	case resource.Skill:
+		if err := manager.AddSkill(filePath, sourceURL, "file"); err != nil {
+			return fmt.Errorf("failed to add skill: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported resource type: %s", resType)
 	}
 
 	// Success message
-	fmt.Printf("✓ Added agent '%s' to repository\n", res.Name)
+	fmt.Printf("✓ Added %s '%s' to repository\n", resType, res.Name)
 	if res.Description != "" {
 		fmt.Printf("  Description: %s\n", res.Description)
 	}
@@ -715,6 +695,17 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 
 	return resources[selection-1], nil
 }
+
+// NOTE: The find*File/Dir functions below (lines 720-923) are STILL NEEDED despite discovery
+// system improvements. They serve distinct purposes:
+//
+// 1. findPackageFile() - Packages are discovered by name only, need to find actual .package.json path
+// 2. findResourceInPath() - Marketplace imports need to resolve resource references (e.g., "command/test")
+//    to actual file paths within plugin source directories
+// 3. All functions skip .claude/.opencode/.github dirs to avoid importing installed resources
+//
+// DO NOT DELETE - These complement the discovery system, they don't duplicate it.
+// See: ai-config-manager-m5zt investigation
 
 // findCommandFile finds the actual file path for a command by name
 func findCommandFile(searchPath, name string) (string, error) {
