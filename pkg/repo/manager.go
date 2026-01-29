@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
+	"github.com/hk9890/ai-config-manager/pkg/config"
 	pkgerrors "github.com/hk9890/ai-config-manager/pkg/errors"
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -20,15 +21,34 @@ type Manager struct {
 }
 
 // NewManager creates a new repository manager
-// Repository is stored at ~/.ai-config/repo/ (XDG data directory)
-// Can be overridden with AIMGR_REPO_PATH environment variable
+// Repository path determined by 3-level precedence:
+// 1. AIMGR_REPO_PATH environment variable (highest priority)
+// 2. repo.path from config file (~/.config/aimgr/aimgr.yaml)
+// 3. XDG default (~/.local/share/ai-config/repo/)
 func NewManager() (*Manager, error) {
-	// Check for environment variable override first
-	repoPath := os.Getenv("AIMGR_REPO_PATH")
-	if repoPath == "" {
-		// Default to XDG data directory
-		repoPath = filepath.Join(xdg.DataHome, "ai-config", "repo")
+	var repoPath string
+
+	// Priority 1: Check for environment variable override first
+	repoPath = os.Getenv("AIMGR_REPO_PATH")
+	if repoPath != "" {
+		return &Manager{
+			repoPath: repoPath,
+		}, nil
 	}
+
+	// Priority 2: Check config file for repo.path
+	cfg, err := config.LoadGlobal()
+	if err == nil && cfg.Repo.Path != "" {
+		// Config loaded successfully and has repo.path set
+		// Path is already validated and expanded by config.Validate()
+		return &Manager{
+			repoPath: cfg.Repo.Path,
+		}, nil
+	}
+
+	// Priority 3: Fall back to XDG default
+	// Ignore config errors - user may not have config file
+	repoPath = filepath.Join(xdg.DataHome, "ai-config", "repo")
 	return &Manager{
 		repoPath: repoPath,
 	}, nil

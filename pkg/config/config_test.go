@@ -866,3 +866,232 @@ func containsHelper(s, substr string) bool {
 	}
 	return false
 }
+
+func TestValidate_RepoPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		repoPath  string
+		wantError bool
+		checkPath func(t *testing.T, path string)
+	}{
+		{
+			name:      "empty path is valid",
+			repoPath:  "",
+			wantError: false,
+		},
+		{
+			name:      "absolute path unchanged",
+			repoPath:  "/home/user/custom-repo",
+			wantError: false,
+			checkPath: func(t *testing.T, path string) {
+				if path != "/home/user/custom-repo" {
+					t.Errorf("path = %q, want /home/user/custom-repo", path)
+				}
+			},
+		},
+		{
+			name:      "tilde expansion",
+			repoPath:  "~/my-repo",
+			wantError: false,
+			checkPath: func(t *testing.T, path string) {
+				if contains(path, "~") {
+					t.Errorf("path still contains ~: %q", path)
+				}
+				if !filepath.IsAbs(path) {
+					t.Errorf("path not absolute after expansion: %q", path)
+				}
+			},
+		},
+		{
+			name:      "relative path converted to absolute",
+			repoPath:  "relative/path",
+			wantError: false,
+			checkPath: func(t *testing.T, path string) {
+				if !filepath.IsAbs(path) {
+					t.Errorf("path not absolute: %q", path)
+				}
+			},
+		},
+		{
+			name:      "path with dot cleaning",
+			repoPath:  "/home/user/./repo",
+			wantError: false,
+			checkPath: func(t *testing.T, path string) {
+				if contains(path, "/.") {
+					t.Errorf("path still contains /.: %q", path)
+				}
+				if path != "/home/user/repo" {
+					t.Errorf("path = %q, want /home/user/repo", path)
+				}
+			},
+		},
+		{
+			name:      "path with double-dot cleaning",
+			repoPath:  "/home/user/foo/../repo",
+			wantError: false,
+			checkPath: func(t *testing.T, path string) {
+				if contains(path, "..") {
+					t.Errorf("path still contains ..: %q", path)
+				}
+				if path != "/home/user/repo" {
+					t.Errorf("path = %q, want /home/user/repo", path)
+				}
+			},
+		},
+		{
+			name:      "tilde with subdirectory",
+			repoPath:  "~/projects/ai-repo",
+			wantError: false,
+			checkPath: func(t *testing.T, path string) {
+				if contains(path, "~") {
+					t.Errorf("path still contains ~: %q", path)
+				}
+				if !filepath.IsAbs(path) {
+					t.Errorf("path not absolute after expansion: %q", path)
+				}
+				if !contains(path, "projects/ai-repo") && !contains(path, "projects\\ai-repo") {
+					t.Errorf("path = %q, want to contain projects/ai-repo", path)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Repo:    RepoConfig{Path: tt.repoPath},
+			}
+
+			err := cfg.Validate()
+			if (err != nil) != tt.wantError {
+				t.Errorf("Validate() error = %v, wantError %v", err, tt.wantError)
+			}
+
+			if !tt.wantError && tt.checkPath != nil {
+				tt.checkPath(t, cfg.Repo.Path)
+			}
+		})
+	}
+}
+
+func TestLoad_WithRepoPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		repoPath  string
+		checkPath func(t *testing.T, path string)
+	}{
+		{
+			name:     "absolute path",
+			repoPath: "/custom/repo/path",
+			checkPath: func(t *testing.T, path string) {
+				if path != "/custom/repo/path" {
+					t.Errorf("Repo.Path = %q, want /custom/repo/path", path)
+				}
+			},
+		},
+		{
+			name:     "tilde expansion",
+			repoPath: "~/custom-repo",
+			checkPath: func(t *testing.T, path string) {
+				if contains(path, "~") {
+					t.Errorf("Repo.Path still contains ~: %q", path)
+				}
+				if !filepath.IsAbs(path) {
+					t.Errorf("Repo.Path not absolute: %q", path)
+				}
+			},
+		},
+		{
+			name:     "relative path",
+			repoPath: "my-repo",
+			checkPath: func(t *testing.T, path string) {
+				if !filepath.IsAbs(path) {
+					t.Errorf("Repo.Path not absolute: %q", path)
+				}
+			},
+		},
+		{
+			name:     "path with dots",
+			repoPath: "/tmp/../home/user/repo",
+			checkPath: func(t *testing.T, path string) {
+				if contains(path, "..") {
+					t.Errorf("Repo.Path still contains ..: %q", path)
+				}
+				if path != "/home/user/repo" {
+					t.Errorf("Repo.Path = %q, want /home/user/repo", path)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			configYAML := "install:\n  targets: [claude]\nrepo:\n  path: " + tt.repoPath + "\n"
+
+			configPath := filepath.Join(tmpDir, DefaultConfigFileName)
+			if err := os.WriteFile(configPath, []byte(configYAML), 0644); err != nil {
+				t.Fatalf("failed to write config: %v", err)
+			}
+
+			cfg, err := Load(tmpDir)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+
+			if tt.checkPath != nil {
+				tt.checkPath(t, cfg.Repo.Path)
+			}
+		})
+	}
+}
+
+func TestLoad_WithEmptyRepoPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	configYAML := `install:
+  targets: [claude]
+repo:
+  path: ""
+`
+
+	configPath := filepath.Join(tmpDir, DefaultConfigFileName)
+	if err := os.WriteFile(configPath, []byte(configYAML), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	cfg, err := Load(tmpDir)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Empty path should remain empty
+	if cfg.Repo.Path != "" {
+		t.Errorf("Repo.Path = %q, want empty string", cfg.Repo.Path)
+	}
+}
+
+func TestLoad_WithoutRepoSection(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	configYAML := `install:
+  targets: [claude]
+`
+
+	configPath := filepath.Join(tmpDir, DefaultConfigFileName)
+	if err := os.WriteFile(configPath, []byte(configYAML), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	cfg, err := Load(tmpDir)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Repo path should be empty when section is omitted
+	if cfg.Repo.Path != "" {
+		t.Errorf("Repo.Path = %q, want empty string", cfg.Repo.Path)
+	}
+}
