@@ -148,11 +148,8 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 		return fmt.Errorf("failed to load command: %w", err)
 	}
 
-	// Check for conflicts using the resource-aware path
+	// Get destination path
 	destPath := m.GetPathForResource(res)
-	if _, err := os.Stat(destPath); err == nil {
-		return fmt.Errorf("command '%s' already exists in repository", res.Name)
-	}
 
 	// Create parent directories if needed (for nested structure)
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
@@ -202,11 +199,8 @@ func (m *Manager) AddSkillWithRef(sourcePath, sourceURL, sourceType, ref string)
 		return fmt.Errorf("failed to load skill: %w", err)
 	}
 
-	// Check for conflicts
+	// Get destination path
 	destPath := m.GetPath(res.Name, resource.Skill)
-	if _, err := os.Stat(destPath); err == nil {
-		return fmt.Errorf("skill '%s' already exists in repository", res.Name)
-	}
 
 	// Copy the directory
 	if err := copyDir(sourcePath, destPath); err != nil {
@@ -251,11 +245,8 @@ func (m *Manager) AddAgentWithRef(sourcePath, sourceURL, sourceType, ref string)
 		return fmt.Errorf("failed to load agent: %w", err)
 	}
 
-	// Check for conflicts
+	// Get destination path
 	destPath := m.GetPath(res.Name, resource.Agent)
-	if _, err := os.Stat(destPath); err == nil {
-		return fmt.Errorf("agent '%s' already exists in repository", res.Name)
-	}
 
 	// Copy the file
 	if err := copyFile(sourcePath, destPath); err != nil {
@@ -300,11 +291,8 @@ func (m *Manager) AddPackageWithRef(sourcePath, sourceURL, sourceType, ref strin
 		return fmt.Errorf("failed to load package: %w", err)
 	}
 
-	// Check for conflicts
+	// Get destination path
 	destPath := resource.GetPackagePath(pkg.Name, m.repoPath)
-	if _, err := os.Stat(destPath); err == nil {
-		return fmt.Errorf("package '%s' already exists in repository", pkg.Name)
-	}
 
 	// Copy the file
 	if err := copyFile(sourcePath, destPath); err != nil {
