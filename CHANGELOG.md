@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [1.14.0] - 2026-01-29
+
+### Breaking Changes
+- **Removed `aimgr repo update` command** - Command has been fully removed from the codebase
+  - Users should use `aimgr repo import` or `aimgr repo sync` instead
+  - All documentation updated to reflect this change
+  - Tests and references cleaned up
+
+### Added
+- **Auto-detection of base path in LoadCommand** - Commands can now be loaded without explicitly specifying base path
+  - `LoadCommand` automatically finds nearest `commands/` directory
+  - Simplified API for command loading
+  - See deprecated `LoadCommandWithBase` for migration path
+
+### Fixed
+- **Discovery parsing prevention** - Discovery now skips files outside resource directories
+  - Prevents incorrect parsing of documentation, node_modules, etc.
+  - Fixes issue where `.md` files in wrong locations were incorrectly identified as agents
+  - Discovery now only looks in proper resource directories (agents/, commands/, skills/)
+
+- **Error reporting improvements**
+  - Discovery errors now properly reported for commands and agents
+  - Prevents metadata creation for failed imports
+  - Better error messages for malformed resources
+
+- **Test suite cleanup**
+  - Removed orphaned test `TestCLIMetadataUpdatedOnUpdate`
+  - Fixed test fixtures to use proper `commands/` directory structure
+  - All tests passing
+
+### Deprecated
+- **LoadCommandWithBase** - Use `LoadCommand` instead (auto-detects base path)
+  - Scheduled for removal in v2.0.0
+- **LoadCommandResourceWithBase** - Use `LoadCommandResource` instead
+  - Scheduled for removal in v2.0.0
+
+### Documentation
+- Removed all `repo update` references from README
+- Updated AGENTS.md with LoadCommand changes
+- Updated MIGRATION.md for deprecated functions
+- Added comprehensive documentation for consolidation epic
+
 ## [1.13.0] - 2026-01-28
 
 ### Fixed
