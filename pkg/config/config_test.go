@@ -1206,3 +1206,156 @@ func TestExpandEnvVars(t *testing.T) {
 		})
 	}
 }
+
+func TestLoad_WithEnvVarExpansion(t *testing.T) {
+	tests := []struct {
+		name         string
+		configYAML   string
+		envVars      map[string]string
+		wantRepoPath string
+		wantError    bool
+	}{
+		{
+			name: "expand env var in repo path",
+			configYAML: `install:
+  targets: [claude]
+repo:
+  path: ${CUSTOM_REPO}`,
+			envVars:      map[string]string{"CUSTOM_REPO": "/tmp/test-repo"},
+			wantRepoPath: "/tmp/test-repo",
+			wantError:    false,
+		},
+		{
+			name: "expand env var with default - var set",
+			configYAML: `install:
+  targets: [claude]
+repo:
+  path: ${CUSTOM_REPO:-/default/repo}`,
+			envVars:      map[string]string{"CUSTOM_REPO": "/actual/repo"},
+			wantRepoPath: "/actual/repo",
+			wantError:    false,
+		},
+		{
+			name: "expand env var with default - var unset",
+			configYAML: `install:
+  targets: [claude]
+repo:
+  path: ${CUSTOM_REPO:-/default/repo}`,
+			envVars:      map[string]string{},
+			wantRepoPath: "/default/repo",
+			wantError:    false,
+		},
+		{
+			name: "expand multiple env vars in sync source",
+			configYAML: `install:
+  targets: [claude]
+sync:
+  sources:
+    - url: ${SYNC_PROTO:-https}://${SYNC_HOST}/repo
+      filter: ${SYNC_FILTER:-skill/*}`,
+			envVars: map[string]string{
+				"SYNC_HOST": "github.com",
+			},
+			wantError: false,
+		},
+		{
+			name: "no env vars - static config",
+			configYAML: `install:
+  targets: [claude]
+repo:
+  path: /static/path`,
+			envVars:      map[string]string{},
+			wantRepoPath: "/static/path",
+			wantError:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			// Set environment variables
+			for k, v := range tt.envVars {
+				t.Setenv(k, v)
+			}
+
+			// Write config file
+			configPath := filepath.Join(tmpDir, DefaultConfigFileName)
+			if err := os.WriteFile(configPath, []byte(tt.configYAML), 0644); err != nil {
+				t.Fatalf("failed to write config: %v", err)
+			}
+
+			// Load config
+			cfg, err := Load(tmpDir)
+			if (err != nil) != tt.wantError {
+				t.Errorf("Load() error = %v, wantError %v", err, tt.wantError)
+				return
+			}
+
+			if tt.wantError {
+				return
+			}
+
+			// Verify repo path if specified
+			if tt.wantRepoPath != "" {
+				if cfg.Repo.Path != tt.wantRepoPath {
+					t.Errorf("Repo.Path = %q, want %q", cfg.Repo.Path, tt.wantRepoPath)
+				}
+			}
+
+			// Verify sync sources if present
+			if len(cfg.Sync.Sources) > 0 {
+				source := cfg.Sync.Sources[0]
+				if contains(tt.configYAML, "SYNC_HOST") {
+					if !contains(source.URL, "github.com") {
+						t.Errorf("URL = %q, expected to contain 'github.com'", source.URL)
+					}
+					if !contains(source.URL, "https://") {
+						t.Errorf("URL = %q, expected to contain 'https://'", source.URL)
+					}
+				}
+				if source.Filter != "" && source.Filter != "skill/*" {
+					t.Errorf("Filter = %q, want 'skill/*'", source.Filter)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadGlobal_WithEnvVarExpansion(t *testing.T) {
+	tmpDir := t.TempDir()
+	xdgConfigDir := filepath.Join(tmpDir, "config")
+
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigDir)
+	t.Setenv("TEST_REPO_PATH", "/test/repo/path")
+
+	// Create config directory
+	configDir := filepath.Join(xdgConfigDir, "aimgr")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+
+	configYAML := `install:
+  targets: [claude]
+repo:
+  path: ${TEST_REPO_PATH:-/default/path}`
+
+	configPath := filepath.Join(configDir, DefaultConfigFileName)
+	if err := os.WriteFile(configPath, []byte(configYAML), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Reload XDG paths
+	xdg.Reload()
+
+	// Load global config
+	cfg, err := LoadGlobal()
+	if err != nil {
+		t.Fatalf("LoadGlobal() error = %v", err)
+	}
+
+	// Verify expansion worked
+	if cfg.Repo.Path != "/test/repo/path" {
+		t.Errorf("Repo.Path = %q, want /test/repo/path", cfg.Repo.Path)
+	}
+}
