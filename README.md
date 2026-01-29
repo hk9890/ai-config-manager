@@ -230,6 +230,55 @@ alias a='./aimgr'
 a install skill/<TAB>
 ```
 
+## Configuration
+
+`aimgr` uses a configuration file at `~/.config/aimgr/aimgr.yaml` for global settings.
+
+### Repository Path
+
+By default, resources are stored in `~/.local/share/ai-config/repo` (XDG data directory). You can customize this location using one of three methods:
+
+**Precedence order (highest to lowest):**
+1. **`AIMGR_REPO_PATH` environment variable** - Highest priority
+2. **`repo.path` in config file** - `~/.config/aimgr/aimgr.yaml`
+3. **XDG default** - `~/.local/share/ai-config/repo`
+
+#### Using Config File
+
+Create or edit `~/.config/aimgr/aimgr.yaml`:
+
+```yaml
+repo:
+  path: ~/my-custom-repo  # Supports ~ expansion and relative paths
+
+install:
+  targets:
+    - claude
+    - opencode
+```
+
+The `repo.path` supports:
+- **Tilde expansion**: `~/custom-repo` expands to your home directory
+- **Relative paths**: `./repo` converts to absolute path automatically
+- **Absolute paths**: `/absolute/path/to/repo`
+
+#### Using Environment Variable
+
+Set `AIMGR_REPO_PATH` to override all other settings:
+
+```bash
+# Temporary override for current session
+export AIMGR_REPO_PATH=/path/to/custom/repo
+aimgr list
+
+# Permanent override (add to ~/.bashrc or ~/.zshrc)
+echo 'export AIMGR_REPO_PATH=~/my-repo' >> ~/.bashrc
+```
+
+**Note:** The environment variable takes precedence over the config file setting.
+
+For detailed configuration options, see [docs/user-guide/configuration.md](docs/user-guide/configuration.md).
+
 ## Quick Start
 
 ### Check Version

@@ -18,7 +18,7 @@ This document provides a high-level architectural overview of the ai-config-mana
 
 ### What It Does
 
-1. **Centralized Repository**: Maintains a single source of truth for all AI resources in `~/.local/share/ai-config/repo/`
+1. **Centralized Repository**: Maintains a single source of truth for all AI resources in `~/.local/share/ai-config/repo/` (configurable via `repo.path` or `AIMGR_REPO_PATH`)
 2. **Multi-Tool Support**: Installs resources to Claude Code (`.claude/`), OpenCode (`.opencode/`), and GitHub Copilot (`.github/`)
 3. **Symlink-Based Installation**: Creates symlinks from tool directories to the central repository (no duplication)
 4. **Git Integration**: Imports resources from Git repositories with intelligent caching
@@ -119,7 +119,7 @@ test/
 
 ### 1. Central Repository
 
-**Location**: `~/.local/share/ai-config/repo/`
+**Default Location**: `~/.local/share/ai-config/repo/` (configurable)
 
 The repository is the single source of truth for all resources:
 

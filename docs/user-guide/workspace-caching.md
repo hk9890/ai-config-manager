@@ -40,7 +40,7 @@ This optimization significantly improves performance for bulk operations.
 ## Workspace Directory Structure
 
 ```
-~/.local/share/ai-config/repo/
+~/.local/share/ai-config/repo/    # Default location (configurable)
 ├── .workspace/                   # Git repository cache
 │   ├── <hash-1>/                 # Cached repository 1 (by URL hash)
 │   │   ├── .git/
@@ -54,6 +54,8 @@ This optimization significantly improves performance for bulk operations.
 ├── skills/                       # Skill resources
 └── agents/                       # Agent resources
 ```
+
+**Note:** The repository path is configurable. See [configuration.md](./configuration.md) for details on customizing the repository location via `repo.path` config or `AIMGR_REPO_PATH` environment variable.
 
 ### Hash-Based Storage
 

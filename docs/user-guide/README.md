@@ -6,6 +6,7 @@ This directory contains user-facing documentation for **aimgr** (ai-config-manag
 
 The user guide provides comprehensive documentation for:
 - **Resource Management**: Understanding and working with commands, skills, agents, and packages
+- **Configuration**: Customizing repository paths, installation targets, and sync sources
 - **Pattern Matching**: Using patterns to filter and select resources
 - **Output Formats**: Controlling CLI output for scripting and automation
 - **GitHub Integration**: Working with GitHub repositories as resource sources
@@ -23,6 +24,18 @@ The user guide provides comprehensive documentation for:
 - Common operations (install, uninstall, list)
 - Practical workflows and examples
 - Troubleshooting tips
+
+### [Configuration](configuration.md)
+Complete guide to configuring aimgr, including repository path customization, installation targets, and sync sources.
+
+**Key Topics:**
+- Config file location (`~/.config/aimgr/aimgr.yaml`)
+- Repository path configuration (config file vs environment variable)
+- Precedence rules (ENV > config > XDG default)
+- Path expansion (tilde, relative, absolute)
+- Installation targets configuration
+- Sync sources configuration
+- Complete examples and troubleshooting
 
 ### [Pattern Matching](pattern-matching.md)
 Learn how to use pattern matching to filter resources when listing, installing, or removing them. Covers syntax, wildcards, type-specific patterns, and practical examples.

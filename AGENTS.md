@@ -11,7 +11,7 @@
 **Key Concepts:**
 - **Language**: Go 1.25.6
 - **Architecture**: CLI built with Cobra, resource management with symlinks  
-- **Storage**: `~/.local/share/ai-config/repo/` (XDG data directory)
+- **Storage**: `~/.local/share/ai-config/repo/` (XDG data directory, configurable via `repo.path` or `AIMGR_REPO_PATH`)
 - **Supported Resources**: Commands, Skills, Agents, Packages
 
 The tool discovers resources from various sources (local directories, Git repositories, GitHub), stores them in a central repository, and installs them via symlinks to tool-specific directories (`.claude/`, `.opencode/`, etc.).
