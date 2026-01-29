@@ -1095,3 +1095,114 @@ func TestLoad_WithoutRepoSection(t *testing.T) {
 		t.Errorf("Repo.Path = %q, want empty string", cfg.Repo.Path)
 	}
 }
+
+func TestExpandEnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		envVars  map[string]string
+		expected string
+	}{
+		{
+			name:     "simple variable",
+			input:    "path: ${HOME}/repo",
+			envVars:  map[string]string{"HOME": "/home/user"},
+			expected: "path: /home/user/repo",
+		},
+		{
+			name:     "variable with default - var set",
+			input:    "path: ${REPO_PATH:-/default/path}",
+			envVars:  map[string]string{"REPO_PATH": "/custom/path"},
+			expected: "path: /custom/path",
+		},
+		{
+			name:     "variable with default - var unset",
+			input:    "path: ${REPO_PATH:-/default/path}",
+			envVars:  map[string]string{},
+			expected: "path: /default/path",
+		},
+		{
+			name:     "variable with default - var empty",
+			input:    "path: ${REPO_PATH:-/default/path}",
+			envVars:  map[string]string{"REPO_PATH": ""},
+			expected: "path: /default/path",
+		},
+		{
+			name:     "simple variable - unset becomes empty",
+			input:    "path: ${MISSING_VAR}",
+			envVars:  map[string]string{},
+			expected: "path: ",
+		},
+		{
+			name:     "multiple variables",
+			input:    "url: ${PROTOCOL}://${HOST}:${PORT}",
+			envVars:  map[string]string{"PROTOCOL": "https", "HOST": "example.com", "PORT": "8080"},
+			expected: "url: https://example.com:8080",
+		},
+		{
+			name:     "mixed with and without defaults",
+			input:    "${VAR1}:${VAR2:-default2}:${VAR3}",
+			envVars:  map[string]string{"VAR1": "value1", "VAR3": "value3"},
+			expected: "value1:default2:value3",
+		},
+		{
+			name:     "no variables",
+			input:    "plain text without variables",
+			envVars:  map[string]string{},
+			expected: "plain text without variables",
+		},
+		{
+			name:     "variable name with underscore",
+			input:    "${MY_VAR_NAME}",
+			envVars:  map[string]string{"MY_VAR_NAME": "test"},
+			expected: "test",
+		},
+		{
+			name:     "variable name with numbers",
+			input:    "${VAR_123}",
+			envVars:  map[string]string{"VAR_123": "test"},
+			expected: "test",
+		},
+		{
+			name:     "default with special characters",
+			input:    "${VAR:-/path/to/default}",
+			envVars:  map[string]string{},
+			expected: "/path/to/default",
+		},
+		{
+			name:     "default with spaces",
+			input:    "${VAR:-default value}",
+			envVars:  map[string]string{},
+			expected: "default value",
+		},
+		{
+			name:     "tilde in default",
+			input:    "${REPO_PATH:-~/.local/share/repo}",
+			envVars:  map[string]string{},
+			expected: "~/.local/share/repo",
+		},
+		{
+			name:     "empty default",
+			input:    "${VAR:-}",
+			envVars:  map[string]string{},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up environment variables
+			for k, v := range tt.envVars {
+				t.Setenv(k, v)
+			}
+
+			// Clear any vars not in the map
+			// (t.Setenv handles cleanup automatically)
+
+			result := expandEnvVars(tt.input)
+			if result != tt.expected {
+				t.Errorf("expandEnvVars() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
