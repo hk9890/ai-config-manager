@@ -261,6 +261,7 @@ The `repo.path` supports:
 - **Tilde expansion**: `~/custom-repo` expands to your home directory
 - **Relative paths**: `./repo` converts to absolute path automatically
 - **Absolute paths**: `/absolute/path/to/repo`
+- **Environment variables**: `${AIMGR_REPO_PATH:-~/.local/share/ai-config/repo}`
 
 #### Using Environment Variable
 
@@ -276,6 +277,30 @@ echo 'export AIMGR_REPO_PATH=~/my-repo' >> ~/.bashrc
 ```
 
 **Note:** The environment variable takes precedence over the config file setting.
+
+#### Environment Variable Interpolation
+
+Config files support Docker Compose-style environment variable interpolation with optional defaults:
+
+```yaml
+repo:
+  path: ${AIMGR_REPO_PATH:-~/.local/share/ai-config/repo}
+
+sync:
+  sources:
+    - url: ${SYNC_REPO:-https://github.com/hk9890/ai-tools}
+      filter: ${RESOURCE_FILTER:-skill/*}
+```
+
+**Syntax:**
+- `${VAR}` - Use environment variable
+- `${VAR:-default}` - Use default if VAR is not set or empty
+
+This is useful for:
+- CI/CD environments with dynamic paths
+- Team configurations with user-specific overrides
+- Testing with temporary repositories
+- Managing secrets without hardcoding credentials
 
 For detailed configuration options, see [docs/user-guide/configuration.md](docs/user-guide/configuration.md).
 

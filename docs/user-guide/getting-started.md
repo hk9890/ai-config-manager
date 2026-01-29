@@ -353,6 +353,27 @@ Use `repo sync` to automatically update from configured sources:
 aimgr repo sync
 ```
 
+### Tip 5: Use Environment Variables in Config
+
+Config files support environment variable interpolation (Docker Compose style):
+
+```yaml
+# ~/.config/aimgr/aimgr.yaml
+repo:
+  path: ${AIMGR_REPO_PATH:-~/.local/share/ai-config/repo}
+
+sync:
+  sources:
+    - url: ${TEAM_REPO:-https://github.com/myorg/resources}
+      filter: ${RESOURCE_FILTER:-skill/*}
+```
+
+This is useful for:
+- Different environments (dev, staging, prod)
+- Team shared configs with user overrides
+- CI/CD pipelines
+- Testing with temporary paths
+
 ---
 
 ## Troubleshooting

@@ -185,6 +185,121 @@ All paths are cleaned and normalized (e.g., `//double/slashes` becomes `/double/
 
 ---
 
+## Environment Variable Interpolation
+
+aimgr supports Docker Compose-style environment variable interpolation in the config file. This allows you to reference environment variables with optional default values.
+
+### Syntax
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| `${VAR}` | Simple substitution | `${HOME}` → `/home/user` |
+| `${VAR:-default}` | Default if unset/empty | `${PORT:-5432}` → `5432` if PORT not set |
+
+### Variable Names
+
+Variable names must match the pattern: `[A-Za-z_][A-Za-z0-9_]*`
+- Start with letter or underscore
+- Contain only letters, numbers, and underscores
+- Case-sensitive (standard shell convention)
+
+### Examples
+
+**Basic usage:**
+```yaml
+repo:
+  path: ${AIMGR_REPO_PATH}  # Use env var or empty if not set
+```
+
+**With default values:**
+```yaml
+repo:
+  path: ${AIMGR_REPO_PATH:-~/.local/share/ai-config/repo}
+
+sync:
+  sources:
+    - url: ${SYNC_REPO:-https://github.com/hk9890/ai-tools}
+      filter: ${RESOURCE_FILTER:-skill/*}
+```
+
+**Multiple variables:**
+```yaml
+sync:
+  sources:
+    - url: ${PROTOCOL:-https}://${HOST}/owner/repo
+```
+
+**Environment-specific configs:**
+```yaml
+# Development
+repo:
+  path: ${DEV_REPO_PATH:-~/dev/ai-resources}
+
+# Production  
+repo:
+  path: ${PROD_REPO_PATH:-/var/lib/ai-config/repo}
+```
+
+### How It Works
+
+1. Environment variables are expanded **before** YAML parsing
+2. Variable expansion happens in both `Load()` and `LoadGlobal()`
+3. Works in **any config field** (repo.path, sync.sources, etc.)
+4. If variable is unset/empty and no default provided, expands to empty string
+5. Existing validation applies **after** expansion
+
+### Use Cases
+
+**CI/CD environments:**
+Different paths per environment without maintaining multiple config files:
+
+```yaml
+repo:
+  path: ${CI_REPO_PATH:-~/.local/share/ai-config/repo}
+
+sync:
+  sources:
+    - url: ${CI_RESOURCE_REPO:-https://github.com/myorg/resources}
+```
+
+**Team configurations:**
+Shared config with user-specific overrides:
+
+```yaml
+repo:
+  path: ${USER_REPO_PATH:-~/team-ai-resources}
+
+sync:
+  sources:
+    - url: ${TEAM_RESOURCES:-https://github.com/team/resources}
+      filter: ${USER_FILTER:-*}
+```
+
+**Testing:**
+Override paths without modifying config file:
+
+```bash
+# Run tests with temporary repository
+export AIMGR_REPO_PATH=/tmp/test-repo
+aimgr repo import ~/test-resources/
+aimgr install skill/test-skill
+
+# Original config unchanged
+unset AIMGR_REPO_PATH
+aimgr list  # Uses default config path
+```
+
+**Secret management:**
+Reference secrets from environment (for private repositories):
+
+```yaml
+sync:
+  sources:
+    - url: https://${GH_TOKEN}@github.com/private/repo
+```
+
+---
+
 ## Installation Targets
 
 Configure which AI tools to install resources to by default:
