@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/adrg/xdg"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
@@ -25,6 +26,9 @@ type Config struct {
 
 	// Sync configuration for syncing resources from external sources
 	Sync SyncConfig `yaml:"sync"`
+
+	// Repo configuration for repository settings
+	Repo RepoConfig `yaml:"repo"`
 }
 
 // InstallConfig holds installation-related configuration
@@ -46,6 +50,12 @@ type SyncSource struct {
 type SyncConfig struct {
 	// Sources is a list of sources to sync from
 	Sources []SyncSource `yaml:"sources"`
+}
+
+// RepoConfig holds repository-related configuration
+type RepoConfig struct {
+	// Path is an optional custom repository path
+	Path string `yaml:"path,omitempty"`
 }
 
 // GetConfigPath returns the path to the config file in XDG config directory
@@ -227,6 +237,30 @@ func (c *Config) Validate() error {
 				return fmt.Errorf("sync.sources[%d]: invalid filter pattern '%s': %w", i, source.Filter, err)
 			}
 		}
+	}
+
+	// Validate repo path if provided
+	if c.Repo.Path != "" {
+		// Expand ~ to home directory
+		if strings.HasPrefix(c.Repo.Path, "~/") {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("repo.path: cannot expand ~: %w", err)
+			}
+			c.Repo.Path = filepath.Join(home, c.Repo.Path[2:])
+		}
+
+		// Convert to absolute path if relative
+		if !filepath.IsAbs(c.Repo.Path) {
+			absPath, err := filepath.Abs(c.Repo.Path)
+			if err != nil {
+				return fmt.Errorf("repo.path: cannot convert to absolute path: %w", err)
+			}
+			c.Repo.Path = absPath
+		}
+
+		// Clean the path
+		c.Repo.Path = filepath.Clean(c.Repo.Path)
 	}
 
 	return nil
