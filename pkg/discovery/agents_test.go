@@ -81,22 +81,12 @@ func TestDiscoverAgents_RecursiveFallback(t *testing.T) {
 		t.Fatalf("DiscoverAgents() error = %v", err)
 	}
 
-	// Should find agents via recursive search since no priority locations exist
-	expectedNames := map[string]bool{
-		"deep-agent":    true,
-		"another-agent": true,
-	}
-
-	if len(agents) != len(expectedNames) {
-		t.Errorf("DiscoverAgents() found %d agents, want %d", len(agents), len(expectedNames))
-		for _, a := range agents {
-			t.Logf("Found: %s", a.Name)
-		}
-	}
-
-	for _, agent := range agents {
-		if !expectedNames[agent.Name] {
-			t.Errorf("Unexpected agent found: %s", agent.Name)
+	// Files outside agents/ directories should be ignored
+	// This is the CORRECT behavior after the bug fix
+	if len(agents) != 0 {
+		t.Errorf("Expected 0 agents (files not in agents/ dir should be ignored), got %d", len(agents))
+		for _, agent := range agents {
+			t.Logf("Found agent: %s", agent.Name)
 		}
 	}
 }
@@ -292,8 +282,8 @@ func TestDiscoverAgentsRecursive(t *testing.T) {
 			name:         "recursive search in nested",
 			dirPath:      "testdata/agents-repo/nested",
 			currentDepth: 0,
-			wantMinCount: 2, // nested-agent and duplicate-agent (invalid-agent skipped)
-			wantMaxCount: 5,
+			wantMinCount: 0, // Files outside agents/ should be ignored per bug fix
+			wantMaxCount: 0,
 		},
 		{
 			name:         "max depth exceeded",

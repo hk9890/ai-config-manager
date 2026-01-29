@@ -63,6 +63,14 @@ func DiscoverCommandsWithErrors(basePath string, subpath string) ([]*resource.Re
 
 	var allCommands []*resource.Resource
 
+	// If searchPath itself is a commands directory, search it directly
+	if isCommandsDirectory(searchPath) {
+		commands, errors := searchCommandsInDirectory(searchPath, 0, searchPath)
+		allCommands = append(allCommands, commands...)
+		allErrors = append(allErrors, errors...)
+		return deduplicateCommands(allCommands), allErrors, nil
+	}
+
 	// Search priority locations
 	priorityCommands, priorityErrors := searchPriorityLocations(searchPath)
 	allErrors = append(allErrors, priorityErrors...)
@@ -164,6 +172,8 @@ func searchCommandsInDirectory(dir string, depth int, basePath string) ([]*resou
 
 // recursiveSearchCommands performs a recursive search for command files
 // basePath is used to calculate relative paths
+// This function ONLY looks for commands/ directories and delegates to searchCommandsInDirectory
+// It does NOT parse files directly - this prevents false positives from non-resource directories
 func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]*resource.Resource, []DiscoveryError) {
 	if depth > maxDepth {
 		return nil, nil
@@ -172,12 +182,7 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 	var allCommands []*resource.Resource
 	var allErrors []DiscoveryError
 
-	// Search current directory
-	commands, errors := searchDirectory(currentPath, basePath)
-	allCommands = append(allCommands, commands...)
-	allErrors = append(allErrors, errors...)
-
-	// Recursively search subdirectories
+	// Recursively search subdirectories (looking for commands/ directories)
 	entries, err := os.ReadDir(currentPath)
 	if err != nil {
 		allErrors = append(allErrors, DiscoveryError{
@@ -199,6 +204,11 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 
 		// Skip agents and skills directories (they're handled by their own discovery)
 		if entry.Name() == "agents" || entry.Name() == "skills" {
+			continue
+		}
+
+		// Skip common non-resource directories
+		if shouldSkipNonResourceDirectory(entry.Name()) {
 			continue
 		}
 
@@ -231,6 +241,8 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 
 // searchDirectory searches a single directory for command files
 // basePath is used to calculate relative paths
+// NOTE: This function is only called from within commands/ directories,
+// so no path filtering is needed here
 func searchDirectory(dir string, basePath string) ([]*resource.Resource, []DiscoveryError) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -291,6 +303,68 @@ func isExcludedFile(filename string) bool {
 
 	for _, excl := range excluded {
 		if filename == excl {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isCommandsDirectory checks if a directory path IS a commands directory
+// (i.e., ends with "/commands" or "/.claude/commands" or "/.opencode/commands")
+func isCommandsDirectory(path string) bool {
+	// Normalize path separators
+	normalizedPath := filepath.ToSlash(path)
+
+	// Check if the path ends with a commands directory name
+	return strings.HasSuffix(normalizedPath, "/commands") ||
+		strings.HasSuffix(normalizedPath, "/.claude/commands") ||
+		strings.HasSuffix(normalizedPath, "/.opencode/commands") ||
+		normalizedPath == "commands" ||
+		strings.HasSuffix(normalizedPath, ".claude/commands") ||
+		strings.HasSuffix(normalizedPath, ".opencode/commands")
+}
+
+// isInCommandsSubtree checks if a file path is within a commands/ directory subtree
+// Returns true if the path contains /commands/ or /.claude/commands/ or /.opencode/commands/
+func isInCommandsSubtree(path string) bool {
+	// Normalize path separators
+	normalizedPath := filepath.ToSlash(path)
+
+	// Check for commands/ directories
+	return strings.Contains(normalizedPath, "/commands/") ||
+		strings.Contains(normalizedPath, "/.claude/commands/") ||
+		strings.Contains(normalizedPath, "/.opencode/commands/") ||
+		isCommandsDirectory(path)
+}
+
+// shouldSkipNonResourceDirectory returns true if the directory should be skipped during recursive search
+// These are common directories that typically don't contain resources
+func shouldSkipNonResourceDirectory(name string) bool {
+	skipDirs := []string{
+		"documentation",
+		"docs",
+		"node_modules",
+		".git",
+		".svn",
+		".hg",
+		"vendor",
+		"build",
+		"dist",
+		"target",
+		"bin",
+		"obj",
+		"__pycache__",
+		".pytest_cache",
+		".venv",
+		"venv",
+		"test",
+		"tests",
+		"examples",
+	}
+
+	for _, skip := range skipDirs {
+		if name == skip {
 			return true
 		}
 	}

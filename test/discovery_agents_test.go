@@ -100,3 +100,33 @@ func TestDiscoverAgents_MalformedFrontmatter(t *testing.T) {
 		}
 	}
 }
+
+func TestDiscoverAgents_IgnoresNonResourceDirectories(t *testing.T) {
+	fixturePath := filepath.Join("..", "testdata", "repos", "discovery-filtering")
+
+	agents, discErrors, err := discovery.DiscoverAgentsWithErrors(fixturePath, "")
+	if err != nil {
+		t.Fatalf("DiscoverAgents failed: %v", err)
+	}
+
+	// Should find only the agent in agents/, not files in documentation/ or root
+	if len(agents) != 1 {
+		t.Errorf("Expected exactly 1 agent, got %d", len(agents))
+		for _, agent := range agents {
+			t.Logf("Found agent: %s", agent.Name)
+		}
+	}
+
+	// Verify we found the valid agent
+	if len(agents) > 0 && agents[0].Name != "valid-agent" {
+		t.Errorf("Expected to find 'valid-agent', got '%s'", agents[0].Name)
+	}
+
+	// Should have 0 discovery errors (files outside agents/ should be ignored, not parsed)
+	if len(discErrors) != 0 {
+		t.Errorf("Expected 0 discovery errors, got %d", len(discErrors))
+		for _, discErr := range discErrors {
+			t.Logf("Discovery error: %s - %v", discErr.Path, discErr.Error)
+		}
+	}
+}

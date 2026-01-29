@@ -223,6 +223,11 @@ func discoverAgentsInDirectory(dirPath string, recursive bool) ([]*resource.Reso
 
 		// If it's a .md file, try to load as agent
 		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".md" {
+			// Only parse files that are in an agents/ subtree
+			if !isInAgentsSubtree(entryPath) {
+				continue
+			}
+
 			agent, err := resource.LoadAgent(entryPath)
 			if err != nil {
 				// Collect error instead of silently skipping
@@ -303,6 +308,8 @@ func shouldSkipDirectory(name string) bool {
 	skipDirs := []string{
 		"commands", // Commands are handled by command discovery
 		"skills",   // Skills are handled by skill discovery
+		"documentation",
+		"docs",
 		"node_modules",
 		".git",
 		".svn",
@@ -317,6 +324,9 @@ func shouldSkipDirectory(name string) bool {
 		".pytest_cache",
 		".venv",
 		"venv",
+		"test",
+		"tests",
+		"examples",
 	}
 
 	for _, skip := range skipDirs {
@@ -326,6 +336,21 @@ func shouldSkipDirectory(name string) bool {
 	}
 
 	return false
+}
+
+// isInAgentsSubtree checks if a file path is within an agents/ directory subtree
+// Returns true if the path contains /agents/ or /.claude/agents/ or /.opencode/agents/
+func isInAgentsSubtree(path string) bool {
+	// Normalize path separators
+	normalizedPath := filepath.ToSlash(path)
+
+	// Check for agents/ directories
+	return strings.Contains(normalizedPath, "/agents/") ||
+		strings.Contains(normalizedPath, "/.claude/agents/") ||
+		strings.Contains(normalizedPath, "/.opencode/agents/") ||
+		strings.HasSuffix(normalizedPath, "/agents") ||
+		strings.HasSuffix(normalizedPath, "/.claude/agents") ||
+		strings.HasSuffix(normalizedPath, "/.opencode/agents")
 }
 
 // deduplicateAgents removes duplicate agents, keeping the first occurrence

@@ -68,8 +68,8 @@ func TestDiscoverCommands_ExcludesSpecialFiles(t *testing.T) {
 }
 
 func TestDiscoverCommands_RecursiveFallback(t *testing.T) {
-	// Test with a repo that has no priority directories
-	// This should trigger recursive search
+	// Test with a repo that has .md files OUTSIDE commands/ directory
+	// These files should be IGNORED (not parsed) per the bug fix
 	basePath := filepath.Join("testdata", "recursive-repo")
 
 	commands, err := DiscoverCommands(basePath, "")
@@ -77,38 +77,13 @@ func TestDiscoverCommands_RecursiveFallback(t *testing.T) {
 		t.Fatalf("DiscoverCommands failed: %v", err)
 	}
 
-	// Should find commands through recursive search
-	if len(commands) == 0 {
-		t.Fatal("Expected to find commands through recursive search, got none")
-	}
-
-	// Should find both top-level and deeply nested command
-	foundTopLevel := false
-	foundDeep := false
-
-	for _, cmd := range commands {
-		if cmd.Name == "top-level" {
-			foundTopLevel = true
-			if cmd.Description != "A top-level command" {
-				t.Errorf("Wrong description for top-level: %s", cmd.Description)
-			}
+	// Files outside commands/ directories should be ignored
+	// This is the CORRECT behavior after the bug fix
+	if len(commands) != 0 {
+		t.Errorf("Expected 0 commands (files not in commands/ dir should be ignored), got %d", len(commands))
+		for _, cmd := range commands {
+			t.Logf("Found command: %s", cmd.Name)
 		}
-		if cmd.Name == "nested/level2/level3/deep-command" {
-			foundDeep = true
-			if cmd.Description != "A command found through recursive search" {
-				t.Errorf("Wrong description for deep-command: %s", cmd.Description)
-			}
-			if cmd.Author != "test-author" {
-				t.Errorf("Wrong author for deep-command: %s", cmd.Author)
-			}
-		}
-	}
-
-	if !foundTopLevel {
-		t.Error("Expected to find top-level command through recursive search")
-	}
-	if !foundDeep {
-		t.Error("Expected to find deep-command through recursive search")
 	}
 }
 

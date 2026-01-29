@@ -994,7 +994,12 @@ func TestCLIRepoVerifyNestedPaths(t *testing.T) {
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create nested commands individually and import them
+	// Commands must be in a commands/ directory per LoadCommand requirements
 	tempDir := t.TempDir()
+	commandsDir := filepath.Join(tempDir, "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands directory: %v", err)
+	}
 
 	// Create command files with nested paths (properly structured)
 	nestedCommands := []struct {
@@ -1008,7 +1013,7 @@ func TestCLIRepoVerifyNestedPaths(t *testing.T) {
 
 	var commandPaths []string
 	for _, cmd := range nestedCommands {
-		cmdPath := filepath.Join(tempDir, cmd.path)
+		cmdPath := filepath.Join(commandsDir, cmd.path)
 		cmdContent := fmt.Sprintf(`---
 description: Test nested command %s
 ---
