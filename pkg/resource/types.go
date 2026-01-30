@@ -22,14 +22,14 @@ const (
 
 // Resource represents an AI resource (command, skill, or agent)
 type Resource struct {
-	Name        string            `yaml:"name"` // For nested commands, contains full path (e.g., "api/deploy")
-	Type        ResourceType      `yaml:"type"`
-	Description string            `yaml:"description"`
-	Version     string            `yaml:"version,omitempty"`
-	Author      string            `yaml:"author,omitempty"`
-	License     string            `yaml:"license,omitempty"`
-	Path        string            `yaml:"path"`
-	Metadata    map[string]string `yaml:"metadata,omitempty"`
+	Name        string            `json:"name" yaml:"name"` // For nested commands, contains full path (e.g., "api/deploy")
+	Type        ResourceType      `json:"type" yaml:"type"`
+	Description string            `json:"description" yaml:"description"`
+	Version     string            `json:"version,omitempty" yaml:"version,omitempty"`
+	Author      string            `json:"author,omitempty" yaml:"author,omitempty"`
+	License     string            `json:"license,omitempty" yaml:"license,omitempty"`
+	Path        string            `json:"path" yaml:"path"`
+	Metadata    map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 
 var (
