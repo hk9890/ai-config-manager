@@ -29,6 +29,10 @@ The `--format` flag is supported by commands that perform bulk operations:
 aimgr repo import <source> --format=<format>
 aimgr repo sync --format=<format>
 aimgr repo list --format=<format>
+aimgr repo describe <pattern> --format=<format>
+aimgr repo info --format=<format>           # NEW
+aimgr repo verify --format=<format>         # NEW (replaces --json)
+aimgr repo prune --format=<format>          # NEW
 aimgr list --format=<format>
 ```
 
@@ -449,6 +453,118 @@ $ aimgr repo list --format=json | jq '[.resources[] | select(.sync_status != "in
 3. **Review sync status regularly**: Run `aimgr list` to catch drift between installations and manifest
 4. **Use CI/CD checks**: Fail builds if sync status shows warnings (see scripting examples below)
 
+## Repository Maintenance Commands
+
+The following commands support structured output for automation and monitoring.
+
+### repo info - Repository Statistics
+
+Display repository information in various formats:
+
+**Table format (default):**
+```bash
+$ aimgr repo info
+
+Repository Information
+======================
+
+Location: /home/user/.local/share/ai-config/repo
+
+Total Resources: 15
+  Commands:      5
+  Skills:        8
+  Agents:        2
+
+Disk Usage:    2.3 MB
+```
+
+**JSON format:**
+```bash
+$ aimgr repo info --format=json
+{
+  "location": "/home/user/.local/share/ai-config/repo",
+  "total_resources": 15,
+  "command_count": 5,
+  "skill_count": 8,
+  "agent_count": 2,
+  "disk_usage_bytes": 2411520,
+  "disk_usage_human": "2.3 MB"
+}
+```
+
+**CI/CD Example:**
+```bash
+# Check resource count in CI
+RESOURCE_COUNT=$(aimgr repo info --format=json | jq '.total_resources')
+if [ "$RESOURCE_COUNT" -lt 10 ]; then
+  echo "::warning::Only $RESOURCE_COUNT resources in repository"
+fi
+```
+
+### repo verify - Repository Integrity
+
+Check repository health with structured output:
+
+**JSON format:**
+```bash
+$ aimgr repo verify --format=json
+{
+  "resources_without_metadata": [],
+  "orphaned_metadata": [],
+  "missing_source_paths": [],
+  "type_mismatches": [],
+  "packages_with_missing_refs": [],
+  "has_errors": false,
+  "has_warnings": false
+}
+```
+
+**CI/CD Example:**
+```bash
+# Fail build on repository errors
+output=$(aimgr repo verify --format=json)
+if [ $(echo "$output" | jq '.has_errors') == "true" ]; then
+  echo "::error::Repository verification failed"
+  echo "$output" | jq -r '.orphaned_metadata[] | "- \(.name) (\(.type))"'
+  exit 1
+fi
+```
+
+**Note:** The `--json` flag is deprecated. Use `--format=json` instead.
+
+### repo prune - Workspace Cleanup
+
+Clean up unreferenced Git caches with structured output:
+
+**JSON format:**
+```bash
+$ aimgr repo prune --dry-run --format=json
+{
+  "unreferenced_caches": [
+    {
+      "url": "https://github.com/user/old-repo",
+      "path": "/home/user/.local/share/ai-config/repo/.workspace/abc123",
+      "size_bytes": 1258291,
+      "size_human": "1.2 MB"
+    }
+  ],
+  "total_count": 1,
+  "total_size_bytes": 1258291,
+  "total_size_human": "1.2 MB",
+  "dry_run": true
+}
+```
+
+**Automation Example:**
+```bash
+# Automated cleanup with logging
+aimgr repo prune --force --format=json >> /var/log/aimgr-cleanup.jsonl
+
+# Monitor freed space
+FREED=$(aimgr repo prune --force --format=json | jq '.freed_bytes')
+echo "Freed $FREED bytes"
+```
+
 ## Error Reporting
 
 All output formats include detailed error reporting to help diagnose issues.
@@ -619,6 +735,52 @@ $ aimgr repo import ~/resources/ --format=json | jq '.added[] | select(.type == 
   "type": "skill",
   "path": "/path/to/skills/pdf-processing"
 }
+```
+
+### Repository Maintenance
+
+**Monitor repository health:**
+```bash
+# Check for any repository issues
+$ aimgr repo verify --format=json | jq '{
+  has_errors: .has_errors,
+  has_warnings: .has_warnings,
+  orphaned: (.orphaned_metadata | length),
+  missing_metadata: (.resources_without_metadata | length)
+}'
+{
+  "has_errors": false,
+  "has_warnings": true,
+  "orphaned": 0,
+  "missing_metadata": 3
+}
+```
+
+**Track repository growth:**
+```bash
+# Log repository statistics over time
+$ aimgr repo info --format=json | jq '{
+  date: now | strftime("%Y-%m-%d"),
+  resources: .total_resources,
+  disk_mb: (.disk_usage_bytes / 1024 / 1024 | floor)
+}' >> repo-stats.jsonl
+```
+
+**Automated cleanup:**
+```bash
+# Clean up workspace caches weekly
+#!/bin/bash
+LOG_FILE="/var/log/aimgr-prune.log"
+
+echo "$(date): Starting prune" >> "$LOG_FILE"
+result=$(aimgr repo prune --force --format=json 2>&1)
+
+if [ $? -eq 0 ]; then
+  freed=$(echo "$result" | jq '.freed_human')
+  echo "$(date): Freed $freed" >> "$LOG_FILE"
+else
+  echo "$(date): Prune failed" >> "$LOG_FILE"
+fi
 ```
 
 ### CI/CD Integration
@@ -930,3 +1092,18 @@ echo "$(date): Resource sync successful ($added added)" >> "$LOG_FILE"
 - Table format may be slightly slower for large outputs (formatting overhead)
 - For batch operations, JSON is recommended for programmatic processing
 - Use `--dry-run` with any format to preview without making changes
+
+## Command Format Support Summary
+
+| Command | Formats | Use Case |
+|---------|---------|----------|
+| `repo import` | table, json, yaml | Import resources with results |
+| `repo sync` | table, json, yaml | Sync from sources |
+| `repo list` | table, json, yaml | List with sync status |
+| `repo describe` | table, json, yaml | Resource details |
+| `repo info` | table, json, yaml | Repository statistics |
+| `repo verify` | table, json, yaml | Repository integrity checks |
+| `repo prune` | table, json, yaml | Workspace cleanup |
+| `list` | table, json, yaml | Installed resources (simple) |
+| `install` | table, json, yaml | Install resources |
+| `uninstall` | table, json, yaml | Uninstall resources |
