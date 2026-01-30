@@ -46,6 +46,7 @@ make build              # Build binary to ./aimgr
 make test              # Run all tests (unit + integration + vet)
 make unit-test         # Run only unit tests
 make integration-test  # Run only integration tests
+make e2e-test          # Run only E2E tests
 
 # Code Quality
 make fmt               # Format all Go code
@@ -596,11 +597,14 @@ Resources must follow agentskills.io naming:
 # All tests
 make test
 
-# Unit tests only
+# Unit tests only (fast, no external dependencies)
 make unit-test
 
-# Integration tests only
+# Integration tests only (slower, requires git/network)
 make integration-test
+
+# E2E tests only (slowest, tests full CLI with real workflows)
+make e2e-test
 
 # Single test file
 go test -v ./pkg/resource/command_test.go
@@ -614,6 +618,61 @@ go test -v -cover ./pkg/...
 # Specific package
 go test -v ./pkg/resource/
 ```
+
+### Test Types
+
+**Unit Tests** (`make unit-test`):
+- Located in package directories (`pkg/*/`)
+- Test individual functions/methods in isolation
+- Use fixtures from `testdata/` directories
+- No network calls or git operations
+- Execution time: <5 seconds
+- Build tag: `//go:build unit` (optional)
+
+**Integration Tests** (`make integration-test`):
+- Located in `test/` directory
+- Test package integration and workflows
+- May use real git repositories (with workspace caching)
+- Execution time: ~30 seconds
+- Build tag: `//go:build integration`
+
+**E2E Tests** (`make e2e-test`):
+- Located in `test/e2e/` directory
+- Test complete CLI workflows end-to-end
+- Build actual binary and execute commands
+- Use real filesystem operations and git repositories
+- Test scenarios: sync, prune, read operations, helpers
+- Execution time: ~1-2 minutes
+- Build tag: `//go:build e2e`
+- **Requirements**: git must be installed
+
+### Running E2E Tests Locally
+
+E2E tests build the full `aimgr` binary and test real command execution:
+
+```bash
+# Run all E2E tests
+make e2e-test
+
+# Run specific E2E test
+go test -v -tags=e2e ./test/e2e/ -run TestSync
+
+# Run with verbose output
+go test -v -tags=e2e ./test/e2e/
+
+# Run E2E tests with timeout
+go test -v -tags=e2e -timeout 10m ./test/e2e/
+```
+
+**What E2E tests verify:**
+- Full binary builds successfully
+- Commands execute with correct exit codes
+- Repository operations work end-to-end (import, sync, prune)
+- Configuration and workspace caching function correctly
+- Error messages are user-friendly
+- Help output is correct
+
+**Note**: E2E tests use git-ignored test repositories and temporary directories for isolation.
 
 ### Writing Tests
 
