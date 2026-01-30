@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -17,6 +19,53 @@ import (
 
 var formatFlag string
 var typeFlag string
+
+// SyncStatus represents the synchronization state between installed resources and ai.package.yaml manifest
+type SyncStatus string
+
+const (
+	// SyncStatusInSync means the resource is both in the manifest and installed
+	SyncStatusInSync SyncStatus = "in-sync"
+	// SyncStatusNotInManifest means the resource is installed but not in the manifest
+	SyncStatusNotInManifest SyncStatus = "not-in-manifest"
+	// SyncStatusNotInstalled means the resource is in the manifest but not installed
+	SyncStatusNotInstalled SyncStatus = "not-installed"
+	// SyncStatusNoManifest means no ai.package.yaml file exists in the project
+	SyncStatusNoManifest SyncStatus = "no-manifest"
+)
+
+// getSyncStatus determines the sync status of a resource relative to ai.package.yaml
+// It compares the resource's installation state with its presence in the manifest file
+func getSyncStatus(projectPath string, resourceRef string, isInstalled bool) SyncStatus {
+	// Load the manifest file from the project directory
+	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		// If manifest file doesn't exist, return no-manifest status
+		if os.IsNotExist(err) {
+			return SyncStatusNoManifest
+		}
+		// For other errors (e.g., invalid YAML), also treat as no manifest
+		// This is graceful - we can't determine sync status without a valid manifest
+		return SyncStatusNoManifest
+	}
+
+	// Check if the resource reference exists in the manifest
+	inManifest := m.Has(resourceRef)
+
+	// Determine sync status based on both installation and manifest presence
+	if inManifest && isInstalled {
+		return SyncStatusInSync
+	} else if inManifest && !isInstalled {
+		return SyncStatusNotInstalled
+	} else if !inManifest && isInstalled {
+		return SyncStatusNotInManifest
+	}
+
+	// This case shouldn't normally occur (not in manifest and not installed)
+	// But we handle it by treating it as not-in-manifest
+	return SyncStatusNotInManifest
+}
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
