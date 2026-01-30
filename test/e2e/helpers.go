@@ -89,6 +89,18 @@ func buildTestBinary(t *testing.T) string {
 //	stdout, stderr, err := runAimgr(t, configPath, "repo", "list", "--format=json")
 func runAimgr(t *testing.T, configPath string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
+	return runAimgrWithEnv(t, configPath, nil, args...)
+}
+
+// runAimgrWithEnv runs the aimgr CLI with the specified config, environment, and arguments.
+// Returns stdout, stderr, and error.
+//
+// Example:
+//
+//	env := map[string]string{"AIMGR_REPO_PATH": "/tmp/repo"}
+//	stdout, stderr, err := runAimgrWithEnv(t, configPath, env, "repo", "list")
+func runAimgrWithEnv(t *testing.T, configPath string, env map[string]string, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
 
 	binPath := buildTestBinary(t)
 
@@ -100,6 +112,14 @@ func runAimgr(t *testing.T, configPath string, args ...string) (stdout, stderr s
 	fullArgs = append(fullArgs, args...)
 
 	cmd := exec.Command(binPath, fullArgs...)
+
+	// Set environment variables
+	if len(env) > 0 {
+		cmd.Env = os.Environ() // Start with current environment
+		for key, value := range env {
+			cmd.Env = append(cmd.Env, key+"="+value)
+		}
+	}
 
 	// Capture stdout and stderr separately
 	var outBuf, errBuf strings.Builder

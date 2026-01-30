@@ -10,7 +10,8 @@ install:
 repo:
   # Use relative path to test repo within test/e2e/repos/
   # This directory is git-ignored and created fresh for each test run
-  path: test/e2e/repos/test-repo-1
+  # Path is relative to the config file location (test/e2e/configs/)
+  path: ../repos/test-repo-1
 
 sync:
   sources:

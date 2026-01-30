@@ -1,4 +1,4 @@
-.PHONY: build test integration-test test-integration install clean help
+.PHONY: build test integration-test test-integration e2e-test install clean help
 
 # Binary name
 BINARY=aimgr
@@ -42,6 +42,10 @@ integration-test: ## Run only integration tests (slower, requires git/network)
 test-integration: ## Run integration tests (requires network, uses real GitHub repos)
 	@echo "Running integration tests with real Git operations..."
 	$(GOTEST) -v -tags=integration ./test/...
+
+e2e-test: ## Run end-to-end tests (slowest, requires network, tests full CLI)
+	@echo "Running E2E tests..."
+	$(GOTEST) -v -tags=e2e ./test/e2e/
 
 install: build ## Install binary to ~/bin
 	mkdir -p $(INSTALL_PATH)
