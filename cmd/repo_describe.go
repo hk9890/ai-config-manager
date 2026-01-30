@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -9,7 +11,33 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
+
+var describeFormatFlag string
+
+// DescribeResourceOutput represents detailed resource information for JSON/YAML output
+type DescribeResourceOutput struct {
+	Type        string                     `json:"type" yaml:"type"`
+	Name        string                     `json:"name" yaml:"name"`
+	Description string                     `json:"description" yaml:"description"`
+	Version     string                     `json:"version,omitempty" yaml:"version,omitempty"`
+	Author      string                     `json:"author,omitempty" yaml:"author,omitempty"`
+	License     string                     `json:"license,omitempty" yaml:"license,omitempty"`
+	Metadata    *metadata.ResourceMetadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Location    string                     `json:"location" yaml:"location"`
+	// Type-specific fields
+	Compatibility []string `json:"compatibility,omitempty" yaml:"compatibility,omitempty"`   // skill only
+	HasScripts    *bool    `json:"has_scripts,omitempty" yaml:"has_scripts,omitempty"`       // skill only
+	HasReferences *bool    `json:"has_references,omitempty" yaml:"has_references,omitempty"` // skill only
+	HasAssets     *bool    `json:"has_assets,omitempty" yaml:"has_assets,omitempty"`         // skill only
+	Agent         string   `json:"agent,omitempty" yaml:"agent,omitempty"`                   // command only
+	Model         string   `json:"model,omitempty" yaml:"model,omitempty"`                   // command only
+	AllowedTools  []string `json:"allowed_tools,omitempty" yaml:"allowed_tools,omitempty"`   // command only
+	AgentType     string   `json:"agent_type,omitempty" yaml:"agent_type,omitempty"`         // agent only
+	Instructions  string   `json:"instructions,omitempty" yaml:"instructions,omitempty"`     // agent only
+	Capabilities  []string `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`     // agent only
+}
 
 // repoDescribeCmd represents the repo describe command
 var repoDescribeCmd = &cobra.Command{
@@ -35,6 +63,11 @@ Note: 'repo show' is deprecated, use 'repo describe' instead.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pattern := args[0]
 
+		// Validate format flag
+		if describeFormatFlag != "table" && describeFormatFlag != "json" && describeFormatFlag != "yaml" {
+			return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", describeFormatFlag)
+		}
+
 		manager, err := repo.NewManager()
 		if err != nil {
 			return err
@@ -52,16 +85,16 @@ Note: 'repo show' is deprecated, use 'repo describe' instead.`,
 
 		if len(matches) == 1 {
 			// Single match - show detailed view
-			return describeDetailedResource(manager, matches[0])
+			return describeDetailedResource(manager, matches[0], describeFormatFlag)
 		}
 
 		// Multiple matches - show summary
-		return describeResourceSummary(manager, matches)
+		return describeResourceSummary(manager, matches, describeFormatFlag)
 	},
 }
 
 // describeDetailedResource displays detailed information for a single resource
-func describeDetailedResource(manager *repo.Manager, resourceArg string) error {
+func describeDetailedResource(manager *repo.Manager, resourceArg string, format string) error {
 	// Parse the resource argument
 	resourceType, name, err := ParseResourceArg(resourceArg)
 	if err != nil {
@@ -78,16 +111,26 @@ func describeDetailedResource(manager *repo.Manager, resourceArg string) error {
 	meta, err := manager.GetMetadata(name, resourceType)
 	metadataAvailable := err == nil
 
-	// Display based on resource type
-	switch resourceType {
-	case resource.Skill:
-		return describeSkillDetails(manager, res, metadataAvailable, meta)
-	case resource.Command:
-		return describeCommandDetails(manager, res, metadataAvailable, meta)
-	case resource.Agent:
-		return describeAgentDetails(manager, res, metadataAvailable, meta)
+	// Route to format-specific output
+	switch format {
+	case "json":
+		return outputDescribeJSON(manager, res, resourceType, metadataAvailable, meta)
+	case "yaml":
+		return outputDescribeYAML(manager, res, resourceType, metadataAvailable, meta)
+	case "table":
+		// Display based on resource type (existing table format)
+		switch resourceType {
+		case resource.Skill:
+			return describeSkillDetails(manager, res, metadataAvailable, meta)
+		case resource.Command:
+			return describeCommandDetails(manager, res, metadataAvailable, meta)
+		case resource.Agent:
+			return describeAgentDetails(manager, res, metadataAvailable, meta)
+		default:
+			return fmt.Errorf("unsupported resource type: %s", resourceType)
+		}
 	default:
-		return fmt.Errorf("unsupported resource type: %s", resourceType)
+		return fmt.Errorf("invalid format: %s", format)
 	}
 }
 
@@ -257,7 +300,22 @@ func describeAgentDetails(manager *repo.Manager, res *resource.Resource, metadat
 }
 
 // describeResourceSummary displays a summary table for multiple resources
-func describeResourceSummary(manager *repo.Manager, matches []string) error {
+func describeResourceSummary(manager *repo.Manager, matches []string, format string) error {
+	// Route to format-specific output
+	switch format {
+	case "json":
+		return outputDescribeSummaryJSON(manager, matches)
+	case "yaml":
+		return outputDescribeSummaryYAML(manager, matches)
+	case "table":
+		return outputDescribeSummaryTable(manager, matches)
+	default:
+		return fmt.Errorf("invalid format: %s", format)
+	}
+}
+
+// outputDescribeSummaryTable displays a summary table for multiple resources
+func outputDescribeSummaryTable(manager *repo.Manager, matches []string) error {
 	fmt.Printf("Found %d matching resources:\n\n", len(matches))
 
 	// Display table header
@@ -293,12 +351,161 @@ func describeResourceSummary(manager *repo.Manager, matches []string) error {
 	return nil
 }
 
+// outputDescribeSummaryJSON outputs resource summary in JSON format
+func outputDescribeSummaryJSON(manager *repo.Manager, matches []string) error {
+	resources := []map[string]string{}
+
+	for _, match := range matches {
+		resourceType, name, err := ParseResourceArg(match)
+		if err != nil {
+			continue
+		}
+
+		res, err := manager.Get(name, resourceType)
+		if err != nil {
+			continue
+		}
+
+		resources = append(resources, map[string]string{
+			"type":        string(resourceType),
+			"name":        name,
+			"description": res.Description,
+		})
+	}
+
+	output := map[string]interface{}{
+		"count":     len(resources),
+		"resources": resources,
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+// outputDescribeSummaryYAML outputs resource summary in YAML format
+func outputDescribeSummaryYAML(manager *repo.Manager, matches []string) error {
+	resources := []map[string]string{}
+
+	for _, match := range matches {
+		resourceType, name, err := ParseResourceArg(match)
+		if err != nil {
+			continue
+		}
+
+		res, err := manager.Get(name, resourceType)
+		if err != nil {
+			continue
+		}
+
+		resources = append(resources, map[string]string{
+			"type":        string(resourceType),
+			"name":        name,
+			"description": res.Description,
+		})
+	}
+
+	output := map[string]interface{}{
+		"count":     len(resources),
+		"resources": resources,
+	}
+
+	encoder := yaml.NewEncoder(os.Stdout)
+	defer encoder.Close()
+	return encoder.Encode(output)
+}
+
 // formatTimestamp formats a timestamp in a human-readable format
 func formatTimestamp(t time.Time) string {
 	// Format: "Jan 2, 2006 at 3:04pm (MST)"
 	return t.Format("Jan 2, 2006 at 3:04pm (MST)")
 }
 
+// outputDescribeJSON outputs resource details in JSON format
+func outputDescribeJSON(manager *repo.Manager, res *resource.Resource, resourceType resource.ResourceType, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
+	output, err := buildDescribeOutput(manager, res, resourceType, metadataAvailable, meta)
+	if err != nil {
+		return err
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+// outputDescribeYAML outputs resource details in YAML format
+func outputDescribeYAML(manager *repo.Manager, res *resource.Resource, resourceType resource.ResourceType, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
+	output, err := buildDescribeOutput(manager, res, resourceType, metadataAvailable, meta)
+	if err != nil {
+		return err
+	}
+
+	encoder := yaml.NewEncoder(os.Stdout)
+	defer encoder.Close()
+	return encoder.Encode(output)
+}
+
+// buildDescribeOutput creates a DescribeResourceOutput struct from resource data
+func buildDescribeOutput(manager *repo.Manager, res *resource.Resource, resourceType resource.ResourceType, metadataAvailable bool, meta *metadata.ResourceMetadata) (*DescribeResourceOutput, error) {
+	output := &DescribeResourceOutput{
+		Type:        string(resourceType),
+		Name:        res.Name,
+		Description: res.Description,
+		Version:     res.Version,
+		Author:      res.Author,
+		License:     res.License,
+		Location:    manager.GetPath(res.Name, resourceType),
+	}
+
+	// Add metadata if available
+	if metadataAvailable {
+		output.Metadata = meta
+	}
+
+	// Add type-specific fields
+	switch resourceType {
+	case resource.Skill:
+		skillPath := manager.GetPath(res.Name, resource.Skill)
+		skill, err := resource.LoadSkillResource(skillPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load skill details: %w", err)
+		}
+		output.Compatibility = skill.Compatibility
+		if skill.HasScripts {
+			output.HasScripts = &skill.HasScripts
+		}
+		if skill.HasReferences {
+			output.HasReferences = &skill.HasReferences
+		}
+		if skill.HasAssets {
+			output.HasAssets = &skill.HasAssets
+		}
+
+	case resource.Command:
+		commandPath := manager.GetPath(res.Name, resource.Command)
+		command, err := resource.LoadCommandResource(commandPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load command details: %w", err)
+		}
+		output.Agent = command.Agent
+		output.Model = command.Model
+		output.AllowedTools = command.AllowedTools
+
+	case resource.Agent:
+		agentPath := manager.GetPath(res.Name, resource.Agent)
+		agent, err := resource.LoadAgentResource(agentPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load agent details: %w", err)
+		}
+		output.AgentType = agent.Type
+		output.Instructions = agent.Instructions
+		output.Capabilities = agent.Capabilities
+	}
+
+	return output, nil
+}
+
 func init() {
 	repoCmd.AddCommand(repoDescribeCmd)
+	repoDescribeCmd.Flags().StringVar(&describeFormatFlag, "format", "table", "Output format (table|json|yaml)")
 }
