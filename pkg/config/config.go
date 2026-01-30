@@ -138,6 +138,19 @@ func (s *SyncSource) Validate() error {
 	return nil
 }
 
+// IsRemote returns true if this source uses a remote URL
+func (s *SyncSource) IsRemote() bool {
+	return s.URL != ""
+}
+
+// GetSourcePath returns the source path for display purposes
+func (s *SyncSource) GetSourcePath() string {
+	if s.URL != "" {
+		return s.URL
+	}
+	return s.Path
+}
+
 // RepoConfig holds repository-related configuration
 type RepoConfig struct {
 	// Path is an optional custom repository path

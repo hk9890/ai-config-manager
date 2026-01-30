@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/hk9890/ai-config-manager/pkg/config"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/source"
+	"github.com/hk9890/ai-config-manager/pkg/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -67,6 +69,60 @@ func init() {
 	syncCmd.Flags().StringVar(&syncFormatFlag, "format", "table", "Output format: table, json, yaml")
 }
 
+// syncSource syncs resources from a single sync source
+func syncSource(src config.SyncSource, manager *repo.Manager) error {
+	var sourcePath string
+	var mode string
+
+	if src.IsRemote() {
+		// Remote source (url): download to workspace, copy to repo
+		fmt.Printf("  Mode: Remote (download + copy)\n")
+		mode = "copy"
+
+		// Get repository path
+		repoPath := manager.GetRepoPath()
+
+		// Create workspace manager
+		wsMgr, err := workspace.NewManager(repoPath)
+		if err != nil {
+			return fmt.Errorf("failed to create workspace manager: %w", err)
+		}
+
+		// Parse source URL
+		parsed, err := source.ParseSource(src.URL)
+		if err != nil {
+			return fmt.Errorf("invalid source URL: %w", err)
+		}
+
+		// Get clone URL
+		cloneURL, err := source.GetCloneURL(parsed)
+		if err != nil {
+			return fmt.Errorf("failed to get clone URL: %w", err)
+		}
+
+		// Get or clone repository (using ref if available)
+		sourcePath, err = wsMgr.GetOrClone(cloneURL, parsed.Ref)
+		if err != nil {
+			return fmt.Errorf("failed to download repository: %w", err)
+		}
+
+	} else {
+		// Local source (path): use path directly, symlink to repo
+		fmt.Printf("  Mode: Local (symlink)\n")
+		mode = "symlink"
+
+		// Convert to absolute path
+		absPath, err := filepath.Abs(src.Path)
+		if err != nil {
+			return fmt.Errorf("invalid path %s: %w", src.Path, err)
+		}
+		sourcePath = absPath
+	}
+
+	// Import from source path with appropriate mode
+	return addBulkFromLocalWithMode(sourcePath, manager, src.Filter, mode)
+}
+
 // runSync executes the sync command
 func runSync(cmd *cobra.Command, args []string) error {
 	// Load global config
@@ -122,29 +178,13 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	// Process each source
 	for i, src := range cfg.Sync.Sources {
-		fmt.Printf("[%d/%d] Processing: %s\n", i+1, len(cfg.Sync.Sources), src.URL)
+		fmt.Printf("[%d/%d] Processing: %s\n", i+1, len(cfg.Sync.Sources), src.GetSourcePath())
 		if src.Filter != "" {
 			fmt.Printf("  Filter: %s\n", src.Filter)
 		}
 
-		// Parse source
-		parsed, err := source.ParseSource(src.URL)
-		if err != nil {
-			fmt.Printf("  ✗ Error: invalid source format: %v\n\n", err)
-			sourcesFailed++
-			continue
-		}
-
-		// Import from source based on type
-		if parsed.Type == source.GitHub || parsed.Type == source.GitURL {
-			// GitHub source
-			err = addBulkFromGitHubWithFilter(parsed, manager, src.Filter)
-		} else {
-			// Local source
-			err = addBulkFromLocalWithFilter(parsed.LocalPath, manager, src.Filter)
-		}
-
-		if err != nil {
+		// Sync this source
+		if err := syncSource(src, manager); err != nil {
 			fmt.Printf("  ✗ Error: %v\n\n", err)
 			sourcesFailed++
 			continue

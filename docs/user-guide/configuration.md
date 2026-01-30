@@ -343,32 +343,104 @@ aimgr config get install.targets
 
 ## Sync Configuration
 
-Configure sources to automatically sync resources from:
+Configure sources to automatically sync resources from remote repositories or local directories.
+
+### URL vs Path: Remote vs Local Sources
+
+**Important:** Sources can be either remote (Git repositories) or local (filesystem paths). Use the appropriate field for your source type:
 
 ```yaml
 sync:
   sources:
-    - url: https://github.com/anthropics/skills
-    - url: gh:myorg/ai-resources@v1.0.0
+    # Remote source (copied from Git)
+    - url: "gh:anthropics/skills"
+    
+    # Local source (symlinked for live editing)  
+    - path: "~/my-custom-skills"
+    
+    # Remote with version and filter
+    - url: "gh:myorg/tools@v1.0.0"
       filter: "skill/*"
-    - url: ~/local/resources
+    
+    # Local with filter
+    - path: "/home/user/dev-resources"
       filter: "*test*"
 ```
 
-### Source Fields
+**Key differences:**
 
-**`url`** (required): Source location
+| Field | Source Type | Behavior | Use Case |
+|-------|-------------|----------|----------|
+| `url` | Remote Git repository | **Copied** to repository | Stable, versioned resources from GitHub/GitLab |
+| `path` | Local filesystem | **Symlinked** to repository | Active development, live editing |
+
+### Remote URL Sources (Copied)
+
+Remote sources use the `url` field and are cloned then copied to your repository:
+
+```yaml
+sync:
+  sources:
+    - url: "gh:anthropics/skills@v2.0.0"
+    - url: "https://github.com/myorg/tools.git"
+      filter: "skill/*"
+```
+
+**Supported formats:**
 - GitHub: `gh:owner/repo` or `owner/repo`
 - Git URLs: `https://github.com/owner/repo.git`
-- Local paths: `~/path/to/resources` or `/absolute/path`
 - Version tags: `gh:owner/repo@v1.0.0`
+- Branches: `gh:owner/repo@main`
 
-**`filter`** (optional): Glob pattern to filter resources
+**Behavior:**
+- Resources are copied from Git repository to your aimgr repository
+- Changes require running `aimgr repo sync` again
+- Best for stable, versioned, or shared resources
+
+### Local Path Sources (Symlinked)
+
+Local sources use the `path` field and are symlinked for live editing:
+
+```yaml
+sync:
+  sources:
+    - path: "~/my-skills"
+    - path: "/home/user/dev-resources"
+      filter: "skill/experimental-*"
+```
+
+**Supported formats:**
+- Home directory: `~/path/to/resources`
+- Absolute paths: `/absolute/path/to/resources`
+- Relative paths: `./resources` (resolved from current directory)
+
+**Behavior:**
+- Resources are symlinked from source directory to your aimgr repository
+- Changes to source files are immediately reflected (no re-sync needed)
+- Best for active development and experimentation
+
+### Filter Patterns
+
+Both remote and local sources support optional filters:
+
+```yaml
+sync:
+  sources:
+    - url: "gh:myorg/all-resources"
+      filter: "skill/*"           # Only skills
+    
+    - path: "~/dev/resources"
+      filter: "command/*test*"    # Commands with "test" in name
+```
+
+**Common patterns:**
 - `"skill/*"` - Only skills
 - `"command/*"` - Only commands
 - `"agent/*"` - Only agents
 - `"*test*"` - Resources with "test" in name
 - `"skill/pdf*"` - Skills starting with "pdf"
+
+See [pattern-matching.md](./pattern-matching.md) for complete syntax.
 
 ### Running Sync
 
@@ -385,7 +457,7 @@ aimgr repo sync --skip-existing
 aimgr repo sync --dry-run
 ```
 
-See the [README](../../README.md#aimgr-repo-sync) for more details on sync functionality.
+For comprehensive details on sync behavior, symlinks, troubleshooting, and migration, see **[sync-sources.md](./sync-sources.md)**.
 
 ---
 
@@ -410,22 +482,23 @@ install:
 # Sync sources (optional)
 sync:
   sources:
-    # Public repositories
+    # Remote: Public repositories (copied)
     - url: gh:anthropics/skills
 
-    # Organization resources with filter
-    - url: gh:myorg/company-resources
+    # Remote: Organization resources with filter (copied)
+    - url: gh:myorg/company-resources@v2.1.0
       filter: "skill/*"
 
-    # Specific version
-    - url: gh:myorg/stable-tools@v2.1.0
-
-    # Local directory with filter
-    - url: ~/dev/custom-tools
-      filter: "*test*"
-
-    # Direct Git URL
+    # Remote: Direct Git URL (copied)
     - url: https://github.com/community/awesome-tools.git
+
+    # Local: Development directory (symlinked for live editing)
+    - path: ~/dev/custom-tools
+      filter: "*test*"
+    
+    # Local: Team shared resources (symlinked)
+    - path: /mnt/shared/team-resources
+      filter: "skill/*"
 ```
 
 ---
@@ -481,15 +554,15 @@ install:
 
 sync:
   sources:
-    # Base skills from Anthropic
-    - url: gh:anthropics/skills
+    # Remote: Base skills from Anthropic (copied, stable)
+    - url: gh:anthropics/skills@v2.0.0
 
-    # Company internal tools
-    - url: gh:mycompany/internal-tools
+    # Remote: Company internal tools (copied, versioned)
+    - url: gh:mycompany/internal-tools@stable
       filter: "skill/*"
 
-    # Personal custom tools
-    - url: ~/personal/custom-tools
+    # Local: Personal custom tools (symlinked for live editing)
+    - path: ~/personal/custom-tools
 ```
 
 ### Example 5: Testing Environment
@@ -685,6 +758,7 @@ rm ~/.ai-repo.yaml
 ## See Also
 
 - [README.md](../../README.md) - Quick start and overview
+- [sync-sources.md](./sync-sources.md) - Comprehensive sync sources guide (URL vs path, symlinks, troubleshooting)
 - [workspace-caching.md](./workspace-caching.md) - Git repository caching
 - [output-formats.md](./output-formats.md) - CLI output formats
 - [pattern-matching.md](./pattern-matching.md) - Pattern syntax for filtering

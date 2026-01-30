@@ -7,6 +7,7 @@ This directory contains user-facing documentation for **aimgr** (ai-config-manag
 The user guide provides comprehensive documentation for:
 - **Resource Management**: Understanding and working with commands, skills, agents, and packages
 - **Configuration**: Customizing repository paths, installation targets, and sync sources
+- **Sync Sources**: Remote URLs (copied) vs local paths (symlinked) for development workflows
 - **Pattern Matching**: Using patterns to filter and select resources
 - **Output Formats**: Controlling CLI output for scripting and automation
 - **GitHub Integration**: Working with GitHub repositories as resource sources
@@ -34,8 +35,19 @@ Complete guide to configuring aimgr, including repository path customization, in
 - Precedence rules (ENV > config > XDG default)
 - Path expansion (tilde, relative, absolute)
 - Installation targets configuration
-- Sync sources configuration
+- Sync sources (URL vs path overview)
 - Complete examples and troubleshooting
+
+### [Sync Sources](sync-sources.md)
+Comprehensive guide to sync sources, explaining remote URLs vs local paths, symlink behavior, and development workflows.
+
+**Key Topics:**
+- URL vs path configuration (remote vs local)
+- Remote sources: Git repositories (copied)
+- Local sources: Filesystem paths (symlinked for live editing)
+- Development workflows and best practices
+- Migration from old config format
+- Troubleshooting broken symlinks and permission issues
 
 ### [Pattern Matching](pattern-matching.md)
 Learn how to use pattern matching to filter resources when listing, installing, or removing them. Covers syntax, wildcards, type-specific patterns, and practical examples.

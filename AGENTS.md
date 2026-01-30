@@ -72,7 +72,7 @@ go test -v ./pkg/config -run TestLoad_ValidConfig
 
 ### Documentation Locations
 
-- **User Guide**: `docs/user-guide/` - Resource formats, pattern matching, output formats
+- **User Guide**: `docs/user-guide/` - Resource formats, pattern matching, output formats, sync sources
 - **Architecture**: `docs/architecture/architecture-rules.md` - Strict architectural rules
 - **Contributor Guide**: `docs/contributor-guide/release-process.md`
 - **Planning/Archive**: `docs/planning/`, `docs/archive/`
@@ -292,5 +292,6 @@ For comprehensive information, see:
 - **[docs/user-guide/workspace-caching.md](docs/user-guide/workspace-caching.md)** - Git repository caching, performance optimization
 - **[docs/user-guide/pattern-matching.md](docs/user-guide/pattern-matching.md)** - Pattern matching syntax, examples
 - **[docs/user-guide/output-formats.md](docs/user-guide/output-formats.md)** - CLI output formats with scripting examples
+- **[docs/user-guide/sync-sources.md](docs/user-guide/sync-sources.md)** - Sync sources (URL vs path, remote vs local, symlinks, development workflow)
 - **[docs/user-guide/github-sources.md](docs/user-guide/github-sources.md)** - Adding resources from GitHub repositories
 - **[docs/contributor-guide/release-process.md](docs/contributor-guide/release-process.md)** - Release workflow and GoReleaser configuration
