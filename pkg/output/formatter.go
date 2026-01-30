@@ -293,3 +293,34 @@ func formatAsYAML(result *BulkOperationResult) error {
 	defer encoder.Close()
 	return encoder.Encode(result)
 }
+
+// FormatOutput formats data according to the specified format
+// It handles common data types (TableData, KeyValueData) and falls back
+// to generic encoding for other types
+func FormatOutput(data interface{}, format Format) error {
+	switch d := data.(type) {
+	case *TableData:
+		return formatTableData(d, format)
+	case *KeyValueData:
+		return formatKeyValueData(d, format)
+	case Renderable:
+		return d.Render(format)
+	default:
+		// Fallback: direct JSON/YAML encoding
+		return formatGeneric(data, format)
+	}
+}
+
+// formatGeneric handles types that don't have specialized formatters
+func formatGeneric(data interface{}, format Format) error {
+	switch format {
+	case Table:
+		return fmt.Errorf("table format not supported for this data type")
+	case JSON:
+		return EncodeJSON(os.Stdout, data)
+	case YAML:
+		return EncodeYAML(os.Stdout, data)
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+}
