@@ -285,4 +285,5 @@ func init() {
 	rootCmd.AddCommand(listInstalledCmd)
 	listInstalledCmd.Flags().StringVar(&listInstalledFormatFlag, "format", "table", "Output format (table|json|yaml)")
 	listInstalledCmd.Flags().StringVar(&listInstalledPathFlag, "path", "", "Project directory path (default: current directory)")
+	listInstalledCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }

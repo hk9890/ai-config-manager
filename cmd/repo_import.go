@@ -133,6 +133,7 @@ func init() {
 	repoImportCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
 	repoImportCmd.Flags().StringVar(&importFormatFlag, "format", "table", "Output format: table, json, yaml")
 	repoImportCmd.Flags().BoolVar(&copyFlag, "copy", false, "Force copy mode for local paths (default: symlink)")
+	repoImportCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
 
 // Helper functions for bulk add integration

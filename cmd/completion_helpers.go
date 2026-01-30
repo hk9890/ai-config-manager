@@ -302,3 +302,8 @@ func completeConfigSetArgs(cmd *cobra.Command, args []string, toComplete string)
 func completeToolNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return []string{"claude", "opencode", "copilot"}, cobra.ShellCompDirectiveNoFileComp
 }
+
+// completeFormatFlag provides completion for --format flag values
+func completeFormatFlag(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{"table", "json", "yaml"}, cobra.ShellCompDirectiveNoFileComp
+}

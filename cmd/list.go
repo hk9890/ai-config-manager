@@ -617,4 +617,5 @@ func init() {
 	repoCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVar(&formatFlag, "format", "table", "Output format (table|json|yaml)")
 	listCmd.Flags().StringVar(&typeFlag, "type", "", "Filter by type (command|skill|agent|package)")
+	listCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }

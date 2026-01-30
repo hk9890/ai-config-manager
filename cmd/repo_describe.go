@@ -509,4 +509,5 @@ func buildDescribeOutput(manager *repo.Manager, res *resource.Resource, resource
 func init() {
 	repoCmd.AddCommand(repoDescribeCmd)
 	repoDescribeCmd.Flags().StringVar(&describeFormatFlag, "format", "table", "Output format (table|json|yaml)")
+	repoDescribeCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }

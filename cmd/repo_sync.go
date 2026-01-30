@@ -67,6 +67,7 @@ func init() {
 	syncCmd.Flags().BoolVar(&syncSkipExistingFlag, "skip-existing", false, "Skip conflicts silently")
 	syncCmd.Flags().BoolVar(&syncDryRunFlag, "dry-run", false, "Preview without importing")
 	syncCmd.Flags().StringVar(&syncFormatFlag, "format", "table", "Output format: table, json, yaml")
+	syncCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
 
 // syncSource syncs resources from a single sync source
