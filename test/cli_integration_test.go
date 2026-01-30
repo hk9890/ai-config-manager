@@ -19,9 +19,11 @@ func runAimgr(t *testing.T, args ...string) (string, error) {
 	// Start with parent environment
 	cmd.Env = os.Environ()
 
-	// Override with test-specific AIMGR_REPO_PATH if set
+	// Override with test-specific environment variables if set
 	// NOTE: t.Setenv() only affects os.Getenv() in the test process,
-	// not child processes, so we need to explicitly propagate it
+	// not child processes, so we need to explicitly propagate them
+
+	// Propagate AIMGR_REPO_PATH
 	if repoPath := os.Getenv("AIMGR_REPO_PATH"); repoPath != "" {
 		// Replace or add AIMGR_REPO_PATH in the environment
 		found := false
@@ -34,6 +36,22 @@ func runAimgr(t *testing.T, args ...string) (string, error) {
 		}
 		if !found {
 			cmd.Env = append(cmd.Env, "AIMGR_REPO_PATH="+repoPath)
+		}
+	}
+
+	// Propagate XDG_DATA_HOME
+	if xdgDataHome := os.Getenv("XDG_DATA_HOME"); xdgDataHome != "" {
+		// Replace or add XDG_DATA_HOME in the environment
+		found := false
+		for i, env := range cmd.Env {
+			if strings.HasPrefix(env, "XDG_DATA_HOME=") {
+				cmd.Env[i] = "XDG_DATA_HOME=" + xdgDataHome
+				found = true
+				break
+			}
+		}
+		if !found {
+			cmd.Env = append(cmd.Env, "XDG_DATA_HOME="+xdgDataHome)
 		}
 	}
 

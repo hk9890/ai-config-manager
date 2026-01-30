@@ -26,6 +26,7 @@ var (
 	dryRunFlag       bool
 	filterFlag       string
 	importFormatFlag string
+	copyFlag         bool
 )
 
 // repoImportCmd represents the import command
@@ -37,6 +38,10 @@ var repoImportCmd = &cobra.Command{
 This command auto-discovers and imports all resources (commands, skills, agents, packages)
 from the specified source location. It also automatically detects and imports marketplace.json
 files if present.
+
+Import Modes:
+  - URLs (git repositories): Auto-detected and copied to repository
+  - Local paths: Auto-detected and symlinked by default (use --copy to force copy)
 
 Source Formats:
   Local folders:
@@ -57,12 +62,12 @@ Packages are .package.json files in the packages/ directory.
 Marketplace files (marketplace.json) are automatically discovered and converted to packages.
 
 Examples:
-  # Add all resources from local folder
+  # Add all resources from local folder (symlinked by default)
   aimgr repo add ~/.opencode/
   aimgr repo add ~/project/.claude/
   aimgr repo add ./my-resources/
 
-  # Add all resources from GitHub
+  # Add all resources from GitHub (copied automatically)
   aimgr repo add https://github.com/owner/repo
   aimgr repo add git@github.com:owner/repo.git
   aimgr repo add gh:owner/repo
@@ -75,6 +80,7 @@ Examples:
   aimgr repo add ~/resources/ --force
   aimgr repo add gh:owner/repo --skip-existing
   aimgr repo add ./test/ --dry-run
+  aimgr repo add ~/resources/ --copy  # Force copy mode for local path
   
   # Filter resources (pattern matching)
   aimgr repo add gh:owner/repo --filter "skill/*"
@@ -98,13 +104,22 @@ Examples:
 			return err
 		}
 
-		// Handle different source types
-		if parsed.Type == source.GitHub || parsed.Type == source.GitURL {
+		// Auto-detect: URL or local path?
+		isRemote := parsed.Type == source.GitHub || parsed.Type == source.GitURL
+
+		if isRemote {
+			// Remote source: always use copy mode
 			return addBulkFromGitHub(parsed, manager)
 		}
 
-		// Local source
-		return addBulkFromLocal(parsed.LocalPath, manager)
+		// Local source: use symlink mode by default, copy if --copy flag is set
+		importMode := "symlink"
+		if copyFlag {
+			importMode = "copy"
+		}
+
+		// Pass import mode to local import handler
+		return addBulkFromLocalWithMode(parsed.LocalPath, manager, filterFlag, importMode)
 	},
 }
 
@@ -117,6 +132,7 @@ func init() {
 	repoImportCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without importing")
 	repoImportCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
 	repoImportCmd.Flags().StringVar(&importFormatFlag, "format", "table", "Output format: table, json, yaml")
+	repoImportCmd.Flags().BoolVar(&copyFlag, "copy", false, "Force copy mode for local paths (default: symlink)")
 }
 
 // Helper functions for bulk add integration
@@ -339,6 +355,7 @@ func applyFilter(filterPattern string, commands, skills, agents []*resource.Reso
 // importFromLocalPath performs the core import logic from a local directory.
 // This function is used by both local imports and remote imports (after cloning to workspace).
 // It discovers resources, applies filters, and imports them into the repository.
+// For backward compatibility, this defaults to "copy" mode.
 func importFromLocalPath(
 	localPath string, // Local directory to import from
 	manager *repo.Manager, // Repository manager
@@ -346,6 +363,19 @@ func importFromLocalPath(
 	sourceURL string, // Source URL for metadata tracking
 	sourceType string, // "local", "github", "git-url", "test"
 	ref string, // Git ref (empty for local/test)
+) error {
+	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, ref, "copy")
+}
+
+// importFromLocalPathWithMode is the same as importFromLocalPath but allows specifying import mode.
+func importFromLocalPathWithMode(
+	localPath string, // Local directory to import from
+	manager *repo.Manager, // Repository manager
+	filter string, // Optional filter pattern (empty string = no filter)
+	sourceURL string, // Source URL for metadata tracking
+	sourceType string, // "local", "github", "git-url", "test"
+	ref string, // Git ref (empty for local/test)
+	importMode string, // "copy" or "symlink"
 ) error {
 	// Discover all resources (with error collection)
 	commands, commandErrors, err := discovery.DiscoverCommandsWithErrors(localPath, "")
@@ -491,6 +521,7 @@ func importFromLocalPath(
 
 	// Import using bulk add
 	opts := repo.BulkImportOptions{
+		ImportMode:   importMode,
 		Force:        forceFlag,
 		SkipExisting: skipExistingFlag,
 		DryRun:       dryRunFlag,
@@ -541,6 +572,11 @@ func addBulkFromLocal(localPath string, manager *repo.Manager) error {
 
 // addBulkFromLocalWithFilter handles bulk add from a local folder or single file with a custom filter
 func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter string) error {
+	return addBulkFromLocalWithMode(localPath, manager, filter, "copy")
+}
+
+// addBulkFromLocalWithMode handles bulk add from a local folder or single file with custom filter and import mode
+func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter string, importMode string) error {
 	// Validate path exists
 	if _, err := os.Stat(localPath); err != nil {
 		return fmt.Errorf("path does not exist: %s", localPath)
@@ -563,6 +599,11 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 	if dryRunFlag {
 		fmt.Println("  Mode: DRY RUN (preview only)")
 	}
+	if importMode == "symlink" {
+		fmt.Println("  Import Mode: SYMLINK (local paths linked, not copied)")
+	} else {
+		fmt.Println("  Import Mode: COPY (resources copied to repository)")
+	}
 	if filter != "" {
 		fmt.Printf("  Filter: %s\n", filter)
 	}
@@ -572,8 +613,8 @@ func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter 
 	sourceURL := "file://" + absPath
 	sourceType := "local"
 
-	// Call common import function
-	return importFromLocalPath(localPath, manager, filter, sourceURL, sourceType, "")
+	// Call common import function with import mode
+	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, "", importMode)
 }
 
 // addBulkFromGitHub handles bulk add from a GitHub repository
