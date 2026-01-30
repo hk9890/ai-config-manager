@@ -678,12 +678,19 @@ func copyDir(src, dst string) error {
 
 // BulkImportOptions contains options for bulk import operations
 type BulkImportOptions struct {
+	ImportMode   string // "copy" or "symlink"
 	Force        bool   // Overwrite existing resources
 	SkipExisting bool   // Skip conflicts silently
 	DryRun       bool   // Preview only, don't actually import
 	SourceURL    string // Original source URL (for Git sources)
 	SourceType   string // Source type (github, git-url, file, local)
 	Ref          string // Git ref (branch/tag/commit), defaults to "main" if empty
+}
+
+// ImportOptions contains options for single resource import operations
+type ImportOptions struct {
+	ImportMode string // "copy" or "symlink"
+	Force      bool   // Overwrite existing resources
 }
 
 // ImportError represents an error during resource import
@@ -994,4 +1001,16 @@ func (m *Manager) ValidatePackageResources(pkg *resource.Package) []string {
 func (m *Manager) GetPackage(name string) (*resource.Package, error) {
 	pkgPath := resource.GetPackagePath(name, m.repoPath)
 	return resource.LoadPackage(pkgPath)
+}
+
+// Drop removes the entire repository directory and recreates the empty structure.
+// WARNING: This is a destructive operation that cannot be undone.
+func (m *Manager) Drop() error {
+	// Remove entire repo directory
+	if err := os.RemoveAll(m.repoPath); err != nil {
+		return fmt.Errorf("failed to remove repository: %w", err)
+	}
+
+	// Recreate empty structure
+	return m.Init()
 }
