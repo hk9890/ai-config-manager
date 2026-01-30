@@ -82,17 +82,59 @@ var listCmd = &cobra.Command{
 	Short: "List resources in the repository",
 	Long: `List all resources in the aimgr repository, optionally filtered by pattern.
 
-Patterns support wildcards (* for multiple characters, ? for single character) and optional type prefixes.
+The list command shows resources with their installation status and sync state:
+  - NAME: Resource reference (e.g., skill/pdf-processing, command/test)
+  - TARGETS: Tools where the resource is installed (e.g., claude, opencode, copilot)
+  - SYNC: Synchronization status with ai.package.yaml manifest
+  - DESCRIPTION: Brief description of the resource
+
+Sync Status Symbols:
+  ✓ = In sync (resource is both in manifest and installed)
+  * = Not in manifest (installed but not declared in ai.package.yaml)
+  ⚠ = Not installed (declared in manifest but not installed yet)
+  - = No manifest (no ai.package.yaml file exists in current directory)
+
+The sync status helps you keep your installations aligned with your project's
+ai.package.yaml manifest file. Resources marked with * should be added to the
+manifest if you want to track them. Resources marked with ⚠ need to be installed
+using 'aimgr install <resource>'.
+
+Patterns support wildcards (* for multiple characters, ? for single character) 
+and optional type prefixes.
 
 Examples:
-  aimgr repo list                    # List all resources and packages
+  aimgr repo list                    # List all resources with sync status
   aimgr repo list skill/*            # List all skills
   aimgr repo list command/test*      # List commands starting with "test"
   aimgr repo list *pdf*              # List all resources with "pdf" in name
-  aimgr repo list agent/code-*       # List agents starting with "code-"
-  aimgr repo list --type=package     # List only packages
-  aimgr repo list --format=json      # Output as JSON
-  aimgr repo list --format=yaml      # Output as YAML`,
+  aimgr repo list --format=json      # Output as JSON with full details
+  aimgr repo list --format=yaml      # Output as YAML
+
+Output Format Examples:
+  Table format (default):
+  ┌──────────────────────┬───────────────────┬──────────┬────────────────────┐
+  │         NAME         │      TARGETS      │   SYNC   │    DESCRIPTION     │
+  ├──────────────────────┼───────────────────┼──────────┼────────────────────┤
+  │ skill/skill-creator  │ claude, opencode  │    ✓     │ Guide for creating │
+  │ skill/webapp-testing │ claude            │    *     │ Toolkit for inter  │
+  └──────────────────────┴───────────────────┴──────────┴────────────────────┘
+
+  JSON format includes targets array and sync_status field for scripting:
+  {
+    "resources": [
+      {
+        "type": "skill",
+        "name": "skill-creator",
+        "targets": ["claude", "opencode"],
+        "sync_status": "in-sync"
+      }
+    ]
+  }
+
+See also:
+  aimgr repo list         # List all resources in repository (not just installed)
+  aimgr install <resource>  # Install a resource
+  aimgr uninstall <resource>  # Uninstall a resource`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create manager

@@ -191,7 +191,49 @@ Check what's installed in your current project:
 aimgr list
 ```
 
-This shows only resources installed in the current directory.
+This shows resources installed in the current directory:
+
+```bash
+┌──────────────────────┬───────────────────┬────────────────────┐
+│         NAME         │      TARGETS      │    DESCRIPTION     │
+├──────────────────────┼───────────────────┼────────────────────┤
+│ skill/skill-creator  │ claude, opencode  │ Guide for creating │
+│ skill/webapp-testing │ claude            │ Toolkit for inter  │
+└──────────────────────┴───────────────────┴────────────────────┘
+```
+
+**TARGETS** shows which AI tools (claude, opencode, copilot) have this resource installed.
+
+### Check Repository Resources with Sync Status
+
+To see all resources in your repository with synchronization status:
+
+```bash
+aimgr repo list
+```
+
+This shows resources with their sync status relative to your `ai.package.yaml` manifest:
+
+```bash
+┌──────────────────────┬───────────────────┬──────────┬────────────────────┐
+│         NAME         │      TARGETS      │   SYNC   │    DESCRIPTION     │
+├──────────────────────┼───────────────────┼──────────┼────────────────────┤
+│ skill/skill-creator  │ claude, opencode  │    ✓     │ Guide for creating │
+│ skill/webapp-testing │ claude            │    *     │ Toolkit for inter  │
+│ command/test         │ -                 │    ⚠     │ Run tests          │
+└──────────────────────┴───────────────────┴──────────┴────────────────────┘
+
+Legend:
+  ✓ = In sync  * = Not in manifest  ⚠ = Not installed  - = No manifest
+```
+
+**Understanding sync status:**
+- **✓ (In sync)**: Resource is in manifest and installed
+- **\* (Not in manifest)**: Resource is installed but not in ai.package.yaml
+- **⚠ (Not installed)**: Resource is in manifest but needs installation
+- **\- (No manifest)**: No ai.package.yaml file exists
+
+**Tip:** If you see resources marked with `*`, consider adding them to your `ai.package.yaml` file to track them as project dependencies.
 
 ### Uninstall Resources from a Project
 
@@ -393,8 +435,37 @@ export PATH="/usr/local/bin:$PATH"
 
 **Solution:** 
 1. Check that resources are installed: `aimgr list`
+   - Look at the **TARGETS** column to see which tools have the resource
+   - If your tool isn't listed, the resource isn't installed for that tool
 2. Verify your tool is using the right directory (`.claude/`, `.opencode/`, etc.)
-3. Restart your AI tool to pick up new resources
+3. Check installation targets in your config: `aimgr config get install.targets`
+4. Restart your AI tool to pick up new resources
+
+### Issue: Resource marked with * (not in manifest)
+
+**What it means:** The resource is installed but not declared in your `ai.package.yaml` file.
+
+**Solution:**
+- If this is a project dependency you want to track, add it to `ai.package.yaml`:
+  ```yaml
+  resources:
+    - skill/my-skill
+    - command/my-command
+  ```
+- If it's just a temporary or local-only resource, you can ignore the `*` symbol
+
+### Issue: Resource marked with ⚠ (not installed) in repo list
+
+**What it means:** The resource is declared in `ai.package.yaml` but not installed yet.
+
+**Solution:**
+```bash
+# Install the resource
+aimgr install skill/my-skill
+
+# Or install all resources from manifest
+aimgr install $(aimgr repo list --format=json | jq -r '.resources[] | select(.sync_status == "not-installed") | .name')
+```
 
 ### Issue: "Resource already exists" error
 

@@ -80,19 +80,55 @@ Summary: 2 added, 1 failed, 0 skipped (3 total)
 ⚠ Use --format=json to see detailed error messages
 ```
 
-### Example: Listing Resources
+### Example: Listing Repository Resources with Sync Status
+
+The `aimgr repo list` command shows resources in your repository with installation targets and sync status:
 
 ```bash
-$ aimgr repo list skill --format=table
+$ aimgr repo list --format=table
 
-┌───────────────────────┬─────────────────────────────────────┐
-│ NAME                  │ DESCRIPTION                         │
-├───────────────────────┼─────────────────────────────────────┤
-│ pdf-processing        │ Extract and process PDF documents   │
-│ typescript-helper     │ TypeScript development utilities    │
-│ react-helper          │ React component development tools   │
-└───────────────────────┴─────────────────────────────────────┘
+┌──────────────────────┬───────────────────┬──────────┬────────────────────┐
+│         NAME         │      TARGETS      │   SYNC   │    DESCRIPTION     │
+├──────────────────────┼───────────────────┼──────────┼────────────────────┤
+│ skill/skill-creator  │ claude, opencode  │    ✓     │ Guide for creating │
+│ skill/webapp-testing │ claude            │    *     │ Toolkit for inter  │
+│ command/test         │ claude, opencode  │    ⚠     │ Run tests          │
+│ agent/code-reviewer  │ opencode          │    -     │ Review code chan   │
+└──────────────────────┴───────────────────┴──────────┴────────────────────┘
+
+Legend:
+  ✓ = In sync  * = Not in manifest  ⚠ = Not installed  - = No manifest
 ```
+
+**Columns explained:**
+- **NAME**: Resource reference (type/name format)
+- **TARGETS**: Which AI tools have this resource installed (claude, opencode, copilot)
+- **SYNC**: Synchronization status with ai.package.yaml manifest
+- **DESCRIPTION**: Brief description (truncated to fit)
+
+**Sync Status Symbols:**
+- **✓ (In sync)**: Resource is both in ai.package.yaml and installed
+- **\* (Not in manifest)**: Resource is installed but not declared in ai.package.yaml
+- **⚠ (Not installed)**: Resource is in ai.package.yaml but not installed yet
+- **\- (No manifest)**: No ai.package.yaml file exists in current directory
+
+### Example: Listing Installed Resources (Simple)
+
+To see only resources installed in your current directory, use `aimgr list`:
+
+```bash
+$ aimgr list --format=table
+
+┌──────────────────────┬───────────────────┬───────────────────────────────────┐
+│         NAME         │      TARGETS      │           DESCRIPTION             │
+├──────────────────────┼───────────────────┼───────────────────────────────────┤
+│ skill/skill-creator  │ claude, opencode  │ Guide for creating effective skills│
+│ skill/webapp-testing │ claude            │ Toolkit for testing web apps       │
+│ command/test         │ claude, opencode  │ Run tests                          │
+└──────────────────────┴───────────────────┴───────────────────────────────────┘
+```
+
+This simpler view shows only what's installed, without sync status information.
 
 ## JSON Format
 
@@ -171,28 +207,71 @@ $ aimgr repo import ~/my-resources/ --format=json
 }
 ```
 
-### Example: Listing Resources
+### Example: Listing Repository Resources with Sync Status (JSON)
+
+The `aimgr repo list` command with JSON format includes installation targets and sync status:
 
 ```bash
-$ aimgr repo list skill --format=json
+$ aimgr repo list --format=json
+{
+  "resources": [
+    {
+      "type": "skill",
+      "name": "skill-creator",
+      "description": "Guide for creating effective skills",
+      "version": "1.0.0",
+      "targets": ["claude", "opencode"],
+      "sync_status": "in-sync"
+    },
+    {
+      "type": "skill",
+      "name": "webapp-testing",
+      "description": "Toolkit for interacting with local web apps",
+      "version": "1.2.0",
+      "targets": ["claude"],
+      "sync_status": "not-in-manifest"
+    },
+    {
+      "type": "command",
+      "name": "test",
+      "description": "Run tests",
+      "targets": ["claude", "opencode"],
+      "sync_status": "not-installed"
+    }
+  ],
+  "packages": []
+}
+```
+
+**New fields in repo list:**
+- **targets**: Array of tool names where resource is installed
+- **sync_status**: One of "in-sync", "not-in-manifest", "not-installed", or "no-manifest"
+
+### Example: Listing Installed Resources (JSON)
+
+To see only installed resources (simpler output without sync status):
+
+```bash
+$ aimgr list --format=json
 [
   {
     "type": "skill",
-    "name": "pdf-processing",
-    "description": "Extract and process PDF documents",
+    "name": "skill-creator",
+    "description": "Guide for creating effective skills",
     "version": "1.0.0",
-    "author": "Team",
-    "license": "MIT"
+    "targets": ["claude", "opencode"]
   },
   {
     "type": "skill",
-    "name": "typescript-helper",
-    "description": "TypeScript development utilities",
-    "version": "2.1.0",
-    "license": "Apache-2.0"
+    "name": "webapp-testing",
+    "description": "Toolkit for testing web apps",
+    "version": "1.2.0",
+    "targets": ["claude"]
   }
 ]
 ```
+
+**Note:** The `list` command shows simpler output focused on what's installed. Use `repo list` for sync status information.
 
 ## YAML Format
 
@@ -258,6 +337,117 @@ $ aimgr repo import gh:myorg/resources --format=yaml > import-log.yaml
 # Review what was imported
 $ cat import-log.yaml
 ```
+
+## Understanding Sync Status
+
+The `aimgr repo list` command tracks synchronization between installed resources and your project's `ai.package.yaml` manifest. This helps ensure your installations match your declared dependencies.
+
+### Sync Status Values
+
+| Status | Symbol | Meaning | Action Needed |
+|--------|--------|---------|---------------|
+| **in-sync** | ✓ | Resource is in manifest and installed | None - everything is synchronized |
+| **not-in-manifest** | * | Resource is installed but not in ai.package.yaml | Add to manifest if you want to track it |
+| **not-installed** | ⚠ | Resource is in manifest but not installed | Run `aimgr install <resource>` |
+| **no-manifest** | - | No ai.package.yaml file exists | Create manifest with `aimgr init` (if needed) |
+
+### Common Scenarios
+
+#### Scenario 1: Resource marked with * (Not in manifest)
+
+**What happened:** You installed a resource, but it's not declared in your `ai.package.yaml`.
+
+```bash
+$ aimgr repo list
+┌──────────────────────┬──────────┬──────┬─────────────────┐
+│ skill/webapp-testing │ claude   │  *   │ Toolkit for...  │
+└──────────────────────┴──────────┴──────┴─────────────────┘
+```
+
+**Solutions:**
+1. **Add to manifest** (recommended if this is a project dependency):
+   ```bash
+   # Manually add to ai.package.yaml:
+   resources:
+     - skill/webapp-testing
+   ```
+
+2. **Keep as-is** (if it's a temporary/local-only resource):
+   ```bash
+   # No action needed - the * reminds you it's not tracked
+   ```
+
+#### Scenario 2: Resource marked with ⚠ (Not installed)
+
+**What happened:** The resource is in your `ai.package.yaml` but not installed yet.
+
+```bash
+$ aimgr repo list
+┌─────────────────┬──────────┬──────┬─────────────────┐
+│ command/test    │ -        │  ⚠   │ Run tests       │
+└─────────────────┴──────────┴──────┴─────────────────┘
+```
+
+**Solution:** Install the resource:
+```bash
+$ aimgr install command/test
+```
+
+This commonly occurs when:
+- You just cloned a repository with an `ai.package.yaml`
+- Someone else added resources to the manifest
+- You manually edited `ai.package.yaml`
+
+#### Scenario 3: All resources marked with - (No manifest)
+
+**What happened:** No `ai.package.yaml` file exists in your current directory.
+
+```bash
+$ aimgr repo list
+┌──────────────────────┬──────────┬──────┬─────────────────┐
+│ skill/skill-creator  │ claude   │  -   │ Guide for...    │
+│ skill/webapp-testing │ claude   │  -   │ Toolkit for...  │
+└──────────────────────┴──────────┴──────┴─────────────────┘
+```
+
+**Solutions:**
+1. **Create a manifest** (recommended for tracking dependencies):
+   ```bash
+   # Option 1: Create empty manifest
+   echo "resources: []" > ai.package.yaml
+   
+   # Option 2: Generate from installed resources
+   # (Future feature - not yet implemented)
+   ```
+
+2. **No action needed** if you don't want to track dependencies with a manifest.
+
+### Checking Sync Status Programmatically
+
+Use JSON format to check sync status in scripts:
+
+```bash
+# Find all resources not in manifest
+$ aimgr repo list --format=json | jq -r '.resources[] | select(.sync_status == "not-in-manifest") | .name'
+skill/webapp-testing
+command/build
+
+# Find all resources needing installation
+$ aimgr repo list --format=json | jq -r '.resources[] | select(.sync_status == "not-installed") | .name'
+command/test
+agent/reviewer
+
+# Count out-of-sync resources
+$ aimgr repo list --format=json | jq '[.resources[] | select(.sync_status != "in-sync" and .sync_status != "no-manifest")] | length'
+3
+```
+
+### Best Practices
+
+1. **Use manifests for projects**: Create `ai.package.yaml` files for projects you share or deploy
+2. **Keep manifests updated**: When you install new resources, add them to the manifest
+3. **Review sync status regularly**: Run `aimgr list` to catch drift between installations and manifest
+4. **Use CI/CD checks**: Fail builds if sync status shows warnings (see scripting examples below)
 
 ## Error Reporting
 
@@ -337,6 +527,42 @@ JSON format provides the most detailed error information:
 
 ### Using jq with JSON Output
 
+**Check sync status of repository resources:**
+```bash
+# List all resource names in repository
+$ aimgr repo list --format=json | jq -r '.resources[].name'
+skill/skill-creator
+skill/webapp-testing
+command/test
+
+# List resources by sync status
+$ aimgr repo list --format=json | jq -r '.resources[] | select(.sync_status == "not-in-manifest") | .name'
+skill/webapp-testing
+
+# List resources and their installation targets
+$ aimgr repo list --format=json | jq -r '.resources[] | "\(.name): \(.targets | join(", "))"'
+skill/skill-creator: claude, opencode
+skill/webapp-testing: claude
+command/test: claude, opencode
+
+# Check if any resources are out of sync
+$ aimgr repo list --format=json | jq -e '.resources[] | select(.sync_status != "in-sync" and .sync_status != "no-manifest")' > /dev/null
+# Exit code 0 if out-of-sync resources exist, 1 if all in sync
+```
+
+**Check installed resources (simpler):**
+```bash
+# List installed resource names
+$ aimgr list --format=json | jq -r '.[].name'
+skill/skill-creator
+skill/webapp-testing
+
+# List with targets
+$ aimgr list --format=json | jq -r '.[] | "\(.name): \(.targets | join(", "))"'
+skill/skill-creator: claude, opencode
+skill/webapp-testing: claude
+```
+
 **Extract only successful additions:**
 ```bash
 $ aimgr repo import ~/resources/ --format=json | jq '.added[].name'
@@ -397,7 +623,30 @@ $ aimgr repo import ~/resources/ --format=json | jq '.added[] | select(.type == 
 
 ### CI/CD Integration
 
-**GitHub Actions example:**
+**Check sync status in CI/CD:**
+```yaml
+# GitHub Actions - Verify resources are in sync
+- name: Check AI Resource Sync
+  run: |
+    # List repository resources with sync status
+    output=$(aimgr repo list --format=json)
+    
+    # Check for out-of-sync resources
+    out_of_sync=$(echo "$output" | jq '[.resources[] | select(.sync_status != "in-sync" and .sync_status != "no-manifest")] | length')
+    
+    if [ "$out_of_sync" -gt 0 ]; then
+      echo "::warning::Found $out_of_sync resources out of sync"
+      echo "$output" | jq -r '.resources[] | select(.sync_status != "in-sync" and .sync_status != "no-manifest") | "- \(.name): \(.sync_status)"'
+      
+      # Optionally fail the build
+      echo "::error::Resources are out of sync with ai.package.yaml"
+      exit 1
+    fi
+    
+    echo "::notice::All resources are in sync"
+```
+
+**GitHub Actions - Import resources example:**
 ```yaml
 - name: Import AI Resources
   id: import
@@ -445,6 +694,70 @@ import-resources:
 
 ### Python Integration
 
+**Check sync status:**
+```python
+#!/usr/bin/env python3
+import json
+import subprocess
+import sys
+
+def list_resources():
+    """List repository resources with sync status and return parsed results."""
+    result = subprocess.run(
+        ["aimgr", "repo", "list", "--format=json"],
+        capture_output=True,
+        text=True
+    )
+    
+    if result.returncode != 0:
+        print(f"Error running aimgr: {result.stderr}", file=sys.stderr)
+        sys.exit(1)
+    
+    return json.loads(result.stdout)
+
+def check_sync_status():
+    """Check if resources are in sync with manifest."""
+    data = list_resources()
+    resources = data.get("resources", [])
+    
+    # Find out-of-sync resources
+    out_of_sync = [
+        r for r in resources 
+        if r["sync_status"] not in ["in-sync", "no-manifest"]
+    ]
+    
+    if out_of_sync:
+        print("⚠ Warning: Found resources out of sync:\n")
+        
+        for resource in out_of_sync:
+            status = resource["sync_status"]
+            name = resource["name"]
+            targets = ", ".join(resource.get("targets", []))
+            
+            if status == "not-in-manifest":
+                print(f"  * {name}")
+                print(f"    Installed in: {targets}")
+                print(f"    Action: Add to ai.package.yaml")
+            elif status == "not-installed":
+                print(f"  ⚠ {name}")
+                print(f"    Action: Run 'aimgr install {name}'")
+            
+            print()
+        
+        return False
+    
+    print("✓ All resources are in sync")
+    return True
+
+def main():
+    if not check_sync_status():
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+```
+
+**Import resources:**
 ```python
 #!/usr/bin/env python3
 import json
