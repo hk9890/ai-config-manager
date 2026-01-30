@@ -19,7 +19,6 @@ import (
 )
 
 var formatFlag string
-var typeFlag string
 
 // SyncStatus represents the synchronization state between installed resources and ai.package.yaml manifest
 type SyncStatus string
@@ -103,9 +102,10 @@ Patterns support wildcards (* for multiple characters, ? for single character)
 and optional type prefixes.
 
 Examples:
-  aimgr repo list                    # List all resources with sync status
+  aimgr repo list                    # List all resources and packages with sync status
   aimgr repo list skill/*            # List all skills
   aimgr repo list command/test*      # List commands starting with "test"
+  aimgr repo list package/*          # List all packages
   aimgr repo list *pdf*              # List all resources with "pdf" in name
   aimgr repo list --format=json      # Output as JSON with full details
   aimgr repo list --format=yaml      # Output as YAML
@@ -143,55 +143,69 @@ See also:
 			return err
 		}
 
-		// Check if user wants only packages
-		if typeFlag == "package" {
-			packages, err := manager.ListPackages()
-			if err != nil {
-				return fmt.Errorf("failed to list packages: %w", err)
+		// Handle pattern-based filtering
+		if len(args) > 0 {
+			// Parse pattern to check if it's a package pattern
+			resourceType, _, _ := pattern.ParsePattern(args[0])
+
+			// Special handling for package patterns
+			if resourceType == resource.PackageType {
+				packages, err := manager.ListPackages()
+				if err != nil {
+					return fmt.Errorf("failed to list packages: %w", err)
+				}
+
+				// Create matcher for filtering
+				matcher, err := pattern.NewMatcher(args[0])
+				if err != nil {
+					return fmt.Errorf("invalid pattern '%s': %w", args[0], err)
+				}
+
+				// Filter packages by pattern
+				var filteredPackages []repo.PackageInfo
+				for _, pkg := range packages {
+					// Create a temporary resource for matching
+					tempRes := resource.Resource{
+						Type: resource.PackageType,
+						Name: pkg.Name,
+					}
+					if matcher.Match(&tempRes) {
+						filteredPackages = append(filteredPackages, pkg)
+					}
+				}
+
+				if len(filteredPackages) == 0 {
+					fmt.Printf("No packages matching pattern '%s' found in repository.\n", args[0])
+					return nil
+				}
+
+				// Format output based on --format flag
+				switch formatFlag {
+				case "json":
+					return outputPackagesJSON(filteredPackages)
+				case "yaml":
+					return outputPackagesYAML(filteredPackages)
+				case "table":
+					return outputPackagesTable(filteredPackages)
+				default:
+					return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", formatFlag)
+				}
 			}
 
-			if len(packages) == 0 {
-				fmt.Println("No packages found in repository.")
-				return nil
-			}
-
-			// Format output based on --format flag
-			switch formatFlag {
-			case "json":
-				return outputPackagesJSON(packages)
-			case "yaml":
-				return outputPackagesYAML(packages)
-			case "table":
-				return outputPackagesTable(packages)
-			default:
-				return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", formatFlag)
-			}
-		}
-
-		var resources []resource.Resource
-
-		if len(args) == 0 {
-			// List all resources (no filter)
-			resources, err = manager.List(nil)
-			if err != nil {
-				return fmt.Errorf("failed to list resources: %w", err)
-			}
-		} else {
-			// Parse pattern
+			// Handle non-package resource patterns
 			matcher, err := pattern.NewMatcher(args[0])
 			if err != nil {
 				return fmt.Errorf("invalid pattern '%s': %w", args[0], err)
 			}
 
-			// Get resource type filter if pattern specifies it
-			resourceType, _, _ := pattern.ParsePattern(args[0])
+			// Get resource type filter if pattern specifies it (performance optimization)
 			var typeFilter *resource.ResourceType
-			if resourceType != "" {
+			if resourceType != "" && resourceType != resource.PackageType {
 				typeFilter = &resourceType
 			}
 
 			// List resources with optional type filter
-			resources, err = manager.List(typeFilter)
+			resources, err := manager.List(typeFilter)
 			if err != nil {
 				return fmt.Errorf("failed to list resources: %w", err)
 			}
@@ -203,25 +217,40 @@ See also:
 					filtered = append(filtered, res)
 				}
 			}
-			resources = filtered
+
+			// Handle empty results
+			if len(filtered) == 0 {
+				fmt.Printf("No resources matching pattern '%s' found in repository.\n", args[0])
+				return nil
+			}
+
+			// Format output (no packages when pattern is used for resources)
+			switch formatFlag {
+			case "json":
+				return outputWithPackagesJSON(filtered, nil)
+			case "yaml":
+				return outputWithPackagesYAML(filtered, nil)
+			case "table":
+				return outputWithPackagesTable(filtered, nil)
+			default:
+				return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", formatFlag)
+			}
 		}
 
-		// Get packages (if not using pattern and not filtered by type)
-		var packages []repo.PackageInfo
-		if len(args) == 0 && typeFlag == "" {
-			packages, err = manager.ListPackages()
-			if err != nil {
-				return fmt.Errorf("failed to list packages: %w", err)
-			}
+		// No pattern provided - list everything
+		resources, err := manager.List(nil)
+		if err != nil {
+			return fmt.Errorf("failed to list resources: %w", err)
+		}
+
+		packages, err := manager.ListPackages()
+		if err != nil {
+			return fmt.Errorf("failed to list packages: %w", err)
 		}
 
 		// Handle empty results
 		if len(resources) == 0 && len(packages) == 0 {
-			if len(args) == 0 {
-				fmt.Println("No resources or packages found in repository.")
-			} else {
-				fmt.Printf("No resources matching pattern '%s' found in repository.\n", args[0])
-			}
+			fmt.Println("No resources or packages found in repository.")
 			fmt.Println("\nAdd resources with: aimgr repo add command <file>, aimgr repo add skill <folder>, or aimgr repo add agent <file>")
 			return nil
 		}
@@ -616,6 +645,5 @@ func getInstalledTargets(projectPath string, resourceName string, resourceType r
 func init() {
 	repoCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVar(&formatFlag, "format", "table", "Output format (table|json|yaml)")
-	listCmd.Flags().StringVar(&typeFlag, "type", "", "Filter by type (command|skill|agent|package)")
 	listCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
