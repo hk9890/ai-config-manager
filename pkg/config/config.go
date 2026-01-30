@@ -87,8 +87,10 @@ type InstallConfig struct {
 
 // SyncSource represents a source for syncing resources
 type SyncSource struct {
-	// URL is the source URL (required, e.g., "https://github.com/owner/repo" or "gh:owner/repo")
-	URL string `yaml:"url"`
+	// URL is the source URL (e.g., "https://github.com/owner/repo" or "gh:owner/repo")
+	URL string `yaml:"url,omitempty"`
+	// Path is the local filesystem path (alternative to URL)
+	Path string `yaml:"path,omitempty"`
 	// Filter is an optional glob pattern to filter resources (e.g., "skill/*", "skill/pdf*")
 	Filter string `yaml:"filter,omitempty"`
 }
@@ -97,6 +99,43 @@ type SyncSource struct {
 type SyncConfig struct {
 	// Sources is a list of sources to sync from
 	Sources []SyncSource `yaml:"sources"`
+}
+
+// Validate checks if the SyncSource is valid
+func (s *SyncSource) Validate() error {
+	hasURL := s.URL != ""
+	hasPath := s.Path != ""
+
+	// Check exactly one is set
+	if hasURL && hasPath {
+		return fmt.Errorf("cannot specify both 'url' and 'path'")
+	}
+	if !hasURL && !hasPath {
+		return fmt.Errorf("must specify either 'url' or 'path'")
+	}
+
+	// Validate URL format
+	if hasURL {
+		if !strings.HasPrefix(s.URL, "http://") &&
+			!strings.HasPrefix(s.URL, "https://") &&
+			!strings.HasPrefix(s.URL, "git@") &&
+			!strings.HasPrefix(s.URL, "git://") &&
+			!strings.HasPrefix(s.URL, "gh:") {
+			return fmt.Errorf("url must start with http://, https://, git@, git://, or gh:")
+		}
+	}
+
+	// Validate path format (but don't check if it exists, as it might not exist yet
+	// or might be on a different machine)
+	if hasPath {
+		// Just validate that we can convert it to an absolute path
+		// This checks if the path format is valid
+		if _, err := filepath.Abs(s.Path); err != nil {
+			return fmt.Errorf("invalid path format: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // RepoConfig holds repository-related configuration
@@ -278,9 +317,9 @@ func (c *Config) Validate() error {
 
 	// Validate sync sources
 	for i, source := range c.Sync.Sources {
-		// Validate URL is non-empty
-		if source.URL == "" {
-			return fmt.Errorf("sync.sources[%d]: url cannot be empty", i)
+		// Validate source
+		if err := source.Validate(); err != nil {
+			return fmt.Errorf("sync.sources[%d]: %w", i, err)
 		}
 
 		// Validate filter pattern if present

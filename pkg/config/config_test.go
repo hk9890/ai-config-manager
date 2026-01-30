@@ -560,7 +560,7 @@ func TestValidate_SyncConfig(t *testing.T) {
 				},
 			},
 			wantError: true,
-			errorMsg:  "url cannot be empty",
+			errorMsg:  "must specify either 'url' or 'path'",
 		},
 		{
 			name: "invalid: empty URL in second source",
@@ -576,7 +576,7 @@ func TestValidate_SyncConfig(t *testing.T) {
 				},
 			},
 			wantError: true,
-			errorMsg:  "sync.sources[1]: url cannot be empty",
+			errorMsg:  "sync.sources[1]: must specify either 'url' or 'path'",
 		},
 		{
 			name: "invalid: malformed filter pattern (unmatched bracket)",
@@ -796,7 +796,7 @@ sync:
   sources:
     - url: ""
 `,
-			errorMsg: "url cannot be empty",
+			errorMsg: "must specify either 'url' or 'path'",
 		},
 		{
 			name: "invalid filter pattern",
@@ -1357,5 +1357,269 @@ repo:
 	// Verify expansion worked
 	if cfg.Repo.Path != "/test/repo/path" {
 		t.Errorf("Repo.Path = %q, want /test/repo/path", cfg.Repo.Path)
+	}
+}
+
+func TestSyncSourceValidate(t *testing.T) {
+	// Create a temp directory for path validation tests
+	tmpDir := t.TempDir()
+	validPath := filepath.Join(tmpDir, "valid-dir")
+	if err := os.MkdirAll(validPath, 0755); err != nil {
+		t.Fatalf("failed to create test directory: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		source    SyncSource
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name: "valid: url only",
+			source: SyncSource{
+				URL: "https://github.com/owner/repo",
+			},
+			wantError: false,
+		},
+		{
+			name: "valid: path only",
+			source: SyncSource{
+				Path: validPath,
+			},
+			wantError: false,
+		},
+		{
+			name: "valid: http:// url",
+			source: SyncSource{
+				URL: "http://github.com/owner/repo",
+			},
+			wantError: false,
+		},
+		{
+			name: "valid: git@ url",
+			source: SyncSource{
+				URL: "git@github.com:owner/repo.git",
+			},
+			wantError: false,
+		},
+		{
+			name: "valid: git:// url",
+			source: SyncSource{
+				URL: "git://github.com/owner/repo.git",
+			},
+			wantError: false,
+		},
+		{
+			name: "valid: gh: shorthand",
+			source: SyncSource{
+				URL: "gh:owner/repo",
+			},
+			wantError: false,
+		},
+		{
+			name: "invalid: both url and path",
+			source: SyncSource{
+				URL:  "https://github.com/owner/repo",
+				Path: validPath,
+			},
+			wantError: true,
+			errorMsg:  "cannot specify both 'url' and 'path'",
+		},
+		{
+			name:      "invalid: neither url nor path",
+			source:    SyncSource{},
+			wantError: true,
+			errorMsg:  "must specify either 'url' or 'path'",
+		},
+		{
+			name: "invalid: url format (no protocol)",
+			source: SyncSource{
+				URL: "github.com/owner/repo",
+			},
+			wantError: true,
+			errorMsg:  "url must start with",
+		},
+		{
+			name: "invalid: url format (ftp://)",
+			source: SyncSource{
+				URL: "ftp://github.com/owner/repo",
+			},
+			wantError: true,
+			errorMsg:  "url must start with",
+		},
+		{
+			name: "valid: path that doesn't exist (format is valid)",
+			source: SyncSource{
+				Path: "/nonexistent/path/that/does/not/exist",
+			},
+			wantError: false,
+		},
+		{
+			name: "valid: relative path that exists",
+			source: SyncSource{
+				Path: ".", // Current directory always exists in tests
+			},
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.source.Validate()
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("Validate() expected error, got nil")
+					return
+				}
+				if tt.errorMsg != "" && !contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Validate() error = %v, want error containing %q", err, tt.errorMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Validate() unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestValidate_SyncSourceUrlAndPath(t *testing.T) {
+	// Create a temp directory for path validation tests
+	tmpDir := t.TempDir()
+	validPath := filepath.Join(tmpDir, "valid-dir")
+	if err := os.MkdirAll(validPath, 0755); err != nil {
+		t.Fatalf("failed to create test directory: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		config    Config
+		wantError bool
+		errorMsg  string
+	}{
+		{
+			name: "valid: url source",
+			config: Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Sync: SyncConfig{
+					Sources: []SyncSource{
+						{URL: "https://github.com/owner/repo"},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "valid: path source",
+			config: Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Sync: SyncConfig{
+					Sources: []SyncSource{
+						{Path: validPath},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "valid: multiple sources with mixed url and path",
+			config: Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Sync: SyncConfig{
+					Sources: []SyncSource{
+						{URL: "https://github.com/owner/repo"},
+						{Path: validPath},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "invalid: both url and path in same source",
+			config: Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Sync: SyncConfig{
+					Sources: []SyncSource{
+						{
+							URL:  "https://github.com/owner/repo",
+							Path: validPath,
+						},
+					},
+				},
+			},
+			wantError: true,
+			errorMsg:  "cannot specify both 'url' and 'path'",
+		},
+		{
+			name: "invalid: neither url nor path",
+			config: Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Sync: SyncConfig{
+					Sources: []SyncSource{
+						{Filter: "skill/*"}, // Only filter, no url or path
+					},
+				},
+			},
+			wantError: true,
+			errorMsg:  "must specify either 'url' or 'path'",
+		},
+		{
+			name: "invalid: non-url string in url field",
+			config: Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Sync: SyncConfig{
+					Sources: []SyncSource{
+						{URL: "not-a-valid-url"},
+					},
+				},
+			},
+			wantError: true,
+			errorMsg:  "url must start with",
+		},
+		{
+			name: "valid: non-existent path (format is valid)",
+			config: Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Sync: SyncConfig{
+					Sources: []SyncSource{
+						{Path: "/this/path/does/not/exist/at/all"},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "invalid: error in second source",
+			config: Config{
+				Install: InstallConfig{Targets: []string{"claude"}},
+				Sync: SyncConfig{
+					Sources: []SyncSource{
+						{URL: "https://github.com/owner/repo1"},
+						{URL: "invalid-url"},
+					},
+				},
+			},
+			wantError: true,
+			errorMsg:  "sync.sources[1]:",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantError {
+				if err == nil {
+					t.Errorf("Validate() expected error, got nil")
+					return
+				}
+				if tt.errorMsg != "" && !contains(err.Error(), tt.errorMsg) {
+					t.Errorf("Validate() error = %v, want error containing %q", err, tt.errorMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Validate() unexpected error: %v", err)
+				}
+			}
+		})
 	}
 }
