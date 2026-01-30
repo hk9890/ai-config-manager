@@ -8,56 +8,59 @@ import (
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // VerifyResult contains the results of repository verification
 type VerifyResult struct {
-	ResourcesWithoutMetadata []ResourceIssue `json:"resources_without_metadata,omitempty"`
-	OrphanedMetadata         []MetadataIssue `json:"orphaned_metadata,omitempty"`
-	MissingSourcePaths       []MetadataIssue `json:"missing_source_paths,omitempty"`
-	TypeMismatches           []TypeMismatch  `json:"type_mismatches,omitempty"`
-	PackagesWithMissingRefs  []PackageIssue  `json:"packages_with_missing_refs,omitempty"`
-	HasErrors                bool            `json:"has_errors"`
-	HasWarnings              bool            `json:"has_warnings"`
+	ResourcesWithoutMetadata []ResourceIssue `json:"resources_without_metadata,omitempty" yaml:"resources_without_metadata,omitempty"`
+	OrphanedMetadata         []MetadataIssue `json:"orphaned_metadata,omitempty" yaml:"orphaned_metadata,omitempty"`
+	MissingSourcePaths       []MetadataIssue `json:"missing_source_paths,omitempty" yaml:"missing_source_paths,omitempty"`
+	TypeMismatches           []TypeMismatch  `json:"type_mismatches,omitempty" yaml:"type_mismatches,omitempty"`
+	PackagesWithMissingRefs  []PackageIssue  `json:"packages_with_missing_refs,omitempty" yaml:"packages_with_missing_refs,omitempty"`
+	HasErrors                bool            `json:"has_errors" yaml:"has_errors"`
+	HasWarnings              bool            `json:"has_warnings" yaml:"has_warnings"`
 }
 
 // ResourceIssue represents a resource with an issue
 type ResourceIssue struct {
-	Name string                `json:"name"`
-	Type resource.ResourceType `json:"type"`
-	Path string                `json:"path"`
+	Name string                `json:"name" yaml:"name"`
+	Type resource.ResourceType `json:"type" yaml:"type"`
+	Path string                `json:"path" yaml:"path"`
 }
 
 // MetadataIssue represents a metadata file with an issue
 type MetadataIssue struct {
-	Name       string                `json:"name"`
-	Type       resource.ResourceType `json:"type"`
-	Path       string                `json:"path"`
-	SourcePath string                `json:"source_path,omitempty"`
+	Name       string                `json:"name" yaml:"name"`
+	Type       resource.ResourceType `json:"type" yaml:"type"`
+	Path       string                `json:"path" yaml:"path"`
+	SourcePath string                `json:"source_path,omitempty" yaml:"source_path,omitempty"`
 }
 
 // TypeMismatch represents a mismatch between resource and metadata types
 type TypeMismatch struct {
-	Name         string                `json:"name"`
-	ResourceType resource.ResourceType `json:"resource_type"`
-	MetadataType resource.ResourceType `json:"metadata_type"`
-	ResourcePath string                `json:"resource_path"`
-	MetadataPath string                `json:"metadata_path"`
+	Name         string                `json:"name" yaml:"name"`
+	ResourceType resource.ResourceType `json:"resource_type" yaml:"resource_type"`
+	MetadataType resource.ResourceType `json:"metadata_type" yaml:"metadata_type"`
+	ResourcePath string                `json:"resource_path" yaml:"resource_path"`
+	MetadataPath string                `json:"metadata_path" yaml:"metadata_path"`
 }
 
 // PackageIssue represents a package with missing resource references
 type PackageIssue struct {
-	Name             string   `json:"name"`
-	Path             string   `json:"path"`
-	MissingResources []string `json:"missing_resources"`
+	Name             string   `json:"name" yaml:"name"`
+	Path             string   `json:"path" yaml:"path"`
+	MissingResources []string `json:"missing_resources" yaml:"missing_resources"`
 }
 
 var (
-	verifyFix  bool
-	verifyJSON bool
+	verifyFix        bool
+	verifyJSON       bool // Deprecated: use --format=json
+	verifyFormatFlag string
 )
 
 // repoVerifyCmd represents the repo verify command
@@ -77,17 +80,35 @@ Use --fix to automatically resolve issues:
   - Create missing metadata for resources
   - Remove orphaned metadata files
 
+Output Formats:
+  --format=table (default): Human-readable with colored status
+  --format=json:  Structured JSON for parsing
+  --format=yaml:  Structured YAML for configuration
+
 Exit status:
   0 - No errors found
   1 - Errors found (orphaned metadata, type mismatches, or broken package references)
 
 Examples:
-  aimgr repo verify              # Check for issues
-  aimgr repo verify --fix        # Fix issues automatically
-  aimgr repo verify --json       # Machine-readable output`,
+  aimgr repo verify                  # Check for issues
+  aimgr repo verify --fix            # Fix issues automatically
+  aimgr repo verify --format=json    # Machine-readable output
+  aimgr repo verify --format=yaml    # YAML output`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create a new repo manager
 		manager, err := repo.NewManager()
+		if err != nil {
+			return err
+		}
+
+		// Determine output format (handle both --json and --format for backward compatibility)
+		outputFormat := verifyFormatFlag
+		if verifyJSON {
+			outputFormat = "json"
+		}
+
+		// Validate format
+		parsedFormat, err := output.ParseFormat(outputFormat)
 		if err != nil {
 			return err
 		}
@@ -96,14 +117,8 @@ Examples:
 
 		// Check if repository exists
 		if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-			if verifyJSON {
-				result := VerifyResult{HasErrors: false, HasWarnings: false}
-				output, _ := json.MarshalIndent(result, "", "  ")
-				fmt.Println(string(output))
-				return nil
-			}
-			fmt.Println("Repository not initialized")
-			return nil
+			result := VerifyResult{HasErrors: false, HasWarnings: false}
+			return outputVerifyResults(&result, parsedFormat, verifyFix)
 		}
 
 		// Run verification
@@ -112,15 +127,9 @@ Examples:
 			return fmt.Errorf("verification failed: %w", err)
 		}
 
-		// Output results
-		if verifyJSON {
-			output, err := json.MarshalIndent(result, "", "  ")
-			if err != nil {
-				return fmt.Errorf("failed to marshal JSON output: %w", err)
-			}
-			fmt.Println(string(output))
-		} else {
-			displayVerifyResults(result, verifyFix)
+		// Output results in requested format
+		if err := outputVerifyResults(result, parsedFormat, verifyFix); err != nil {
+			return err
 		}
 
 		// Exit with non-zero status if errors found
@@ -336,6 +345,28 @@ func createMetadataForResource(manager *repo.Manager, res resource.Resource) err
 	return metadata.Save(meta, repoPath)
 }
 
+// outputVerifyResults outputs verification results in the requested format
+func outputVerifyResults(result *VerifyResult, format output.Format, fixed bool) error {
+	switch format {
+	case output.JSON:
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(result)
+
+	case output.YAML:
+		encoder := yaml.NewEncoder(os.Stdout)
+		defer encoder.Close()
+		return encoder.Encode(result)
+
+	case output.Table:
+		displayVerifyResults(result, fixed)
+		return nil
+
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
 // displayVerifyResults displays verification results in human-readable format
 func displayVerifyResults(result *VerifyResult, fixed bool) {
 	fmt.Println("Repository Verification")
@@ -433,5 +464,12 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 func init() {
 	repoCmd.AddCommand(repoVerifyCmd)
 	repoVerifyCmd.Flags().BoolVar(&verifyFix, "fix", false, "Automatically fix issues (create missing metadata, remove orphaned)")
-	repoVerifyCmd.Flags().BoolVar(&verifyJSON, "json", false, "Output results in JSON format")
+
+	// Add new --format flag
+	repoVerifyCmd.Flags().StringVar(&verifyFormatFlag, "format", "table", "Output format (table|json|yaml)")
+	repoVerifyCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+
+	// Keep --json for backward compatibility but mark deprecated
+	repoVerifyCmd.Flags().BoolVar(&verifyJSON, "json", false, "Output results in JSON format (deprecated: use --format=json)")
+	repoVerifyCmd.Flags().MarkDeprecated("json", "use --format=json instead")
 }
