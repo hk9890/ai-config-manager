@@ -5,10 +5,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/spf13/cobra"
 )
+
+var repoInfoFormatFlag string
 
 // repoInfoCmd represents the repo info command
 var repoInfoCmd = &cobra.Command{
@@ -17,10 +20,17 @@ var repoInfoCmd = &cobra.Command{
 	Long: `Display comprehensive information about the aimgr repository.
 
 Shows repository location, total resource counts, breakdown by type,
-and other useful statistics.
+and disk usage statistics.
 
-Example:
-  aimgr repo info`,
+Output Formats:
+  --format=table (default): Human-readable text
+  --format=json:  JSON for scripting
+  --format=yaml:  YAML for configuration
+
+Examples:
+  aimgr repo info
+  aimgr repo info --format=json
+  aimgr repo info --format=yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create a new repo manager
 		manager, err := repo.NewManager()
@@ -62,26 +72,31 @@ Example:
 			}
 		}
 
-		// Display the information
-		fmt.Println("Repository Information")
-		fmt.Println("======================")
-		fmt.Println()
-		fmt.Printf("Location: %s\n", repoPath)
-		fmt.Println()
-		fmt.Printf("Total Resources: %d\n", len(allResources))
-		fmt.Printf("  Commands:      %d\n", commandCount)
-		fmt.Printf("  Skills:        %d\n", skillCount)
-		fmt.Printf("  Agents:        %d\n", agentCount)
-		fmt.Println()
-
-		// Calculate and display disk usage
-		size, err := calculateDirSize(repoPath)
-		if err == nil {
-			fmt.Printf("Disk Usage:    %s\n", formatBytes(size))
-			fmt.Println()
+		// Validate format
+		parsedFormat, err := output.ParseFormat(repoInfoFormatFlag)
+		if err != nil {
+			return err
 		}
 
-		return nil
+		// Calculate disk usage
+		size, _ := calculateDirSize(repoPath)
+
+		// Build output using KeyValueBuilder
+		info := output.NewKeyValue("Repository Information").
+			Add("Location", repoPath).
+			AddSection().
+			Add("Total Resources", fmt.Sprintf("%d", len(allResources))).
+			Add("  Commands", fmt.Sprintf("%d", commandCount)).
+			Add("  Skills", fmt.Sprintf("%d", skillCount)).
+			Add("  Agents", fmt.Sprintf("%d", agentCount))
+
+		// Add disk usage if calculated successfully
+		if size > 0 {
+			info.AddSection().Add("Disk Usage", formatBytes(size))
+		}
+
+		// Format output
+		return info.Format(parsedFormat)
 	},
 }
 
@@ -116,4 +131,6 @@ func formatBytes(bytes int64) string {
 
 func init() {
 	repoCmd.AddCommand(repoInfoCmd)
+	repoInfoCmd.Flags().StringVar(&repoInfoFormatFlag, "format", "table", "Output format (table|json|yaml)")
+	repoInfoCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
