@@ -12,6 +12,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -349,6 +350,93 @@ func truncateString(s string, maxLen int) string {
 	return strings.TrimSpace(s[:maxLen-3]) + "..."
 }
 
+// getInstalledTargets detects which tools (claude, opencode, copilot) have the given resource installed.
+// It checks tool-specific directories for the resource and returns a list of tools where it's found.
+//
+// Parameters:
+//   - projectPath: Path to the project directory
+//   - resourceName: Name of the resource (e.g., "test-command", "api/deploy")
+//   - resourceType: Type of resource (Command, Skill, Agent)
+//
+// Returns:
+//   - A slice of Tool types where the resource is installed (empty if not installed anywhere)
+//
+// The function:
+//   - Iterates over all supported tools using tools.AllTools()
+//   - Checks if each tool supports the given resource type
+//   - Verifies if the resource exists in the tool-specific directory
+//   - Handles symlinks correctly (checks both existence and validity)
+//   - Gracefully handles missing directories (not an error, just not installed)
+func getInstalledTargets(projectPath string, resourceName string, resourceType resource.ResourceType) []tools.Tool {
+	var installedTools []tools.Tool
+
+	// Iterate over all supported tools
+	for _, tool := range tools.AllTools() {
+		toolInfo := tools.GetToolInfo(tool)
+
+		// Determine the directory and file path based on resource type
+		var resourcePath string
+		var supported bool
+
+		switch resourceType {
+		case resource.Command:
+			if !toolInfo.SupportsCommands {
+				continue
+			}
+			supported = true
+			// Commands use .md extension
+			resourcePath = filepath.Join(projectPath, toolInfo.CommandsDir, resourceName+".md")
+
+		case resource.Skill:
+			if !toolInfo.SupportsSkills {
+				continue
+			}
+			supported = true
+			// Skills are directories
+			resourcePath = filepath.Join(projectPath, toolInfo.SkillsDir, resourceName)
+
+		case resource.Agent:
+			if !toolInfo.SupportsAgents {
+				continue
+			}
+			supported = true
+			// Agents use .md extension
+			resourcePath = filepath.Join(projectPath, toolInfo.AgentsDir, resourceName+".md")
+
+		default:
+			// Unknown resource type, skip
+			continue
+		}
+
+		// Skip if tool doesn't support this resource type
+		if !supported {
+			continue
+		}
+
+		// Check if the resource exists at the expected path
+		// Use Lstat to check symlink existence without following it
+		info, err := os.Lstat(resourcePath)
+		if err != nil {
+			// Resource doesn't exist in this tool's directory (not an error, just not installed)
+			continue
+		}
+
+		// For symlinks, verify the target is valid
+		if info.Mode()&os.ModeSymlink != 0 {
+			// Check if symlink target exists
+			_, err := os.Stat(resourcePath)
+			if err != nil {
+				// Symlink target is invalid (broken symlink), skip
+				continue
+			}
+		}
+
+		// Resource is installed for this tool
+		installedTools = append(installedTools, tool)
+	}
+
+	return installedTools
+}
 func init() {
 	repoCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVar(&formatFlag, "format", "table", "Output format (table|json|yaml)")
