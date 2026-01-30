@@ -2,21 +2,25 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/workspace"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
 	pruneForceFlag  bool
 	pruneDryRunFlag bool
+	pruneFormatFlag string
 )
 
 // CachedRepo represents a cached repository to be pruned
@@ -24,6 +28,27 @@ type CachedRepo struct {
 	URL  string
 	Path string
 	Size int64 // Size in bytes
+}
+
+// PruneResult represents the result of a prune operation
+type PruneResult struct {
+	UnreferencedCaches []CachedRepoInfo `json:"unreferenced_caches" yaml:"unreferenced_caches"`
+	TotalCount         int              `json:"total_count" yaml:"total_count"`
+	TotalSizeBytes     int64            `json:"total_size_bytes" yaml:"total_size_bytes"`
+	TotalSizeHuman     string           `json:"total_size_human" yaml:"total_size_human"`
+	Removed            int              `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Failed             int              `json:"failed,omitempty" yaml:"failed,omitempty"`
+	FreedBytes         int64            `json:"freed_bytes,omitempty" yaml:"freed_bytes,omitempty"`
+	FreedHuman         string           `json:"freed_human,omitempty" yaml:"freed_human,omitempty"`
+	DryRun             bool             `json:"dry_run" yaml:"dry_run"`
+}
+
+// CachedRepoInfo represents detailed information about a cached repository
+type CachedRepoInfo struct {
+	URL       string `json:"url" yaml:"url"`
+	Path      string `json:"path" yaml:"path"`
+	SizeBytes int64  `json:"size_bytes" yaml:"size_bytes"`
+	SizeHuman string `json:"size_human" yaml:"size_human"`
 }
 
 // repoPruneCmd represents the prune command
@@ -42,24 +67,24 @@ What is NOT pruned:
   - Local file sources (not cached in .workspace/)
   - Resource files themselves (only Git caches are removed)
 
-When to run prune:
-  - After removing many resources from the repository
-  - When .workspace/ directory grows too large
-  - As periodic maintenance to reclaim disk space
-  - After changing Git source URLs for resources
-
-How it works:
-  1. Scans all resource metadata to build list of referenced Git URLs
-  2. Compares against cached repositories in .workspace/
-  3. Identifies unreferenced caches (not used by any resource)
-  4. Removes unreferenced caches and frees disk space
-  5. Updates cache metadata (.cache-metadata.json)
+Output Formats:
+  --format=table (default): Interactive with confirmation prompts
+  --format=json:  Structured JSON (best with --force or --dry-run)
+  --format=yaml:  Structured YAML (best with --force or --dry-run)
 
 Examples:
-  aimgr repo prune                # Scan and remove unreferenced caches (with confirmation)
-  aimgr repo prune --dry-run      # Preview what would be removed without removing
-  aimgr repo prune --force        # Remove without confirmation prompt`,
+  aimgr repo prune                         # Interactive preview with confirmation
+  aimgr repo prune --dry-run               # Preview without removing
+  aimgr repo prune --format=json --force   # Non-interactive JSON output
+  aimgr repo prune --format=yaml --dry-run # YAML preview
+  aimgr repo prune --force                 # Remove without confirmation`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Validate format
+		parsedFormat, err := output.ParseFormat(pruneFormatFlag)
+		if err != nil {
+			return err
+		}
+
 		manager, err := repo.NewManager()
 		if err != nil {
 			return err
@@ -77,58 +102,58 @@ Examples:
 			return err
 		}
 
+		// Build result struct
+		result := buildPruneResult(unreferenced, pruneDryRunFlag)
+
 		// If no unreferenced caches found
 		if len(unreferenced) == 0 {
-			fmt.Println("No unreferenced workspace caches found.")
-			return nil
+			return outputPruneResult(result, parsedFormat, pruneForceFlag, pruneDryRunFlag)
 		}
 
-		// Display unreferenced caches
-		totalSize := displayUnreferencedCaches(unreferenced)
+		// For table format, show interactive display
+		if parsedFormat == output.Table {
+			displayUnreferencedCaches(unreferenced)
 
-		// Dry run mode - just display, don't remove
-		if pruneDryRunFlag {
-			fmt.Printf("\n[DRY RUN] Would remove %d cached %s, freeing %s\n",
-				len(unreferenced),
-				pluralize("repository", "repositories", len(unreferenced)),
-				formatSize(totalSize))
-			return nil
-		}
-
-		// Confirmation prompt (unless --force)
-		if !pruneForceFlag {
-			fmt.Printf("\nRemove %d cached %s? This will free %s. [y/N] ",
-				len(unreferenced),
-				pluralize("repository", "repositories", len(unreferenced)),
-				formatSize(totalSize))
-
-			reader := bufio.NewReader(os.Stdin)
-			response, err := reader.ReadString('\n')
-			if err != nil {
-				return fmt.Errorf("failed to read input: %w", err)
-			}
-
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
-				fmt.Println("Cancelled.")
+			if pruneDryRunFlag {
+				fmt.Printf("\n[DRY RUN] Would remove %d cached %s, freeing %s\n",
+					result.TotalCount,
+					pluralize("repository", "repositories", result.TotalCount),
+					result.TotalSizeHuman)
 				return nil
 			}
+
+			// Confirmation prompt (unless --force)
+			if !pruneForceFlag {
+				fmt.Printf("\nRemove %d cached %s? This will free %s. [y/N] ",
+					result.TotalCount,
+					pluralize("repository", "repositories", result.TotalCount),
+					result.TotalSizeHuman)
+
+				reader := bufio.NewReader(os.Stdin)
+				response, err := reader.ReadString('\n')
+				if err != nil {
+					return fmt.Errorf("failed to read input: %w", err)
+				}
+
+				response = strings.ToLower(strings.TrimSpace(response))
+				if response != "y" && response != "yes" {
+					fmt.Println("Cancelled.")
+					return nil
+				}
+			}
 		}
 
-		// Remove unreferenced caches
-		removed, failed, freedSize := removeUnreferencedCaches(workspaceManager, unreferenced)
-
-		// Display summary
-		fmt.Printf("\n✓ Removed %d cached %s, freed %s",
-			removed,
-			pluralize("repository", "repositories", removed),
-			formatSize(freedSize))
-		if failed > 0 {
-			fmt.Printf(" (%d failed)", failed)
+		// Perform removal (if not dry-run)
+		if !pruneDryRunFlag {
+			removed, failed, freedSize := removeUnreferencedCaches(workspaceManager, unreferenced)
+			result.Removed = removed
+			result.Failed = failed
+			result.FreedBytes = freedSize
+			result.FreedHuman = formatSize(freedSize)
 		}
-		fmt.Println()
 
-		return nil
+		// Output results
+		return outputPruneResult(result, parsedFormat, pruneForceFlag, pruneDryRunFlag)
 	},
 }
 
@@ -136,6 +161,68 @@ func init() {
 	repoCmd.AddCommand(repoPruneCmd)
 	repoPruneCmd.Flags().BoolVar(&pruneForceFlag, "force", false, "Skip confirmation prompt")
 	repoPruneCmd.Flags().BoolVar(&pruneDryRunFlag, "dry-run", false, "Preview what would be removed without removing")
+	repoPruneCmd.Flags().StringVar(&pruneFormatFlag, "format", "table", "Output format (table|json|yaml)")
+	repoPruneCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+}
+
+// buildPruneResult constructs a PruneResult from unreferenced caches
+func buildPruneResult(unreferenced []CachedRepo, dryRun bool) *PruneResult {
+	cacheInfos := make([]CachedRepoInfo, len(unreferenced))
+	var totalSize int64
+
+	for i, cache := range unreferenced {
+		totalSize += cache.Size
+		cacheInfos[i] = CachedRepoInfo{
+			URL:       cache.URL,
+			Path:      cache.Path,
+			SizeBytes: cache.Size,
+			SizeHuman: formatSize(cache.Size),
+		}
+	}
+
+	return &PruneResult{
+		UnreferencedCaches: cacheInfos,
+		TotalCount:         len(unreferenced),
+		TotalSizeBytes:     totalSize,
+		TotalSizeHuman:     formatSize(totalSize),
+		DryRun:             dryRun,
+	}
+}
+
+// outputPruneResult outputs prune results in the requested format
+func outputPruneResult(result *PruneResult, format output.Format, force bool, dryRun bool) error {
+	switch format {
+	case output.JSON:
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(result)
+
+	case output.YAML:
+		encoder := yaml.NewEncoder(os.Stdout)
+		defer encoder.Close()
+		return encoder.Encode(result)
+
+	case output.Table:
+		// Table output handled in RunE (interactive)
+		if result.TotalCount == 0 {
+			fmt.Println("No unreferenced workspace caches found.")
+			return nil
+		}
+		if result.Removed > 0 {
+			fmt.Printf("\n✓ Removed %d cached %s, freed %s",
+				result.Removed,
+				pluralize("repository", "repositories", result.Removed),
+				result.FreedHuman)
+			if result.Failed > 0 {
+				fmt.Printf(" (%d failed)", result.Failed)
+			}
+			fmt.Println()
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
 }
 
 // findUnreferencedCaches finds all cached repos that are not referenced by any resource metadata
@@ -278,19 +365,15 @@ func getDirSize(path string) (int64, error) {
 	return size, err
 }
 
-// displayUnreferencedCaches displays the list of unreferenced caches and returns total size
-func displayUnreferencedCaches(unreferenced []CachedRepo) int64 {
+// displayUnreferencedCaches displays the list of unreferenced caches
+func displayUnreferencedCaches(unreferenced []CachedRepo) {
 	fmt.Printf("Found %d unreferenced cached %s:\n\n",
 		len(unreferenced),
 		pluralize("repository", "repositories", len(unreferenced)))
 
-	var totalSize int64
 	for _, cache := range unreferenced {
-		totalSize += cache.Size
 		fmt.Printf("  • %s (%s)\n", cache.URL, formatSize(cache.Size))
 	}
-
-	return totalSize
 }
 
 // removeUnreferencedCaches removes unreferenced caches and returns counts
