@@ -104,6 +104,11 @@ func (m *Manager) AddCommand(sourcePath, sourceURL, sourceType string) error {
 // AddCommandWithRef adds a command resource to the repository with a specified Git ref.
 // Metadata is automatically saved to .metadata/commands/<name>-metadata.json
 func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref string) error {
+	return m.addCommandWithOptions(sourcePath, sourceURL, sourceType, ref, ImportOptions{ImportMode: "copy"})
+}
+
+// addCommandWithOptions is an internal method that adds a command with import options
+func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -176,9 +181,23 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 		return fmt.Errorf("failed to create parent directories: %w", err)
 	}
 
-	// Copy the file
-	if err := copyFile(sourcePath, destPath); err != nil {
-		return fmt.Errorf("failed to copy command: %w", err)
+	// Copy or symlink based on mode
+	if opts.ImportMode == "symlink" {
+		// Ensure source is absolute path
+		absSource, err := filepath.Abs(sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		// Create symlink
+		if err := os.Symlink(absSource, destPath); err != nil {
+			return fmt.Errorf("failed to create symlink: %w", err)
+		}
+	} else {
+		// Copy the file (default)
+		if err := copyFile(sourcePath, destPath); err != nil {
+			return fmt.Errorf("failed to copy command: %w", err)
+		}
 	}
 
 	// Create and save metadata
@@ -208,6 +227,11 @@ func (m *Manager) AddSkill(sourcePath, sourceURL, sourceType string) error {
 // AddSkillWithRef adds a skill resource to the repository with a specified Git ref.
 // Metadata is automatically saved to .metadata/skills/<name>-metadata.json
 func (m *Manager) AddSkillWithRef(sourcePath, sourceURL, sourceType, ref string) error {
+	return m.addSkillWithOptions(sourcePath, sourceURL, sourceType, ref, ImportOptions{ImportMode: "copy"})
+}
+
+// addSkillWithOptions is an internal method that adds a skill with import options
+func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -222,9 +246,23 @@ func (m *Manager) AddSkillWithRef(sourcePath, sourceURL, sourceType, ref string)
 	// Get destination path
 	destPath := m.GetPath(res.Name, resource.Skill)
 
-	// Copy the directory
-	if err := copyDir(sourcePath, destPath); err != nil {
-		return fmt.Errorf("failed to copy skill: %w", err)
+	// Copy or symlink based on mode
+	if opts.ImportMode == "symlink" {
+		// Ensure source is absolute path
+		absSource, err := filepath.Abs(sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		// Create symlink to the entire directory
+		if err := os.Symlink(absSource, destPath); err != nil {
+			return fmt.Errorf("failed to create symlink: %w", err)
+		}
+	} else {
+		// Copy the directory (default)
+		if err := copyDir(sourcePath, destPath); err != nil {
+			return fmt.Errorf("failed to copy skill: %w", err)
+		}
 	}
 
 	// Create and save metadata
@@ -254,6 +292,11 @@ func (m *Manager) AddAgent(sourcePath, sourceURL, sourceType string) error {
 // AddAgentWithRef adds an agent resource to the repository with a specified Git ref.
 // Metadata is automatically saved to .metadata/agents/<name>-metadata.json
 func (m *Manager) AddAgentWithRef(sourcePath, sourceURL, sourceType, ref string) error {
+	return m.addAgentWithOptions(sourcePath, sourceURL, sourceType, ref, ImportOptions{ImportMode: "copy"})
+}
+
+// addAgentWithOptions is an internal method that adds an agent with import options
+func (m *Manager) addAgentWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -268,9 +311,23 @@ func (m *Manager) AddAgentWithRef(sourcePath, sourceURL, sourceType, ref string)
 	// Get destination path
 	destPath := m.GetPath(res.Name, resource.Agent)
 
-	// Copy the file
-	if err := copyFile(sourcePath, destPath); err != nil {
-		return fmt.Errorf("failed to copy agent: %w", err)
+	// Copy or symlink based on mode
+	if opts.ImportMode == "symlink" {
+		// Ensure source is absolute path
+		absSource, err := filepath.Abs(sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		// Create symlink
+		if err := os.Symlink(absSource, destPath); err != nil {
+			return fmt.Errorf("failed to create symlink: %w", err)
+		}
+	} else {
+		// Copy the file (default)
+		if err := copyFile(sourcePath, destPath); err != nil {
+			return fmt.Errorf("failed to copy agent: %w", err)
+		}
 	}
 
 	// Create and save metadata
@@ -300,6 +357,11 @@ func (m *Manager) AddPackage(sourcePath, sourceURL, sourceType string) error {
 // AddPackageWithRef adds a package resource to the repository with a specified Git ref.
 // Metadata is automatically saved to .metadata/packages/<name>-metadata.json
 func (m *Manager) AddPackageWithRef(sourcePath, sourceURL, sourceType, ref string) error {
+	return m.addPackageWithOptions(sourcePath, sourceURL, sourceType, ref, ImportOptions{ImportMode: "copy"})
+}
+
+// addPackageWithOptions is an internal method that adds a package with import options
+func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
@@ -314,9 +376,23 @@ func (m *Manager) AddPackageWithRef(sourcePath, sourceURL, sourceType, ref strin
 	// Get destination path
 	destPath := resource.GetPackagePath(pkg.Name, m.repoPath)
 
-	// Copy the file
-	if err := copyFile(sourcePath, destPath); err != nil {
-		return fmt.Errorf("failed to copy package: %w", err)
+	// Copy or symlink based on mode
+	if opts.ImportMode == "symlink" {
+		// Ensure source is absolute path
+		absSource, err := filepath.Abs(sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		// Create symlink
+		if err := os.Symlink(absSource, destPath); err != nil {
+			return fmt.Errorf("failed to create symlink: %w", err)
+		}
+	} else {
+		// Copy the file (default)
+		if err := copyFile(sourcePath, destPath); err != nil {
+			return fmt.Errorf("failed to copy package: %w", err)
+		}
 	}
 
 	// Create and save metadata
@@ -844,13 +920,23 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 			ref = ""
 		}
 
+		// Create import options from bulk options
+		importOpts := ImportOptions{
+			ImportMode: opts.ImportMode,
+			Force:      opts.Force,
+		}
+		// Default to "copy" if not specified
+		if importOpts.ImportMode == "" {
+			importOpts.ImportMode = "copy"
+		}
+
 		switch resourceType {
 		case resource.Command:
-			err = m.AddCommandWithRef(sourcePath, sourceURL, sourceType, ref)
+			err = m.addCommandWithOptions(sourcePath, sourceURL, sourceType, ref, importOpts)
 		case resource.Skill:
-			err = m.AddSkillWithRef(sourcePath, sourceURL, sourceType, ref)
+			err = m.addSkillWithOptions(sourcePath, sourceURL, sourceType, ref, importOpts)
 		case resource.Agent:
-			err = m.AddAgentWithRef(sourcePath, sourceURL, sourceType, ref)
+			err = m.addAgentWithOptions(sourcePath, sourceURL, sourceType, ref, importOpts)
 		}
 
 		if err != nil {
@@ -967,7 +1053,17 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 			ref = ""
 		}
 
-		err = m.AddPackageWithRef(sourcePath, sourceURL, sourceType, ref)
+		// Create import options from bulk options
+		importOpts := ImportOptions{
+			ImportMode: opts.ImportMode,
+			Force:      opts.Force,
+		}
+		// Default to "copy" if not specified
+		if importOpts.ImportMode == "" {
+			importOpts.ImportMode = "copy"
+		}
+
+		err = m.addPackageWithOptions(sourcePath, sourceURL, sourceType, ref, importOpts)
 		if err != nil {
 			// Could be various errors - wrap as validation for now
 			typedErr := pkgerrors.Validation(err, "failed to import package")
