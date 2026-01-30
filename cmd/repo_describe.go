@@ -11,23 +11,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// repoShowCmd represents the repo show command
-var repoShowCmd = &cobra.Command{
-	Use:   "show <pattern>",
-	Short: "Display detailed resource information",
+// repoDescribeCmd represents the repo describe command
+var repoDescribeCmd = &cobra.Command{
+	Use:     "describe <pattern>",
+	Aliases: []string{"show"}, // Deprecated: use 'describe' instead
+	Short:   "Display detailed resource information",
 	Long: `Display detailed information about resources in the repository.
 
 Examples:
-  aimgr repo show skill/pdf-processing    # Show specific skill
-  aimgr repo show command/test            # Show specific command
-  aimgr repo show agent/code-reviewer     # Show specific agent
-  aimgr repo show skill/*                 # Show all skills (summary)
-  aimgr repo show *pdf*                   # Show all resources with "pdf"
+  aimgr repo describe skill/pdf-processing    # Describe specific skill
+  aimgr repo describe command/test            # Describe specific command
+  aimgr repo describe agent/code-reviewer     # Describe specific agent
+  aimgr repo describe skill/*                 # Describe all skills (summary)
+  aimgr repo describe *pdf*                   # Describe all resources with "pdf"
 
 Supports glob patterns: *, ?, [abc], {a,b}
 
 When multiple resources match, shows a summary list.
-When a single resource matches, shows detailed information.`,
+When a single resource matches, shows detailed information.
+
+Note: 'repo show' is deprecated, use 'repo describe' instead.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pattern := args[0]
@@ -49,16 +52,16 @@ When a single resource matches, shows detailed information.`,
 
 		if len(matches) == 1 {
 			// Single match - show detailed view
-			return showDetailedResource(manager, matches[0])
+			return describeDetailedResource(manager, matches[0])
 		}
 
 		// Multiple matches - show summary
-		return showResourceSummary(manager, matches)
+		return describeResourceSummary(manager, matches)
 	},
 }
 
-// showDetailedResource displays detailed information for a single resource
-func showDetailedResource(manager *repo.Manager, resourceArg string) error {
+// describeDetailedResource displays detailed information for a single resource
+func describeDetailedResource(manager *repo.Manager, resourceArg string) error {
 	// Parse the resource argument
 	resourceType, name, err := ParseResourceArg(resourceArg)
 	if err != nil {
@@ -78,18 +81,18 @@ func showDetailedResource(manager *repo.Manager, resourceArg string) error {
 	// Display based on resource type
 	switch resourceType {
 	case resource.Skill:
-		return showSkillDetails(manager, res, metadataAvailable, meta)
+		return describeSkillDetails(manager, res, metadataAvailable, meta)
 	case resource.Command:
-		return showCommandDetails(manager, res, metadataAvailable, meta)
+		return describeCommandDetails(manager, res, metadataAvailable, meta)
 	case resource.Agent:
-		return showAgentDetails(manager, res, metadataAvailable, meta)
+		return describeAgentDetails(manager, res, metadataAvailable, meta)
 	default:
 		return fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
 }
 
-// showSkillDetails displays detailed information for a skill
-func showSkillDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
+// describeSkillDetails displays detailed information for a skill
+func describeSkillDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
 	// Load full skill resource for additional details
 	skillPath := manager.GetPath(res.Name, resource.Skill)
 	skill, err := resource.LoadSkillResource(skillPath)
@@ -149,8 +152,8 @@ func showSkillDetails(manager *repo.Manager, res *resource.Resource, metadataAva
 	return nil
 }
 
-// showCommandDetails displays detailed information for a command
-func showCommandDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
+// describeCommandDetails displays detailed information for a command
+func describeCommandDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
 	// Load full command resource for additional details
 	commandPath := manager.GetPath(res.Name, resource.Command)
 	command, err := resource.LoadCommandResource(commandPath)
@@ -201,8 +204,8 @@ func showCommandDetails(manager *repo.Manager, res *resource.Resource, metadataA
 	return nil
 }
 
-// showAgentDetails displays detailed information for an agent
-func showAgentDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
+// describeAgentDetails displays detailed information for an agent
+func describeAgentDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
 	// Load full agent resource for additional details
 	agentPath := manager.GetPath(res.Name, resource.Agent)
 	agent, err := resource.LoadAgentResource(agentPath)
@@ -253,8 +256,8 @@ func showAgentDetails(manager *repo.Manager, res *resource.Resource, metadataAva
 	return nil
 }
 
-// showResourceSummary displays a summary table for multiple resources
-func showResourceSummary(manager *repo.Manager, matches []string) error {
+// describeResourceSummary displays a summary table for multiple resources
+func describeResourceSummary(manager *repo.Manager, matches []string) error {
 	fmt.Printf("Found %d matching resources:\n\n", len(matches))
 
 	// Display table header
@@ -285,7 +288,7 @@ func showResourceSummary(manager *repo.Manager, matches []string) error {
 	}
 
 	fmt.Println()
-	fmt.Println("Use 'aimgr repo show <type>/<name>' to see detailed information")
+	fmt.Println("Use 'aimgr repo describe <type>/<name>' to see detailed information")
 
 	return nil
 }
@@ -297,5 +300,5 @@ func formatTimestamp(t time.Time) string {
 }
 
 func init() {
-	repoCmd.AddCommand(repoShowCmd)
+	repoCmd.AddCommand(repoDescribeCmd)
 }

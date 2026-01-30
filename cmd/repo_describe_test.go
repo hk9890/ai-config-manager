@@ -10,58 +10,58 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 )
 
-// Test showDetailedResource with exact match
+// Test describeDetailedResource with exact match
 
-func TestShowDetailedResource_Skill(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestDescribeDetailedResource_Skill(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
-	err := showDetailedResource(mgr, "skill/test-skill")
+	err := describeDetailedResource(mgr, "skill/test-skill")
 	if err != nil {
-		t.Errorf("showDetailedResource() error = %v, want nil", err)
+		t.Errorf("describeDetailedResource() error = %v, want nil", err)
 	}
 }
 
-func TestShowDetailedResource_Command(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestDescribeDetailedResource_Command(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
-	err := showDetailedResource(mgr, "command/test-command")
+	err := describeDetailedResource(mgr, "command/test-command")
 	if err != nil {
-		t.Errorf("showDetailedResource() error = %v, want nil", err)
+		t.Errorf("describeDetailedResource() error = %v, want nil", err)
 	}
 }
 
-func TestShowDetailedResource_Agent(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestDescribeDetailedResource_Agent(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
-	err := showDetailedResource(mgr, "agent/test-agent")
+	err := describeDetailedResource(mgr, "agent/test-agent")
 	if err != nil {
-		t.Errorf("showDetailedResource() error = %v, want nil", err)
+		t.Errorf("describeDetailedResource() error = %v, want nil", err)
 	}
 }
 
-func TestShowDetailedResource_NotFound(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestDescribeDetailedResource_NotFound(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
-	err := showDetailedResource(mgr, "skill/nonexistent")
+	err := describeDetailedResource(mgr, "skill/nonexistent")
 	if err == nil {
-		t.Error("showDetailedResource() expected error for nonexistent resource, got nil")
+		t.Error("describeDetailedResource() expected error for nonexistent resource, got nil")
 	}
 }
 
-func TestShowDetailedResource_InvalidFormat(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestDescribeDetailedResource_InvalidFormat(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
@@ -90,23 +90,23 @@ func TestShowDetailedResource_InvalidFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := showDetailedResource(mgr, tt.arg)
+			err := describeDetailedResource(mgr, tt.arg)
 			if err == nil {
-				t.Errorf("showDetailedResource(%q) expected error, got nil", tt.arg)
+				t.Errorf("describeDetailedResource(%q) expected error, got nil", tt.arg)
 				return
 			}
 
 			if !strings.Contains(err.Error(), tt.errContains) {
-				t.Errorf("showDetailedResource(%q) error = %v, want error containing %q", tt.arg, err, tt.errContains)
+				t.Errorf("describeDetailedResource(%q) error = %v, want error containing %q", tt.arg, err, tt.errContains)
 			}
 		})
 	}
 }
 
-// Test showResourceSummary
+// Test describeResourceSummary
 
-func TestShowResourceSummary_MultipleMatches(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestDescribeResourceSummary_MultipleMatches(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
@@ -117,28 +117,28 @@ func TestShowResourceSummary_MultipleMatches(t *testing.T) {
 		"command/test-command",
 	}
 
-	err := showResourceSummary(mgr, matches)
+	err := describeResourceSummary(mgr, matches)
 	if err != nil {
-		t.Errorf("showResourceSummary() error = %v, want nil", err)
+		t.Errorf("describeResourceSummary() error = %v, want nil", err)
 	}
 }
 
-func TestShowResourceSummary_EmptyMatches(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestDescribeResourceSummary_EmptyMatches(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
 	matches := []string{}
 
-	err := showResourceSummary(mgr, matches)
+	err := describeResourceSummary(mgr, matches)
 	if err != nil {
-		t.Errorf("showResourceSummary() error = %v, want nil", err)
+		t.Errorf("describeResourceSummary() error = %v, want nil", err)
 	}
 }
 
-func TestShowResourceSummary_InvalidMatches(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestDescribeResourceSummary_InvalidMatches(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
@@ -151,16 +151,16 @@ func TestShowResourceSummary_InvalidMatches(t *testing.T) {
 		"command/test-command",
 	}
 
-	err := showResourceSummary(mgr, matches)
+	err := describeResourceSummary(mgr, matches)
 	if err != nil {
-		t.Errorf("showResourceSummary() error = %v, want nil", err)
+		t.Errorf("describeResourceSummary() error = %v, want nil", err)
 	}
 }
 
 // Integration tests with ExpandPattern
 
-func TestRepoShow_ExactMatch(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestRepoDescribe_ExactMatch(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
@@ -207,20 +207,20 @@ func TestRepoShow_ExactMatch(t *testing.T) {
 			}
 
 			if len(matches) == 1 {
-				err = showDetailedResource(mgr, matches[0])
+				err = describeDetailedResource(mgr, matches[0])
 			} else {
-				err = showResourceSummary(mgr, matches)
+				err = describeResourceSummary(mgr, matches)
 			}
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("show operation error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("describe operation error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestRepoShow_PatternWithSingleMatch(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestRepoDescribe_PatternWithSingleMatch(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
@@ -236,14 +236,14 @@ func TestRepoShow_PatternWithSingleMatch(t *testing.T) {
 	}
 
 	// Should show detailed view
-	err = showDetailedResource(mgr, matches[0])
+	err = describeDetailedResource(mgr, matches[0])
 	if err != nil {
-		t.Errorf("showDetailedResource() error = %v", err)
+		t.Errorf("describeDetailedResource() error = %v", err)
 	}
 }
 
-func TestRepoShow_PatternWithMultipleMatches(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestRepoDescribe_PatternWithMultipleMatches(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
@@ -286,16 +286,16 @@ func TestRepoShow_PatternWithMultipleMatches(t *testing.T) {
 			}
 
 			// Should show summary
-			err = showResourceSummary(mgr, matches)
+			err = describeResourceSummary(mgr, matches)
 			if (err != nil) != tt.shouldError {
-				t.Errorf("showResourceSummary() error = %v, wantErr %v", err, tt.shouldError)
+				t.Errorf("describeResourceSummary() error = %v, wantErr %v", err, tt.shouldError)
 			}
 		})
 	}
 }
 
-func TestRepoShow_PatternWithNoMatches(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestRepoDescribe_PatternWithNoMatches(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
@@ -311,8 +311,8 @@ func TestRepoShow_PatternWithNoMatches(t *testing.T) {
 	}
 }
 
-func TestRepoShow_InvalidPattern(t *testing.T) {
-	repoPath, cleanup := createTestRepoForShow(t)
+func TestRepoDescribe_InvalidPattern(t *testing.T) {
+	repoPath, cleanup := createTestRepoForDescribe(t)
 	defer cleanup()
 
 	mgr := repo.NewManagerWithPath(repoPath)
@@ -351,7 +351,7 @@ func TestRepoShow_InvalidPattern(t *testing.T) {
 
 // Test helpers
 
-func createTestRepoForShow(t *testing.T) (repoPath string, cleanup func()) {
+func createTestRepoForDescribe(t *testing.T) (repoPath string, cleanup func()) {
 	t.Helper()
 
 	// Create temp directory for repo
