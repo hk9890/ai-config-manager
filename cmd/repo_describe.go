@@ -41,9 +41,10 @@ type DescribeResourceOutput struct {
 
 // repoDescribeCmd represents the repo describe command
 var repoDescribeCmd = &cobra.Command{
-	Use:     "describe <pattern>",
-	Aliases: []string{"show"}, // Deprecated: use 'describe' instead
-	Short:   "Display detailed resource information",
+	Use:               "describe <pattern>",
+	Aliases:           []string{"show"}, // Deprecated: use 'describe' instead
+	ValidArgsFunction: completeResourceArgs,
+	Short:             "Display detailed resource information",
 	Long: `Display detailed information about resources in the repository.
 
 Examples:
