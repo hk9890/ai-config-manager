@@ -35,6 +35,14 @@ const (
 	SyncStatusNoManifest SyncStatus = "no-manifest"
 )
 
+// ListResourceOutput represents a resource with installation and sync information
+// for JSON and YAML output formats
+type ListResourceOutput struct {
+	resource.Resource
+	Targets    []string `json:"targets" yaml:"targets"`         // Tools where resource is installed (e.g., ["claude", "opencode"])
+	SyncStatus string   `json:"sync_status" yaml:"sync_status"` // Sync status (e.g., "in-sync", "not-in-manifest")
+}
+
 // getSyncStatus determines the sync status of a resource relative to ai.package.yaml
 // It compares the resource's installation state with its presence in the manifest file
 func getSyncStatus(projectPath string, resourceRef string, isInstalled bool) SyncStatus {
@@ -191,6 +199,12 @@ Examples:
 }
 
 func outputWithPackagesTable(resources []resource.Resource, packages []repo.PackageInfo) error {
+	// Get current working directory for installation detection
+	projectPath, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
 	// Group resources by type
 	commands := []resource.Resource{}
 	skills := []resource.Resource{}
@@ -211,66 +225,81 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 		return packages[i].Name < packages[j].Name
 	})
 
-	// Create table with new API
+	// Create table with new header including TARGETS and SYNC columns
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("Name", "Description")
+	table.Header("Name", "Targets", "Sync", "Description")
 
 	// Add commands
 	for _, cmd := range commands {
-		desc := truncateString(cmd.Description, 60)
-		if err := table.Append(fmt.Sprintf("command/%s", cmd.Name), desc); err != nil {
+		targets := formatInstalledTargets(projectPath, cmd.Name, cmd.Type)
+		syncSymbol := formatSyncStatus(projectPath, fmt.Sprintf("command/%s", cmd.Name), targets != "-")
+		desc := truncateString(cmd.Description, 40)
+		if err := table.Append(fmt.Sprintf("command/%s", cmd.Name), targets, syncSymbol, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
 	if len(commands) > 0 && (len(skills) > 0 || len(agents) > 0) {
-		if err := table.Append("", ""); err != nil {
+		if err := table.Append("", "", "", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
 
 	// Add skills
 	for _, skill := range skills {
-		desc := truncateString(skill.Description, 60)
-		if err := table.Append(fmt.Sprintf("skill/%s", skill.Name), desc); err != nil {
+		targets := formatInstalledTargets(projectPath, skill.Name, skill.Type)
+		syncSymbol := formatSyncStatus(projectPath, fmt.Sprintf("skill/%s", skill.Name), targets != "-")
+		desc := truncateString(skill.Description, 40)
+		if err := table.Append(fmt.Sprintf("skill/%s", skill.Name), targets, syncSymbol, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between types if skills exist and agents exist
 	if len(skills) > 0 && len(agents) > 0 {
-		if err := table.Append("", ""); err != nil {
+		if err := table.Append("", "", "", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
 
 	// Add agents
 	for _, agent := range agents {
-		desc := truncateString(agent.Description, 60)
-		if err := table.Append(fmt.Sprintf("agent/%s", agent.Name), desc); err != nil {
+		targets := formatInstalledTargets(projectPath, agent.Name, agent.Type)
+		syncSymbol := formatSyncStatus(projectPath, fmt.Sprintf("agent/%s", agent.Name), targets != "-")
+		desc := truncateString(agent.Description, 40)
+		if err := table.Append(fmt.Sprintf("agent/%s", agent.Name), targets, syncSymbol, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between agents and packages if both exist
 	if len(agents) > 0 && len(packages) > 0 {
-		if err := table.Append("", ""); err != nil {
+		if err := table.Append("", "", "", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
 
 	// Add packages
 	for _, pkg := range packages {
-		desc := truncateString(pkg.Description, 50)
+		desc := truncateString(pkg.Description, 40)
 		countStr := fmt.Sprintf("%d resources", pkg.ResourceCount)
-		fullDesc := fmt.Sprintf("%s    %s", countStr, desc)
-		if err := table.Append(fmt.Sprintf("package/%s", pkg.Name), fullDesc); err != nil {
+		fullDesc := fmt.Sprintf("%s %s", countStr, desc)
+		if err := table.Append(fmt.Sprintf("package/%s", pkg.Name), "-", "-", fullDesc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
-	return table.Render()
+	// Render the table
+	if err := table.Render(); err != nil {
+		return err
+	}
+
+	// Print legend
+	fmt.Println("\nLegend:")
+	fmt.Println("  ✓ = In sync  * = Not in manifest  ⚠ = Not installed  - = No manifest")
+
+	return nil
 }
 
 func outputPackagesTable(packages []repo.PackageInfo) error {
@@ -294,8 +323,43 @@ func outputPackagesTable(packages []repo.PackageInfo) error {
 }
 
 func outputWithPackagesJSON(resources []resource.Resource, packages []repo.PackageInfo) error {
+	// Get current working directory for installation detection
+	projectPath, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Build ListResourceOutput for each resource with targets and sync status
+	enhancedResources := make([]ListResourceOutput, 0, len(resources))
+	for _, res := range resources {
+		// Get installed targets as Tool slice
+		targetTools := getInstalledTargets(projectPath, res.Name, res.Type)
+
+		// Convert Tool slice to string slice
+		targetStrings := make([]string, 0, len(targetTools))
+		for _, tool := range targetTools {
+			targetStrings = append(targetStrings, tool.String())
+		}
+
+		// Determine if resource is installed (has at least one target)
+		isInstalled := len(targetTools) > 0
+
+		// Build resource reference for manifest lookup
+		resourceRef := fmt.Sprintf("%s/%s", res.Type, res.Name)
+
+		// Get sync status
+		syncStatus := getSyncStatus(projectPath, resourceRef, isInstalled)
+
+		// Create enhanced resource output
+		enhancedResources = append(enhancedResources, ListResourceOutput{
+			Resource:   res,
+			Targets:    targetStrings,
+			SyncStatus: string(syncStatus),
+		})
+	}
+
 	output := map[string]interface{}{
-		"resources": resources,
+		"resources": enhancedResources,
 		"packages":  packages,
 	}
 	encoder := json.NewEncoder(os.Stdout)
@@ -310,8 +374,43 @@ func outputPackagesJSON(packages []repo.PackageInfo) error {
 }
 
 func outputWithPackagesYAML(resources []resource.Resource, packages []repo.PackageInfo) error {
+	// Get current working directory for installation detection
+	projectPath, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Build ListResourceOutput for each resource with targets and sync status
+	enhancedResources := make([]ListResourceOutput, 0, len(resources))
+	for _, res := range resources {
+		// Get installed targets as Tool slice
+		targetTools := getInstalledTargets(projectPath, res.Name, res.Type)
+
+		// Convert Tool slice to string slice
+		targetStrings := make([]string, 0, len(targetTools))
+		for _, tool := range targetTools {
+			targetStrings = append(targetStrings, tool.String())
+		}
+
+		// Determine if resource is installed (has at least one target)
+		isInstalled := len(targetTools) > 0
+
+		// Build resource reference for manifest lookup
+		resourceRef := fmt.Sprintf("%s/%s", res.Type, res.Name)
+
+		// Get sync status
+		syncStatus := getSyncStatus(projectPath, resourceRef, isInstalled)
+
+		// Create enhanced resource output
+		enhancedResources = append(enhancedResources, ListResourceOutput{
+			Resource:   res,
+			Targets:    targetStrings,
+			SyncStatus: string(syncStatus),
+		})
+	}
+
 	output := map[string]interface{}{
-		"resources": resources,
+		"resources": enhancedResources,
 		"packages":  packages,
 	}
 	encoder := yaml.NewEncoder(os.Stdout)
@@ -348,6 +447,41 @@ func truncateString(s string, maxLen int) string {
 
 	// Truncate and add ellipsis
 	return strings.TrimSpace(s[:maxLen-3]) + "..."
+}
+
+// formatInstalledTargets gets the list of installed tools for a resource and formats it as a comma-separated string
+func formatInstalledTargets(projectPath string, resourceName string, resourceType resource.ResourceType) string {
+	installedTools := getInstalledTargets(projectPath, resourceName, resourceType)
+
+	if len(installedTools) == 0 {
+		return "-"
+	}
+
+	// Convert tools to string names
+	toolNames := make([]string, len(installedTools))
+	for i, tool := range installedTools {
+		toolNames[i] = tool.String()
+	}
+
+	return strings.Join(toolNames, ", ")
+}
+
+// formatSyncStatus gets the sync status and returns the appropriate symbol
+func formatSyncStatus(projectPath string, resourceRef string, isInstalled bool) string {
+	status := getSyncStatus(projectPath, resourceRef, isInstalled)
+
+	switch status {
+	case SyncStatusInSync:
+		return "✓"
+	case SyncStatusNotInManifest:
+		return "*"
+	case SyncStatusNotInstalled:
+		return "⚠"
+	case SyncStatusNoManifest:
+		return "-"
+	default:
+		return "-"
+	}
 }
 
 // getInstalledTargets detects which tools (claude, opencode, copilot) have the given resource installed.
