@@ -88,9 +88,9 @@ func LoadSkillResource(dirPath string) (*SkillResource, error) {
 
 | Callsite | Function | Purpose | Fields Needed |
 |----------|----------|---------|---------------|
-| **cmd/repo_show.go:95** | `LoadSkillResource` | Display skill details | `Compatibility`, `HasScripts`, `HasReferences`, `HasAssets` |
-| **cmd/repo_show.go:156** | `LoadCommandResource` | Display command details | `Agent`, `Model`, `AllowedTools` |
-| **cmd/repo_show.go:208** | `LoadAgentResource` | Display agent details | `Type`, `Instructions`, `Capabilities` |
+| **cmd/repo_describe.go:95** | `LoadSkillResource` | Display skill details | `Compatibility`, `HasScripts`, `HasReferences`, `HasAssets` |
+| **cmd/repo_describe.go:156** | `LoadCommandResource` | Display command details | `Agent`, `Model`, `AllowedTools` |
+| **cmd/repo_describe.go:208** | `LoadAgentResource` | Display agent details | `Type`, `Instructions`, `Capabilities` |
 | **cmd/repo_import.go:157** | `LoadAgentResource` | Distinguish agent from command | `Type`, `Instructions`, `Capabilities` |
 
 #### Test Callsites
@@ -105,7 +105,7 @@ func LoadSkillResource(dirPath string) (*SkillResource, error) {
 
 ### Why Each Callsite Needs LoadXResource
 
-#### 1. repo_show.go (3 callsites) - Display Type-Specific Fields
+#### 1. repo_describe.go (3 callsites) - Display Type-Specific Fields
 
 **Purpose:** Show detailed information about a resource to the user
 
@@ -254,7 +254,7 @@ func LoadCommand(filePath string) (*Resource, error) {
 
 **Performance Impact:**
 - ParseFrontmatter is called twice for 4 callsites
-- These are interactive commands (repo show, repo import), not hot paths
+- These are interactive commands (repo describe, repo import), not hot paths
 - Parsing YAML frontmatter is fast (< 1ms per file)
 - **Total waste: ~4ms per command invocation** (negligible)
 
@@ -318,7 +318,7 @@ To prevent future confusion about this design choice, the following comments hav
 // 
 // This function re-parses the frontmatter that LoadCommand already parsed. While
 // this is technically duplicate work, it's acceptable because:
-// 1. Only used in 4 places (repo show, repo import, tests)
+// 1. Only used in 4 places (repo describe, repo import, tests)
 // 2. Performance impact is negligible (~1ms per call)
 // 3. Keeps the common case (LoadCommand) simple and fast
 // 4. Provides clear separation: LoadCommand for metadata, LoadCommandResource for full details
@@ -358,7 +358,7 @@ There are more impactful duplication issues to fix first:
 
 ### Production Callsites
 
-#### cmd/repo_show.go:95 - showSkillDetails
+#### cmd/repo_describe.go:95 - showSkillDetails
 ```go
 func showSkillDetails(manager *repo.Manager, res *resource.Resource, ...) error {
     skill, err := resource.LoadSkillResource(skillPath)
@@ -378,7 +378,7 @@ func showSkillDetails(manager *repo.Manager, res *resource.Resource, ...) error 
 }
 ```
 
-#### cmd/repo_show.go:156 - showCommandDetails
+#### cmd/repo_describe.go:156 - showCommandDetails
 ```go
 func showCommandDetails(manager *repo.Manager, res *resource.Resource, ...) error {
     command, err := resource.LoadCommandResource(commandPath)
@@ -399,7 +399,7 @@ func showCommandDetails(manager *repo.Manager, res *resource.Resource, ...) erro
 }
 ```
 
-#### cmd/repo_show.go:208 - showAgentDetails
+#### cmd/repo_describe.go:208 - showAgentDetails
 ```go
 func showAgentDetails(manager *repo.Manager, res *resource.Resource, ...) error {
     agent, err := resource.LoadAgentResource(agentPath)

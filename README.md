@@ -1343,19 +1343,24 @@ aimgr uninstall package/my-tools --force
 - `--project-path`: Specify project directory (defaults to current directory)
 - `--force`: Force uninstall (placeholder for future confirmation prompts)
 
-### `aimgr repo show`
+### `aimgr repo describe`
 
 Display detailed information about a resource, including metadata and source information.
 
 ```bash
 # Show skill details
-aimgr repo show skill pdf-processing
+aimgr repo describe skill pdf-processing
 
 # Show command details
-aimgr repo show command test
+aimgr repo describe command test
 
 # Show agent details
-aimgr repo show agent code-reviewer
+aimgr repo describe agent code-reviewer
+
+# Output in different formats
+aimgr repo describe skill pdf-processing --format=json
+aimgr repo describe command test --format=yaml
+aimgr repo describe agent code-reviewer --format=table  # Default
 ```
 
 **Output includes:**
@@ -1365,11 +1370,19 @@ aimgr repo show agent code-reviewer
 - Metadata tracking information
 - Installation status
 
+**Output formats:**
+- `--format=table` - Human-readable table format (default)
+- `--format=json` - JSON output for scripting and automation
+- `--format=yaml` - YAML output for configuration files
+
 **Use cases:**
 - Check resource metadata before installing
 - Verify resource source information
 - Review resource details and documentation
 - Debug installation issues
+- Export resource information for automation
+
+**Note:** The `repo show` command is deprecated and will be removed in a future version. Use `repo describe` instead.
 
 ### `aimgr repo prune`
 
@@ -1876,7 +1889,7 @@ Imported packages and resources are tracked with metadata:
 
 ```bash
 # View package metadata
-aimgr repo show package/web-dev-tools
+aimgr repo describe package/web-dev-tools
 ```
 
 Metadata includes:
@@ -2108,23 +2121,12 @@ Commands, skills, and agents must follow these naming rules:
 
 ## Metadata Tracking
 
-aimgr automatically tracks metadata about resource sources, enabling features like `repo show`.
+aimgr automatically tracks metadata about resource sources, enabling features like `repo describe`.
 
-### What is Tracked
-
-When you add a resource from GitHub or other sources, aimgr stores:
-
-- **Source type**: `github`, `local`, or `file`
-- **Source location**: URL, path, or file location
-- **Git reference**: Branch or tag (for GitHub sources)
-- **Subpath**: Path within repository (if applicable)
-- **Timestamps**: When resource was added and last updated
-
-### Metadata File Location
-
-Metadata is stored in a centralized `.metadata/` directory organized by resource type:
-
-**Skills:**
+```bash
+aimgr repo describe skill pdf-processing
+aimgr repo describe command test
+aimgr repo describe agent code-reviewer
 ```
 ~/.local/share/ai-config/repo/.metadata/skills/my-skill-metadata.json
 ```
@@ -2169,9 +2171,9 @@ Metadata files are stored in JSON format for better performance and tooling supp
 **View metadata:**
 ```bash
 # Show detailed resource info including metadata
-aimgr repo show skill pdf-processing
-aimgr repo show command test
-aimgr repo show agent code-reviewer
+aimgr repo describe skill pdf-processing
+aimgr repo describe command test
+aimgr repo describe agent code-reviewer
 ```
 
 ### Metadata Best Practices
@@ -2179,7 +2181,7 @@ aimgr repo show agent code-reviewer
 1. **Add from GitHub when possible** - Enables better source tracking
 2. **Use specific refs** - Tag versions (e.g., `@v1.0.0`) for stability
 3. **Keep local sources accessible** - Maintain access to original paths
-4. **Check metadata with `repo show`** - Verify source info
+4. **Check metadata with `repo describe`** - Verify source info
 
 ### Metadata Privacy
 

@@ -126,7 +126,7 @@ Clear separation between repository management and project operations:
 ```bash
 aimgr repo add skill gh:vercel-labs/agent-skills
 aimgr repo list
-aimgr repo show skill pdf-processing
+aimgr repo show skill pdf-processing  # Renamed to 'repo describe'
 aimgr repo update
 aimgr repo remove skill old-skill
 ```
@@ -164,7 +164,7 @@ Automatic tracking of resource sources enables powerful update functionality.
 
 ```bash
 # View resource metadata
-aimgr repo show skill pdf-processing
+aimgr repo show skill pdf-processing  # Note: Renamed to 'repo describe' in later versions
 
 # Update from source
 aimgr repo update skill pdf-processing
@@ -215,6 +215,8 @@ aimgr repo show skill pdf-processing
 aimgr repo show command test
 aimgr repo show agent code-reviewer
 ```
+
+> **Note:** The `repo show` command has been renamed to `repo describe` in later versions. See current documentation for updated command syntax.
 
 **Output includes:**
 - 📝 Name, type, description

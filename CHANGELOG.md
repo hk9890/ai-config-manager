@@ -79,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Nested Command Path Detection** - Fixed multiple bugs in nested command path handling
   - Fixed `DetectType()` to correctly handle nested command and agent paths
   - Fixed `repo Get()` to use `LoadCommandWithBase` for proper nested names
-  - Fixed `repo show` command to support nested paths correctly
+  - Fixed `repo describe` command to support nested paths correctly
   - Fixed `repo verify` nested paths bug
   - Commands now correctly use nested paths in Name field throughout the system
   
@@ -409,7 +409,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Standardized pattern syntax across all commands**
   - All commands now use `type/pattern` syntax (e.g., `skill/pdf*`, `command/test-*`)
   - Consistent pattern matching with glob support (`*`, `?`, `[abc]`, `{a,b}`)
-  - Applies to: `repo list`, `repo show`, `repo update`, `repo remove`, `list`, `uninstall`
+  - Applies to: `repo list`, `repo describe`, `repo update`, `repo remove`, `list`, `uninstall`
   - Backward compatible: bare names still work (e.g., `my-skill` → searches all types)
   - Type prefix required for ambiguity: `skill/my-skill` vs `command/my-skill`
 
