@@ -40,63 +40,91 @@ func parseResourceArg(arg string) (resource.ResourceType, string, error) {
 	return resourceType, name, nil
 }
 
-// completeResourceArgs provides shell completion for resource arguments in "type/name" format
-// Supports completing both the type prefix and resource names after the slash
-func completeResourceArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	manager, err := repo.NewManager()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
+// completionOptions controls behavior of the base resource completion function
+type completionOptions struct {
+	includePackages bool // Include "package/" prefix in type suggestions
+	multiArg        bool // Support completing multiple resource arguments
+}
 
-	// If toComplete doesn't contain a slash, suggest type prefixes
-	if !strings.Contains(toComplete, "/") {
-		prefixes := []string{"skill/", "command/", "agent/"}
-		var matches []string
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(prefix, toComplete) {
-				matches = append(matches, prefix)
+// completeResourcesWithOptions is the base completion function for resource arguments
+// Provides shell completion for resource arguments in "type/name" format
+// Supports completing both the type prefix and resource names after the slash
+func completeResourcesWithOptions(opts completionOptions) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		manager, err := repo.NewManager()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		// If toComplete doesn't contain a slash, suggest type prefixes
+		if !strings.Contains(toComplete, "/") {
+			prefixes := []string{"skill/", "command/", "agent/"}
+			if opts.includePackages {
+				prefixes = append(prefixes, "package/")
+			}
+			var matches []string
+			for _, prefix := range prefixes {
+				if strings.HasPrefix(prefix, toComplete) {
+					matches = append(matches, prefix)
+				}
+			}
+			return matches, cobra.ShellCompDirectiveNoSpace
+		}
+
+		// Parse the type prefix
+		parts := strings.SplitN(toComplete, "/", 2)
+		if len(parts) != 2 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		typeStr := parts[0]
+		namePrefix := parts[1]
+
+		// Determine resource type
+		var resourceType resource.ResourceType
+		switch strings.ToLower(typeStr) {
+		case "skill", "skills":
+			resourceType = resource.Skill
+		case "command", "commands":
+			resourceType = resource.Command
+		case "agent", "agents":
+			resourceType = resource.Agent
+		case "package", "packages":
+			if opts.includePackages {
+				resourceType = resource.PackageType
+			} else {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+		default:
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		// Get resources of that type
+		resources, err := manager.List(&resourceType)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		// Build completions with type prefix
+		var suggestions []string
+		for _, res := range resources {
+			if strings.HasPrefix(res.Name, namePrefix) {
+				suggestions = append(suggestions, typeStr+"/"+res.Name)
 			}
 		}
-		return matches, cobra.ShellCompDirectiveNoSpace
+
+		return suggestions, cobra.ShellCompDirectiveNoFileComp
 	}
+}
 
-	// Parse the type prefix
-	parts := strings.SplitN(toComplete, "/", 2)
-	if len(parts) != 2 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	typeStr := parts[0]
-	namePrefix := parts[1]
-
-	// Determine resource type
-	var resourceType resource.ResourceType
-	switch strings.ToLower(typeStr) {
-	case "skill", "skills":
-		resourceType = resource.Skill
-	case "command", "commands":
-		resourceType = resource.Command
-	case "agent", "agents":
-		resourceType = resource.Agent
-	default:
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Get resources of that type
-	resources, err := manager.List(&resourceType)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	// Build completions with type prefix
-	var suggestions []string
-	for _, res := range resources {
-		if strings.HasPrefix(res.Name, namePrefix) {
-			suggestions = append(suggestions, typeStr+"/"+res.Name)
-		}
-	}
-
-	return suggestions, cobra.ShellCompDirectiveNoFileComp
+// completeResourceArgs provides shell completion for resource arguments in "type/name" format
+// Supports completing both the type prefix and resource names after the slash
+// Used by commands that accept a single resource without package support
+func completeResourceArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return completeResourcesWithOptions(completionOptions{
+		includePackages: false,
+		multiArg:        false,
+	})(cmd, args, toComplete)
 }
 
 // completeCommandNames provides completion for command names from the repository
@@ -176,73 +204,12 @@ func completeAgentNames(cmd *cobra.Command, args []string, toComplete string) ([
 
 // completeInstallResources provides shell completion for install command with type prefix support
 // Handles both old-style subcommands and new type/name format
+// Supports multiple resource arguments and package completion
 func completeInstallResources(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	manager, err := repo.NewManager()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	// Check how many args we already have
-	argIndex := len(args)
-
-	// If this is the first argument (or continuing after previous args)
-	// If toComplete doesn't contain a slash, suggest type prefixes
-	if !strings.Contains(toComplete, "/") {
-		prefixes := []string{"skill/", "command/", "agent/", "package/"}
-		var matches []string
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(prefix, toComplete) {
-				matches = append(matches, prefix)
-			}
-		}
-		return matches, cobra.ShellCompDirectiveNoSpace
-	}
-
-	// Parse the type prefix
-	parts := strings.SplitN(toComplete, "/", 2)
-	if len(parts) != 2 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	typeStr := parts[0]
-	namePrefix := parts[1]
-
-	// Determine resource type
-	var resourceType resource.ResourceType
-	switch strings.ToLower(typeStr) {
-	case "skill", "skills":
-		resourceType = resource.Skill
-	case "command", "commands":
-		resourceType = resource.Command
-	case "agent", "agents":
-		resourceType = resource.Agent
-	case "package", "packages":
-		resourceType = resource.PackageType
-	default:
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	// Get resources of that type
-	resources, err := manager.List(&resourceType)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	// Build completions with type prefix
-	var suggestions []string
-	for _, res := range resources {
-		if strings.HasPrefix(res.Name, namePrefix) {
-			suggestions = append(suggestions, typeStr+"/"+res.Name)
-		}
-	}
-
-	// Allow multiple resources: after completing one, suggest prefixes again
-	if argIndex > 0 {
-		// Already have some args, so also suggest type prefixes for next resource
-		return suggestions, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	return suggestions, cobra.ShellCompDirectiveNoFileComp
+	return completeResourcesWithOptions(completionOptions{
+		includePackages: true,
+		multiArg:        true,
+	})(cmd, args, toComplete)
 }
 
 // completeUninstallResources provides shell completion for uninstall command with type prefix support
