@@ -481,11 +481,14 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 			}
 
 			for _, entry := range entries {
-				if !entry.IsDir() {
+				skillPath := filepath.Join(skillsPath, entry.Name())
+
+				// Follow symlinks to check if target is a directory
+				info, err := os.Stat(skillPath)
+				if err != nil || !info.IsDir() {
 					continue
 				}
 
-				skillPath := filepath.Join(skillsPath, entry.Name())
 				res, err := resource.LoadSkill(skillPath)
 				if err != nil {
 					// Skip invalid skills
