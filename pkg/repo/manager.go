@@ -739,7 +739,14 @@ func copyDir(src, dst string) error {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 
-		if entry.IsDir() {
+		// Follow symlinks with os.Stat
+		info, err := os.Stat(srcPath)
+		if err != nil {
+			// Skip entries we can't stat
+			continue
+		}
+
+		if info.IsDir() {
 			// Recursively copy subdirectory
 			if err := copyDir(srcPath, dstPath); err != nil {
 				return err

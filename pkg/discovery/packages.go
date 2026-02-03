@@ -92,7 +92,11 @@ func recursiveSearchPackages(basePath string, depth int) ([]*resource.Package, e
 	}
 
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		entryPath := filepath.Join(basePath, entry.Name())
+
+		// Follow symlinks with os.Stat
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil || !entryInfo.IsDir() {
 			continue
 		}
 
@@ -106,8 +110,7 @@ func recursiveSearchPackages(basePath string, depth int) ([]*resource.Package, e
 			continue
 		}
 
-		subdirPath := filepath.Join(basePath, entry.Name())
-		subPackages, err := recursiveSearchPackages(subdirPath, depth+1)
+		subPackages, err := recursiveSearchPackages(entryPath, depth+1)
 		if err == nil {
 			allPackages = append(allPackages, subPackages...)
 		}
