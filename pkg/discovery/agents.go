@@ -152,7 +152,13 @@ func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, []Dis
 	for _, entry := range entries {
 		entryPath := filepath.Join(dir, entry.Name())
 
-		if entry.IsDir() {
+		// Follow symlinks with os.Stat
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil {
+			continue
+		}
+
+		if entryInfo.IsDir() {
 			// Recursively search subdirectories
 			subAgents, subErrors := searchAgentsInDirectory(entryPath, depth+1)
 			agents = append(agents, subAgents...)
@@ -221,8 +227,14 @@ func discoverAgentsInDirectory(dirPath string, recursive bool) ([]*resource.Reso
 			continue
 		}
 
+		// Follow symlinks with os.Stat
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil {
+			continue
+		}
+
 		// If it's a .md file, try to load as agent
-		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".md" {
+		if !entryInfo.IsDir() && filepath.Ext(entry.Name()) == ".md" {
 			// Only parse files that are in an agents/ subtree
 			if !isInAgentsSubtree(entryPath) {
 				continue
@@ -281,7 +293,11 @@ func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Reso
 	}
 
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		entryPath := filepath.Join(dirPath, entry.Name())
+
+		// Follow symlinks with os.Stat
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil || !entryInfo.IsDir() {
 			continue
 		}
 
@@ -290,8 +306,7 @@ func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Reso
 			continue
 		}
 
-		subPath := filepath.Join(dirPath, entry.Name())
-		subAgents, subErrors, err := discoverAgentsRecursive(subPath, currentDepth+1)
+		subAgents, subErrors, err := discoverAgentsRecursive(entryPath, currentDepth+1)
 		if err != nil {
 			// Continue on error
 			continue

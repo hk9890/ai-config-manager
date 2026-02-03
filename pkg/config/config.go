@@ -10,6 +10,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )
 
@@ -229,10 +230,19 @@ func Load(projectPath string) (*Config, error) {
 // Checks ~/.config/aimgr/aimgr.yaml and falls back to ~/.ai-repo.yaml
 // Automatically migrates from old location if found
 func LoadGlobal() (*Config, error) {
-	// Get new config path
-	configPath, err := GetConfigPath()
-	if err != nil {
-		return nil, fmt.Errorf("getting config path: %w", err)
+	var configPath string
+	var err error
+
+	// Priority 1: Check if Viper has a config file set (via --config flag)
+	viperConfigFile := viper.ConfigFileUsed()
+	if viperConfigFile != "" {
+		configPath = viperConfigFile
+	} else {
+		// Priority 2: Use default config path
+		configPath, err = GetConfigPath()
+		if err != nil {
+			return nil, fmt.Errorf("getting config path: %w", err)
+		}
 	}
 
 	// Check if new config exists

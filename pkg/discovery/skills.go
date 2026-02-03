@@ -165,21 +165,24 @@ func searchSkillsInDir(dirPath string) ([]*resource.Resource, []DiscoveryError) 
 
 	// Check each subdirectory for SKILL.md
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		entryPath := filepath.Join(dirPath, entry.Name())
+		
+		// Follow symlinks with os.Stat
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil || !entryInfo.IsDir() {
 			continue
 		}
 
-		skillPath := filepath.Join(dirPath, entry.Name())
-		if !isSkillDir(skillPath) {
+		if !isSkillDir(entryPath) {
 			continue
 		}
 
 		// Try to load the skill
-		skill, err := resource.LoadSkill(skillPath)
+		skill, err := resource.LoadSkill(entryPath)
 		if err != nil {
 			// Collect error instead of silently skipping
 			errors = append(errors, DiscoveryError{
-				Path:  skillPath,
+				Path:  entryPath,
 				Error: err,
 			})
 			continue
@@ -217,11 +220,13 @@ func recursiveSearchSkills(rootPath string, currentDepth int) ([]*resource.Resou
 
 	// Check each entry
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		entryPath := filepath.Join(rootPath, entry.Name())
+		
+		// Follow symlinks with os.Stat
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil || !entryInfo.IsDir() {
 			continue
 		}
-
-		entryPath := filepath.Join(rootPath, entry.Name())
 
 		// Skip hidden directories (except those in our priority list)
 		if len(entry.Name()) > 0 && entry.Name()[0] == '.' {

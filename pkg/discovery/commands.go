@@ -135,7 +135,13 @@ func searchCommandsInDirectory(dir string, depth int, basePath string) ([]*resou
 	for _, entry := range entries {
 		entryPath := filepath.Join(dir, entry.Name())
 
-		if entry.IsDir() {
+		// Follow symlinks with os.Stat
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil {
+			continue
+		}
+
+		if entryInfo.IsDir() {
 			// Recursively search subdirectories
 			subCommands, subErrors := searchCommandsInDirectory(entryPath, depth+1, basePath)
 			commands = append(commands, subCommands...)
@@ -193,7 +199,11 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 	}
 
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		entryPath := filepath.Join(currentPath, entry.Name())
+
+		// Follow symlinks with os.Stat
+		entryInfo, err := os.Stat(entryPath)
+		if err != nil || !entryInfo.IsDir() {
 			continue
 		}
 
@@ -212,8 +222,6 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 			continue
 		}
 
-		subdirPath := filepath.Join(currentPath, entry.Name())
-
 		// Handle 'commands' directories specially
 		if entry.Name() == "commands" {
 			// Skip root-level 'commands' (already handled by priority search)
@@ -223,7 +231,7 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 			// For nested 'commands' directories (depth > 0):
 			// Search them recursively using the 'commands' directory as basePath
 			// (similar to how priority search works)
-			cmdDirCommands, cmdDirErrors := searchCommandsInDirectory(subdirPath, 0, subdirPath)
+			cmdDirCommands, cmdDirErrors := searchCommandsInDirectory(entryPath, 0, entryPath)
 			allCommands = append(allCommands, cmdDirCommands...)
 			allErrors = append(allErrors, cmdDirErrors...)
 			// Don't recurse into this 'commands' directory again with recursiveSearchCommands
@@ -231,7 +239,7 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 		}
 
 		// For non-'commands' directories, continue recursive search
-		subCommands, subErrors := recursiveSearchCommands(subdirPath, depth+1, basePath)
+		subCommands, subErrors := recursiveSearchCommands(entryPath, depth+1, basePath)
 		allCommands = append(allCommands, subCommands...)
 		allErrors = append(allErrors, subErrors...)
 	}
