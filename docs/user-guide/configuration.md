@@ -315,7 +315,7 @@ install:
 **Valid tools:**
 - `claude` - Claude Code (`.claude/` directories)
 - `opencode` - OpenCode (`.opencode/` directories)
-- `copilot` - GitHub Copilot (`.github/skills/` directories)
+- `copilot` or `vscode` - VSCode / GitHub Copilot (`.github/skills/` directories, skills only)
 
 **Behavior:**
 - Used when installing to fresh projects (no existing tool directories)

@@ -17,6 +17,8 @@ const (
 	OpenCode
 	// Copilot represents GitHub Copilot (supports skills only)
 	Copilot
+	// VSCode is an alias for Copilot (GitHub Copilot in VSCode)
+	VSCode = Copilot
 )
 
 // String returns the string representation of a Tool
@@ -26,7 +28,7 @@ func (t Tool) String() string {
 		return "claude"
 	case OpenCode:
 		return "opencode"
-	case Copilot:
+	case Copilot: // VSCode is an alias, same value
 		return "copilot"
 	default:
 		return "unknown"
@@ -40,10 +42,10 @@ func ParseTool(s string) (Tool, error) {
 		return Claude, nil
 	case "opencode":
 		return OpenCode, nil
-	case "copilot":
+	case "copilot", "vscode":
 		return Copilot, nil
 	default:
-		return -1, fmt.Errorf("unknown tool: %s (must be: claude, opencode, or copilot)", s)
+		return -1, fmt.Errorf("unknown tool: %s (must be: claude, opencode, copilot, or vscode)", s)
 	}
 }
 
@@ -88,9 +90,9 @@ func GetToolInfo(tool Tool) ToolInfo {
 			SupportsSkills:   true,
 			SupportsAgents:   true,
 		}
-	case Copilot:
+	case Copilot: // VSCode is an alias for Copilot
 		return ToolInfo{
-			Name:             "GitHub Copilot",
+			Name:             "GitHub Copilot / VSCode",
 			CommandsDir:      "", // Not supported
 			SkillsDir:        ".github/skills",
 			AgentsDir:        "", // Not supported

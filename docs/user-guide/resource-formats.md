@@ -278,7 +278,7 @@ err := resource.WriteAgent(agent, "code-reviewer.md")
 
 ### Tool Support
 
-OpenCode is supported as a first-class AI tool alongside Claude Code and GitHub Copilot.
+OpenCode and VSCode / GitHub Copilot are supported as first-class AI tools alongside Claude Code.
 
 **Tool Directories:**
 
@@ -286,7 +286,14 @@ OpenCode is supported as a first-class AI tool alongside Claude Code and GitHub 
 |------|----------|--------|--------|
 | Claude Code | `.claude/commands/` | `.claude/skills/` | `.claude/agents/` |
 | OpenCode | `.opencode/commands/` | `.opencode/skills/` | `.opencode/agents/` |
-| GitHub Copilot | N/A | `.github/skills/` | N/A |
+| VSCode / GitHub Copilot | N/A | `.github/skills/` | N/A |
+
+**VSCode / GitHub Copilot Support:**
+- Only supports skills (no commands or agents)
+- Skills use the same `SKILL.md` format as Claude Code and OpenCode
+- Follows the [Agent Skills standard](https://www.agentskills.io/) at agentskills.io
+- Compatible with both the Copilot CLI and coding agent features
+- Use `--tool=copilot` or `--tool=vscode` (both names work)
 
 **OpenCode-Specific Features:**
 

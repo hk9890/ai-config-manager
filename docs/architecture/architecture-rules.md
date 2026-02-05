@@ -7,6 +7,7 @@ This document establishes strict architectural rules for the ai-config-manager c
 - [Rule 2: XDG Base Directory Specification](#rule-2-xdg-base-directory-specification)
 - [Rule 3: Build Tags for Test Categories](#rule-3-build-tags-for-test-categories)
 - [Rule 4: Error Wrapping Requirements](#rule-4-error-wrapping-requirements)
+- [Rule 5: Symlink Handling for Filesystem Operations](#rule-5-symlink-handling-for-filesystem-operations)
 - [Version History](#version-history)
 
 ---
@@ -347,12 +348,247 @@ if err != nil {
 
 ---
 
+## Rule 5: Symlink Handling for Filesystem Operations
+
+**Status**: ✅ Active (Since 2026-02-05)
+
+### Statement
+
+All filesystem traversal code **MUST** support both real files/directories (COPY mode) and symlinks (SYMLINK mode). When checking if a path is a directory, use `os.Stat()` which follows symlinks, not `entry.IsDir()` from `os.ReadDir()`.
+
+### Context
+
+Resources can be imported via two modes:
+- **COPY mode**: GitHub imports - creates real files/directories in repository
+- **SYMLINK mode**: Local imports - creates symlinks to source locations
+
+All filesystem traversal code must support BOTH modes transparently.
+
+### Problem
+
+`os.ReadDir()` returns directory entries where `entry.IsDir()` reports `false` for symlinks to directories. This causes code to skip symlinked directories when it should process them as regular directories.
+
+**Example of the issue:**
+```bash
+# Real directory
+$ ls -ld /repo/skills/real-skill/
+drwxr-xr-x  /repo/skills/real-skill/
+# entry.IsDir() = true ✓
+
+# Symlinked directory  
+$ ls -ld /repo/skills/symlinked-skill/
+lrwxrwxrwx  /repo/skills/symlinked-skill/ -> /source/symlinked-skill/
+# entry.IsDir() = false ✗ (reports as symlink, not directory)
+```
+
+### Correct Usage
+
+✅ **DO**: Use `os.Stat()` which follows symlinks
+
+```go
+entries, err := os.ReadDir(dir)
+if err != nil {
+    return fmt.Errorf("failed to read directory: %w", err)
+}
+
+for _, entry := range entries {
+    path := filepath.Join(dir, entry.Name())
+    
+    // Follow symlinks to check if target is a directory
+    info, err := os.Stat(path)
+    if err != nil {
+        // Handle error (broken symlink, permissions, etc.)
+        continue
+    }
+    
+    if info.IsDir() {
+        // Process directory (works for both real and symlinked dirs)
+        processDirectory(path)
+    }
+}
+```
+
+✅ **DO**: Use `os.Lstat()` when you need symlink metadata
+
+```go
+// When you explicitly need to know if something IS a symlink
+info, err := os.Lstat(path)
+if err != nil {
+    return err
+}
+
+if info.Mode()&os.ModeSymlink != 0 {
+    // This is a symlink - get its target
+    target, err := os.Readlink(path)
+    // ...
+}
+```
+
+### Prohibited Patterns
+
+❌ **DON'T**: Use `entry.IsDir()` directly from `os.ReadDir()`
+
+```go
+// WRONG: Skips symlinked directories
+entries, _ := os.ReadDir(dir)
+for _, entry := range entries {
+    if entry.IsDir() {  // ← Returns false for symlinks!
+        processDirectory(entry.Name())
+    }
+}
+```
+
+❌ **DON'T**: Skip symlinks without justification
+
+```go
+// WRONG: Silently excludes symlinked resources
+if info.Mode()&os.ModeSymlink != 0 {
+    continue  // Why? This breaks SYMLINK mode!
+}
+```
+
+### Guidelines
+
+1. **Default Behavior**: Follow symlinks during directory traversal
+2. **Document Exceptions**: If you intentionally skip symlinks, document why
+3. **Test Both Modes**: Every discovery function must test both real and symlinked resources
+4. **Error Handling**: Handle broken symlinks gracefully (permissions, missing targets)
+
+### Common Use Cases
+
+**Directory Traversal for Resource Discovery:**
+```go
+// Pattern: List all skill directories
+func findSkills(repoDir string) ([]string, error) {
+    skillsDir := filepath.Join(repoDir, "skills")
+    entries, err := os.ReadDir(skillsDir)
+    if err != nil {
+        return nil, err
+    }
+    
+    var skills []string
+    for _, entry := range entries {
+        path := filepath.Join(skillsDir, entry.Name())
+        
+        // ✓ Follow symlinks
+        info, err := os.Stat(path)
+        if err != nil {
+            log.Printf("skipping %s: %v", path, err)
+            continue
+        }
+        
+        if info.IsDir() {
+            skills = append(skills, path)
+        }
+    }
+    return skills, nil
+}
+```
+
+**Recursive Directory Walk:**
+```go
+// Pattern: Walk directory tree, following symlinks
+func walkResources(root string, fn func(path string) error) error {
+    return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+            return err
+        }
+        
+        // filepath.Walk automatically follows symlinks via os.Lstat
+        // But you still need os.Stat if you need the target's info
+        if info.IsDir() {
+            return fn(path)
+        }
+        return nil
+    })
+}
+```
+
+### Testing Requirements
+
+Every resource discovery/listing function **MUST** test both:
+- ✅ Real directories (COPY mode)
+- ✅ Symlinked directories (SYMLINK mode)
+
+**Test Pattern:**
+```go
+func TestDiscoverSkills_WithSymlinks(t *testing.T) {
+    // Test 1: Real directory
+    realDir := filepath.Join(t.TempDir(), "real-skill")
+    os.MkdirAll(realDir, 0755)
+    os.WriteFile(filepath.Join(realDir, "SKILL.md"), []byte("# Skill"), 0644)
+    
+    // Test 2: Symlinked directory
+    sourceDir := filepath.Join(t.TempDir(), "source-skill")
+    os.MkdirAll(sourceDir, 0755)
+    os.WriteFile(filepath.Join(sourceDir, "SKILL.md"), []byte("# Skill"), 0644)
+    
+    symlinkDir := filepath.Join(t.TempDir(), "symlink-skill")
+    os.Symlink(sourceDir, symlinkDir)
+    
+    // Both should be discovered
+    skills, err := discoverSkills(t.TempDir())
+    require.NoError(t, err)
+    assert.Len(t, skills, 2)
+}
+```
+
+**Test Helper Available:**
+```go
+import "github.com/hk9890/ai-config-manager/test/testutil"
+
+// Creates source directory and symlink, returns both paths + cleanup
+sourceDir, symlinkPath, cleanup := testutil.CreateSymlinkedDir(t, "my-skill")
+defer cleanup()
+```
+
+### Enforcement
+
+#### Code Review Checklist
+- [ ] If code uses `os.ReadDir()` + `entry.IsDir()`, verify symlinks are handled
+- [ ] Tests include both real and symlinked directory cases
+- [ ] Intentional symlink skipping is documented with rationale
+
+#### Static Analysis
+```bash
+# Detect potential symlink issues in discovery code
+rg "entry\.IsDir\(\)" pkg/discovery/ pkg/repo/
+```
+
+### Historical Context
+
+This rule was added to prevent recurrence of symlink-related bugs:
+
+- **ai-config-manager-nm6i** (2026-02-03): Skills listing skipped symlinked skills
+  - Root cause: Used `entry.IsDir()` which returns false for symlinks
+  - Impact: Local symlinked skills invisible to `aimgr list`
+  - Fix: Changed to `os.Stat()` + `info.IsDir()`
+
+- **ai-config-manager-pepy** (2026-02-03): copyDir and package discovery skip symlinks
+  - Same pattern in multiple code locations
+  - Discovered during comprehensive audit
+
+### Why This Matters
+
+1. **Feature Parity**: SYMLINK mode should behave identically to COPY mode
+2. **User Expectations**: Users expect symlinked resources to work transparently
+3. **Development Workflow**: Local development often uses symlinks for rapid iteration
+4. **Data Integrity**: Skipping symlinks silently loses user data
+
+### Related Rules
+
+- **Rule 1**: Git workspace caching (affects how resources are initially stored)
+- **Rule 4**: Error wrapping (handle broken symlinks with clear error messages)
+
+---
+
 ## Version History
 
 | Version | Date | Change | Author |
 |---------|------|--------|--------|
 | 1.0 | 2026-01-27 | Initial version with Git workspace rule | AI Agent |
 | 1.0 | 2026-01-27 | Added XDG, build tags, error wrapping rules | AI Agent |
+| 1.1 | 2026-02-05 | Added Rule 5: Symlink handling for filesystem operations | AI Agent |
 
 ---
 

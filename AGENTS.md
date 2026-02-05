@@ -6,15 +6,16 @@
 
 ## Project Overview
 
-**aimgr** is a CLI tool for managing AI resources (commands, skills, and agents) across multiple AI coding tools (Claude Code, OpenCode, GitHub Copilot). It uses a centralized repository with symlink-based installation.
+**aimgr** is a CLI tool for managing AI resources (commands, skills, and agents) across multiple AI coding tools (Claude Code, OpenCode, VSCode / GitHub Copilot). It uses a centralized repository with symlink-based installation.
 
 **Key Concepts:**
 - **Language**: Go 1.25.6
 - **Architecture**: CLI built with Cobra, resource management with symlinks  
 - **Storage**: `~/.local/share/ai-config/repo/` (XDG data directory, configurable via `repo.path` or `AIMGR_REPO_PATH`)
 - **Supported Resources**: Commands, Skills, Agents, Packages
+- **Supported Tools**: Claude Code, OpenCode, VSCode / GitHub Copilot
 
-The tool discovers resources from various sources (local directories, Git repositories, GitHub), stores them in a central repository, and installs them via symlinks to tool-specific directories (`.claude/`, `.opencode/`, etc.).
+The tool discovers resources from various sources (local directories, Git repositories, GitHub), stores them in a central repository, and installs them via symlinks to tool-specific directories (`.claude/`, `.opencode/`, `.github/skills/`).
 
 ---
 
@@ -123,6 +124,33 @@ if err != nil {
 - Use `defer file.Close()` for cleanup
 - Permissions: `0755` for dirs, `0644` for files
 
+### Symlink Handling
+
+When traversing directories:
+- Use `os.Stat()` to check if path is directory (follows symlinks)
+- Don't use `entry.IsDir()` from `os.ReadDir()` (doesn't follow symlinks)
+- Resources can be symlinked (SYMLINK mode) or real files (COPY mode)
+
+**Important**: Both modes must work identically. See [docs/architecture/architecture-rules.md Rule 5](docs/architecture/architecture-rules.md#rule-5-symlink-handling-for-filesystem-operations) for detailed guidelines.
+
+**Example**:
+```go
+// WRONG: Skips symlinked directories
+entries, _ := os.ReadDir(dir)
+for _, entry := range entries {
+    if entry.IsDir() { ... }  // ← Breaks SYMLINK mode
+}
+
+// CORRECT: Follows symlinks
+entries, _ := os.ReadDir(dir)
+for _, entry := range entries {
+    path := filepath.Join(dir, entry.Name())
+    info, err := os.Stat(path)  // ← Follows symlinks
+    if err != nil || !info.IsDir() { continue }
+    // Process directory...
+}
+```
+
 ---
 
 ## Common Patterns
@@ -176,10 +204,19 @@ result, err := mgr.AddBulk(paths, opts)
 
 ### Tool Detection
 ```go
-tool, err := tools.ParseTool("claude")  // Returns tools.Claude
+tool, err := tools.ParseTool("claude")   // Returns tools.Claude
 tool, err := tools.ParseTool("opencode") // Returns tools.OpenCode
-info := tools.GetToolInfo(tool)         // Get dirs, etc.
+tool, err := tools.ParseTool("copilot")  // Returns tools.Copilot
+tool, err := tools.ParseTool("vscode")   // Returns tools.Copilot (alias)
+info := tools.GetToolInfo(tool)          // Get dirs, etc.
 ```
+
+**VSCode / GitHub Copilot Support:**
+- Use `--tool=copilot` or `--tool=vscode` when installing (both names work)
+- Only skills are supported (no commands or agents)
+- Skills install to `.github/skills/` directory
+- Example: `aimgr install skill/pdf-processing --tool=copilot`
+- Multi-tool example: `aimgr install skill/my-skill --tool=claude,opencode,copilot`
 
 ### Pattern Matching
 ```go

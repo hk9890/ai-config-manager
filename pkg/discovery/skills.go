@@ -166,7 +166,7 @@ func searchSkillsInDir(dirPath string) ([]*resource.Resource, []DiscoveryError) 
 	// Check each subdirectory for SKILL.md
 	for _, entry := range entries {
 		entryPath := filepath.Join(dirPath, entry.Name())
-		
+
 		// Follow symlinks with os.Stat
 		entryInfo, err := os.Stat(entryPath)
 		if err != nil || !entryInfo.IsDir() {
@@ -221,7 +221,7 @@ func recursiveSearchSkills(rootPath string, currentDepth int) ([]*resource.Resou
 	// Check each entry
 	for _, entry := range entries {
 		entryPath := filepath.Join(rootPath, entry.Name())
-		
+
 		// Follow symlinks with os.Stat
 		entryInfo, err := os.Stat(entryPath)
 		if err != nil || !entryInfo.IsDir() {

@@ -70,6 +70,24 @@ func TestParseTool(t *testing.T) {
 			wantError: false,
 		},
 		{
+			name:      "vscode lowercase",
+			input:     "vscode",
+			want:      Copilot,
+			wantError: false,
+		},
+		{
+			name:      "vscode uppercase",
+			input:     "VSCODE",
+			want:      Copilot,
+			wantError: false,
+		},
+		{
+			name:      "vscode mixed case",
+			input:     "VSCode",
+			want:      Copilot,
+			wantError: false,
+		},
+		{
 			name:      "invalid tool",
 			input:     "invalid",
 			want:      -1,
@@ -105,40 +123,48 @@ func TestParseTool(t *testing.T) {
 
 func TestGetToolInfo(t *testing.T) {
 	tests := []struct {
-		name             string
-		tool             Tool
-		wantName         string
-		wantCommandsDir  string
-		wantSkillsDir    string
-		wantSupportsCmd  bool
-		wantSupportsSkil bool
+		name              string
+		tool              Tool
+		wantName          string
+		wantCommandsDir   string
+		wantSkillsDir     string
+		wantAgentsDir     string
+		wantSupportsCmd   bool
+		wantSupportsSkil  bool
+		wantSupportsAgent bool
 	}{
 		{
-			name:             "Claude",
-			tool:             Claude,
-			wantName:         "Claude Code",
-			wantCommandsDir:  ".claude/commands",
-			wantSkillsDir:    ".claude/skills",
-			wantSupportsCmd:  true,
-			wantSupportsSkil: true,
+			name:              "Claude",
+			tool:              Claude,
+			wantName:          "Claude Code",
+			wantCommandsDir:   ".claude/commands",
+			wantSkillsDir:     ".claude/skills",
+			wantAgentsDir:     ".claude/agents",
+			wantSupportsCmd:   true,
+			wantSupportsSkil:  true,
+			wantSupportsAgent: true,
 		},
 		{
-			name:             "OpenCode",
-			tool:             OpenCode,
-			wantName:         "OpenCode",
-			wantCommandsDir:  ".opencode/commands",
-			wantSkillsDir:    ".opencode/skills",
-			wantSupportsCmd:  true,
-			wantSupportsSkil: true,
+			name:              "OpenCode",
+			tool:              OpenCode,
+			wantName:          "OpenCode",
+			wantCommandsDir:   ".opencode/commands",
+			wantSkillsDir:     ".opencode/skills",
+			wantAgentsDir:     ".opencode/agents",
+			wantSupportsCmd:   true,
+			wantSupportsSkil:  true,
+			wantSupportsAgent: true,
 		},
 		{
-			name:             "Copilot",
-			tool:             Copilot,
-			wantName:         "GitHub Copilot",
-			wantCommandsDir:  "",
-			wantSkillsDir:    ".github/skills",
-			wantSupportsCmd:  false,
-			wantSupportsSkil: true,
+			name:              "Copilot",
+			tool:              Copilot,
+			wantName:          "GitHub Copilot / VSCode",
+			wantCommandsDir:   "",
+			wantSkillsDir:     ".github/skills",
+			wantAgentsDir:     "",
+			wantSupportsCmd:   false,
+			wantSupportsSkil:  true,
+			wantSupportsAgent: false,
 		},
 	}
 
@@ -154,11 +180,17 @@ func TestGetToolInfo(t *testing.T) {
 			if info.SkillsDir != tt.wantSkillsDir {
 				t.Errorf("GetToolInfo(%v).SkillsDir = %v, want %v", tt.tool, info.SkillsDir, tt.wantSkillsDir)
 			}
+			if info.AgentsDir != tt.wantAgentsDir {
+				t.Errorf("GetToolInfo(%v).AgentsDir = %v, want %v", tt.tool, info.AgentsDir, tt.wantAgentsDir)
+			}
 			if info.SupportsCommands != tt.wantSupportsCmd {
 				t.Errorf("GetToolInfo(%v).SupportsCommands = %v, want %v", tt.tool, info.SupportsCommands, tt.wantSupportsCmd)
 			}
 			if info.SupportsSkills != tt.wantSupportsSkil {
 				t.Errorf("GetToolInfo(%v).SupportsSkills = %v, want %v", tt.tool, info.SupportsSkills, tt.wantSupportsSkil)
+			}
+			if info.SupportsAgents != tt.wantSupportsAgent {
+				t.Errorf("GetToolInfo(%v).SupportsAgents = %v, want %v", tt.tool, info.SupportsAgents, tt.wantSupportsAgent)
 			}
 		})
 	}

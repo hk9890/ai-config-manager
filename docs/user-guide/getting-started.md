@@ -73,14 +73,18 @@ aimgr config set install.targets claude
 # For OpenCode
 aimgr config set install.targets opencode
 
-# For GitHub Copilot
+# For VSCode / GitHub Copilot (both names work)
 aimgr config set install.targets copilot
+aimgr config set install.targets vscode
 
 # For multiple tools (installs to all)
-aimgr config set install.targets claude,opencode
+aimgr config set install.targets claude,opencode,copilot
 ```
 
-**Tip:** If you're not sure which tool you're using, start with `claude` (most common).
+**Notes:**
+- If you're not sure which tool you're using, start with `claude` (most common)
+- VSCode / GitHub Copilot only supports skills (no commands or agents)
+- Use either `copilot` or `vscode` as the tool name (both work)
 
 ### 2. Add Your First Resource
 

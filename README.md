@@ -25,11 +25,13 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 |------|----------|--------|--------|-----------|
 | **[Claude Code](https://code.claude.com/)** | ✅ | ✅ | ✅ | `.claude/` |
 | **[OpenCode](https://opencode.ai/)** | ✅ | ✅ | ✅ | `.opencode/` |
-| **[GitHub Copilot](https://github.com/features/copilot)** | ❌ | ✅ | ❌ | `.github/skills/` |
+| **[VSCode / GitHub Copilot](https://github.com/features/copilot)** | ❌ | ✅ | ❌ | `.github/skills/` |
 
 **Notes:** 
-- GitHub Copilot only supports Agent Skills, not slash commands or agents.
-- Agents provide specialized roles with specific capabilities for different AI tools.
+- VSCode / GitHub Copilot only supports [Agent Skills](https://www.agentskills.io/) (via the open standard at agentskills.io), not slash commands or agents.
+- Skills for Copilot use the same `SKILL.md` format as other tools.
+- Use `--tool=copilot` or `--tool=vscode` when installing resources (both names work).
+- Agents provide specialized roles with specific capabilities for Claude Code and OpenCode.
 
 ## Installation
 
@@ -453,6 +455,11 @@ aimgr install agent/code-reviewer
 # Install multiple resources at once
 aimgr install skill/pdf-processing command/my-command agent/code-reviewer
 
+# Install for specific tools
+aimgr install skill/pdf-processing --tool=copilot      # VSCode/Copilot only
+aimgr install skill/pdf-processing --tool=vscode       # Same as copilot
+aimgr install skill/pdf-processing --tool=claude,opencode,copilot  # Multiple tools
+
 # Use patterns to install multiple resources
 aimgr install "skill/*"              # Install all skills
 aimgr install "*test*"               # Install all resources with "test" in name
@@ -460,7 +467,7 @@ aimgr install "skill/pdf*"           # Install skills starting with "pdf"
 aimgr install "command/test*" "agent/qa*"  # Multiple patterns
 
 # Resources are symlinked to tool-specific directories
-# Example: .claude/commands/, .opencode/commands/, etc.
+# Example: .claude/commands/, .opencode/commands/, .github/skills/
 ```
 
 ### 5. Remove Resources
@@ -555,10 +562,12 @@ The `install.targets` setting controls which tool directories are created when i
 
 ### Tool-Specific Behavior
 
-- **Claude Code** and **OpenCode** support both commands and skills
-- **GitHub Copilot** only supports skills (no commands)
+- **Claude Code** and **OpenCode** support commands, skills, and agents
+- **VSCode / GitHub Copilot** only supports skills (no commands or agents)
+- Skills for Copilot follow the [Agent Skills standard](https://www.agentskills.io/) at agentskills.io
 - When installing commands to a Copilot-only project, the command is not installed
-- When installing to multiple tools including Copilot, commands are installed to Claude/OpenCode only
+- When installing to multiple tools including Copilot, commands and agents are installed to Claude/OpenCode only
+- Use either `--tool=copilot` or `--tool=vscode` (both names work)
 
 ### Migration from .ai Directory
 

@@ -569,3 +569,125 @@ func TestExplicitTargetOverridesDetection(t *testing.T) {
 		t.Error("Command should not be installed in Claude when using explicit target")
 	}
 }
+
+func TestInstallSkillToCopilot(t *testing.T) {
+	manager, _ := setupTestRepo(t)
+	projectDir := t.TempDir()
+
+	// Create installer targeting Copilot/VSCode
+	installer, err := NewInstallerWithTargets(projectDir, []tools.Tool{tools.Copilot})
+	if err != nil {
+		t.Fatalf("NewInstallerWithTargets() error = %v", err)
+	}
+
+	// Install skill
+	err = installer.InstallSkill("test-skill", manager)
+	if err != nil {
+		t.Fatalf("InstallSkill() error = %v", err)
+	}
+
+	// Verify .github directory was created
+	githubDir := filepath.Join(projectDir, ".github")
+	info, err := os.Stat(githubDir)
+	if err != nil {
+		t.Fatalf(".github directory not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error(".github should be a directory")
+	}
+	if info.Mode().Perm() != 0755 {
+		t.Errorf(".github directory permissions = %o, want 0755", info.Mode().Perm())
+	}
+
+	// Verify skills directory was created
+	skillsDir := filepath.Join(projectDir, ".github", "skills")
+	info, err = os.Stat(skillsDir)
+	if err != nil {
+		t.Fatalf(".github/skills directory not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error(".github/skills should be a directory")
+	}
+	if info.Mode().Perm() != 0755 {
+		t.Errorf(".github/skills directory permissions = %o, want 0755", info.Mode().Perm())
+	}
+
+	// Verify symlink was created in .github/skills
+	symlinkPath := filepath.Join(projectDir, ".github", "skills", "test-skill")
+	info, err = os.Lstat(symlinkPath)
+	if err != nil {
+		t.Fatalf("Symlink not created: %v", err)
+	}
+
+	// Verify it's a symlink
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Error("Expected symlink, got regular directory")
+	}
+
+	// Verify symlink target is correct
+	target, err := os.Readlink(symlinkPath)
+	if err != nil {
+		t.Fatalf("Failed to read symlink: %v", err)
+	}
+
+	expectedTarget := manager.GetPath("test-skill", resource.Skill)
+	if target != expectedTarget {
+		t.Errorf("Symlink target = %v, want %v", target, expectedTarget)
+	}
+}
+
+func TestInstallSkillMultipleToolsIncludingCopilot(t *testing.T) {
+	manager, _ := setupTestRepo(t)
+	projectDir := t.TempDir()
+
+	// Create installer targeting all three tools
+	installer, err := NewInstallerWithTargets(projectDir, []tools.Tool{tools.Claude, tools.OpenCode, tools.Copilot})
+	if err != nil {
+		t.Fatalf("NewInstallerWithTargets() error = %v", err)
+	}
+
+	// Install skill
+	err = installer.InstallSkill("test-skill", manager)
+	if err != nil {
+		t.Fatalf("InstallSkill() error = %v", err)
+	}
+
+	// Verify symlink was created in all three directories
+	claudeSymlink := filepath.Join(projectDir, ".claude", "skills", "test-skill")
+	opencodeSymlink := filepath.Join(projectDir, ".opencode", "skills", "test-skill")
+	copilotSymlink := filepath.Join(projectDir, ".github", "skills", "test-skill")
+
+	for _, path := range []string{claudeSymlink, opencodeSymlink, copilotSymlink} {
+		info, err := os.Lstat(path)
+		if err != nil {
+			t.Errorf("Symlink not created at %s: %v", path, err)
+			continue
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			t.Errorf("Expected symlink at %s, got regular directory", path)
+		}
+	}
+}
+
+func TestInstallSkillCopilotSkipsCommands(t *testing.T) {
+	manager, _ := setupTestRepo(t)
+	projectDir := t.TempDir()
+
+	// Create installer targeting Copilot (doesn't support commands)
+	installer, err := NewInstallerWithTargets(projectDir, []tools.Tool{tools.Copilot})
+	if err != nil {
+		t.Fatalf("NewInstallerWithTargets() error = %v", err)
+	}
+
+	// Try to install command - should succeed but not create anything
+	err = installer.InstallCommand("test-cmd", manager)
+	if err != nil {
+		t.Fatalf("InstallCommand() error = %v", err)
+	}
+
+	// Verify no .github/commands directory was created
+	githubCommandsDir := filepath.Join(projectDir, ".github", "commands")
+	if _, err := os.Stat(githubCommandsDir); err == nil {
+		t.Error("Copilot should not create commands directory (commands not supported)")
+	}
+}
