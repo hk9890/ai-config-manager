@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [1.20.0] - 2026-02-05
+
+### Added
+- **VSCode / GitHub Copilot support** - Added full support for VSCode with GitHub Copilot
+  - New tool constants: `Copilot` and `VSCode` (alias)
+  - Install skills with `--tool=copilot` or `--tool=vscode`
+  - Skills install to `.github/skills/` directory
+  - Multi-tool support: `--tool=claude,opencode,copilot`
+  - Tool detection finds `.github/skills/` directories
+  - Copilot supports skills only (commands and agents not supported)
+  - Comprehensive integration tests for full workflow
+  - Updated documentation with VSCode/Copilot examples
+
+### Documentation
+- **Architecture documentation enhanced**
+  - Added Rule 5: Symlink Handling for Filesystem Operations
+  - Comprehensive symlink best practices
+  - Test utilities for symlink testing (`test/testutil/symlinks.go`)
+  - Updated AGENTS.md with symlink guidelines
+  - Examples throughout user documentation
+
+### Fixed
+- **Test compilation error** - Fixed `repo_describe_test.go` missing format parameter
+
 ## [1.15.0] - 2026-01-29
 
 ### Fixed
