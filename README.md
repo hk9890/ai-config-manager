@@ -1,5 +1,10 @@
 # aimgr - AI Resources Manager
 
+[![Build Status](https://github.com/hk9890/ai-config-manager/actions/workflows/build.yml/badge.svg)](https://github.com/hk9890/ai-config-manager/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/releases)
+[![License](https://img.shields.io/github/license/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/blob/main/LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/blob/main/go.mod)
+
 A command-line tool for discovering, installing, and managing AI resources (commands and skills) across multiple AI coding tools including Claude Code, OpenCode, and GitHub Copilot.
 
 ## Features
@@ -35,41 +40,13 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 
 ## Installation
 
-### Download Binary
+### Using Go (Recommended)
 
-Download the latest release for your platform from the [Releases page](https://github.com/hk9890/ai-config-manager/releases).
+The easiest way to install `aimgr` is using Go:
 
-**Linux (amd64)**:
 ```bash
-curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_linux_amd64.tar.gz | tar xz
-sudo mv aimgr /usr/local/bin/
+go install github.com/hk9890/ai-config-manager@latest
 ```
-
-**Linux (arm64)**:
-```bash
-curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_linux_arm64.tar.gz | tar xz
-sudo mv aimgr /usr/local/bin/
-```
-
-**macOS (Intel)**:
-```bash
-curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_darwin_amd64.tar.gz | tar xz
-sudo mv aimgr /usr/local/bin/
-```
-
-**macOS (Apple Silicon)**:
-```bash
-curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_darwin_arm64.tar.gz | tar xz
-sudo mv aimgr /usr/local/bin/
-```
-
-**Windows (PowerShell)**:
-```powershell
-Invoke-WebRequest -Uri "https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_windows_amd64.zip" -OutFile "aimgr.zip"
-Expand-Archive -Path "aimgr.zip" -DestinationPath "."
-```
-
-*Note: Replace `VERSION` with the actual version number (e.g., `v0.1.0`).*
 
 ### From Source
 
@@ -78,18 +55,14 @@ Expand-Archive -Path "aimgr.zip" -DestinationPath "."
 git clone https://github.com/hk9890/ai-config-manager.git
 cd ai-config-manager
 
-# Build and install
+# Build and install to ~/bin
 make install
 
-# Or just build
+# Or just build (outputs to ./aimgr)
 make build
 ```
 
-### Using Go
-
-```bash
-go install github.com/hk9890/ai-config-manager@latest
-```
+**Note:** Precompiled binaries are not currently available. Please use one of the above installation methods.
 
 ## Shell Completion
 
@@ -2506,7 +2479,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Testing requirements
 - Architecture overview
 
-For quick questions or discussions, visit our [GitHub Discussions](https://github.com/hk9890/ai-config-manager/discussions).
+For quick questions or discussions, please contact the repository maintainer.
 
 ## License
 
@@ -2521,8 +2494,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- Issues: https://github.com/hk9890/ai-config-manager/issues
-- Discussions: https://github.com/hk9890/ai-config-manager/discussions
+For questions, bug reports, or feature requests, please contact the repository maintainer directly.
 
 ## Troubleshooting
 

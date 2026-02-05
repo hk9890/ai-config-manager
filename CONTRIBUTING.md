@@ -15,9 +15,11 @@ Thank you for your interest in contributing to aimgr! This document provides gui
 
 ### Prerequisites
 
-- **Go 1.25 or higher** (check with `go version`)
+- **Go 1.25.6 or higher** (check with `go version`)
 - **Make** (optional, but recommended)
 - **Git**
+
+**Note:** If Go is not installed, you can download it from [golang.org/dl](https://golang.org/dl/).
 
 ### Clone and Build
 
@@ -75,7 +77,6 @@ aimgr is a CLI tool built with Go that manages AI resources (commands and skills
 ai-config-manager/
 ├── cmd/                    # CLI command definitions (Cobra)
 │   ├── root.go            # Root command and global flags
-│   ├── add.go             # Add command (auto-discovery from sources)
 │   ├── config.go          # Configuration management
 │   ├── init.go            # Initialize ai.package.yaml
 │   ├── install.go         # Install resources/packages
@@ -84,13 +85,16 @@ ai-config-manager/
 │   ├── remove.go          # Remove resources
 │   ├── uninstall.go       # Uninstall from project
 │   ├── repo.go            # Repo subcommand group
-│   ├── repo_create_package.go  # Create packages
-│   ├── repo_show.go       # Show resource details
+│   ├── repo_import.go     # Import resources from sources
 │   ├── repo_sync.go       # Sync from configured sources
-│   ├── repo_update.go     # Update resources from sources
+│   ├── repo_drop.go       # Drop resources from repository
 │   ├── repo_prune.go      # Prune unused caches
 │   ├── repo_verify.go     # Verify repository health
+│   ├── repo_info.go       # Show repository information
+│   ├── repo_describe.go   # Describe resource details
 │   ├── completion.go      # Shell completion
+│   ├── completion_helpers.go  # Completion helper functions
+│   ├── pattern_utils.go   # Pattern matching utilities
 │   └── *_test.go          # Test files
 │
 ├── pkg/                    # Core packages
@@ -103,6 +107,9 @@ ai-config-manager/
 │   │   ├── agents.go      # Agent auto-discovery
 │   │   ├── packages.go    # Package auto-discovery
 │   │   └── testdata/      # Test fixtures
+│   │
+│   ├── errors/            # Error types and handling
+│   │   └── errors.go      # Custom error types
 │   │
 │   ├── install/           # Installation logic
 │   │   └── installer.go   # Symlink creation, tool detection
@@ -117,6 +124,9 @@ ai-config-manager/
 │   │
 │   ├── metadata/          # Metadata tracking
 │   │   └── metadata.go    # Resource metadata management
+│   │
+│   ├── output/            # Output formatting
+│   │   └── formatter.go   # Table, JSON, YAML formatting
 │   │
 │   ├── pattern/           # Pattern matching
 │   │   └── matcher.go     # Glob pattern matching for resources
@@ -143,14 +153,17 @@ ai-config-manager/
 │   │   └── version.go     # Embedded at build time
 │   │
 │   └── workspace/         # Workspace caching
-│       └── cache.go       # Git repository caching for repo operations
+│       └── manager.go     # Git repository caching for repo operations
 │
-├── test/                   # Integration tests
+├── test/                   # Integration and E2E tests
 │   ├── integration_test.go       # End-to-end workflow tests
 │   ├── ai_package_test.go        # ai.package.yaml tests
 │   ├── marketplace_test.go       # Marketplace import tests
 │   ├── package_import_test.go    # Package auto-import tests
-│   └── github_sources_test.go    # GitHub source tests
+│   ├── cli_integration_test.go   # CLI integration tests
+│   ├── e2e/                      # End-to-end tests
+│   ├── testdata/                 # Test fixtures
+│   └── testutil/                 # Test utilities and helpers
 │
 ├── examples/               # Example resources
 │   ├── sample-command.md
@@ -159,6 +172,12 @@ ai-config-manager/
 │   ├── marketplace/        # Marketplace examples
 │   ├── packages/           # Package examples
 │   └── ai-package/         # ai.package.yaml examples
+│
+├── docs/                   # Documentation
+│   ├── user-guide/         # User-facing documentation
+│   ├── contributor-guide/  # Contributor documentation
+│   ├── architecture/       # Architecture documentation
+│   └── planning/           # Planning and design documents
 │
 ├── main.go                 # Entry point
 ├── Makefile                # Build automation
@@ -171,21 +190,21 @@ ai-config-manager/
 
 #### Adding Resources (Local)
 
-1. **User runs CLI command** → `cmd/add.go` (Cobra)
+1. **User runs CLI command** → `cmd/repo_import.go` (Cobra)
 2. **Command validates input** → `pkg/resource/` (validation)
 3. **Manager handles operation** → `pkg/repo/manager.go` (add/remove/list)
 4. **Resources stored** → `~/.local/share/ai-config/repo/`
 5. **Installation creates symlinks** → `pkg/install/` → `.claude/`, `.opencode/`, etc.
 
-#### Adding Resources (GitHub)
+#### Adding Resources (GitHub/Remote)
 
-1. **User runs CLI command** → `cmd/add.go` with GitHub source
+1. **User runs CLI command** → `cmd/repo_import.go` or `cmd/repo_sync.go`
 2. **Parse source format** → `pkg/source/parser.go` (gh:owner/repo → ParsedSource)
-3. **Clone repository** → `pkg/source/git.go` (git clone to temp dir)
+3. **Workspace caching** → `pkg/workspace/manager.go` (cached clone, not temp dir)
 4. **Auto-discover resources** → `pkg/discovery/` (search standard locations)
 5. **User selection** (if multiple resources found)
 6. **Copy to repository** → `pkg/repo/manager.go` (centralized storage)
-7. **Cleanup temp directory** → `pkg/source/git.go`
+7. **Cache managed** → `pkg/workspace/manager.go` (persistent, can be pruned)
 8. **Installation works as before** → symlinks to centralized repo
 
 ### Key Design Patterns
@@ -313,7 +332,7 @@ Search locations:
 - Validate frontmatter before including
 - Max recursion depth of 5 levels
 
-#### Integration in Add Command (`cmd/add.go`)
+#### Integration in Import Command (`cmd/repo_import.go`)
 
 **Workflow:**
 ```go
@@ -323,18 +342,18 @@ parsed := source.ParseSource(input)
 // 2. Handle based on type
 switch parsed.Type {
 case source.Local:
-    // Existing behavior - add directly
-    manager.AddSkill(parsed.LocalPath)
+    // Add from local filesystem (may create symlink)
+    manager.AddSkill(parsed.LocalPath, parsed.URL, "local")
 
 case source.GitHub, source.GitURL:
-    // Clone repository
-    tempDir, err := source.CloneRepo(parsed.URL, parsed.Ref)
-    defer source.CleanupTempDir(tempDir)
+    // Use workspace cache (not temp directory)
+    workspaceMgr, _ := workspace.NewManager(repoPath)
+    clonePath, err := workspaceMgr.GetOrClone(parsed.URL, parsed.Ref)
     
     // Discover resources
-    searchPath := tempDir
+    searchPath := clonePath
     if parsed.Subpath != "" {
-        searchPath = filepath.Join(tempDir, parsed.Subpath)
+        searchPath = filepath.Join(clonePath, parsed.Subpath)
     }
     
     resources, err := discovery.DiscoverSkills(searchPath, "")
@@ -344,13 +363,15 @@ case source.GitHub, source.GitURL:
         return fmt.Errorf("no skills found in %s", parsed.URL)
     }
     if len(resources) == 1 {
-        // Add automatically
-        manager.AddSkill(resources[0].Path)
+        // Add automatically (copies to repo)
+        manager.AddSkill(resources[0].Path, parsed.URL, "git")
     } else {
         // Interactive selection or error
         selected := promptUserSelection(resources)
-        manager.AddSkill(selected.Path)
+        manager.AddSkill(selected.Path, parsed.URL, "git")
     }
+    
+    // No cleanup - workspace cache persists
 }
 ```
 
@@ -573,6 +594,37 @@ os.MkdirAll(dir, 0755)        // Directories
 os.WriteFile(path, data, 0644) // Files
 ```
 
+### Symlink Handling
+
+**CRITICAL:** Resources can be stored as real files (COPY mode) or symlinks (SYMLINK mode). All code must support both transparently.
+
+```go
+// ❌ WRONG: Skips symlinked directories
+entries, _ := os.ReadDir(dir)
+for _, entry := range entries {
+    if entry.IsDir() {  // Returns false for symlinks!
+        processDirectory(entry.Name())
+    }
+}
+
+// ✅ CORRECT: Follows symlinks
+entries, _ := os.ReadDir(dir)
+for _, entry := range entries {
+    path := filepath.Join(dir, entry.Name())
+    info, err := os.Stat(path)  // os.Stat follows symlinks
+    if err != nil {
+        continue  // Handle broken symlinks gracefully
+    }
+    if info.IsDir() {
+        processDirectory(path)  // Works for both real and symlinked dirs
+    }
+}
+```
+
+**Key Rule:** Use `os.Stat()` to follow symlinks, not `entry.IsDir()` from `os.ReadDir()`.
+
+See [Architecture Rules - Rule 5](docs/architecture/architecture-rules.md#rule-5-symlink-handling-for-filesystem-operations) for complete details.
+
 ### Resource Name Validation
 
 Resources must follow agentskills.io naming:
@@ -765,12 +817,37 @@ Use junction points instead of symlinks for Windows compatibility.
 
 ### Pull Request Process
 
-1. Create PR from your feature branch
-2. Fill out PR template (if available)
-3. Link related issues
-4. Wait for CI to pass
-5. Address review feedback
-6. Maintainer will merge when approved
+1. **Create PR** from your feature branch to `main`
+2. **Fill out description** with:
+   - What changes were made
+   - Why the changes were necessary
+   - How to test the changes
+3. **Link related issues** using keywords (e.g., "Fixes #42")
+4. **Wait for CI to pass** - GitHub Actions will run:
+   - Unit tests (`make unit-test`)
+   - Integration tests (`make integration-test`)
+   - E2E tests (`make e2e-test`)
+   - Go vet static analysis
+   - Multi-platform builds (Linux, macOS, Windows)
+5. **Address review feedback** promptly and respectfully
+6. **Maintainer will merge** when approved and all checks pass
+
+### CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration:
+
+- **Build workflow** (`.github/workflows/build.yml`):
+  - Runs on every push and pull request
+  - Tests on Linux (ubuntu-latest)
+  - Builds for multiple platforms (Linux, macOS, Windows on amd64/arm64)
+  
+- **Lint workflow** (`.github/workflows/lint.yml`):
+  - Static code analysis
+  
+- **Release workflow** (`.github/workflows/release.yml`):
+  - Automated releases on tag push
+
+**Note:** The CI currently uses Go 1.21. If you're developing with Go 1.25.6 (as specified in go.mod), be aware of potential compatibility differences. The CI configuration may need updating.
 
 ## Key Dependencies
 

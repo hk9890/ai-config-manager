@@ -92,5 +92,5 @@ goreleaser release --clean
 Verify ldflags paths match `pkg/version/version.go`:
 ```bash
 go build -ldflags "-X github.com/hk9890/ai-config-manager/pkg/version.Version=test" .
-./ai-repo --version
+./aimgr --version
 ```
