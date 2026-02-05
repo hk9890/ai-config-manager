@@ -7,12 +7,12 @@ import (
 )
 
 // TestDiscoverCommands_NestedCommandsDirectory tests discovery when 'commands' directory itself is nested
-// This reproduces the bug where knowledge-base/dynatrace/commands/ is skipped
+// This reproduces the bug where knowledge-base/company/commands/ is skipped
 func TestDiscoverCommands_NestedCommandsDirectory(t *testing.T) {
 	// Create temp directory structure: repo/subdir/commands/test.md
 	tmpDir := t.TempDir()
 
-	nestedCmdsDir := filepath.Join(tmpDir, "knowledge-base", "dynatrace", "commands", "dt")
+	nestedCmdsDir := filepath.Join(tmpDir, "knowledge-base", "company", "commands", "dept")
 	if err := os.MkdirAll(nestedCmdsDir, 0755); err != nil {
 		t.Fatalf("Failed to create nested commands dir: %v", err)
 	}
@@ -33,7 +33,7 @@ description: Test command in nested commands directory
 		t.Fatalf("DiscoverCommands failed: %v", err)
 	}
 
-	// Should find the command in knowledge-base/dynatrace/commands/dt/test-cmd.md
+	// Should find the command in knowledge-base/company/commands/dt/test-cmd.md
 	if len(commands) == 0 {
 		t.Fatalf("Expected to find command in nested 'commands' directory, but found none")
 	}

@@ -18,15 +18,15 @@ import (
 // 4. Metadata creation and correctness
 // 5. List() returns correct names
 //
-// This reproduces the bug where knowledge-base/dynatrace/commands/ was skipped
+// This reproduces the bug where knowledge-base/company/commands/ was skipped
 func TestNestedCommandsDirectory_EndToEnd(t *testing.T) {
 	// Create temp directories
 	sourceDir := t.TempDir()
 	repoDir := t.TempDir()
 
 	// Create nested commands directory structure:
-	// sourceDir/knowledge-base/dynatrace/commands/dt/critical-incident/test-cmd.md
-	nestedCmdsDir := filepath.Join(sourceDir, "knowledge-base", "dynatrace", "commands", "dt", "critical-incident")
+	// sourceDir/knowledge-base/company/commands/dt/critical-incident/test-cmd.md
+	nestedCmdsDir := filepath.Join(sourceDir, "knowledge-base", "company", "commands", "dept", "critical-incident")
 	if err := os.MkdirAll(nestedCmdsDir, 0755); err != nil {
 		t.Fatalf("Failed to create nested commands dir: %v", err)
 	}
@@ -102,7 +102,7 @@ This is a test command in a deeply nested commands directory.
 
 	// Step 3: Verify file layout
 	t.Log("Step 3: Verifying file layout")
-	expectedFile := filepath.Join(repoDir, "commands", "dt", "critical-incident", "test-cmd.md")
+	expectedFile := filepath.Join(repoDir, "commands", "dept", "critical-incident", "test-cmd.md")
 	if _, err := os.Stat(expectedFile); os.IsNotExist(err) {
 		t.Errorf("Command file not created at expected path: %s", expectedFile)
 	} else {
