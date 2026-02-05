@@ -18,7 +18,7 @@ func TestDescribeDetailedResource_Skill(t *testing.T) {
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
-	err := describeDetailedResource(mgr, "skill/test-skill")
+	err := describeDetailedResource(mgr, "skill/test-skill", "table")
 	if err != nil {
 		t.Errorf("describeDetailedResource() error = %v, want nil", err)
 	}
@@ -30,7 +30,7 @@ func TestDescribeDetailedResource_Command(t *testing.T) {
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
-	err := describeDetailedResource(mgr, "command/test-command")
+	err := describeDetailedResource(mgr, "command/test-command", "table")
 	if err != nil {
 		t.Errorf("describeDetailedResource() error = %v, want nil", err)
 	}
@@ -42,7 +42,7 @@ func TestDescribeDetailedResource_Agent(t *testing.T) {
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
-	err := describeDetailedResource(mgr, "agent/test-agent")
+	err := describeDetailedResource(mgr, "agent/test-agent", "table")
 	if err != nil {
 		t.Errorf("describeDetailedResource() error = %v, want nil", err)
 	}
@@ -54,7 +54,7 @@ func TestDescribeDetailedResource_NotFound(t *testing.T) {
 
 	mgr := repo.NewManagerWithPath(repoPath)
 
-	err := describeDetailedResource(mgr, "skill/nonexistent")
+	err := describeDetailedResource(mgr, "skill/nonexistent", "table")
 	if err == nil {
 		t.Error("describeDetailedResource() expected error for nonexistent resource, got nil")
 	}
@@ -90,7 +90,7 @@ func TestDescribeDetailedResource_InvalidFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := describeDetailedResource(mgr, tt.arg)
+			err := describeDetailedResource(mgr, tt.arg, "table")
 			if err == nil {
 				t.Errorf("describeDetailedResource(%q) expected error, got nil", tt.arg)
 				return
@@ -117,7 +117,7 @@ func TestDescribeResourceSummary_MultipleMatches(t *testing.T) {
 		"command/test-command",
 	}
 
-	err := describeResourceSummary(mgr, matches)
+	err := describeResourceSummary(mgr, matches, "table")
 	if err != nil {
 		t.Errorf("describeResourceSummary() error = %v, want nil", err)
 	}
@@ -131,7 +131,7 @@ func TestDescribeResourceSummary_EmptyMatches(t *testing.T) {
 
 	matches := []string{}
 
-	err := describeResourceSummary(mgr, matches)
+	err := describeResourceSummary(mgr, matches, "table")
 	if err != nil {
 		t.Errorf("describeResourceSummary() error = %v, want nil", err)
 	}
@@ -151,7 +151,7 @@ func TestDescribeResourceSummary_InvalidMatches(t *testing.T) {
 		"command/test-command",
 	}
 
-	err := describeResourceSummary(mgr, matches)
+	err := describeResourceSummary(mgr, matches, "table")
 	if err != nil {
 		t.Errorf("describeResourceSummary() error = %v, want nil", err)
 	}
@@ -207,9 +207,9 @@ func TestRepoDescribe_ExactMatch(t *testing.T) {
 			}
 
 			if len(matches) == 1 {
-				err = describeDetailedResource(mgr, matches[0])
+				err = describeDetailedResource(mgr, matches[0], "table")
 			} else {
-				err = describeResourceSummary(mgr, matches)
+				err = describeResourceSummary(mgr, matches, "table")
 			}
 
 			if (err != nil) != tt.wantErr {
@@ -236,7 +236,7 @@ func TestRepoDescribe_PatternWithSingleMatch(t *testing.T) {
 	}
 
 	// Should show detailed view
-	err = describeDetailedResource(mgr, matches[0])
+	err = describeDetailedResource(mgr, matches[0], "table")
 	if err != nil {
 		t.Errorf("describeDetailedResource() error = %v", err)
 	}
@@ -286,7 +286,7 @@ func TestRepoDescribe_PatternWithMultipleMatches(t *testing.T) {
 			}
 
 			// Should show summary
-			err = describeResourceSummary(mgr, matches)
+			err = describeResourceSummary(mgr, matches, "table")
 			if (err != nil) != tt.shouldError {
 				t.Errorf("describeResourceSummary() error = %v, wantErr %v", err, tt.shouldError)
 			}
