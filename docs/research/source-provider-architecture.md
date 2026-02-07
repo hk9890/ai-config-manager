@@ -530,3 +530,222 @@ The ai-config-manager architecture uses a clear, struct-based approach for sourc
 - Store metadata with agentskills source type
 
 This approach is **consistent**, **simple**, and **proven** by existing GitHub/GitLab/Local implementations.
+
+---
+
+## CRITICAL UPDATE: ParsedSource Limitations for AgentSkills
+
+**Issue Identified**: The `ParsedSource` struct is Git-centric and doesn't map well to AgentSkills.
+
+### Semantic Mismatches
+
+| Field | Git Sources | AgentSkills | Problem |
+|-------|-------------|-------------|---------|
+| `URL` | Git clone URL | API endpoint | ✅ Works, but different semantics |
+| `Ref` | Branch/tag/commit | Semantic version | ⚠️ **Semantic mismatch** |
+| `LocalPath` | For local sources | Not used | ❌ Waste of space |
+| `Subpath` | Path within repo | Not applicable | ❌ Waste of space |
+
+### Why This Matters
+
+1. **`Ref` vs `Version`**:
+   ```go
+   // Git: ref is mutable (branch) or immutable (commit)
+   parsed.Ref = "main"      // Mutable
+   parsed.Ref = "abc123"    // Immutable commit
+   
+   // AgentSkills: version is always immutable
+   parsed.Ref = "1.0.0"     // ← Confusing: ref implies Git semantics
+   ```
+
+2. **`GetCloneURL()` doesn't apply**:
+   ```go
+   // Git sources
+   cloneURL, _ := source.GetCloneURL(parsed)
+   workspace.GetOrClone(cloneURL, ref)
+   
+   // AgentSkills: Can't "clone" an API
+   // Would need: GetDownloadURL() or FetchFromAPI()
+   ```
+
+3. **Missing API-specific fields**:
+   - AgentSkills needs: `author`, `downloads`, `rating`, `published_at`
+   - ParsedSource has no place for this metadata
+
+### Revised Recommendations
+
+#### Option A: Extend ParsedSource (Pragmatic)
+
+**Add optional fields** for non-Git sources:
+
+```go
+type ParsedSource struct {
+    Type      SourceType
+    URL       string
+    LocalPath string
+    Ref       string     // Git: branch/tag/commit; AgentSkills: version
+    Subpath   string
+    
+    // New: API-specific metadata (optional, only for AgentSkills)
+    Version   string     // Semantic version (clearer than "Ref")
+    Metadata  map[string]interface{} // Flexible for API responses
+}
+```
+
+**Pros**:
+- Minimal changes to existing code
+- Backward compatible
+- Git sources ignore new fields
+
+**Cons**:
+- Struct becomes less cohesive
+- Two ways to express version (`Ref` vs `Version`)
+- Metadata map is untyped
+
+#### Option B: Create AgentSkillsSource Struct (Clean)
+
+**Separate struct** for AgentSkills:
+
+```go
+type AgentSkillsSource struct {
+    URL       string  // https://agentskills.in/skills/owner/name
+    Owner     string  // Parsed from URL
+    Name      string  // Parsed from URL
+    Version   string  // Optional: "1.0.0" or "latest"
+    
+    // API metadata (fetched separately)
+    Author      string
+    Description string
+    Downloads   int
+    Rating      float64
+}
+
+// Modify ParseSource to return interface
+func ParseSource(input string) (interface{}, error) {
+    if strings.HasPrefix(input, "as:") {
+        return parseAgentSkillsSource(input)
+    }
+    return parseGitSource(input)  // Returns ParsedSource
+}
+```
+
+**Pros**:
+- Clean separation of concerns
+- Proper semantic types
+- No confusion between Git and API sources
+
+**Cons**:
+- Breaks existing API (returns interface{})
+- Requires type assertions everywhere
+- More refactoring needed
+
+#### Option C: Introduce Source Interface (Future-Proof)
+
+**Abstract away differences**:
+
+```go
+// Common interface for all sources
+type Source interface {
+    GetType() SourceType
+    Fetch(repoPath string) (localPath string, err error)
+    GetMetadata() SourceMetadata
+}
+
+// Git-based sources
+type GitSource struct {
+    URL     string
+    Ref     string
+    Subpath string
+}
+
+func (g *GitSource) Fetch(repoPath string) (string, error) {
+    ws, _ := workspace.NewManager(repoPath)
+    return ws.GetOrClone(g.URL, g.Ref)
+}
+
+// AgentSkills sources
+type AgentSkillsSource struct {
+    URL     string
+    Owner   string
+    Name    string
+    Version string
+}
+
+func (a *AgentSkillsSource) Fetch(repoPath string) (string, error) {
+    // Call AgentSkills API
+    // Download skill to temp dir
+    // Return path
+}
+```
+
+**Pros**:
+- Clean abstraction
+- Easy to add new source types
+- Proper encapsulation
+
+**Cons**:
+- Large refactor (20+ files affected)
+- Over-engineering for 5 source types
+- Performance cost of interface dispatch
+
+### Updated Recommendation
+
+**Start with Option A (Extend ParsedSource)**, then **refactor to Option C** if/when we add more API-based sources.
+
+**Rationale**:
+1. **Option A is pragmatic** - Gets AgentSkills working with minimal changes
+2. **Technical debt is manageable** - Only 2-3 files need to handle version semantics
+3. **Refactor later** - If we add more API sources (npm, crates.io, etc.), then justify Option C
+
+**Implementation**:
+```go
+// pkg/source/parser.go
+type ParsedSource struct {
+    Type      SourceType
+    URL       string
+    LocalPath string
+    Ref       string     // For Git sources
+    Subpath   string     // For Git sources
+    Version   string     // For AgentSkills (clearer than Ref)
+}
+
+func parseAgentSkillsPrefix(input string) (*ParsedSource, error) {
+    // Parse: as:owner/skillname[@version]
+    parts := strings.Split(input, "@")
+    ref := parts[0]
+    version := "latest"
+    if len(parts) > 1 {
+        version = parts[1]
+    }
+    
+    return &ParsedSource{
+        Type:    AgentSkills,
+        URL:     fmt.Sprintf("https://agentskills.in/skills/%s", ref),
+        Version: version,  // Use Version field, not Ref
+    }, nil
+}
+
+// cmd/repo_import.go
+if parsed.Type == source.AgentSkills {
+    return addBulkFromAgentSkills(parsed, manager)
+}
+
+// pkg/source/agentskills.go (new file)
+func FetchFromAgentSkills(parsed *ParsedSource) (localPath string, err error) {
+    // Use parsed.Version (not parsed.Ref)
+    // Call API: GET /skills/{owner}/{name}/versions/{version}
+    // Download and extract
+    // Return path
+}
+```
+
+### Key Insight
+
+**The real issue**: Current architecture assumes **all remote sources are Git repositories**. AgentSkills breaks this assumption by being an **API-based registry**.
+
+This is similar to how package managers work:
+- Git: `gh:owner/repo` → Clone repository
+- AgentSkills: `as:owner/skill` → Fetch from API
+- npm (future): `npm:packagename` → Fetch from npm registry
+
+**Long-term**: We'll need Source interface abstraction. **Short-term**: Extend ParsedSource with `Version` field.
