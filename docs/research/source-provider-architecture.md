@@ -749,3 +749,185 @@ This is similar to how package managers work:
 - npm (future): `npm:packagename` → Fetch from npm registry
 
 **Long-term**: We'll need Source interface abstraction. **Short-term**: Extend ParsedSource with `Version` field.
+
+---
+
+## CRITICAL DISCOVERY: AgentSkills is Git-Based, Not an API
+
+**Major Finding**: After reviewing the AgentSkills CLI source, **there is NO centralized API**. AgentSkills works entirely through **Git repositories**.
+
+### How AgentSkills Actually Works
+
+```bash
+# Install from "marketplace"
+skills install @anthropic/xlsx
+
+# Actually resolves to GitHub:
+skills add anthropic/skills@xlsx
+# → Clones: https://github.com/anthropic/skills
+# → Extracts: xlsx skill from the repo
+```
+
+### AgentSkills Architecture
+
+1. **No Central Registry**: AgentSkills.in is a **directory/index**, not a package registry
+2. **Git-Based Distribution**: All skills are stored in GitHub/GitLab repos
+3. **Namespace = GitHub Owner**: `@anthropic/xlsx` = `anthropic/skills` repo
+4. **CLI Downloads from Git**: Uses `git clone` or GitHub API to fetch skills
+
+### Evidence from Documentation
+
+From the README:
+```bash
+# These are equivalent:
+skills install @anthropic/xlsx
+skills add anthropic/skills@xlsx
+
+# Git URL Support:
+skills add vercel-labs/agent-skills
+skills add https://github.com/user/repo
+skills add https://gitlab.com/org/repo
+```
+
+The `@owner/skill` syntax is **syntactic sugar** for `owner/skills@skill`.
+
+### What This Means for aimgr
+
+**Good News**: We **already support AgentSkills sources**!
+
+```bash
+# Current aimgr syntax (works today):
+aimgr repo import gh:anthropic/skills
+
+# AgentSkills syntax:
+skills install @anthropic/xlsx
+
+# Mapping:
+@anthropic/xlsx → gh:anthropic/skills (subpath: xlsx)
+```
+
+### Updated Integration Approach
+
+#### Option 1: Treat as GitHub Shorthand (Simplest)
+
+**No new code needed** - just document the pattern:
+
+```bash
+# AgentSkills "marketplace" install
+skills install @anthropic/xlsx
+
+# aimgr equivalent (works today)
+aimgr repo import gh:anthropic/skills --filter "skill/xlsx"
+```
+
+**Pros**:
+- Works immediately
+- No new code
+- Leverages existing Git/workspace infrastructure
+
+**Cons**:
+- Verbose syntax
+- User must know GitHub owner/repo mapping
+- No namespace resolution
+
+#### Option 2: Add AgentSkills Namespace Resolution
+
+**Add prefix** that resolves to GitHub:
+
+```go
+// pkg/source/parser.go
+if strings.HasPrefix(input, "as:") {
+    return parseAgentSkillsShorthand(input)
+}
+
+func parseAgentSkillsShorthand(input string) (*ParsedSource, error) {
+    // Parse: as:@anthropic/xlsx
+    // Resolve to: gh:anthropic/skills
+    // Extract skill: xlsx
+    
+    parts := strings.Split(strings.TrimPrefix(input, "as:@"), "/")
+    owner := parts[0]
+    skillName := parts[1]
+    
+    // AgentSkills convention: repo is usually named "skills"
+    // or "agent-skills" or "<owner>-skills"
+    return &ParsedSource{
+        Type: GitHub,
+        URL: fmt.Sprintf("https://github.com/%s/skills", owner),
+        Subpath: skillName,
+    }, nil
+}
+```
+
+**Usage**:
+```bash
+aimgr repo import as:@anthropic/xlsx
+# → Resolves to: gh:anthropic/skills
+# → Downloads skill: xlsx
+```
+
+**Pros**:
+- Convenient `as:` prefix
+- Familiar syntax from AgentSkills
+- Still uses Git infrastructure
+
+**Cons**:
+- Assumes repo naming convention (`owner/skills`)
+- May not work for all providers
+- Adds complexity for minimal benefit
+
+#### Option 3: No AgentSkills Support (Recommended)
+
+**Rationale**: AgentSkills is just a **Git repo directory**. Users can:
+
+1. Import entire repo: `aimgr repo import gh:anthropic/skills`
+2. Use filter: `aimgr repo import gh:anthropic/skills --filter "xlsx"`
+3. Clone and symlink: `aimgr repo import ~/dev/anthropic-skills`
+
+**No special support needed** - it's just Git repos.
+
+### Revised Recommendations
+
+**Original Epic Goal**: "Support AgentSkills.in as a source"
+
+**Reality**: AgentSkills.in is **not a source** - it's a **directory of Git repos**
+
+**New Recommendation**: 
+1. **No AgentSkills-specific code needed**
+2. Document the equivalence in user docs
+3. Focus on improving Git source experience (workspace, filters)
+
+### Documentation Example
+
+```markdown
+# Working with AgentSkills
+
+AgentSkills.in is a directory of Git repositories. To use AgentSkills 
+with aimgr, import directly from the Git repository:
+
+## Import entire repository
+aimgr repo import gh:anthropic/skills
+
+## Import specific skill
+aimgr repo import gh:anthropic/skills --filter "xlsx"
+
+## Install to specific tool
+aimgr install skill/xlsx --tool=claude
+
+## Finding the repository
+AgentSkills uses the @owner/skillname format. To find the Git URL:
+1. Visit https://agentskills.in/marketplace
+2. Click on the skill
+3. Note the GitHub owner/repo
+4. Use: aimgr repo import gh:owner/repo
+```
+
+### Conclusion: No API, No New Code Needed
+
+**AgentSkills is already supported** through Git sources. The "integration" is just:
+1. Document the pattern
+2. Maybe add `as:` prefix as convenience (low priority)
+3. Focus on other features
+
+**The research epic was based on the assumption that AgentSkills had a centralized API.** 
+It doesn't - it's a Git-based directory, which we already support.
