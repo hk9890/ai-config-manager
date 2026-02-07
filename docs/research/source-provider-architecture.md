@@ -931,3 +931,172 @@ AgentSkills uses the @owner/skillname format. To find the Git URL:
 
 **The research epic was based on the assumption that AgentSkills had a centralized API.** 
 It doesn't - it's a Git-based directory, which we already support.
+
+---
+
+## Final Clarification: AgentSkills Discovery API
+
+### What AgentSkills.in Actually Provides
+
+After analysis, here's the **complete picture**:
+
+1. **Web Directory** (agentskills.in/marketplace)
+   - Browse/search UI for humans
+   - Shows skill descriptions, authors, stats
+   - Links to GitHub repos
+
+2. **No Programmatic API** (confirmed)
+   - No REST API endpoints
+   - No npm-like registry API
+   - CLI dependencies: Only Git/filesystem tools (no HTTP clients)
+
+3. **Discovery Mechanism**: GitHub Search
+   ```bash
+   # When you run:
+   skills search "pdf"
+   
+   # It probably does:
+   - GitHub API search for repos with "agent-skills" topic
+   - Or: Scrapes agentskills.in website
+   - Or: Uses cached index file from a known repo
+   ```
+
+### How "skills install @owner/name" Works
+
+**Theory 1: GitHub Convention**
+```bash
+skills install @anthropic/xlsx
+# Assumes: github.com/anthropic/skills (repo named "skills")
+# Clones and extracts: xlsx subdirectory
+```
+
+**Theory 2: Registry File**
+```bash
+# Possible central registry:
+github.com/Karanjot786/agent-skills-registry/registry.json
+{
+  "@anthropic/xlsx": {
+    "repo": "anthropic/skills",
+    "path": "xlsx"
+  }
+}
+```
+
+**Theory 3: Web Scraping**
+```bash
+# Fetch from website:
+curl https://agentskills.in/api/skills
+# Returns: JSON mapping of @owner/name → GitHub URLs
+```
+
+### What This Means for aimgr
+
+**Two potential features**:
+
+#### Feature 1: Add Discovery/Search Command
+
+```bash
+# New command:
+aimgr search agentskills "pdf processing"
+
+# Implementation:
+1. Scrape agentskills.in marketplace, OR
+2. Use GitHub API to search "agent-skills" topic, OR
+3. Maintain our own curated list
+
+# Output:
+Found 5 skills:
+  @anthropic/pdf-processing     gh:anthropic/skills
+  @vercel/pdf-reader            gh:vercel-labs/agent-skills
+  ...
+
+# Then install:
+aimgr repo import gh:anthropic/skills --filter "pdf-processing"
+```
+
+**Pros**:
+- Helps users discover skills
+- Integrates with existing Git workflow
+
+**Cons**:
+- Scraping is fragile
+- GitHub API has rate limits
+- Maintenance burden
+
+#### Feature 2: Resolve `as:` Prefix via Convention
+
+```bash
+# User types:
+aimgr repo import as:@anthropic/xlsx
+
+# aimgr assumes convention:
+# @owner/skill → github.com/owner/skills (or owner/agent-skills)
+
+# Tries in order:
+1. github.com/owner/skills
+2. github.com/owner/agent-skills
+3. github.com/owner/<skill-repo-name>  # Fallback: search for repo
+
+# Then imports with filter:
+gh:owner/skills --filter "xlsx"
+```
+
+**Pros**:
+- Convenient shorthand
+- No external dependencies
+- Falls back gracefully
+
+**Cons**:
+- Assumes naming convention
+- May not work for all repos
+- Adds complexity
+
+### Recommendation: Neither (Yet)
+
+**Rationale**:
+1. **Discovery**: Users can browse agentskills.in website manually
+2. **Import**: `gh:owner/repo` syntax works today
+3. **Value**: Low - most users find skills via web anyway
+4. **Effort**: Medium - parsing conventions, error handling
+
+**If we do add it later**:
+- Start with Feature 2 (`as:` prefix resolution)
+- Add Feature 1 (search) only if user demand is high
+- Keep it simple: convention-based, no scraping
+
+### Summary
+
+**AgentSkills Architecture** (confirmed):
+```
+┌─────────────────────────────────────┐
+│  agentskills.in (Website)           │
+│  - Browse/search UI                 │
+│  - No programmatic API              │
+└─────────────────────────────────────┘
+                  │
+                  ▼ (links to)
+┌─────────────────────────────────────┐
+│  GitHub Repositories                │
+│  - github.com/owner/skills          │
+│  - SKILL.md files in subdirectories │
+└─────────────────────────────────────┘
+                  │
+                  ▼ (git clone)
+┌─────────────────────────────────────┐
+│  Local Installation                 │
+│  - .claude/skills/                  │
+│  - .cursor/skills/                  │
+│  - .github/skills/                  │
+└─────────────────────────────────────┘
+```
+
+**aimgr Status**:
+- ✅ Can import from GitHub repos (git sources)
+- ✅ Can use filters to select specific skills
+- ✅ Workspace cache provides performance
+- ❌ No discovery/search integration
+- ❌ No `as:@owner/skill` shorthand
+
+**Conclusion**: AgentSkills is a **directory of Git repos**, not a package registry. 
+The "marketplace" is just a website that links to GitHub. No special integration needed 
+beyond what we already have for Git sources.
