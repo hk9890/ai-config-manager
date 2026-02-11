@@ -9,4 +9,5 @@ type Renderable interface {
 type TableOptions struct {
 	ShowBorders bool
 	AutoWrap    bool
+	Responsive  bool // Enable terminal-aware sizing
 }

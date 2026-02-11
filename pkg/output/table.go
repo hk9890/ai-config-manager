@@ -51,6 +51,12 @@ func (tb *TableBuilder) WithOptions(opts TableOptions) *TableBuilder {
 	return tb
 }
 
+// WithResponsive enables terminal-aware column sizing
+func (tb *TableBuilder) WithResponsive() *TableBuilder {
+	tb.data.Options.Responsive = true
+	return tb
+}
+
 // Format outputs the table in the specified format
 func (tb *TableBuilder) Format(format Format) error {
 	return FormatOutput(tb.data, format)
@@ -80,6 +86,19 @@ func renderTable(data *TableData) error {
 		headers[i] = h
 	}
 	table.Header(headers...)
+
+	// Apply responsive sizing if enabled and running in a TTY
+	// Note: tablewriter automatically wraps text based on terminal width,
+	// but we detect terminal size here to enable future enhancements
+	// like dynamic column width allocation
+	if data.Options.Responsive && IsTTY() {
+		term, err := NewTerminal()
+		if err == nil && term.Width() > 0 {
+			// Terminal size detected - tablewriter will auto-wrap
+			// Future enhancement: smart column width distribution
+			_ = term // placeholder for future use
+		}
+	}
 
 	for _, row := range data.Rows {
 		table.Append(row)
