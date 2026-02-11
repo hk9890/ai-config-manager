@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -223,53 +223,40 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 		return packages[i].Name < packages[j].Name
 	})
 
-	// Create table with NAME and DESCRIPTION only
-	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("Name", "Description")
+	// Create table with NAME and DESCRIPTION only using shared infrastructure
+	table := output.NewTable("Name", "Description")
 
 	// Add commands
 	for _, cmd := range commands {
 		desc := truncateString(cmd.Description, 60)
-		if err := table.Append(fmt.Sprintf("command/%s", cmd.Name), desc); err != nil {
-			return fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(fmt.Sprintf("command/%s", cmd.Name), desc)
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
 	if len(commands) > 0 && (len(skills) > 0 || len(agents) > 0) {
-		if err := table.Append("", ""); err != nil {
-			return fmt.Errorf("failed to add separator: %w", err)
-		}
+		table.AddSeparator()
 	}
 
 	// Add skills
 	for _, skill := range skills {
 		desc := truncateString(skill.Description, 60)
-		if err := table.Append(fmt.Sprintf("skill/%s", skill.Name), desc); err != nil {
-			return fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(fmt.Sprintf("skill/%s", skill.Name), desc)
 	}
 
 	// Add empty row between types if skills exist and agents exist
 	if len(skills) > 0 && len(agents) > 0 {
-		if err := table.Append("", ""); err != nil {
-			return fmt.Errorf("failed to add separator: %w", err)
-		}
+		table.AddSeparator()
 	}
 
 	// Add agents
 	for _, agent := range agents {
 		desc := truncateString(agent.Description, 60)
-		if err := table.Append(fmt.Sprintf("agent/%s", agent.Name), desc); err != nil {
-			return fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(fmt.Sprintf("agent/%s", agent.Name), desc)
 	}
 
 	// Add empty row between agents and packages if both exist
 	if len(agents) > 0 && len(packages) > 0 {
-		if err := table.Append("", ""); err != nil {
-			return fmt.Errorf("failed to add separator: %w", err)
-		}
+		table.AddSeparator()
 	}
 
 	// Add packages
@@ -277,13 +264,11 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 		desc := truncateString(pkg.Description, 60)
 		countStr := fmt.Sprintf("%d resources", pkg.ResourceCount)
 		fullDesc := fmt.Sprintf("%s %s", countStr, desc)
-		if err := table.Append(fmt.Sprintf("package/%s", pkg.Name), fullDesc); err != nil {
-			return fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(fmt.Sprintf("package/%s", pkg.Name), fullDesc)
 	}
 
 	// Render the table
-	return table.Render()
+	return table.Format(output.Table)
 }
 
 func outputPackagesTable(packages []repo.PackageInfo) error {
@@ -292,18 +277,15 @@ func outputPackagesTable(packages []repo.PackageInfo) error {
 		return packages[i].Name < packages[j].Name
 	})
 
-	// Create table
-	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("Name", "Resources", "Description")
+	// Create table using shared infrastructure
+	table := output.NewTable("Name", "Resources", "Description")
 
 	for _, pkg := range packages {
 		desc := truncateString(pkg.Description, 60)
-		if err := table.Append(pkg.Name, fmt.Sprintf("%d", pkg.ResourceCount), desc); err != nil {
-			return fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(pkg.Name, fmt.Sprintf("%d", pkg.ResourceCount), desc)
 	}
 
-	return table.Render()
+	return table.Format(output.Table)
 }
 
 func outputWithPackagesJSON(resources []resource.Resource, packages []repo.PackageInfo) error {

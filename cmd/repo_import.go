@@ -15,7 +15,6 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/source"
 	"github.com/hk9890/ai-config-manager/pkg/workspace"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -691,9 +690,8 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 	// Print header
 	fmt.Printf("Multiple %ss found in repository:\n\n", resourceType)
 
-	// Create table
-	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("#", "Name", "Description")
+	// Create table using shared infrastructure
+	table := output.NewTable("#", "Name", "Description")
 
 	// Add rows
 	for i, res := range resources {
@@ -704,13 +702,11 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 		// Truncate description to 60 chars (same as list command)
 		desc = truncateString(desc, 60)
 
-		if err := table.Append(fmt.Sprintf("%d", i+1), res.Name, desc); err != nil {
-			return nil, fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(fmt.Sprintf("%d", i+1), res.Name, desc)
 	}
 
 	// Render table
-	if err := table.Render(); err != nil {
+	if err := table.Format(output.Table); err != nil {
 		return nil, fmt.Errorf("failed to render table: %w", err)
 	}
 

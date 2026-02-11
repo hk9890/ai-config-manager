@@ -15,21 +15,21 @@ import (
 // setupGitRepo initializes a git repository in the given directory
 func setupGitRepo(t *testing.T, dir string) {
 	t.Helper()
-	
+
 	// Initialize git repo
 	cmd := exec.Command("git", "init")
 	cmd.Dir = dir
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("Failed to initialize git: %v\nOutput: %s", err, output)
 	}
-	
+
 	// Configure git user (required for commits)
 	configName := exec.Command("git", "config", "user.name", "Test User")
 	configName.Dir = dir
 	if err := configName.Run(); err != nil {
 		t.Fatalf("Failed to configure git user.name: %v", err)
 	}
-	
+
 	configEmail := exec.Command("git", "config", "user.email", "test@example.com")
 	configEmail.Dir = dir
 	if err := configEmail.Run(); err != nil {
@@ -40,7 +40,7 @@ func setupGitRepo(t *testing.T, dir string) {
 // getGitLog returns the git log output (empty string if no commits)
 func getGitLog(t *testing.T, dir string) string {
 	t.Helper()
-	
+
 	cmd := exec.Command("git", "log", "--oneline")
 	cmd.Dir = dir
 	output, _ := cmd.CombinedOutput() // Ignore error - may have no commits
@@ -50,7 +50,7 @@ func getGitLog(t *testing.T, dir string) string {
 // getLastCommitMessage returns the last commit message
 func getLastCommitMessage(t *testing.T, dir string) string {
 	t.Helper()
-	
+
 	cmd := exec.Command("git", "log", "-1", "--pretty=%s")
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
@@ -87,7 +87,7 @@ func TestIsGitRepo(t *testing.T) {
 
 			manager := NewManagerWithPath(tmpDir)
 			got := manager.isGitRepo()
-			
+
 			if got != tt.want {
 				t.Errorf("isGitRepo() = %v, want %v", got, tt.want)
 			}
@@ -144,7 +144,7 @@ func TestCommitChanges_NoChanges(t *testing.T) {
 	if err := manager.Init(); err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
-	
+
 	// Create and commit a file
 	testFile := filepath.Join(tmpDir, "initial.txt")
 	if err := os.WriteFile(testFile, []byte("initial"), 0644); err != nil {
@@ -172,7 +172,7 @@ func TestAddCommand_CreatesCommit(t *testing.T) {
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands directory: %v", err)
 	}
-	
+
 	testCmd := filepath.Join(commandsDir, "test-cmd.md")
 	cmdContent := `---
 description: A test command
@@ -195,7 +195,7 @@ This is a test command.
 	if err != nil {
 		t.Fatalf("AddBulk() error = %v", err)
 	}
-	
+
 	if len(result.Added) != 1 {
 		t.Fatalf("Expected 1 resource added, got %d. Failed: %v", len(result.Added), result.Failed)
 	}
@@ -221,7 +221,7 @@ func TestRemove_CreatesCommit(t *testing.T) {
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands directory: %v", err)
 	}
-	
+
 	testCmd := filepath.Join(commandsDir, "test-cmd.md")
 	cmdContent := `---
 description: A test command
@@ -266,13 +266,13 @@ func TestAddBulk_CreatesCommit(t *testing.T) {
 
 	// Create test resources in proper directory structure
 	resourcesDir := t.TempDir()
-	
+
 	// Create a command in commands/ directory
 	commandsDir := filepath.Join(resourcesDir, "commands")
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands directory: %v", err)
 	}
-	
+
 	cmdContent := `---
 description: Test command
 ---
@@ -310,7 +310,7 @@ Description: Test skill content
 	if err != nil {
 		t.Fatalf("AddBulk() error = %v", err)
 	}
-	
+
 	if len(result.Added) != 2 {
 		t.Fatalf("Expected 2 resources added, got %d. Failed: %v", len(result.Added), result.Failed)
 	}
@@ -339,7 +339,7 @@ func TestAddBulk_DryRun_NoCommit(t *testing.T) {
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands directory: %v", err)
 	}
-	
+
 	testCmd := filepath.Join(commandsDir, "test-cmd.md")
 	cmdContent := `---
 description: A test command

@@ -9,10 +9,10 @@ import (
 
 	"github.com/hk9890/ai-config-manager/pkg/install"
 	"github.com/hk9890/ai-config-manager/pkg/manifest"
+	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -317,9 +317,8 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		}
 	}
 
-	// Create table with NAME, TARGETS, SYNC, DESCRIPTION
-	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("Name", "Targets", "Sync", "Description")
+	// Create table with NAME, TARGETS, SYNC, DESCRIPTION using shared infrastructure
+	table := output.NewTable("Name", "Targets", "Sync", "Description")
 
 	// Add commands
 	for _, cmd := range commands {
@@ -327,16 +326,12 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		targets := strings.Join(cmd.Targets, ", ")
 		resourceRef := fmt.Sprintf("command/%s", cmd.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0)
-		if err := table.Append(resourceRef, targets, syncSymbol, desc); err != nil {
-			return fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(resourceRef, targets, syncSymbol, desc)
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
 	if len(commands) > 0 && (len(skills) > 0 || len(agents) > 0) {
-		if err := table.Append("", "", "", ""); err != nil {
-			return fmt.Errorf("failed to add separator: %w", err)
-		}
+		table.AddSeparator()
 	}
 
 	// Add skills
@@ -345,16 +340,12 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		targets := strings.Join(skill.Targets, ", ")
 		resourceRef := fmt.Sprintf("skill/%s", skill.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0)
-		if err := table.Append(resourceRef, targets, syncSymbol, desc); err != nil {
-			return fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(resourceRef, targets, syncSymbol, desc)
 	}
 
 	// Add empty row between types if skills exist and agents exist
 	if len(skills) > 0 && len(agents) > 0 {
-		if err := table.Append("", "", "", ""); err != nil {
-			return fmt.Errorf("failed to add separator: %w", err)
-		}
+		table.AddSeparator()
 	}
 
 	// Add agents
@@ -363,13 +354,11 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		targets := strings.Join(agent.Targets, ", ")
 		resourceRef := fmt.Sprintf("agent/%s", agent.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0)
-		if err := table.Append(resourceRef, targets, syncSymbol, desc); err != nil {
-			return fmt.Errorf("failed to add row: %w", err)
-		}
+		table.AddRow(resourceRef, targets, syncSymbol, desc)
 	}
 
 	// Render the table
-	if err := table.Render(); err != nil {
+	if err := table.Format(output.Table); err != nil {
 		return err
 	}
 

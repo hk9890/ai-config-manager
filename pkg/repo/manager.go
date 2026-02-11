@@ -887,7 +887,7 @@ func (m *Manager) AddBulk(sources []string, opts BulkImportOptions) (*BulkImport
 		// Build commit message
 		totalChanges := len(result.Added) + len(result.Updated)
 		commitMsg := fmt.Sprintf("aimgr: import %d resource(s)", totalChanges)
-		
+
 		// Add detail about resource types
 		details := []string{}
 		if result.CommandCount > 0 {
@@ -905,7 +905,7 @@ func (m *Manager) AddBulk(sources []string, opts BulkImportOptions) (*BulkImport
 		if len(details) > 0 {
 			commitMsg += " (" + strings.Join(details, ", ") + ")"
 		}
-		
+
 		if err := m.CommitChanges(commitMsg); err != nil {
 			// Log warning but don't fail the operation
 			// Git tracking is optional
