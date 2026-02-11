@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/install"
+	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
@@ -20,6 +22,20 @@ var (
 	listInstalledPathFlag   string
 )
 
+// SyncStatus represents the synchronization state between installed resources and ai.package.yaml manifest
+type SyncStatus string
+
+const (
+	// SyncStatusInSync means the resource is both in the manifest and installed
+	SyncStatusInSync SyncStatus = "in-sync"
+	// SyncStatusNotInManifest means the resource is installed but not in the manifest
+	SyncStatusNotInManifest SyncStatus = "not-in-manifest"
+	// SyncStatusNotInstalled means the resource is in the manifest but not installed
+	SyncStatusNotInstalled SyncStatus = "not-installed"
+	// SyncStatusNoManifest means no ai.package.yaml file exists in the project
+	SyncStatusNoManifest SyncStatus = "no-manifest"
+)
+
 // listInstalledCmd represents the list command for installed resources
 var listInstalledCmd = &cobra.Command{
 	Use:   "list [pattern]",
@@ -27,7 +43,25 @@ var listInstalledCmd = &cobra.Command{
 	Long: `List all resources installed in the current directory (or specified path).
 
 This command shows resources that were installed using 'aimgr install',
-displaying which tools (claude, opencode, copilot) each resource is installed to.
+displaying which tools (claude, opencode, copilot) each resource is installed to
+and their synchronization status with ai.package.yaml.
+
+Output columns:
+  - NAME: Resource reference (e.g., skill/pdf-processing, command/test)
+  - TARGETS: Tools where the resource is installed (e.g., claude, opencode)
+  - SYNC: Synchronization status with ai.package.yaml manifest
+  - DESCRIPTION: Brief description of the resource
+
+Sync Status Symbols:
+  ✓ = In sync (resource is both in manifest and installed)
+  * = Not in manifest (installed but not declared in ai.package.yaml)
+  ⚠ = Not installed (declared in manifest but not installed yet)
+  - = No manifest (no ai.package.yaml file exists in current directory)
+
+The sync status helps you keep your installations aligned with your project's
+ai.package.yaml manifest file. Resources marked with * should be added to the
+manifest if you want to track them. Resources marked with ⚠ need to be installed
+using 'aimgr install <resource>'.
 
 Only resources installed via aimgr (symlinks) are shown - manually copied files are excluded.
 
@@ -38,14 +72,14 @@ The optional pattern argument supports glob wildcards (* ? [ ]) and type prefixe
   - Combined: skill/pdf*, command/test-*
 
 Examples:
-  aimgr list                         # List all installed resources
+  aimgr list                         # List all installed resources with sync status
   aimgr list skill/*                 # List all installed skills
   aimgr list command/*               # List all installed commands
   aimgr list agent/*                 # List all installed agents
   aimgr list *test*                  # List all resources with "test" in name
   aimgr list skill/pdf*              # List installed skills starting with "pdf"
   aimgr list command/test-*          # List installed commands starting with "test-"
-  aimgr list --format=json           # Output as JSON
+  aimgr list --format=json           # Output as JSON with sync_status field
   aimgr list --format=yaml           # Output as YAML
   aimgr list --path ~/project        # List in specific directory`,
 	Args:              cobra.MaximumNArgs(1),
@@ -128,23 +162,75 @@ Examples:
 		case "yaml":
 			return outputInstalledYAML(resourceInfos)
 		case "table":
-			return outputInstalledTable(resourceInfos)
+			return outputInstalledTable(resourceInfos, projectPath)
 		default:
 			return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", listInstalledFormatFlag)
 		}
 	},
 }
 
-// ResourceInfo extends Resource with installation target information
+// ResourceInfo extends Resource with installation target information and sync status
 type ResourceInfo struct {
 	Type        resource.ResourceType `json:"type" yaml:"type"`
 	Name        string                `json:"name" yaml:"name"`
 	Description string                `json:"description" yaml:"description"`
 	Version     string                `json:"version,omitempty" yaml:"version,omitempty"`
 	Targets     []string              `json:"targets" yaml:"targets"`
+	SyncStatus  string                `json:"sync_status" yaml:"sync_status"`
 }
 
-// buildResourceInfo creates ResourceInfo entries with target tool information
+// getSyncStatus determines the sync status of a resource relative to ai.package.yaml
+// It compares the resource's installation state with its presence in the manifest file
+func getSyncStatus(projectPath string, resourceRef string, isInstalled bool) SyncStatus {
+	// Load the manifest file from the project directory
+	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		// If manifest file doesn't exist, return no-manifest status
+		if os.IsNotExist(err) {
+			return SyncStatusNoManifest
+		}
+		// For other errors (e.g., invalid YAML), also treat as no manifest
+		// This is graceful - we can't determine sync status without a valid manifest
+		return SyncStatusNoManifest
+	}
+
+	// Check if the resource reference exists in the manifest
+	inManifest := m.Has(resourceRef)
+
+	// Determine sync status based on both installation and manifest presence
+	if inManifest && isInstalled {
+		return SyncStatusInSync
+	} else if inManifest && !isInstalled {
+		return SyncStatusNotInstalled
+	} else if !inManifest && isInstalled {
+		return SyncStatusNotInManifest
+	}
+
+	// This case shouldn't normally occur (not in manifest and not installed)
+	// But we handle it by treating it as not-in-manifest
+	return SyncStatusNotInManifest
+}
+
+// formatSyncStatus gets the sync status and returns the appropriate symbol
+func formatSyncStatus(projectPath string, resourceRef string, isInstalled bool) string {
+	status := getSyncStatus(projectPath, resourceRef, isInstalled)
+
+	switch status {
+	case SyncStatusInSync:
+		return "✓"
+	case SyncStatusNotInManifest:
+		return "*"
+	case SyncStatusNotInstalled:
+		return "⚠"
+	case SyncStatusNoManifest:
+		return "-"
+	default:
+		return "-"
+	}
+}
+
+// buildResourceInfo creates ResourceInfo entries with target tool information and sync status
 func buildResourceInfo(resources []resource.Resource, projectPath string, detectedTools []tools.Tool) []ResourceInfo {
 	infos := make([]ResourceInfo, 0, len(resources))
 
@@ -163,6 +249,16 @@ func buildResourceInfo(resources []resource.Resource, projectPath string, detect
 				info.Targets = append(info.Targets, tool.String())
 			}
 		}
+
+		// Determine if resource is installed (has at least one target)
+		isInstalled := len(info.Targets) > 0
+
+		// Build resource reference for manifest lookup
+		resourceRef := fmt.Sprintf("%s/%s", res.Type, res.Name)
+
+		// Get sync status
+		syncStatus := getSyncStatus(projectPath, resourceRef, isInstalled)
+		info.SyncStatus = string(syncStatus)
 
 		infos = append(infos, info)
 	}
@@ -205,7 +301,7 @@ func isInstalledInTool(projectPath, name string, resType resource.ResourceType, 
 	return info.Mode()&os.ModeSymlink != 0
 }
 
-func outputInstalledTable(infos []ResourceInfo) error {
+func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 	// Group by type
 	commands := []ResourceInfo{}
 	skills := []ResourceInfo{}
@@ -221,52 +317,67 @@ func outputInstalledTable(infos []ResourceInfo) error {
 		}
 	}
 
-	// Create table with new API
+	// Create table with NAME, TARGETS, SYNC, DESCRIPTION
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header("Name", "Targets", "Description")
+	table.Header("Name", "Targets", "Sync", "Description")
 
 	// Add commands
 	for _, cmd := range commands {
-		desc := truncateString(cmd.Description, 50)
+		desc := truncateString(cmd.Description, 40)
 		targets := strings.Join(cmd.Targets, ", ")
-		if err := table.Append(fmt.Sprintf("command/%s", cmd.Name), targets, desc); err != nil {
+		resourceRef := fmt.Sprintf("command/%s", cmd.Name)
+		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0)
+		if err := table.Append(resourceRef, targets, syncSymbol, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
 	if len(commands) > 0 && (len(skills) > 0 || len(agents) > 0) {
-		if err := table.Append("", "", ""); err != nil {
+		if err := table.Append("", "", "", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
 
 	// Add skills
 	for _, skill := range skills {
-		desc := truncateString(skill.Description, 50)
+		desc := truncateString(skill.Description, 40)
 		targets := strings.Join(skill.Targets, ", ")
-		if err := table.Append(fmt.Sprintf("skill/%s", skill.Name), targets, desc); err != nil {
+		resourceRef := fmt.Sprintf("skill/%s", skill.Name)
+		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0)
+		if err := table.Append(resourceRef, targets, syncSymbol, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
 	// Add empty row between types if skills exist and agents exist
 	if len(skills) > 0 && len(agents) > 0 {
-		if err := table.Append("", "", ""); err != nil {
+		if err := table.Append("", "", "", ""); err != nil {
 			return fmt.Errorf("failed to add separator: %w", err)
 		}
 	}
 
 	// Add agents
 	for _, agent := range agents {
-		desc := truncateString(agent.Description, 50)
+		desc := truncateString(agent.Description, 40)
 		targets := strings.Join(agent.Targets, ", ")
-		if err := table.Append(fmt.Sprintf("agent/%s", agent.Name), targets, desc); err != nil {
+		resourceRef := fmt.Sprintf("agent/%s", agent.Name)
+		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0)
+		if err := table.Append(resourceRef, targets, syncSymbol, desc); err != nil {
 			return fmt.Errorf("failed to add row: %w", err)
 		}
 	}
 
-	return table.Render()
+	// Render the table
+	if err := table.Render(); err != nil {
+		return err
+	}
+
+	// Print legend
+	fmt.Println("\nLegend:")
+	fmt.Println("  ✓ = In sync  * = Not in manifest  ⚠ = Not installed  - = No manifest")
+
+	return nil
 }
 
 func outputInstalledJSON(infos []ResourceInfo) error {
