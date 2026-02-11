@@ -99,6 +99,17 @@ Understanding workspace caching for Git repositories, which dramatically improve
 - Cache pruning and maintenance
 - Troubleshooting cache issues
 
+### [Git-Backed Repository Tracking](git-tracking.md)
+Learn how to enable git-based tracking of your AI resource repository for full auditability, change history, and recoverability.
+
+**Key Topics:**
+- Initializing git tracking with `aimgr repo init`
+- Automatic commits for all import/sync/remove operations
+- Viewing change history and reverting operations
+- Working with remote repositories for team collaboration
+- Branch strategies and tagging milestones
+- Integration with CI/CD workflows
+
 ## Getting Started
 
 New to aimgr? **Read the [Getting Started Guide](getting-started.md)** for a complete tutorial.

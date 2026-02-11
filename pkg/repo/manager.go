@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -650,6 +651,13 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 		}
 	}
 
+	// Commit the removal
+	commitMsg := fmt.Sprintf("aimgr: remove %s: %s", resourceType, name)
+	if err := m.CommitChanges(commitMsg); err != nil {
+		// Log warning but don't fail the operation
+		fmt.Fprintf(os.Stderr, "Warning: failed to commit changes: %v\n", err)
+	}
+
 	return nil
 }
 
@@ -692,6 +700,52 @@ func (m *Manager) GetRepoPath() string {
 // Loads metadata from .metadata/<type>s/<name>-metadata.json
 func (m *Manager) GetMetadata(name string, resourceType resource.ResourceType) (*metadata.ResourceMetadata, error) {
 	return metadata.Load(name, resourceType, m.repoPath)
+}
+
+// isGitRepo checks if the repository is a git repository
+func (m *Manager) isGitRepo() bool {
+	gitDir := filepath.Join(m.repoPath, ".git")
+	info, err := os.Stat(gitDir)
+	return err == nil && info.IsDir()
+}
+
+// CommitChanges commits all changes in the repository with a message
+// Returns nil if successful, or an error if the commit fails
+// If not a git repo, returns nil (non-fatal - operations work without git)
+func (m *Manager) CommitChanges(message string) error {
+	if !m.isGitRepo() {
+		// Not a git repo - this is not an error, just skip
+		return nil
+	}
+
+	// Stage all changes (respecting .gitignore)
+	addCmd := exec.Command("git", "add", ".")
+	addCmd.Dir = m.repoPath
+	if output, err := addCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, output)
+	}
+
+	// Check if there are changes to commit
+	statusCmd := exec.Command("git", "status", "--porcelain")
+	statusCmd.Dir = m.repoPath
+	output, err := statusCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to check git status: %w\nOutput: %s", err, output)
+	}
+
+	// If no changes, nothing to commit
+	if len(output) == 0 {
+		return nil
+	}
+
+	// Create commit
+	commitCmd := exec.Command("git", "commit", "-m", message)
+	commitCmd.Dir = m.repoPath
+	if output, err := commitCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to commit changes: %w\nOutput: %s", err, output)
+	}
+
+	return nil
 }
 
 // copyFile copies a single file from src to dst
@@ -825,6 +879,37 @@ func (m *Manager) AddBulk(sources []string, opts BulkImportOptions) (*BulkImport
 			if pkgerrors.IsFatal(err) {
 				return result, err
 			}
+		}
+	}
+
+	// Commit changes if not a dry run and if any resources were added/updated
+	if !opts.DryRun && (len(result.Added) > 0 || len(result.Updated) > 0) {
+		// Build commit message
+		totalChanges := len(result.Added) + len(result.Updated)
+		commitMsg := fmt.Sprintf("aimgr: import %d resource(s)", totalChanges)
+		
+		// Add detail about resource types
+		details := []string{}
+		if result.CommandCount > 0 {
+			details = append(details, fmt.Sprintf("%d command(s)", result.CommandCount))
+		}
+		if result.SkillCount > 0 {
+			details = append(details, fmt.Sprintf("%d skill(s)", result.SkillCount))
+		}
+		if result.AgentCount > 0 {
+			details = append(details, fmt.Sprintf("%d agent(s)", result.AgentCount))
+		}
+		if result.PackageCount > 0 {
+			details = append(details, fmt.Sprintf("%d package(s)", result.PackageCount))
+		}
+		if len(details) > 0 {
+			commitMsg += " (" + strings.Join(details, ", ") + ")"
+		}
+		
+		if err := m.CommitChanges(commitMsg); err != nil {
+			// Log warning but don't fail the operation
+			// Git tracking is optional
+			fmt.Fprintf(os.Stderr, "Warning: failed to commit changes: %v\n", err)
 		}
 	}
 
