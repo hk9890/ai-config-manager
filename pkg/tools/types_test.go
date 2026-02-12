@@ -14,6 +14,7 @@ func TestTool_String(t *testing.T) {
 		{Claude, "claude"},
 		{OpenCode, "opencode"},
 		{Copilot, "copilot"},
+		{Windsurf, "windsurf"},
 		{Tool(-1), "unknown"},
 	}
 
@@ -85,6 +86,18 @@ func TestParseTool(t *testing.T) {
 			name:      "vscode mixed case",
 			input:     "VSCode",
 			want:      Copilot,
+			wantError: false,
+		},
+		{
+			name:      "windsurf lowercase",
+			input:     "windsurf",
+			want:      Windsurf,
+			wantError: false,
+		},
+		{
+			name:      "windsurf uppercase",
+			input:     "WINDSURF",
+			want:      Windsurf,
 			wantError: false,
 		},
 		{
@@ -166,6 +179,17 @@ func TestGetToolInfo(t *testing.T) {
 			wantSupportsSkil:  true,
 			wantSupportsAgent: false,
 		},
+		{
+			name:              "Windsurf",
+			tool:              Windsurf,
+			wantName:          "Windsurf",
+			wantCommandsDir:   "",
+			wantSkillsDir:     ".windsurf/skills",
+			wantAgentsDir:     "",
+			wantSupportsCmd:   false,
+			wantSupportsSkil:  true,
+			wantSupportsAgent: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -223,14 +247,19 @@ func TestDetectExistingTools(t *testing.T) {
 			expectedTools: []Tool{Copilot},
 		},
 		{
+			name:          "only Windsurf",
+			setupDirs:     []string{".windsurf/skills"},
+			expectedTools: []Tool{Windsurf},
+		},
+		{
 			name:          "Claude and OpenCode",
 			setupDirs:     []string{".claude", ".opencode"},
 			expectedTools: []Tool{Claude, OpenCode},
 		},
 		{
 			name:          "all tools",
-			setupDirs:     []string{".claude", ".opencode", ".github/skills"},
-			expectedTools: []Tool{Claude, OpenCode, Copilot},
+			setupDirs:     []string{".claude", ".opencode", ".github/skills", ".windsurf/skills"},
+			expectedTools: []Tool{Claude, OpenCode, Copilot, Windsurf},
 		},
 		{
 			name:          ".github exists but not skills",
@@ -299,12 +328,12 @@ func TestDetectExistingTools_NonexistentPath(t *testing.T) {
 
 func TestAllTools(t *testing.T) {
 	tools := AllTools()
-	if len(tools) != 3 {
-		t.Errorf("AllTools() returned %d tools, want 3", len(tools))
+	if len(tools) != 4 {
+		t.Errorf("AllTools() returned %d tools, want 4", len(tools))
 	}
 
 	// Check that all expected tools are present
-	expectedTools := []Tool{Claude, OpenCode, Copilot}
+	expectedTools := []Tool{Claude, OpenCode, Copilot, Windsurf}
 	for _, expected := range expectedTools {
 		found := false
 		for _, tool := range tools {

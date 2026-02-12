@@ -27,7 +27,7 @@
 | **Online Marketplace** | ✅ https://www.agentskills.in | ❌ None |
 | **Database Backend** | ✅ PostgreSQL (Supabase) | ❌ Filesystem only |
 | **Installation** | npm global install | Go install / binary |
-| **Supported Platforms** | 42 AI agents | 3 AI tools (Claude, OpenCode, Copilot) |
+| **Supported Platforms** | 42 AI agents | 4 AI tools (Claude, OpenCode, Copilot, Windsurf) |
 | **Search Feature** | ✅ FZF interactive search | ❌ None |
 | **Lock File** | ✅ `~/.skills/skills.lock` | ❌ None |
 | **Telemetry** | ✅ Anonymous usage tracking | ❌ None |
@@ -426,10 +426,11 @@ sync:
 - Windsurf, Cline, Gemini CLI, Zed, Antigravity
 - +33 more: Amp, Kilo, Roo, Goose, CodeBuddy, Continue, Crush, Clawdbot, Droid, Kiro, MCPJam, Mux, OpenHands, Pi, Qoder, Qwen Code, Trae, Zencoder, Neovate, Command Code, Ara, Aide, Alex, BB, CodeStory, Helix AI, Meekia, Pear AI, Adal, Pochi, Sourcegraph Cody, Void AI
 
-**aimgr**: **3 AI tools**
+**aimgr**: **4 AI tools**
 - Claude Code
 - OpenCode
 - GitHub Copilot / VSCode
+- Windsurf
 
 **Winner**: **agent-skills-cli** (14x more platforms)
 

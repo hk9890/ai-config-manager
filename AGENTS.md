@@ -6,16 +6,16 @@
 
 ## Project Overview
 
-**aimgr** is a CLI tool for managing AI resources (commands, skills, and agents) across multiple AI coding tools (Claude Code, OpenCode, VSCode / GitHub Copilot). It uses a centralized repository with symlink-based installation.
+**aimgr** is a CLI tool for managing AI resources (commands, skills, and agents) across multiple AI coding tools (Claude Code, OpenCode, VSCode / GitHub Copilot, Windsurf). It uses a centralized repository with symlink-based installation.
 
 **Key Concepts:**
 - **Language**: Go 1.25.6
 - **Architecture**: CLI built with Cobra, resource management with symlinks  
 - **Storage**: `~/.local/share/ai-config/repo/` (XDG data directory, configurable via `repo.path` or `AIMGR_REPO_PATH`)
 - **Supported Resources**: Commands, Skills, Agents, Packages
-- **Supported Tools**: Claude Code, OpenCode, VSCode / GitHub Copilot
+- **Supported Tools**: Claude Code, OpenCode, VSCode / GitHub Copilot, Windsurf
 
-The tool discovers resources from various sources (local directories, Git repositories, GitHub), stores them in a central repository, and installs them via symlinks to tool-specific directories (`.claude/`, `.opencode/`, `.github/skills/`).
+The tool discovers resources from various sources (local directories, Git repositories, GitHub), stores them in a central repository, and installs them via symlinks to tool-specific directories (`.claude/`, `.opencode/`, `.github/skills/`, `.windsurf/skills/`).
 
 ---
 
@@ -42,7 +42,7 @@ ai-config-manager/
 | `repo/` | Repository management (add, list, remove) |
 | `resource/` | Resource types (command, skill, agent, package) |
 | `source/` | Source parsing and Git operations |
-| `tools/` | Tool-specific info (Claude, OpenCode, Copilot) |
+| `tools/` | Tool-specific info (Claude, OpenCode, Copilot, Windsurf) |
 | `workspace/` | Workspace caching for Git repos (10-50x faster) |
 
 **For detailed architecture:** See `docs/architecture/architecture-rules.md`
@@ -208,6 +208,7 @@ tool, err := tools.ParseTool("claude")   // Returns tools.Claude
 tool, err := tools.ParseTool("opencode") // Returns tools.OpenCode
 tool, err := tools.ParseTool("copilot")  // Returns tools.Copilot
 tool, err := tools.ParseTool("vscode")   // Returns tools.Copilot (alias)
+tool, err := tools.ParseTool("windsurf") // Returns tools.Windsurf
 info := tools.GetToolInfo(tool)          // Get dirs, etc.
 ```
 
@@ -217,6 +218,13 @@ info := tools.GetToolInfo(tool)          // Get dirs, etc.
 - Skills install to `.github/skills/` directory
 - Example: `aimgr install skill/pdf-processing --tool=copilot`
 - Multi-tool example: `aimgr install skill/my-skill --tool=claude,opencode,copilot`
+
+**Windsurf Support:**
+- Use `--tool=windsurf` when installing
+- Only skills are supported (no commands or agents)
+- Skills install to `.windsurf/skills/` directory
+- Example: `aimgr install skill/pdf-processing --tool=windsurf`
+- Multi-tool example: `aimgr install skill/my-skill --tool=claude,opencode,windsurf`
 
 ### Pattern Matching
 ```go

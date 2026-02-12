@@ -287,6 +287,7 @@ OpenCode and VSCode / GitHub Copilot are supported as first-class AI tools along
 | Claude Code | `.claude/commands/` | `.claude/skills/` | `.claude/agents/` |
 | OpenCode | `.opencode/commands/` | `.opencode/skills/` | `.opencode/agents/` |
 | VSCode / GitHub Copilot | N/A | `.github/skills/` | N/A |
+| Windsurf | N/A | `.windsurf/skills/` | N/A |
 
 **VSCode / GitHub Copilot Support:**
 - Only supports skills (no commands or agents)
@@ -294,6 +295,12 @@ OpenCode and VSCode / GitHub Copilot are supported as first-class AI tools along
 - Follows the [Agent Skills standard](https://www.agentskills.io/) at agentskills.io
 - Compatible with both the Copilot CLI and coding agent features
 - Use `--tool=copilot` or `--tool=vscode` (both names work)
+
+**Windsurf Support:**
+- Only supports skills (no commands or agents)
+- Skills use the same `SKILL.md` format as other tools
+- Follows the [Agent Skills standard](https://www.agentskills.io/) at agentskills.io
+- Use `--tool=windsurf`
 
 **OpenCode-Specific Features:**
 
@@ -629,7 +636,7 @@ targets:
   - Uses the same format as CLI commands throughout aimgr
 
 - **targets** ([]string, optional): Override default install targets
-  - Valid values: `claude`, `opencode`, `copilot`
+  - Valid values: `claude`, `opencode`, `copilot`, `windsurf`
   - If not specified, uses defaults from `~/.config/aimgr/aimgr.yaml`
   - Allows per-project tool preferences
 

@@ -17,6 +17,8 @@ const (
 	OpenCode
 	// Copilot represents GitHub Copilot (supports skills only)
 	Copilot
+	// Windsurf represents Windsurf IDE (supports skills only)
+	Windsurf
 	// VSCode is an alias for Copilot (GitHub Copilot in VSCode)
 	VSCode = Copilot
 )
@@ -30,6 +32,8 @@ func (t Tool) String() string {
 		return "opencode"
 	case Copilot: // VSCode is an alias, same value
 		return "copilot"
+	case Windsurf:
+		return "windsurf"
 	default:
 		return "unknown"
 	}
@@ -44,8 +48,10 @@ func ParseTool(s string) (Tool, error) {
 		return OpenCode, nil
 	case "copilot", "vscode":
 		return Copilot, nil
+	case "windsurf":
+		return Windsurf, nil
 	default:
-		return -1, fmt.Errorf("unknown tool: %s (must be: claude, opencode, copilot, or vscode)", s)
+		return -1, fmt.Errorf("unknown tool: %s (must be: claude, opencode, copilot, vscode, or windsurf)", s)
 	}
 }
 
@@ -100,6 +106,16 @@ func GetToolInfo(tool Tool) ToolInfo {
 			SupportsSkills:   true,
 			SupportsAgents:   false,
 		}
+	case Windsurf:
+		return ToolInfo{
+			Name:             "Windsurf",
+			CommandsDir:      "",
+			SkillsDir:        ".windsurf/skills",
+			AgentsDir:        "",
+			SupportsCommands: false,
+			SupportsSkills:   true,
+			SupportsAgents:   false,
+		}
 	default:
 		return ToolInfo{}
 	}
@@ -137,6 +153,14 @@ func DetectExistingTools(projectPath string) ([]Tool, error) {
 		detected = append(detected, Copilot)
 	}
 
+	// Check for Windsurf (.windsurf/skills directory)
+	windsurfPath := filepath.Join(projectPath, ".windsurf", "skills")
+	if exists, err := dirExists(windsurfPath); err != nil {
+		return nil, fmt.Errorf("checking .windsurf/skills directory: %w", err)
+	} else if exists {
+		detected = append(detected, Windsurf)
+	}
+
 	return detected, nil
 }
 
@@ -154,5 +178,5 @@ func dirExists(path string) (bool, error) {
 
 // AllTools returns a slice containing all supported tools
 func AllTools() []Tool {
-	return []Tool{Claude, OpenCode, Copilot}
+	return []Tool{Claude, OpenCode, Copilot, Windsurf}
 }

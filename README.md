@@ -5,13 +5,13 @@
 [![License](https://img.shields.io/github/license/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/blob/main/LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/blob/main/go.mod)
 
-A command-line tool for discovering, installing, and managing AI resources (commands and skills) across multiple AI coding tools including Claude Code, OpenCode, and GitHub Copilot.
+A command-line tool for discovering, installing, and managing AI resources (commands and skills) across multiple AI coding tools including Claude Code, OpenCode, GitHub Copilot, and Windsurf.
 
 ## Features
 
 - 📦 **Repository Management**: Centralized repository for AI commands, skills, and agents
 - 🔗 **Symlink-based Installation**: Install resources in projects without duplication
-- 🤖 **Multi-Tool Support**: Works with Claude Code, OpenCode, and GitHub Copilot
+- 🤖 **Multi-Tool Support**: Works with Claude Code, OpenCode, GitHub Copilot, and Windsurf
 - 🤖 **Agent Support**: Manage AI agents with specialized roles and capabilities
 - ⚡ **Workspace Caching**: Git repositories cached for 10-50x faster subsequent operations
 - 🧹 **Cache Management**: `repo prune` command to clean up unused Git caches
@@ -24,18 +24,21 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 
 ## Supported AI Tools
 
-`aimgr` supports three major AI coding tools:
+`aimgr` supports four major AI coding tools:
 
 | Tool | Commands | Skills | Agents | Directory |
 |------|----------|--------|--------|-----------|
 | **[Claude Code](https://code.claude.com/)** | ✅ | ✅ | ✅ | `.claude/` |
 | **[OpenCode](https://opencode.ai/)** | ✅ | ✅ | ✅ | `.opencode/` |
 | **[VSCode / GitHub Copilot](https://github.com/features/copilot)** | ❌ | ✅ | ❌ | `.github/skills/` |
+| **[Windsurf](https://codeium.com/windsurf)** | ❌ | ✅ | ❌ | `.windsurf/skills/` |
 
 **Notes:** 
 - VSCode / GitHub Copilot only supports [Agent Skills](https://www.agentskills.io/) (via the open standard at agentskills.io), not slash commands or agents.
-- Skills for Copilot use the same `SKILL.md` format as other tools.
-- Use `--tool=copilot` or `--tool=vscode` when installing resources (both names work).
+- Windsurf only supports Agent Skills, similar to GitHub Copilot.
+- Skills for Copilot and Windsurf use the same `SKILL.md` format as other tools.
+- Use `--tool=copilot` or `--tool=vscode` for GitHub Copilot (both names work).
+- Use `--tool=windsurf` for Windsurf.
 - Agents provide specialized roles with specific capabilities for Claude Code and OpenCode.
 
 ## Installation
@@ -368,7 +371,7 @@ aimgr repo import gh:owner/repo --filter "package/*"   # Only add packages
 
 - Searches recursively in the folder for commands (*.md), skills (*/SKILL.md), agents (*.md), and packages (*.package.json)
 - Automatically detects resource types and validates them
-- Handles Claude (`.claude/`), OpenCode (`.opencode/`), and GitHub Copilot (`.github/`) structures
+- Handles Claude (`.claude/`), OpenCode (`.opencode/`), GitHub Copilot (`.github/`), and Windsurf (`.windsurf/`) structures
 - Discovers packages from `packages/*.package.json` files
 - Skips common directories like `node_modules`, `.git`, etc.
 - Supports filtering with glob patterns via `--filter` flag
@@ -431,7 +434,8 @@ aimgr install skill/pdf-processing command/my-command agent/code-reviewer
 # Install for specific tools
 aimgr install skill/pdf-processing --tool=copilot      # VSCode/Copilot only
 aimgr install skill/pdf-processing --tool=vscode       # Same as copilot
-aimgr install skill/pdf-processing --tool=claude,opencode,copilot  # Multiple tools
+aimgr install skill/pdf-processing --tool=windsurf     # Windsurf only
+aimgr install skill/pdf-processing --tool=claude,opencode,copilot,windsurf  # Multiple tools
 
 # Use patterns to install multiple resources
 aimgr install "skill/*"              # Install all skills
@@ -537,10 +541,12 @@ The `install.targets` setting controls which tool directories are created when i
 
 - **Claude Code** and **OpenCode** support commands, skills, and agents
 - **VSCode / GitHub Copilot** only supports skills (no commands or agents)
-- Skills for Copilot follow the [Agent Skills standard](https://www.agentskills.io/) at agentskills.io
-- When installing commands to a Copilot-only project, the command is not installed
-- When installing to multiple tools including Copilot, commands and agents are installed to Claude/OpenCode only
-- Use either `--tool=copilot` or `--tool=vscode` (both names work)
+- **Windsurf** only supports skills (no commands or agents)
+- Skills for Copilot and Windsurf follow the [Agent Skills standard](https://www.agentskills.io/) at agentskills.io
+- When installing commands to a Copilot or Windsurf-only project, the command is not installed
+- When installing to multiple tools including Copilot/Windsurf, commands and agents are installed to Claude/OpenCode only
+- Use either `--tool=copilot` or `--tool=vscode` for GitHub Copilot (both names work)
+- Use `--tool=windsurf` for Windsurf
 
 ### Migration from .ai Directory
 
