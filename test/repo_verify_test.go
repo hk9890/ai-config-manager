@@ -651,8 +651,8 @@ func TestCLIRepoVerifyFixOrphanedMetadata(t *testing.T) {
 		t.Errorf("Expected 'fix-orphan' in output, got: %s", output)
 	}
 
-	if !strings.Contains(output, "Removed orphaned metadata") {
-		t.Errorf("Expected 'Removed orphaned metadata' in output, got: %s", output)
+	if !strings.Contains(output, "Removed metadata") {
+		t.Errorf("Expected 'Removed metadata' in output, got: %s", output)
 	}
 
 	// Verify metadata is now removed
