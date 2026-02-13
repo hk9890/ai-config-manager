@@ -9,6 +9,28 @@ Manage AI resources using `aimgr` CLI. Resources are stored once in `~/.local/sh
 
 ---
 
+## ⚠️ IMPORTANT: Agent Safety Rules
+
+**Before running any mutating command, you MUST ask the user for explicit approval:**
+
+**Mutating operations that require user approval:**
+- `aimgr install` / `aimgr uninstall` - Modifies project symlinks
+- `aimgr repo import` - Adds resources to repository
+- `aimgr repo sync` - Updates repository from remote sources
+- `aimgr repo remove` - Permanently deletes resources
+
+**Read-only operations (safe to run):**
+- `aimgr list` - Show installed resources
+- `aimgr repo list` - Show available resources
+- `aimgr repo describe` - Show resource details
+- `aimgr repo verify` - Check repository health
+- `aimgr repo import --dry-run` - Validate without changes
+
+**Never assume permission. Always ask first.**
+
+---
+
+
 ## Quick Reference
 
 ```bash
@@ -90,19 +112,22 @@ aimgr uninstall skill/name
 
 Import, sync, or remove resources from the global repository.
 
+**⚠️ All operations below require user approval before execution.**
+
 ### Key Operations
 
 ```bash
-# Import resources
+# Import resources (ask user first)
 aimgr repo import ~/my-skills/          # Local directory
 aimgr repo import gh:user/repo          # GitHub
 aimgr repo import gh:user/repo@v1.0.0   # Specific version
 
-# Sync from configured sources (reads sync.sources from ~/.config/aimgr/aimgr.yaml)
+# Sync from configured sources (ask user first)
+# Reads sync.sources from ~/.config/aimgr/aimgr.yaml
 aimgr repo sync                         # All configured sources
 aimgr repo sync --skip-existing         # Don't overwrite existing
 
-# Remove resources
+# Remove resources (ask user first)
 aimgr repo remove skill/name            # With confirmation
 aimgr repo remove skill/name --force    # Skip confirmation
 ```
@@ -124,13 +149,13 @@ aimgr repo remove skill/name --force    # Skip confirmation
 Validate that your resources are compatible with aimgr before publishing.
 
 ```bash
-# Validate without adding to repository
+# Validate without adding to repository (read-only)
 aimgr repo import ./my-skill --dry-run
 
-# If validation passes, add it
-aimgr repo import ./my-skill
+# User can choose to add it after validation
+# Agent must ask user before running: aimgr repo import ./my-skill
 
-# Test installation
+# Test installation in a temporary directory
 cd /tmp/test && aimgr install skill/my-skill
 ```
 
@@ -141,6 +166,8 @@ cd /tmp/test && aimgr install skill/my-skill
 - **Packages** - JSON structure, resource references exist
 
 **Exit Codes:** `0` = Valid, `1` = Validation failed
+
+**⚠️ Agent Note:** Never run `repo import`, `repo remove`, or `repo sync` without explicit user approval.
 
 📚 **Complete validation guide:** [references/validating-resources.md](references/validating-resources.md)
 
