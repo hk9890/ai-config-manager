@@ -425,6 +425,9 @@ func importFromLocalPathWithMode(
 	origAgentCount := len(agents)
 	origPackageCount := len(packages)
 
+	// Determine if we should print informational output
+	isHumanFormat := importFormatFlag == "" || importFormatFlag == "table"
+
 	// Apply filter if specified
 	if filter != "" {
 		var err error
@@ -436,46 +439,58 @@ func importFromLocalPathWithMode(
 		// Check if filter matched any resources
 		filteredTotal := len(commands) + len(skills) + len(agents) + len(packages)
 		if filteredTotal == 0 {
-			fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filter, totalResources)
+			if isHumanFormat {
+				fmt.Printf("⚠ Warning: Filter '%s' matched 0 resources (found %d total)\n\n", filter, totalResources)
+			}
 			return nil
 		}
 
 		// Show filtered counts
-		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages", origCommandCount, origSkillCount, origAgentCount, origPackageCount)
-		if filteredTotal < totalResources {
-			fmt.Printf(" (filtered to %d matching '%s')\n", filteredTotal, filter)
-		} else {
-			fmt.Println()
+		if isHumanFormat {
+			fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages", origCommandCount, origSkillCount, origAgentCount, origPackageCount)
+			if filteredTotal < totalResources {
+				fmt.Printf(" (filtered to %d matching '%s')\n", filteredTotal, filter)
+			} else {
+				fmt.Println()
+			}
 		}
 	} else {
-		fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n", len(commands), len(skills), len(agents), len(packages))
+		if isHumanFormat {
+			fmt.Printf("Found: %d commands, %d skills, %d agents, %d packages\n", len(commands), len(skills), len(agents), len(packages))
+		}
 	}
 
 	// Display marketplace info if found
 	var marketplacePackages []*marketplace.PackageInfo
 	if marketplaceConfig != nil {
-		relPath := strings.TrimPrefix(marketplacePath, absPath)
-		if relPath == "" {
-			relPath = "marketplace.json"
-		} else {
-			relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
-		}
-		fmt.Printf("Found marketplace: %s (%d plugins)\n", relPath, len(marketplaceConfig.Plugins))
+		if isHumanFormat {
+			relPath := strings.TrimPrefix(marketplacePath, absPath)
+			if relPath == "" {
+				relPath = "marketplace.json"
+			} else {
+				relPath = strings.TrimPrefix(relPath, string(filepath.Separator))
+			}
+			fmt.Printf("Found marketplace: %s (%d plugins)\n", relPath, len(marketplaceConfig.Plugins))
 
-		// Generate packages from marketplace
-		fmt.Println("\nGenerating packages from marketplace:")
+			// Generate packages from marketplace
+			fmt.Println("\nGenerating packages from marketplace:")
+		}
 		basePath := filepath.Dir(marketplacePath)
 		marketplacePackages, err = marketplace.GeneratePackages(marketplaceConfig, basePath)
 		if err != nil {
 			return fmt.Errorf("failed to generate packages from marketplace: %w", err)
 		}
 
-		for _, pkgInfo := range marketplacePackages {
-			fmt.Printf("  ✓ %s (%d resources)\n", pkgInfo.Package.Name, len(pkgInfo.Package.Resources))
+		if isHumanFormat {
+			for _, pkgInfo := range marketplacePackages {
+				fmt.Printf("  ✓ %s (%d resources)\n", pkgInfo.Package.Name, len(pkgInfo.Package.Resources))
+			}
 		}
 	}
 
-	fmt.Println()
+	if isHumanFormat {
+		fmt.Println()
+	}
 
 	// Collect all resource paths
 	var allPaths []string
@@ -548,8 +563,8 @@ func importFromLocalPathWithMode(
 		}
 	}
 
-	// Print discovery errors if any
-	if len(discoveryErrors) > 0 {
+	// Print discovery errors if any (only for human-readable format)
+	if isHumanFormat && len(discoveryErrors) > 0 {
 		printDiscoveryErrors(discoveryErrors)
 		fmt.Println()
 	}
@@ -593,9 +608,10 @@ func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter st
 		return addSingleResource(localPath, manager)
 	}
 
+	absPath, _ := filepath.Abs(localPath)
+
 	// Print header (LOCAL-SPECIFIC) - only for table format
 	if importFormatFlag == "" || importFormatFlag == "table" {
-		absPath, _ := filepath.Abs(localPath)
 		fmt.Printf("Importing from: %s\n", absPath)
 		if dryRunFlag {
 			fmt.Println("  Mode: DRY RUN (preview only)")

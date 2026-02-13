@@ -582,8 +582,8 @@ func TestPackageAutoImportCLI(t *testing.T) {
 		t.Errorf("Output should mention 1 package, got: %s", output)
 	}
 
-	// Verify package was added (using --type=package flag)
-	listOutput, err := runAimgr(t, "repo", "list", "--type=package")
+	// Verify package was added (using package/* pattern)
+	listOutput, err := runAimgr(t, "repo", "list", "package/*")
 	if err != nil {
 		t.Fatalf("Failed to list packages: %v", err)
 	}
