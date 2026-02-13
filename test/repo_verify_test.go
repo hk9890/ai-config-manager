@@ -122,8 +122,8 @@ func TestCLIRepoVerifyPackageJSON(t *testing.T) {
 		t.Fatalf("Failed to create package: %v", err)
 	}
 
-	// Test: verify --json
-	output, _ := runAimgr(t, "repo", "verify", "--json")
+	// Test: verify --format=json
+	output, _ := runAimgr(t, "repo", "verify", "--format=json")
 
 	var result struct {
 		PackagesWithMissingRefs []struct {
@@ -231,8 +231,8 @@ func TestCLIRepoVerifyHealthyPackage(t *testing.T) {
 		t.Errorf("Should not report package issues for healthy package, got: %s", output)
 	}
 
-	// Verify JSON output also shows healthy
-	jsonOutput, _ := runAimgr(t, "repo", "verify", "--json")
+	// Verify in JSON format to check detailed results
+	jsonOutput, _ := runAimgr(t, "repo", "verify", "--format=json")
 
 	var result struct {
 		PackagesWithMissingRefs []interface{} `json:"packages_with_missing_refs"`
@@ -309,7 +309,7 @@ func TestCLIRepoVerifyJSON(t *testing.T) {
 	repoDir := t.TempDir()
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
-	output, _ := runAimgr(t, "repo", "verify", "--json")
+	output, _ := runAimgr(t, "repo", "verify", "--format=json")
 
 	// Parse JSON output
 	var result struct {
@@ -363,7 +363,7 @@ func TestCLIRepoVerifyHelp(t *testing.T) {
 	expectedContent := []string{
 		"Check for consistency issues",
 		"--fix",
-		"--json",
+		"--format",
 		"Resources without metadata",
 		"Orphaned metadata",
 	}
@@ -700,8 +700,8 @@ description: Test JSON output
 		t.Fatalf("Failed to delete orphan resource: %v", err)
 	}
 
-	// Test: verify --json
-	output, _ := runAimgr(t, "repo", "verify", "--json")
+	// Test: verify --format=json
+	output, _ := runAimgr(t, "repo", "verify", "--format=json")
 
 	var result struct {
 		ResourcesWithoutMetadata []struct {
@@ -780,7 +780,7 @@ func TestCLIRepoVerifyHealthyRepo(t *testing.T) {
 	}
 
 	// Verify JSON output also shows healthy
-	jsonOutput, _ := runAimgr(t, "repo", "verify", "--json")
+	jsonOutput, _ := runAimgr(t, "repo", "verify", "--format=json")
 
 	var result struct {
 		HasErrors   bool `json:"has_errors"`
@@ -1057,8 +1057,8 @@ Test nested command content.
 		}
 	}
 
-	// Verify in JSON format to check detailed results
-	jsonOutput, _ := runAimgr(t, "repo", "verify", "--json")
+	// Verify JSON output also shows healthy
+	jsonOutput, _ := runAimgr(t, "repo", "verify", "--format=json")
 
 	var result struct {
 		OrphanedMetadata []struct {
