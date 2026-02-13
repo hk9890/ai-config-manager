@@ -108,17 +108,20 @@ func renderTable(data *TableData) error {
 	}
 	table.Header(headers...)
 
-	// Apply responsive sizing if enabled and running in a TTY
-	// Note: tablewriter automatically wraps text based on terminal width,
-	// but we detect terminal size here to enable future enhancements
-	// like dynamic column width allocation
-	if data.Options.Responsive && IsTTY() {
-		term, err := NewTerminal()
-		if err == nil && term.Width() > 0 {
-			// Terminal size detected - tablewriter will auto-wrap
-			// Future enhancement: smart column width distribution
-			_ = term // placeholder for future use
+	// Apply responsive sizing if enabled
+	// If TerminalWidth is explicitly set (non-zero), use that value for testing
+	// Otherwise, auto-detect from terminal if running in a TTY
+	if data.Options.Responsive {
+		termWidth := data.Options.TerminalWidth
+		if termWidth == 0 && IsTTY() {
+			term, err := NewTerminal()
+			if err == nil && term.Width() > 0 {
+				termWidth = term.Width()
+			}
 		}
+		// Terminal width available for responsive features
+		// Future enhancement: smart column width distribution
+		_ = termWidth // placeholder for future use
 	}
 
 	for _, row := range data.Rows {
