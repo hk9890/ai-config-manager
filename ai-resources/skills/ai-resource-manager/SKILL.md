@@ -1,6 +1,6 @@
 ---
 name: ai-resource-manager
-description: "Manage AI resources (skills, commands, agents) using aimgr CLI. Use when user asks to: (1) Install/uninstall resources, (2) Manage repository (import/sync/remove), (3) Troubleshoot aimgr issues."
+description: "Manage AI resources (skills, commands, agents) using aimgr CLI. Use when user asks to: (1) Install/uninstall resources, (2) Manage repository (import/sync/remove), (3) Validate resources for developers, (4) Troubleshoot aimgr issues."
 ---
 
 # AI Resource Manager
@@ -23,6 +23,9 @@ aimgr repo import ./path        # Import from local directory
 aimgr repo import gh:user/repo  # Import from GitHub
 aimgr repo sync                 # Sync from configured sources
 aimgr repo remove skill/name    # Remove from repository
+
+# Validation (for developers)
+aimgr repo import ./my-skill --dry-run  # Validate without adding
 ```
 
 📚 **Command syntax:** Run `aimgr [command] --help` for detailed usage and examples
@@ -114,7 +117,36 @@ aimgr repo remove skill/name --force    # Skip confirmation
 
 ---
 
-## Use Case 3: Troubleshooting
+## Use Case 3: Validate Resources (for Developers)
+
+**For developers creating skills, agents, commands, or packages**
+
+Validate that your resources are compatible with aimgr before publishing.
+
+```bash
+# Validate without adding to repository
+aimgr repo import ./my-skill --dry-run
+
+# If validation passes, add it
+aimgr repo import ./my-skill
+
+# Test installation
+cd /tmp/test && aimgr install skill/my-skill
+```
+
+**What Gets Validated:**
+- **Skills** - Directory structure, SKILL.md format, naming rules
+- **Agents** - Single .md file format, frontmatter requirements
+- **Commands** - Must be in `commands/` directory, proper format
+- **Packages** - JSON structure, resource references exist
+
+**Exit Codes:** `0` = Valid, `1` = Validation failed
+
+📚 **Complete validation guide:** [references/validating-resources.md](references/validating-resources.md)
+
+---
+
+## Use Case 4: Troubleshooting
 
 Common issues and quick fixes:
 
@@ -155,6 +187,7 @@ make install  # Installs to ~/bin
 
 **Documentation:**
 - [troubleshooting.md](references/troubleshooting.md) - Troubleshooting guide
+- [validating-resources.md](references/validating-resources.md) - Resource validation for developers
 
 **Supported Tools:**
 
