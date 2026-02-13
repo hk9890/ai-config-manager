@@ -11,12 +11,9 @@ import (
 func TestBulkAddSimple(t *testing.T) {
 	// Create unique temp directories
 	testDir := t.TempDir()
-	xdgData := filepath.Join(testDir, "xdg-data")
 	repoDir := filepath.Join(testDir, "repo")
-	repoPath := filepath.Join(xdgData, "ai-config", "repo")
 
-	// Set XDG_DATA_HOME to control where the repo is created
-	t.Setenv("XDG_DATA_HOME", xdgData)
+	// Set AIMGR_REPO_PATH to control where the repo is created
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create one command using helper function
@@ -35,7 +32,7 @@ func TestBulkAddSimple(t *testing.T) {
 	}
 
 	// Verify resource was added to repo
-	if _, err := os.Stat(filepath.Join(repoPath, "commands", "test-cmd.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(repoDir, "commands", "test-cmd.md")); err != nil {
 		t.Errorf("Resource not found in repo: %v", err)
 	}
 }

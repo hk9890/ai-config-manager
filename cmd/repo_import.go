@@ -593,21 +593,23 @@ func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter st
 		return addSingleResource(localPath, manager)
 	}
 
-	// Print header (LOCAL-SPECIFIC)
-	absPath, _ := filepath.Abs(localPath)
-	fmt.Printf("Importing from: %s\n", absPath)
-	if dryRunFlag {
-		fmt.Println("  Mode: DRY RUN (preview only)")
+	// Print header (LOCAL-SPECIFIC) - only for table format
+	if importFormatFlag == "" || importFormatFlag == "table" {
+		absPath, _ := filepath.Abs(localPath)
+		fmt.Printf("Importing from: %s\n", absPath)
+		if dryRunFlag {
+			fmt.Println("  Mode: DRY RUN (preview only)")
+		}
+		if importMode == "symlink" {
+			fmt.Println("  Import Mode: SYMLINK (local paths linked, not copied)")
+		} else {
+			fmt.Println("  Import Mode: COPY (resources copied to repository)")
+		}
+		if filter != "" {
+			fmt.Printf("  Filter: %s\n", filter)
+		}
+		fmt.Println()
 	}
-	if importMode == "symlink" {
-		fmt.Println("  Import Mode: SYMLINK (local paths linked, not copied)")
-	} else {
-		fmt.Println("  Import Mode: COPY (resources copied to repository)")
-	}
-	if filter != "" {
-		fmt.Printf("  Filter: %s\n", filter)
-	}
-	fmt.Println()
 
 	// Determine source info
 	sourceURL := "file://" + absPath
@@ -653,21 +655,23 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		searchPath = filepath.Join(cachePath, parsed.Subpath)
 	}
 
-	// Print header (GitHub-specific)
-	fmt.Printf("Importing from: %s\n", parsed.URL)
-	if parsed.Ref != "" {
-		fmt.Printf("  Branch/Tag: %s\n", parsed.Ref)
+	// Print header (GitHub-specific) - only for table format
+	if importFormatFlag == "" || importFormatFlag == "table" {
+		fmt.Printf("Importing from: %s\n", parsed.URL)
+		if parsed.Ref != "" {
+			fmt.Printf("  Branch/Tag: %s\n", parsed.Ref)
+		}
+		if parsed.Subpath != "" {
+			fmt.Printf("  Subpath: %s\n", parsed.Subpath)
+		}
+		if dryRunFlag {
+			fmt.Println("  Mode: DRY RUN (preview only)")
+		}
+		if filter != "" {
+			fmt.Printf("  Filter: %s\n", filter)
+		}
+		fmt.Println()
 	}
-	if parsed.Subpath != "" {
-		fmt.Printf("  Subpath: %s\n", parsed.Subpath)
-	}
-	if dryRunFlag {
-		fmt.Println("  Mode: DRY RUN (preview only)")
-	}
-	if filter != "" {
-		fmt.Printf("  Filter: %s\n", filter)
-	}
-	fmt.Println()
 
 	// Determine source type
 	sourceType := "github"

@@ -91,9 +91,9 @@ func TestCLIRepoVerifyPackageWithMissingRefs(t *testing.T) {
 		t.Errorf("Packages with missing refs should be an error")
 	}
 
-	// Verify it shows the count of missing resources
-	if !strings.Contains(output, "3 missing") {
-		t.Errorf("Expected '3 missing' count in output, got: %s", output)
+	// Verify it shows the count of missing resources (in the MISSING COUNT column)
+	if !strings.Contains(output, "│ 3             │") && !strings.Contains(output, "│ 3 │") {
+		t.Errorf("Expected '3' in MISSING COUNT column in output, got: %s", output)
 	}
 }
 
