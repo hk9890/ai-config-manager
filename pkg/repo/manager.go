@@ -62,7 +62,8 @@ func NewManagerWithPath(repoPath string) *Manager {
 	}
 }
 
-// Init initializes the repository directory structure
+// Init initializes the repository directory structure and git repository.
+// This is idempotent - safe to call multiple times.
 func (m *Manager) Init() error {
 	// Create main repo directory
 	if err := os.MkdirAll(m.repoPath, 0755); err != nil {
@@ -91,6 +92,81 @@ func (m *Manager) Init() error {
 	packagesPath := filepath.Join(m.repoPath, "packages")
 	if err := os.MkdirAll(packagesPath, 0755); err != nil {
 		return fmt.Errorf("failed to create packages directory: %w", err)
+	}
+
+	// Initialize git repository if not already initialized
+	gitDir := filepath.Join(m.repoPath, ".git")
+	alreadyGit := false
+	if _, err := os.Stat(gitDir); err == nil {
+		alreadyGit = true
+	}
+
+	if !alreadyGit {
+		gitCmd := exec.Command("git", "init")
+		gitCmd.Dir = m.repoPath
+		if output, err := gitCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to initialize git repository: %w\nOutput: %s", err, output)
+		}
+	}
+
+	// Create/update .gitignore (idempotent)
+	gitignorePath := filepath.Join(m.repoPath, ".gitignore")
+	gitignoreContent := `# aimgr workspace cache (Git clones for remote sources)
+.workspace/
+
+# macOS
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+`
+
+	if _, err := os.Stat(gitignorePath); err == nil {
+		// .gitignore exists - check if it contains .workspace/
+		content, err := os.ReadFile(gitignorePath)
+		if err != nil {
+			return fmt.Errorf("failed to read .gitignore: %w", err)
+		}
+
+		// If .workspace/ is not in .gitignore, append it
+		if !strings.Contains(string(content), ".workspace/") &&
+			!strings.Contains(string(content), ".workspace") {
+			f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				return fmt.Errorf("failed to open .gitignore for append: %w", err)
+			}
+			defer f.Close()
+
+			if _, err := f.WriteString("\n" + gitignoreContent); err != nil {
+				return fmt.Errorf("failed to append to .gitignore: %w", err)
+			}
+		}
+	} else {
+		// Create new .gitignore
+		if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644); err != nil {
+			return fmt.Errorf("failed to create .gitignore: %w", err)
+		}
+	}
+
+	// Initial commit if git was just initialized
+	if !alreadyGit {
+		// Add .gitignore
+		addCmd := exec.Command("git", "add", ".gitignore")
+		addCmd.Dir = m.repoPath
+		if _, err := addCmd.CombinedOutput(); err != nil {
+			// Don't fail on add error - might not have anything to add
+			// Continue to try commit anyway
+		}
+
+		// Create initial commit
+		commitCmd := exec.Command("git", "commit", "-m", "aimgr: initialize repository")
+		commitCmd.Dir = m.repoPath
+		// Don't fail on commit error - might not have anything to commit
+		commitCmd.CombinedOutput()
 	}
 
 	return nil

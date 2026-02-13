@@ -41,3 +41,4 @@ vendor/
 # E2E test artifacts (don't commit)
 test/e2e/repos/
 test/e2e/configs/*.local.yaml
+.opencode/
