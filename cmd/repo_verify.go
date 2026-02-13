@@ -457,6 +457,9 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		fmt.Printf("⚠ Resources without metadata: %d\n\n", len(result.ResourcesWithoutMetadata))
 
 		table := output.NewTable("Type", "Name", "Status")
+		table.WithResponsive().
+			WithDynamicColumn(1).          // Name stretches
+			WithMinColumnWidths(8, 15, 18) // Type min=8, Name min=15, Status min=18
 		for _, issue := range result.ResourcesWithoutMetadata {
 			status := "Missing metadata"
 			if fixed {
@@ -474,6 +477,9 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		fmt.Printf("✗ Orphaned metadata (resource missing): %d\n\n", len(result.OrphanedMetadata))
 
 		table := output.NewTable("Type", "Name", "Status")
+		table.WithResponsive().
+			WithDynamicColumn(1).          // Name stretches
+			WithMinColumnWidths(8, 15, 18) // Type min=8, Name min=15, Status min=18
 		for _, issue := range result.OrphanedMetadata {
 			status := "Resource missing"
 			if fixed {
@@ -491,6 +497,9 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		fmt.Printf("⚠ Metadata with missing source paths: %d\n\n", len(result.MissingSourcePaths))
 
 		table := output.NewTable("Type", "Name", "Source Path")
+		table.WithResponsive().
+			WithDynamicColumn(2).          // Source Path stretches
+			WithMinColumnWidths(8, 15, 20) // Type min=8, Name min=15, Source Path min=20
 		for _, issue := range result.MissingSourcePaths {
 			table.AddRow(string(issue.Type), issue.Name, issue.SourcePath)
 		}
@@ -504,6 +513,9 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		fmt.Printf("✗ Type mismatches: %d\n\n", len(result.TypeMismatches))
 
 		table := output.NewTable("Name", "Resource Type", "Metadata Type")
+		table.WithResponsive().
+			WithDynamicColumn(0).           // Name stretches
+			WithMinColumnWidths(15, 13, 13) // Name min=15, Resource Type min=13, Metadata Type min=13
 		for _, mismatch := range result.TypeMismatches {
 			metaTypeStr := string(mismatch.MetadataType)
 			if metaTypeStr == "" {
@@ -521,6 +533,9 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		fmt.Printf("✗ Packages with missing resource references: %d\n\n", len(result.PackagesWithMissingRefs))
 
 		table := output.NewTable("Package", "Missing Count", "Missing Resources")
+		table.WithResponsive().
+			WithDynamicColumn(2).           // Missing Resources stretches
+			WithMinColumnWidths(15, 13, 30) // Package min=15, Missing Count min=13, Missing Resources min=30
 		for _, issue := range result.PackagesWithMissingRefs {
 			missingStr := strings.Join(issue.MissingResources, ", ")
 			table.AddRow(issue.Name, fmt.Sprintf("%d", len(issue.MissingResources)), missingStr)

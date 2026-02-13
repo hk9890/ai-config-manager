@@ -692,6 +692,9 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 
 	// Create table using shared infrastructure
 	table := output.NewTable("#", "Name", "Description")
+	table.WithResponsive().
+		WithDynamicColumn(2).          // Description stretches
+		WithMinColumnWidths(3, 15, 30) // # min=3, Name min=15, Description min=30
 
 	// Add rows
 	for i, res := range resources {
@@ -699,8 +702,6 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 		if desc == "" {
 			desc = "(no description)"
 		}
-		// Truncate description to 60 chars (same as list command)
-		desc = truncateString(desc, 60)
 
 		table.AddRow(fmt.Sprintf("%d", i+1), res.Name, desc)
 	}

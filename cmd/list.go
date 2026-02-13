@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
@@ -225,11 +224,13 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 
 	// Create table with NAME and DESCRIPTION only using shared infrastructure
 	table := output.NewTable("Name", "Description")
+	table.WithResponsive().
+		WithDynamicColumn(1).       // Description stretches
+		WithMinColumnWidths(15, 30) // Name min=15, Description min=30
 
 	// Add commands
 	for _, cmd := range commands {
-		desc := truncateString(cmd.Description, 60)
-		table.AddRow(fmt.Sprintf("command/%s", cmd.Name), desc)
+		table.AddRow(fmt.Sprintf("command/%s", cmd.Name), cmd.Description)
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
@@ -239,8 +240,7 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 
 	// Add skills
 	for _, skill := range skills {
-		desc := truncateString(skill.Description, 60)
-		table.AddRow(fmt.Sprintf("skill/%s", skill.Name), desc)
+		table.AddRow(fmt.Sprintf("skill/%s", skill.Name), skill.Description)
 	}
 
 	// Add empty row between types if skills exist and agents exist
@@ -250,8 +250,7 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 
 	// Add agents
 	for _, agent := range agents {
-		desc := truncateString(agent.Description, 60)
-		table.AddRow(fmt.Sprintf("agent/%s", agent.Name), desc)
+		table.AddRow(fmt.Sprintf("agent/%s", agent.Name), agent.Description)
 	}
 
 	// Add empty row between agents and packages if both exist
@@ -261,9 +260,8 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 
 	// Add packages
 	for _, pkg := range packages {
-		desc := truncateString(pkg.Description, 60)
 		countStr := fmt.Sprintf("%d resources", pkg.ResourceCount)
-		fullDesc := fmt.Sprintf("%s %s", countStr, desc)
+		fullDesc := fmt.Sprintf("%s %s", countStr, pkg.Description)
 		table.AddRow(fmt.Sprintf("package/%s", pkg.Name), fullDesc)
 	}
 
@@ -279,10 +277,12 @@ func outputPackagesTable(packages []repo.PackageInfo) error {
 
 	// Create table using shared infrastructure
 	table := output.NewTable("Name", "Resources", "Description")
+	table.WithResponsive().
+		WithDynamicColumn(2).          // Description stretches
+		WithMinColumnWidths(15, 9, 30) // Name min=15, Resources min=9, Description min=30
 
 	for _, pkg := range packages {
-		desc := truncateString(pkg.Description, 60)
-		table.AddRow(pkg.Name, fmt.Sprintf("%d", pkg.ResourceCount), desc)
+		table.AddRow(pkg.Name, fmt.Sprintf("%d", pkg.ResourceCount), pkg.Description)
 	}
 
 	return table.Format(output.Table)
@@ -334,15 +334,6 @@ func outputYAML(resources []resource.Resource) error {
 	encoder := yaml.NewEncoder(os.Stdout)
 	defer encoder.Close()
 	return encoder.Encode(resources)
-}
-
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-
-	// Truncate and add ellipsis
-	return strings.TrimSpace(s[:maxLen-3]) + "..."
 }
 
 func init() {

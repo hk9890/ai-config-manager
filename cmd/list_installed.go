@@ -319,14 +319,16 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 
 	// Create table with NAME, TARGETS, SYNC, DESCRIPTION using shared infrastructure
 	table := output.NewTable("Name", "Targets", "Sync", "Description")
+	table.WithResponsive().
+		WithDynamicColumn(3).              // Description stretches
+		WithMinColumnWidths(15, 12, 4, 30) // Name min=15, Targets min=12, Sync min=4, Description min=30
 
 	// Add commands
 	for _, cmd := range commands {
-		desc := truncateString(cmd.Description, 40)
 		targets := strings.Join(cmd.Targets, ", ")
 		resourceRef := fmt.Sprintf("command/%s", cmd.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0)
-		table.AddRow(resourceRef, targets, syncSymbol, desc)
+		table.AddRow(resourceRef, targets, syncSymbol, cmd.Description)
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
@@ -336,11 +338,10 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 
 	// Add skills
 	for _, skill := range skills {
-		desc := truncateString(skill.Description, 40)
 		targets := strings.Join(skill.Targets, ", ")
 		resourceRef := fmt.Sprintf("skill/%s", skill.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0)
-		table.AddRow(resourceRef, targets, syncSymbol, desc)
+		table.AddRow(resourceRef, targets, syncSymbol, skill.Description)
 	}
 
 	// Add empty row between types if skills exist and agents exist
@@ -350,11 +351,10 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 
 	// Add agents
 	for _, agent := range agents {
-		desc := truncateString(agent.Description, 40)
 		targets := strings.Join(agent.Targets, ", ")
 		resourceRef := fmt.Sprintf("agent/%s", agent.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0)
-		table.AddRow(resourceRef, targets, syncSymbol, desc)
+		table.AddRow(resourceRef, targets, syncSymbol, agent.Description)
 	}
 
 	// Render the table
