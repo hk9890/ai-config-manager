@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.23.0] - 2026-02-13
+
+### Added
+- **Package support in `repo describe` command** - Complete implementation for describing packages
+  - Works with all output formats: table, JSON, YAML
+  - Pattern matching support: `aimgr repo describe 'package/*'`
+  - Shows package name, description, resource count, and full resource list
+  - Displays complete metadata (source, timestamps, original format)
+  - Integrated with existing describe infrastructure
+
+### Security
+- **Agent Safety Rules for AI Resource Manager Skill** - Added prominent safety guidelines
+  - New "Agent Safety Rules" section at top of skill documentation
+  - Clear categorization of mutating vs read-only operations
+  - Explicit requirement: "Never assume permission. Always ask first."
+  - Warning labels on all destructive commands throughout skill
+  - Agent safety notes in Use Cases 2 and 3
+  - Prevents AI agents from running destructive operations without user approval
+
+### Fixed
+- **Column widths in `repo verify`** - Adjusted column widths in missing refs table for better readability
+- **Build documentation** - Fixed references to removed `install.sh` script, updated to proper build methods
+- **OpenCode plugin support** - Added OpenCode as valid tool option in repository init
+
+### Documentation
+- **AI Resource Manager Skill improvements**
+  - Shortened Use Case 3 (Validation) from 44 to 28 lines while maintaining essential content
+  - Removed misleading "If validation passes, add it" example
+  - Added safety warnings and agent notes throughout
+  - Better structure with consistent use case lengths
+- **Updated build instructions** - All docs now reference `go install` or `make install`
+
+### Changed
+- Consolidated repository initialization logic for better maintainability
+- Improved error messages for unsupported tools
+
+
 
 ## [1.20.0] - 2026-02-05
 
