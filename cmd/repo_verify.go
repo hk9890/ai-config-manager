@@ -458,8 +458,8 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 
 		table := output.NewTable("Name", "Status")
 		table.WithResponsive().
-			WithDynamicColumn(0).          // Name stretches
-			WithMinColumnWidths(40, 18)    // Name min=40, Status min=18
+			WithDynamicColumn(0).       // Name stretches
+			WithMinColumnWidths(40, 20) // Name min=40, Status min=20
 		for _, issue := range result.ResourcesWithoutMetadata {
 			status := "Missing metadata"
 			if fixed {
@@ -479,8 +479,8 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 
 		table := output.NewTable("Name", "Status")
 		table.WithResponsive().
-			WithDynamicColumn(0).          // Name stretches
-			WithMinColumnWidths(40, 18)    // Name min=40, Status min=18
+			WithDynamicColumn(0).       // Name stretches
+			WithMinColumnWidths(40, 20) // Name min=40, Status min=20
 		for _, issue := range result.OrphanedMetadata {
 			status := "Resource missing"
 			if fixed {
@@ -500,8 +500,8 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 
 		table := output.NewTable("Name", "Source Path")
 		table.WithResponsive().
-			WithDynamicColumn(1).          // Source Path stretches
-			WithMinColumnWidths(40, 20)    // Name min=40, Source Path min=20
+			WithDynamicColumn(1).       // Source Path stretches
+			WithMinColumnWidths(40, 20) // Name min=40, Source Path min=20
 		for _, issue := range result.MissingSourcePaths {
 			resourceRef := formatResourceReference(issue.Type, issue.Name)
 			table.AddRow(resourceRef, issue.SourcePath)
@@ -537,8 +537,8 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 
 		table := output.NewTable("Package", "Missing Count", "Missing Resources")
 		table.WithResponsive().
-			WithDynamicColumn(2).           // Missing Resources stretches
-			WithMinColumnWidths(40, 15, 30) // Package min=40, Missing Count min=15, Missing Resources min=30
+			WithDynamicColumn(2).          // Missing Resources stretches
+			WithMinColumnWidths(25, 5, 30) // Package min=25, Missing Count min=5, Missing Resources min=30
 		for _, issue := range result.PackagesWithMissingRefs {
 			missingStr := strings.Join(issue.MissingResources, ", ")
 			table.AddRow(issue.Name, fmt.Sprintf("%d", len(issue.MissingResources)), missingStr)

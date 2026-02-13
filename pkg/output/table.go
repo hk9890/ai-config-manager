@@ -125,7 +125,7 @@ func formatTableData(data *TableData, format Format) error {
 //   - Slice of column indices that should be visible (0-indexed)
 //
 // Algorithm:
-//  1. Calculate border overhead: (numCols * 3) + 1
+//  1. Calculate border overhead: numCols + 1 (one | per column + final |)
 //  2. Iterate left-to-right, accumulating column widths + borders
 //  3. Stop when next column would exceed terminal width
 //  4. Always show at least the first column (index 0)
@@ -141,8 +141,9 @@ func determineVisibleColumns(termWidth, numCols int, minWidths []int) []int {
 		// Get minimum width for this column
 		minWidth := getMinWidth(i, minWidths)
 
-		// Calculate border overhead: 3 chars per visible column (| text |) + 1 for final border
-		borders := (len(visible)+1)*3 + 1
+		// Calculate border overhead: one | per column + final | = numCols + 1
+		// When checking if the NEXT column fits, we use len(visible)+2
+		borders := len(visible) + 2
 
 		// Check if this column fits
 		if usedWidth+minWidth+borders <= termWidth {
@@ -175,7 +176,7 @@ func determineVisibleColumns(termWidth, numCols int, minWidths []int) []int {
 //   - Map of column index to allocated width
 //
 // Algorithm:
-//  1. Calculate border overhead: (numVisibleCols * 3) + 1
+//  1. Calculate border overhead: numVisibleCols + 1 (one | per column + final |)
 //  2. Allocate minimum widths to all fixed columns (non-dynamic)
 //  3. Give remaining space to dynamic column (minimum 15 chars)
 func allocateColumnWidths(termWidth int, visibleCols []int, minWidths []int, dynamicColIndex int) map[int]int {
@@ -184,13 +185,27 @@ func allocateColumnWidths(termWidth int, visibleCols []int, minWidths []int, dyn
 	}
 
 	widths := make(map[int]int)
-	borders := (len(visibleCols) * 3) + 1
+	borders := len(visibleCols) + 1
 
 	// Determine which column is dynamic
 	// -1 means rightmost visible column
+	// If the configured dynamic column is not visible, fall back to rightmost visible
 	dynIdx := dynamicColIndex
 	if dynIdx == -1 {
 		dynIdx = visibleCols[len(visibleCols)-1]
+	} else {
+		// Check if the configured dynamic column is actually visible
+		isVisible := false
+		for _, colIdx := range visibleCols {
+			if colIdx == dynIdx {
+				isVisible = true
+				break
+			}
+		}
+		if !isVisible {
+			// Fall back to rightmost visible column
+			dynIdx = visibleCols[len(visibleCols)-1]
+		}
 	}
 
 	// Allocate minimum widths to fixed columns (all except dynamic)
