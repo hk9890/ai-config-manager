@@ -177,15 +177,18 @@ uname -m
 
 ---
 
-### Installation Script Fails
+### Build from Source Fails
 
 **Symptoms:**
-- Install script throws errors
-- Partial installation
-- Network errors during install
+- `make install` or `go install` throws errors
+- Build fails with compilation errors
+- Missing dependencies
 
 **Diagnosis:**
 ```bash
+# Check Go version (needs 1.21+)
+go version
+
 # Check network connectivity
 curl -I https://github.com
 
@@ -193,36 +196,41 @@ curl -I https://github.com
 df -h
 
 # Check write permissions
-ls -la ~/.local/bin/
+ls -la ~/bin/ ~/.local/bin/
 ```
 
 **Solutions:**
 
-1. **Manual installation**:
+1. **Update Go version**:
    ```bash
-   # Create directories
-   mkdir -p ~/.local/bin
-   mkdir -p ~/.config/aimgr
+   # Check minimum required version
+   go version  # Should be 1.21 or higher
    
-   # Download binary manually
-   curl -L -o ~/.local/bin/aimgr https://github.com/.../aimgr
-   chmod +x ~/.local/bin/aimgr
-   
-   # Initialize config
-   aimgr config set install.targets claude
+   # Update if needed (see https://go.dev/doc/install)
    ```
 
-2. **Check prerequisites**:
+2. **Manual build and install**:
+   ```bash
+   # Clone and build
+   git clone https://github.com/hk9890/ai-config-manager.git
+   cd ai-config-manager
+   go build -o aimgr
+   
+   # Install manually
+   mkdir -p ~/bin
+   cp aimgr ~/bin/
+   chmod +x ~/bin/aimgr
+   
+   # Verify
+   ~/bin/aimgr --version
+   ```
+
+3. **Check prerequisites**:
    ```bash
    # Ensure required tools exist
-   which curl
-   which tar
+   which go
    which git
-   ```
-
-3. **Run with debug output**:
-   ```bash
-   bash -x install.sh 2>&1 | tee install.log
+   which make
    ```
 
 ---
