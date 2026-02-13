@@ -226,7 +226,7 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 	table := output.NewTable("Name", "Description")
 	table.WithResponsive().
 		WithDynamicColumn(1).       // Description stretches
-		WithMinColumnWidths(15, 30) // Name min=15, Description min=30
+		WithMinColumnWidths(40, 30) // Name min=40, Description min=30
 
 	// Add commands
 	for _, cmd := range commands {
