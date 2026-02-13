@@ -244,6 +244,23 @@ func completeInstalledResources(cmd *cobra.Command, args []string, toComplete st
 	return patterns, cobra.ShellCompDirectiveNoFileComp
 }
 
+// completeVerifyPatterns provides completion for repo verify command patterns
+func completeVerifyPatterns(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	// Offer type-based patterns including packages
+	patterns := []string{
+		"skill/*",
+		"command/*",
+		"agent/*",
+		"package/*",
+		"*",
+	}
+	return patterns, cobra.ShellCompDirectiveNoFileComp
+}
+
 // completeConfigKeys provides completion for config key names
 func completeConfigKeys(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	if len(args) != 0 {

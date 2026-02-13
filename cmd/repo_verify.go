@@ -9,6 +9,7 @@ import (
 
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/output"
+	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/spf13/cobra"
@@ -65,8 +66,9 @@ var (
 
 // repoVerifyCmd represents the repo verify command
 var repoVerifyCmd = &cobra.Command{
-	Use:   "verify",
-	Short: "Check repository metadata and package integrity",
+	Use:               "verify [pattern]",
+	Short:             "Check repository metadata and package integrity",
+	ValidArgsFunction: completeVerifyPatterns,
 	Long: `Check for consistency issues between resources and metadata, and validate package references.
 
 This command performs the following checks:
@@ -80,6 +82,9 @@ Use --fix to automatically resolve issues:
   - Create missing metadata for resources
   - Remove orphaned metadata files
 
+Patterns support wildcards (* for multiple characters, ? for single character) 
+and optional type prefixes.
+
 Output Formats:
   --format=table (default): Human-readable with colored status
   --format=json:  Structured JSON for parsing
@@ -90,10 +95,13 @@ Exit status:
   1 - Errors found (orphaned metadata, type mismatches, or broken package references)
 
 Examples:
-  aimgr repo verify                  # Check for issues
+  aimgr repo verify                  # Check all resources
+  aimgr repo verify skill/*          # Check only skills
+  aimgr repo verify command/test*    # Check commands starting with "test"
   aimgr repo verify --fix            # Fix issues automatically
   aimgr repo verify --format=json    # Machine-readable output
   aimgr repo verify --format=yaml    # YAML output`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create a new repo manager
 		manager, err := repo.NewManager()
@@ -121,8 +129,17 @@ Examples:
 			return outputVerifyResults(&result, parsedFormat, verifyFix)
 		}
 
+		// Parse pattern if provided
+		var matcher *pattern.Matcher
+		if len(args) > 0 {
+			matcher, err = pattern.NewMatcher(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid pattern '%s': %w", args[0], err)
+			}
+		}
+
 		// Run verification
-		result, err := verifyRepository(manager, verifyFix)
+		result, err := verifyRepository(manager, verifyFix, matcher)
 		if err != nil {
 			return fmt.Errorf("verification failed: %w", err)
 		}
@@ -142,7 +159,7 @@ Examples:
 }
 
 // verifyRepository performs repository verification checks
-func verifyRepository(manager *repo.Manager, fix bool) (*VerifyResult, error) {
+func verifyRepository(manager *repo.Manager, fix bool, matcher *pattern.Matcher) (*VerifyResult, error) {
 	result := &VerifyResult{}
 	repoPath := manager.GetRepoPath()
 
@@ -152,11 +169,54 @@ func verifyRepository(manager *repo.Manager, fix bool) (*VerifyResult, error) {
 		return nil, fmt.Errorf("failed to list resources: %w", err)
 	}
 
-	// Build resource map for quick lookup
+	// Get all packages
+	packageInfos, err := manager.ListPackages()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list packages: %w", err)
+	}
+
+	// Filter resources by pattern if provided
+	if matcher != nil {
+		var filtered []resource.Resource
+		for _, res := range allResources {
+			if matcher.Match(&res) {
+				filtered = append(filtered, res)
+			}
+		}
+		allResources = filtered
+
+		// Filter packages by pattern
+		if matcher.GetResourceType() == "" || matcher.GetResourceType() == resource.PackageType {
+			var filteredPackages []repo.PackageInfo
+			for _, pkg := range packageInfos {
+				tempRes := resource.Resource{
+					Type: resource.PackageType,
+					Name: pkg.Name,
+				}
+				if matcher.Match(&tempRes) {
+					filteredPackages = append(filteredPackages, pkg)
+				}
+			}
+			packageInfos = filteredPackages
+		} else if matcher.GetResourceType() != resource.PackageType {
+			// If filtering for specific non-package type, clear packages
+			packageInfos = nil
+		}
+	}
+
+	// Build resource map for quick lookup (including packages)
 	resourceMap := make(map[string]resource.Resource)
 	for _, res := range allResources {
 		key := fmt.Sprintf("%s:%s", res.Type, res.Name)
 		resourceMap[key] = res
+	}
+	// Add packages to resource map
+	for _, pkg := range packageInfos {
+		key := fmt.Sprintf("%s:%s", resource.PackageType, pkg.Name)
+		resourceMap[key] = resource.Resource{
+			Type: resource.PackageType,
+			Name: pkg.Name,
+		}
 	}
 
 	// Check 1: Resources without metadata
@@ -218,7 +278,7 @@ func verifyRepository(manager *repo.Manager, fix bool) (*VerifyResult, error) {
 	// Check 4: Orphaned metadata (metadata without resources)
 	metadataDir := filepath.Join(repoPath, ".metadata")
 	if _, err := os.Stat(metadataDir); err == nil {
-		orphanedMeta, err := findVerifyOrphanedMetadata(manager, resourceMap, metadataDir, fix)
+		orphanedMeta, err := findVerifyOrphanedMetadata(manager, resourceMap, metadataDir, fix, matcher)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check for orphaned metadata: %w", err)
 		}
@@ -229,11 +289,7 @@ func verifyRepository(manager *repo.Manager, fix bool) (*VerifyResult, error) {
 	}
 
 	// Check 5: Packages with missing resource references
-	packageInfos, err := manager.ListPackages()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list packages: %w", err)
-	}
-
+	// packageInfos is already filtered by pattern earlier
 	for _, pkgInfo := range packageInfos {
 		// Load the full package
 		pkg, err := manager.GetPackage(pkgInfo.Name)
@@ -258,11 +314,18 @@ func verifyRepository(manager *repo.Manager, fix bool) (*VerifyResult, error) {
 }
 
 // findVerifyOrphanedMetadata finds metadata files without corresponding resources
-func findVerifyOrphanedMetadata(manager *repo.Manager, resourceMap map[string]resource.Resource, metadataDir string, fix bool) ([]MetadataIssue, error) {
+func findVerifyOrphanedMetadata(manager *repo.Manager, resourceMap map[string]resource.Resource, metadataDir string, fix bool, matcher *pattern.Matcher) ([]MetadataIssue, error) {
 	var orphaned []MetadataIssue
 
+	// Determine which resource types to check based on the matcher
+	typesToCheck := []resource.ResourceType{resource.Command, resource.Skill, resource.Agent, resource.PackageType}
+	if matcher != nil && matcher.GetResourceType() != "" {
+		// If pattern specifies a type, only check that type
+		typesToCheck = []resource.ResourceType{matcher.GetResourceType()}
+	}
+
 	// Check each resource type
-	for _, resType := range []resource.ResourceType{resource.Command, resource.Skill, resource.Agent} {
+	for _, resType := range typesToCheck {
 		typeDir := filepath.Join(metadataDir, string(resType)+"s")
 		if _, err := os.Stat(typeDir); os.IsNotExist(err) {
 			continue
@@ -292,6 +355,19 @@ func findVerifyOrphanedMetadata(manager *repo.Manager, resourceMap map[string]re
 			}
 
 			name := meta.Name
+
+			// If matcher is provided, check if this resource matches the pattern
+			if matcher != nil {
+				tempRes := resource.Resource{
+					Type: resType,
+					Name: name,
+				}
+				if !matcher.Match(&tempRes) {
+					// Skip resources that don't match the pattern
+					continue
+				}
+			}
+
 			key := fmt.Sprintf("%s:%s", resType, name)
 
 			// Check if corresponding resource exists
@@ -378,69 +454,78 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 	// Display resources without metadata (warning)
 	if len(result.ResourcesWithoutMetadata) > 0 {
 		hasIssues = true
-		fmt.Printf("⚠ Resources without metadata: %d\n", len(result.ResourcesWithoutMetadata))
+		fmt.Printf("⚠ Resources without metadata: %d\n\n", len(result.ResourcesWithoutMetadata))
+
+		table := output.NewTable("Type", "Name", "Status")
 		for _, issue := range result.ResourcesWithoutMetadata {
+			status := "Missing metadata"
 			if fixed {
-				fmt.Printf("  ✓ Created metadata for %s (%s)\n", issue.Name, issue.Type)
-			} else {
-				fmt.Printf("  - %s (%s) at %s\n", issue.Name, issue.Type, issue.Path)
+				status = "✓ Created metadata"
 			}
+			table.AddRow(string(issue.Type), issue.Name, status)
 		}
+		table.Format(output.Table)
 		fmt.Println()
 	}
 
 	// Display orphaned metadata (error)
 	if len(result.OrphanedMetadata) > 0 {
 		hasIssues = true
-		fmt.Printf("✗ Orphaned metadata (resource missing): %d\n", len(result.OrphanedMetadata))
+		fmt.Printf("✗ Orphaned metadata (resource missing): %d\n\n", len(result.OrphanedMetadata))
+
+		table := output.NewTable("Type", "Name", "Status")
 		for _, issue := range result.OrphanedMetadata {
+			status := "Resource missing"
 			if fixed {
-				fmt.Printf("  ✓ Removed orphaned metadata for %s (%s)\n", issue.Name, issue.Type)
-			} else {
-				fmt.Printf("  - %s (%s) at %s\n", issue.Name, issue.Type, issue.Path)
+				status = "✓ Removed metadata"
 			}
+			table.AddRow(string(issue.Type), issue.Name, status)
 		}
+		table.Format(output.Table)
 		fmt.Println()
 	}
 
 	// Display metadata with missing source paths (warning)
 	if len(result.MissingSourcePaths) > 0 {
 		hasIssues = true
-		fmt.Printf("⚠ Metadata with missing source paths: %d\n", len(result.MissingSourcePaths))
+		fmt.Printf("⚠ Metadata with missing source paths: %d\n\n", len(result.MissingSourcePaths))
+
+		table := output.NewTable("Type", "Name", "Source Path")
 		for _, issue := range result.MissingSourcePaths {
-			fmt.Printf("  - %s (%s)\n", issue.Name, issue.Type)
-			fmt.Printf("    Source: %s\n", issue.SourcePath)
+			table.AddRow(string(issue.Type), issue.Name, issue.SourcePath)
 		}
+		table.Format(output.Table)
 		fmt.Println()
 	}
 
 	// Display type mismatches (error)
 	if len(result.TypeMismatches) > 0 {
 		hasIssues = true
-		fmt.Printf("✗ Type mismatches: %d\n", len(result.TypeMismatches))
+		fmt.Printf("✗ Type mismatches: %d\n\n", len(result.TypeMismatches))
+
+		table := output.NewTable("Name", "Resource Type", "Metadata Type")
 		for _, mismatch := range result.TypeMismatches {
 			metaTypeStr := string(mismatch.MetadataType)
 			if metaTypeStr == "" {
-				metaTypeStr = "(empty - metadata may be corrupted)"
+				metaTypeStr = "(empty/corrupted)"
 			}
-			fmt.Printf("  - %s: resource is %s, metadata says %s\n",
-				mismatch.Name, mismatch.ResourceType, metaTypeStr)
-			fmt.Printf("    Resource: %s\n", mismatch.ResourcePath)
-			fmt.Printf("    Metadata: %s\n", mismatch.MetadataPath)
+			table.AddRow(mismatch.Name, string(mismatch.ResourceType), metaTypeStr)
 		}
+		table.Format(output.Table)
 		fmt.Println()
 	}
 
 	// Display packages with missing resource references (error)
 	if len(result.PackagesWithMissingRefs) > 0 {
 		hasIssues = true
-		fmt.Printf("✗ Packages with missing resource references: %d\n", len(result.PackagesWithMissingRefs))
+		fmt.Printf("✗ Packages with missing resource references: %d\n\n", len(result.PackagesWithMissingRefs))
+
+		table := output.NewTable("Package", "Missing Count", "Missing Resources")
 		for _, issue := range result.PackagesWithMissingRefs {
-			fmt.Printf("  - %s (%d missing):\n", issue.Name, len(issue.MissingResources))
-			for _, ref := range issue.MissingResources {
-				fmt.Printf("    - %s\n", ref)
-			}
+			missingStr := strings.Join(issue.MissingResources, ", ")
+			table.AddRow(issue.Name, fmt.Sprintf("%d", len(issue.MissingResources)), missingStr)
 		}
+		table.Format(output.Table)
 		fmt.Println()
 	}
 
