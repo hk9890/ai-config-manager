@@ -289,7 +289,7 @@ For detailed configuration options, see [docs/user-guide/configuration.md](docs/
 ```bash
 # Display version information
 aimgr --version
-# Output: aimgr version 0.1.0 (commit: a1b2c3d, built: 2026-01-18T19:30:00Z)
+# Output: aimgr version v1.22.0 (commit: a1b2c3d, built: 2026-02-13T12:00:29Z)
 
 # Short form
 aimgr -v
@@ -1409,6 +1409,118 @@ Shows detailed list of unreferenced caches with sizes before removal.
 **Flags:**
 - `--dry-run`: Preview what would be removed without removing
 - `--force`: Skip confirmation prompt
+
+
+### `aimgr repo init`
+
+Initialize the aimgr repository directory structure and git repository.
+
+```bash
+# Initialize with default location
+aimgr repo init
+
+# Initialize at custom location (via environment variable)
+AIMGR_REPO_PATH=/custom/path aimgr repo init
+```
+
+**What this command does:**
+- Creates the repository directory structure (`commands/`, `skills/`, `agents/`, `packages/`)
+- Initializes a git repository for tracking changes
+- Creates `.gitignore` to exclude `.workspace/` cache directory
+
+**Repository location determined by (in order of precedence):**
+1. `AIMGR_REPO_PATH` environment variable
+2. `repo.path` in config file (`~/.config/aimgr/aimgr.yaml`)
+3. Default XDG location (`~/.local/share/ai-config/repo/`)
+
+This command is idempotent - safe to run multiple times.
+
+### `aimgr repo drop`
+
+Delete all resources from the repository. Requires `--force` flag for safety.
+
+```bash
+# Delete and recreate repository
+aimgr repo drop --force
+```
+
+**WARNING:** This is destructive and cannot be undone.
+
+**What this command does:**
+- Removes the entire repository directory
+- Recreates an empty structure with standard subdirectories
+- All resources and cached data are deleted
+
+**When to use:**
+- To completely reset the repository
+- To remove all cached resources at once
+- Before migrating to a new repository location
+
+**Tip:** Use `aimgr repo sync` after drop to rebuild from configured sources.
+
+### `aimgr repo info`
+
+Display comprehensive information about the aimgr repository.
+
+```bash
+# Show repository information
+aimgr repo info
+
+# JSON output for scripting
+aimgr repo info --format=json
+
+# YAML output
+aimgr repo info --format=yaml
+```
+
+**Output includes:**
+- Repository location
+- Total resource counts
+- Breakdown by type (commands, skills, agents, packages)
+- Disk usage statistics
+
+**Output formats:**
+- `--format=table` (default): Human-readable text
+- `--format=json`: JSON for scripting
+- `--format=yaml`: YAML for configuration
+
+### `aimgr repo verify`
+
+Check for consistency issues between resources and metadata, and validate package references.
+
+```bash
+# Check all resources
+aimgr repo verify
+
+# Check only skills
+aimgr repo verify skill/*
+
+# Check and fix issues automatically
+aimgr repo verify --fix
+
+# JSON output
+aimgr repo verify --format=json
+```
+
+**What this command checks:**
+- Resources without metadata (warning)
+- Orphaned metadata files with missing resources (error)
+- Metadata with non-existent source paths (warning)
+- Type mismatches between resource and metadata (error)
+- Packages with missing resource references (error)
+
+**Using `--fix` flag:**
+- Creates missing metadata for resources
+- Removes orphaned metadata files
+
+**Exit status:**
+- `0` - No errors found
+- `1` - Errors found (orphaned metadata, type mismatches, or broken package references)
+
+**Output formats:**
+- `--format=table` (default): Human-readable with colored status
+- `--format=json`: Structured JSON for parsing
+- `--format=yaml`: Structured YAML
 
 ## Resource Formats
 

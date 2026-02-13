@@ -847,7 +847,7 @@ The project uses GitHub Actions for continuous integration:
 - **Release workflow** (`.github/workflows/release.yml`):
   - Automated releases on tag push
 
-**Note:** The CI currently uses Go 1.21. If you're developing with Go 1.25.6 (as specified in go.mod), be aware of potential compatibility differences. The CI configuration may need updating.
+**Note:** The CI currently uses Go 1.21, while go.mod specifies Go 1.25.6. This version number in go.mod appears unusually high (Go stable releases are typically 1.21, 1.22, etc.). If you encounter compatibility issues during development, the CI configuration may need updating to match go.mod, or go.mod may need correction.
 
 ## Key Dependencies
 

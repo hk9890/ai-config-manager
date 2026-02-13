@@ -19,21 +19,13 @@ We take the security of `aimgr` seriously. If you discover a security vulnerabil
 
 ### How to Report
 
-**Email:** [hans.kohlreiter@dynatrace.com](mailto:hans.kohlreiter@dynatrace.com)
+**Create a GitHub Security Advisory:** Use the [GitHub Security Advisory](https://github.com/hk9890/ai-config-manager/security/advisories/new) feature for private disclosure.
 
 **Please include:**
 - A description of the vulnerability
 - Steps to reproduce the issue
 - Potential impact of the vulnerability
 - Any suggested fixes (if applicable)
-
-### What to Expect
-
-- **Initial Response:** You will receive an acknowledgment within 48 hours
-- **Assessment:** We will investigate and assess the severity within 5 business days
-- **Updates:** You will receive regular updates on our progress
-- **Resolution:** We aim to release a fix within 30 days for critical vulnerabilities
-- **Credit:** We will credit you in the security advisory (unless you prefer to remain anonymous)
 
 ### Security Advisory Process
 
@@ -49,6 +41,12 @@ When using `aimgr`, follow these best practices to maintain security:
 
 ### Safe Resource Management
 
+**⚠️ CRITICAL: Prompt Injection Vulnerability**
+
+AI resources (commands, skills, agents) are markdown files read by LLMs. **These files are inherently vulnerable to prompt injection attacks**, and there is no technical solution to prevent this.
+
+**You MUST manually review all markdown content from untrusted sources before adding them to your repository.**
+
 1. **Verify Sources Before Adding:**
    ```bash
    # Review repository contents before importing
@@ -60,7 +58,7 @@ When using `aimgr`, follow these best practices to maintain security:
 
 2. **Use Trusted Sources:**
    - Only add resources from repositories you trust
-   - Review resource content before installation
+   - **Always review resource content before installation**
    - Be cautious with resources that execute system commands
 
 3. **Regularly Update Resources:**
@@ -69,59 +67,7 @@ When using `aimgr`, follow these best practices to maintain security:
    aimgr repo sync
    ```
 
-### Repository Security
-
-1. **Protect Your Repository Path:**
-   - The default repository location is `~/.local/share/ai-config/repo/`
-   - Ensure appropriate file permissions (755 for directories, 644 for files)
-   - Do not store the repository in world-writable locations
-
-2. **Configuration File Security:**
-   - Configuration is stored at `~/.config/aimgr/aimgr.yaml`
-   - Do not commit secrets or credentials to configuration files
-   - Use environment variables for sensitive values:
-     ```yaml
-     repo:
-       path: ${AIMGR_REPO_PATH:-~/.local/share/ai-config/repo}
-     ```
-
-3. **Workspace Cache:**
-   - Git repository caches are stored in `.workspace/` within your repository
-   - Regularly prune unused caches: `aimgr repo prune`
-   - The workspace directory should not be world-writable
-
-### Installation Security
-
-1. **Review Before Installing:**
-   ```bash
-   # Check what a resource does before installing
-   cat ~/.local/share/ai-config/repo/commands/command-name.md
-   cat ~/.local/share/ai-config/repo/skills/skill-name/SKILL.md
-   ```
-
-2. **Use Symlink Mode (Default):**
-   - `aimgr` uses symlinks by default, which allows you to review and update resources centrally
-   - Any changes to the repository immediately affect all installations
-
-3. **Limit Tool Access:**
-   - Only install resources to the AI tools you actually use
-   - Configure default targets: `aimgr config set install.targets claude`
-
-### Git Repository Security
-
-1. **SSH vs HTTPS:**
-   - Use SSH URLs for private repositories: `git@github.com:owner/repo.git`
-   - Use HTTPS for public repositories: `https://github.com/owner/repo.git`
-
-2. **Verify Repository Authenticity:**
-   - Check the repository owner and contents before importing
-   - Be cautious with repositories that have few stars or recent creation dates
-
-3. **Use Specific Versions:**
-   ```bash
-   # Pin to specific tags/versions instead of main/master
-   aimgr repo import gh:owner/repo@v1.0.0
-   ```
+**The repository model assumes all content is reviewed and trusted. Be extremely careful when adding new resources.**
 
 ### Command Execution Safety
 
@@ -204,15 +150,5 @@ make install
 
 Subscribe to releases on GitHub to be notified of security updates:
 https://github.com/hk9890/ai-config-manager/releases
-
-## Responsible Disclosure
-
-We appreciate the security research community's efforts to responsibly disclose vulnerabilities. We commit to:
-
-- Acknowledge your report within 48 hours
-- Provide regular updates on our progress
-- Credit you in the security advisory (with your permission)
-- Work with you on a coordinated disclosure timeline
-- Not take legal action against researchers who follow this policy
 
 Thank you for helping keep `aimgr` and its users safe!
