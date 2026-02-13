@@ -43,3 +43,22 @@ func SkipIfNoGit(t *testing.T) {
 		t.Skip("Skipping test: git not available")
 	}
 }
+
+// SetupIsolatedRepo creates an isolated repository for testing
+// and sets AIMGR_REPO_PATH to prevent pollution of real repo.
+// Returns the path to the isolated repository directory.
+//
+// Example:
+//
+//	func TestRepoOperations(t *testing.T) {
+//	    repoDir := testutil.SetupIsolatedRepo(t)
+//	    // Test code that uses repository
+//	}
+func SetupIsolatedRepo(t *testing.T) string {
+	t.Helper()
+
+	testDir := t.TempDir()
+	repoDir := filepath.Join(testDir, "repo")
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	return repoDir
+}

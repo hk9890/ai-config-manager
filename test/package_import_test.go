@@ -545,8 +545,10 @@ func TestPackageAutoImportWithMissingResources(t *testing.T) {
 func TestPackageAutoImportCLI(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create source directory with packages
 	sourceDir := filepath.Join(testDir, "source")

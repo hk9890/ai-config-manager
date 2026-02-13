@@ -14,8 +14,10 @@ import (
 func TestOutputFormatTable(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a resources directory with valid skill
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -57,8 +59,10 @@ func TestOutputFormatTable(t *testing.T) {
 func TestOutputFormatJSON(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a resources directory with valid skill
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -143,8 +147,10 @@ func TestOutputFormatJSON(t *testing.T) {
 func TestOutputFormatYAML(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a resources directory with valid skill
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -222,8 +228,10 @@ func TestOutputFormatYAML(t *testing.T) {
 func TestOutputFormatMixedResults(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create resources directory with mixed resources
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -304,8 +312,10 @@ func TestOutputFormatMixedResults(t *testing.T) {
 func TestOutputFormatDryRun(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a resources directory with valid command
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -351,8 +361,10 @@ func TestOutputFormatDryRun(t *testing.T) {
 func TestOutputFormatErrorReporting(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Resolve to absolute path for testdata fixtures
 	absFixtures, err := filepath.Abs(filepath.Join("testdata", "output"))
@@ -413,8 +425,10 @@ func TestOutputFormatErrorReporting(t *testing.T) {
 func TestOutputFormatBulkOperations(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create resources directory with multiple resource types
 	resourcesDir := filepath.Join(testDir, "resources")

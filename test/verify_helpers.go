@@ -11,8 +11,8 @@ import (
 func AssertVerifyClean(t *testing.T) {
 	t.Helper()
 
-	// Run verify --json to get structured output
-	output, _ := runAimgr(t, "repo", "verify", "--json")
+	// Run verify --format=json to get structured output
+	output, _ := runAimgr(t, "repo", "verify", "--format=json")
 
 	var result struct {
 		OrphanedMetadata         []map[string]interface{} `json:"orphaned_metadata"`
@@ -64,8 +64,8 @@ func AssertVerifyClean(t *testing.T) {
 func AssertVerifyHasErrors(t *testing.T, expectOrphaned, expectMismatches, expectMissingRefs bool) {
 	t.Helper()
 
-	// Run verify --json to get structured output
-	output, _ := runAimgr(t, "repo", "verify", "--json")
+	// Run verify --format=json to get structured output
+	output, _ := runAimgr(t, "repo", "verify", "--format=json")
 
 	var result struct {
 		OrphanedMetadata        []map[string]interface{} `json:"orphaned_metadata"`

@@ -11,8 +11,10 @@ import (
 func TestCLIBulkAdd(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a folder with mixed resources using helper functions
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -90,8 +92,10 @@ func TestCLIBulkAdd(t *testing.T) {
 func TestCLIBulkAddForce(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a command first using helper
 	cmdPath := createTestCommand(t, "conflict", "Original command")
@@ -127,8 +131,10 @@ func TestCLIBulkAddForce(t *testing.T) {
 func TestCLIBulkAddSkipExisting(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a command using helper
 	cmdPath := createTestCommand(t, "skip", "Existing command")
@@ -166,8 +172,10 @@ func TestCLIBulkAddSkipExisting(t *testing.T) {
 func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a command using helper
 	cmdPath := createTestCommand(t, "fail", "Existing command")
@@ -198,8 +206,10 @@ func TestCLIBulkAddNoFlagsFailsOnConflict(t *testing.T) {
 func TestCLIBulkAddDryRun(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a resources directory with one command using helper
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -240,8 +250,10 @@ func TestCLIBulkAddDryRun(t *testing.T) {
 func TestCLIBulkAddEmptyFolder(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create an empty resources directory
 	resourcesDir := filepath.Join(testDir, "empty")
@@ -260,8 +272,10 @@ func TestCLIBulkAddEmptyFolder(t *testing.T) {
 func TestCLIAddSingleFile(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create a command file using helper
 	cmdPath := createTestCommand(t, "test-cmd", "Test command")

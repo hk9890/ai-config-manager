@@ -10,7 +10,9 @@ import (
 func TestFilterSkills(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create resources with mixed types using helper functions
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -65,7 +67,9 @@ func TestFilterSkills(t *testing.T) {
 func TestFilterPattern(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create resources with various names using helper functions
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -107,7 +111,9 @@ func TestFilterPattern(t *testing.T) {
 func TestFilterExactName(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create multiple resources using helper functions
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -144,7 +150,9 @@ func TestFilterExactName(t *testing.T) {
 func TestFilterNoMatch(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create resources using helper function
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -173,7 +181,9 @@ func TestFilterNoMatch(t *testing.T) {
 func TestFilterWithDryRun(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create resources using helper function
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -211,7 +221,9 @@ func TestFilterWithDryRun(t *testing.T) {
 func TestFilterWithForce(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a command first using helper function
 	initialDir := filepath.Join(testDir, "initial")
@@ -257,7 +269,9 @@ func TestFilterWithForce(t *testing.T) {
 func TestFilterWithSkipExisting(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create and add a command first using helper function
 	initialDir := filepath.Join(testDir, "initial")
@@ -293,7 +307,9 @@ func TestFilterWithSkipExisting(t *testing.T) {
 func TestFilterWildcardAll(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create mixed resources using helper functions
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -317,7 +333,9 @@ func TestFilterWildcardAll(t *testing.T) {
 func TestFilterTypeWithExactName(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create resources with same name but different types using helper functions
 	resourcesDir := filepath.Join(testDir, "resources")
@@ -358,7 +376,9 @@ func TestFilterTypeWithExactName(t *testing.T) {
 func TestFilterAgents(t *testing.T) {
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create mixed resources using helper functions
 	resourcesDir := filepath.Join(testDir, "resources")

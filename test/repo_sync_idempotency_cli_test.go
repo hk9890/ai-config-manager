@@ -79,9 +79,11 @@ func TestRepoSyncIdempotency_CLI(t *testing.T) {
 		binPath := filepath.Join("..", "aimgr")
 
 		cmd := exec.Command(binPath, "repo", "sync")
+		repoDir := filepath.Join(dataDir, "repo")
 		cmd.Env = append(os.Environ(),
 			"XDG_CONFIG_HOME="+configDir,
 			"XDG_DATA_HOME="+dataDir,
+			"AIMGR_REPO_PATH="+repoDir,
 		)
 
 		output, err := cmd.CombinedOutput()
@@ -159,7 +161,7 @@ func TestRepoSyncIdempotency_CLI(t *testing.T) {
 	t.Log("VERIFYING REPOSITORY:")
 	t.Log("========================================")
 
-	repoPath := filepath.Join(dataDir, "ai-config", "repo")
+	repoPath := filepath.Join(dataDir, "repo")
 	verifyResourcesExist(t, repoPath)
 }
 
@@ -225,9 +227,11 @@ func TestRepoSyncIdempotency_CLI_SkipExisting(t *testing.T) {
 		binPath := filepath.Join("..", "aimgr")
 
 		cmd := exec.Command(binPath, args...)
+		repoDir := filepath.Join(dataDir, "repo")
 		cmd.Env = append(os.Environ(),
 			"XDG_CONFIG_HOME="+configDir,
 			"XDG_DATA_HOME="+dataDir,
+			"AIMGR_REPO_PATH="+repoDir,
 		)
 
 		output, err := cmd.CombinedOutput()
@@ -278,7 +282,7 @@ func TestRepoSyncIdempotency_CLI_SkipExisting(t *testing.T) {
 	}
 
 	// Verify repository integrity
-	repoPath := filepath.Join(dataDir, "ai-config", "repo")
+	repoPath := filepath.Join(dataDir, "repo")
 	verifyResourcesExist(t, repoPath)
 }
 

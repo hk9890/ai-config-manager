@@ -12,10 +12,12 @@ func TestBulkAddSimple(t *testing.T) {
 	// Create unique temp directories
 	testDir := t.TempDir()
 	xdgData := filepath.Join(testDir, "xdg-data")
+	repoDir := filepath.Join(testDir, "repo")
 	repoPath := filepath.Join(xdgData, "ai-config", "repo")
 
 	// Set XDG_DATA_HOME to control where the repo is created
 	t.Setenv("XDG_DATA_HOME", xdgData)
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create one command using helper function
 	cmdPath := createTestCommand(t, "test-cmd", "Test command")
