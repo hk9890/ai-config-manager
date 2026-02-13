@@ -57,6 +57,13 @@ func (tb *TableBuilder) WithResponsive() *TableBuilder {
 	return tb
 }
 
+// WithTerminalWidth sets an explicit terminal width (mainly for testing)
+// Pass 0 to use auto-detection (default behavior)
+func (tb *TableBuilder) WithTerminalWidth(width int) *TableBuilder {
+	tb.data.Options.TerminalWidth = width
+	return tb
+}
+
 // Format outputs the table in the specified format
 func (tb *TableBuilder) Format(format Format) error {
 	return FormatOutput(tb.data, format)
@@ -77,6 +84,20 @@ func formatTableData(data *TableData, format Format) error {
 }
 
 // renderTable renders TableData as a human-readable table
+//
+// Terminal Width Detection:
+// The terminal width is detected once at render time using NewTerminal().Width().
+// This width is used by tablewriter to format the table with appropriate column widths
+// and text wrapping.
+//
+// Terminal Resize Limitation:
+// If the terminal is resized after the table has been rendered, the existing output
+// will NOT automatically reflow or adjust. This is expected behavior for CLI tools:
+// - The rendered output is immutable text in the shell buffer
+// - Most CLI tools work this way (ls, git log, grep, etc.)
+// - To see the table with new terminal dimensions, simply re-run the command
+//
+// This design is intentional and aligns with standard CLI tool behavior.
 func renderTable(data *TableData) error {
 	table := tablewriter.NewWriter(os.Stdout)
 

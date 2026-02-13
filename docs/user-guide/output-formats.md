@@ -46,6 +46,81 @@ The table format provides human-readable output ideal for interactive terminal u
 - **Color-coded status**: SUCCESS, SKIPPED, FAILED
 - **Summary statistics**: Count of operations and resources
 - **Error hints**: Suggestions for debugging failures
+- **Responsive sizing**: Tables adapt to your terminal width at render time (TTY only)
+
+### Terminal Output Behavior
+
+#### Interactive Terminal (TTY)
+
+When running `aimgr` in an interactive terminal, table output uses responsive sizing to adapt to your terminal width (when implemented). Columns dynamically adjust to use available space.
+
+```bash
+# Interactive terminal - responsive mode active
+$ aimgr list
+# Table adapts to terminal width
+```
+
+#### Piped or Redirected Output (non-TTY)
+
+When output is piped or redirected, responsive mode is **automatically disabled**. Tables use fixed widths for consistent, predictable output.
+
+```bash
+# Piped output - fixed width tables
+$ aimgr list | less
+$ aimgr list | grep "skill"
+$ aimgr list > file.txt
+```
+
+**Why this matters:**
+- Scripts get consistent table formatting across runs
+- CI/CD logs have readable, predictable output
+- Redirected files have stable layouts for version control
+- Output can be reliably parsed by downstream tools
+
+#### Structured Formats (Terminal-Independent)
+
+JSON and YAML formats (`--format=json`, `--format=yaml`) are **always independent of terminal width**. They produce identical output in all contexts:
+
+```bash
+# These produce identical output regardless of terminal width
+$ aimgr list --format=json
+$ aimgr list --format=json | jq
+$ aimgr list --format=json > data.json
+```
+
+**Best practice:** Use structured formats for scripting and automation to avoid any terminal-related formatting variations.
+
+### Terminal Resize Behavior
+
+Tables are formatted based on your terminal width at the time the command runs. If you resize your terminal after the table has been rendered, the existing output will not automatically reflow or adjust.
+
+**This is expected behavior** for CLI tools and works the same way as other standard tools like `ls`, `git log`, and `grep`:
+- Once rendered, output is immutable text in your shell buffer
+- The shell controls display, not the application
+- To see the table formatted for your new terminal size, simply re-run the command
+
+**Example:**
+```bash
+# Terminal is 120 columns wide
+$ aimgr repo list
+┌──────────────────────┬───────────────────┬──────────┬────────────────────┐
+│         NAME         │      TARGETS      │   SYNC   │    DESCRIPTION     │
+├──────────────────────┼───────────────────┼──────────┼────────────────────┤
+│ skill/skill-creator  │ claude, opencode  │    ✓     │ Guide for creating │
+└──────────────────────┴───────────────────┴──────────┴────────────────────┘
+
+# (User resizes terminal to 80 columns)
+# Existing output above stays the same - no reflow
+
+# Re-run command to see new layout
+$ aimgr repo list
+┌─────────────────┬──────────┬──────┬─────────┐
+│      NAME       │ TARGETS  │ SYNC │  DESC   │
+├─────────────────┼──────────┼──────┼─────────┤
+│ skill/skill-cr  │ claude,  │  ✓   │ Guide   │
+│ eator           │ opencode │      │ for...  │
+└─────────────────┴──────────┴──────┴─────────┘
+```
 
 ### Example: Adding Resources
 

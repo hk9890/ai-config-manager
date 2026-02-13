@@ -7,7 +7,8 @@ type Renderable interface {
 
 // TableOptions configures table rendering behavior
 type TableOptions struct {
-	ShowBorders bool
-	AutoWrap    bool
-	Responsive  bool // Enable terminal-aware sizing
+	ShowBorders   bool
+	AutoWrap      bool
+	Responsive    bool // Enable terminal-aware sizing
+	TerminalWidth int  // Explicit terminal width (0 = auto-detect)
 }
