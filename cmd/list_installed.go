@@ -321,7 +321,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 	table := output.NewTable("Name", "Targets", "Sync", "Description")
 	table.WithResponsive().
 		WithDynamicColumn(3).              // Description stretches
-		WithMinColumnWidths(15, 12, 4, 30) // Name min=15, Targets min=12, Sync min=4, Description min=30
+		WithMinColumnWidths(40, 12, 4, 30) // Name min=40, Targets min=12, Sync min=4, Description min=30
 
 	// Add commands
 	for _, cmd := range commands {

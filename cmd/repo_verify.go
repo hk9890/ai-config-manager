@@ -459,7 +459,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		table := output.NewTable("Type", "Name", "Status")
 		table.WithResponsive().
 			WithDynamicColumn(1).          // Name stretches
-			WithMinColumnWidths(8, 15, 18) // Type min=8, Name min=15, Status min=18
+			WithMinColumnWidths(8, 40, 18) // Type min=8, Name min=40, Status min=18
 		for _, issue := range result.ResourcesWithoutMetadata {
 			status := "Missing metadata"
 			if fixed {
@@ -479,7 +479,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		table := output.NewTable("Type", "Name", "Status")
 		table.WithResponsive().
 			WithDynamicColumn(1).          // Name stretches
-			WithMinColumnWidths(8, 15, 18) // Type min=8, Name min=15, Status min=18
+			WithMinColumnWidths(8, 40, 18) // Type min=8, Name min=40, Status min=18
 		for _, issue := range result.OrphanedMetadata {
 			status := "Resource missing"
 			if fixed {
@@ -499,7 +499,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		table := output.NewTable("Type", "Name", "Source Path")
 		table.WithResponsive().
 			WithDynamicColumn(2).          // Source Path stretches
-			WithMinColumnWidths(8, 15, 20) // Type min=8, Name min=15, Source Path min=20
+			WithMinColumnWidths(8, 40, 20) // Type min=8, Name min=40, Source Path min=20
 		for _, issue := range result.MissingSourcePaths {
 			table.AddRow(string(issue.Type), issue.Name, issue.SourcePath)
 		}
@@ -515,7 +515,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		table := output.NewTable("Name", "Resource Type", "Metadata Type")
 		table.WithResponsive().
 			WithDynamicColumn(0).           // Name stretches
-			WithMinColumnWidths(15, 13, 13) // Name min=15, Resource Type min=13, Metadata Type min=13
+			WithMinColumnWidths(40, 13, 13) // Name min=40, Resource Type min=13, Metadata Type min=13
 		for _, mismatch := range result.TypeMismatches {
 			metaTypeStr := string(mismatch.MetadataType)
 			if metaTypeStr == "" {
@@ -535,7 +535,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		table := output.NewTable("Package", "Missing Count", "Missing Resources")
 		table.WithResponsive().
 			WithDynamicColumn(2).           // Missing Resources stretches
-			WithMinColumnWidths(15, 13, 30) // Package min=15, Missing Count min=13, Missing Resources min=30
+			WithMinColumnWidths(40, 13, 30) // Package min=40, Missing Count min=13, Missing Resources min=30
 		for _, issue := range result.PackagesWithMissingRefs {
 			missingStr := strings.Join(issue.MissingResources, ", ")
 			table.AddRow(issue.Name, fmt.Sprintf("%d", len(issue.MissingResources)), missingStr)

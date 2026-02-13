@@ -714,7 +714,7 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 	table := output.NewTable("#", "Name", "Description")
 	table.WithResponsive().
 		WithDynamicColumn(2).          // Description stretches
-		WithMinColumnWidths(3, 15, 30) // # min=3, Name min=15, Description min=30
+		WithMinColumnWidths(3, 40, 30) // # min=3, Name min=40, Description min=30
 
 	// Add rows
 	for i, res := range resources {

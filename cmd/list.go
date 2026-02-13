@@ -279,7 +279,7 @@ func outputPackagesTable(packages []repo.PackageInfo) error {
 	table := output.NewTable("Name", "Resources", "Description")
 	table.WithResponsive().
 		WithDynamicColumn(2).          // Description stretches
-		WithMinColumnWidths(15, 9, 30) // Name min=15, Resources min=9, Description min=30
+		WithMinColumnWidths(40, 9, 30) // Name min=40, Resources min=9, Description min=30
 
 	for _, pkg := range packages {
 		table.AddRow(pkg.Name, fmt.Sprintf("%d", pkg.ResourceCount), pkg.Description)
