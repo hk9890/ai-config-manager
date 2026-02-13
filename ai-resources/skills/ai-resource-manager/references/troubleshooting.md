@@ -56,10 +56,14 @@ ls -la /usr/local/bin/aimgr
 1. **Install aimgr** (if not installed):
    ```bash
    # Linux/macOS
-   curl -fsSL https://raw.githubusercontent.com/your-org/aimgr/main/install.sh | bash
+   ```bash
+   # Using Go (recommended)
+   go install github.com/hk9890/ai-config-manager@latest
    
-   # Or manually download the binary
-   # See main installation documentation
+   # Or from source
+   git clone https://github.com/hk9890/ai-config-manager.git
+   cd ai-config-manager
+   make install
    ```
 
 2. **Add to PATH** (if installed but not in PATH):
@@ -265,7 +269,7 @@ ls -la $(readlink .claude/skills/some-skill)
    rm .claude/skills/broken-skill
    
    # Find resource in repository
-   aimgr repo show skill broken-skill
+   aimgr repo describe skill broken-skill
    
    # Recreate symlink manually
    ln -s ~/.local/share/ai-config/repo/skills/broken-skill .claude/skills/
@@ -277,7 +281,7 @@ ls -la $(readlink .claude/skills/some-skill)
    ls -la ~/.local/share/ai-config/repo/skills/
    
    # If missing, update repository
-   aimgr repo update --force
+   aimgr repo sync --force
    ```
 
 ---
@@ -319,7 +323,7 @@ ls -la .claude/skills/some-skill/SKILL.md
    
    # If missing, resource may be corrupted
    aimgr uninstall skill/some-skill
-   aimgr repo update --force
+   aimgr repo sync --force
    aimgr install skill/some-skill
    ```
 
@@ -349,7 +353,7 @@ readlink -f .claude/skills/some-skill
 # If different, symlink is outdated
 
 # Compare versions
-aimgr repo show skill some-skill
+aimgr repo describe skill some-skill
 cat .claude/skills/some-skill/version.txt
 ```
 
@@ -366,7 +370,7 @@ cat .claude/skills/some-skill/version.txt
    aimgr uninstall skill/some-skill
    
    # Update repository
-   aimgr repo update
+   aimgr repo sync
    
    # Reinstall
    aimgr install skill/some-skill
@@ -413,7 +417,7 @@ ls -la ~/.config/aimgr/
    # ~/.config/aimgr/aimgr.yaml
    install:
      targets: [claude]
-   repository:
+   repo:
      path: ~/.local/share/ai-config/repo
    ```
 
@@ -471,11 +475,8 @@ cat ~/.config/aimgr/aimgr.yaml
      targets:
        - claude
        - opencode
-     force: false
-   
-   repository:
+   repo:
      path: /home/user/.local/share/ai-config/repo
-     auto_update: true
    ```
 
 ---
@@ -539,7 +540,7 @@ aimgr repo list --format=json
 aimgr repo list | grep -i "resource-name"
 
 # Check repository metadata
-aimgr repo show skill resource-name
+aimgr repo describe skill resource-name
 ```
 
 **Solutions:**
@@ -547,10 +548,10 @@ aimgr repo show skill resource-name
 1. **Update repository**:
    ```bash
    # Sync with latest sources
-   aimgr repo update
+   aimgr repo sync
    
    # Force update if cached
-   aimgr repo update --force
+   aimgr repo sync --force
    ```
 
 2. **Check exact name** (case-sensitive):
@@ -567,8 +568,8 @@ aimgr repo show skill resource-name
 3. **Add resource source**:
    ```bash
    # If resource is in external source
-   aimgr repo add /path/to/resource
-   aimgr repo add https://github.com/user/repo
+   aimgr repo import /path/to/resource
+   aimgr repo import https://github.com/user/repo
    ```
 
 4. **Verify repository path**:
@@ -582,21 +583,21 @@ aimgr repo show skill resource-name
 ### Repository Update Fails
 
 **Symptoms:**
-- `aimgr repo update` throws errors
+- `aimgr repo sync` throws errors
 - Git fetch/pull errors
 - Source unreachable
 
 **Diagnosis:**
 ```bash
 # Check repository metadata
-aimgr repo show skill/resource-name
+aimgr repo describe skill/resource-name
 ```
 
 **Solutions:**
 
 1. **Force update**:
    ```bash
-   aimgr repo update --force
+   aimgr repo sync --force
    ```
 
 2. **Check source accessibility**:
@@ -611,13 +612,13 @@ aimgr repo show skill/resource-name
 3. **Remove and re-add source**:
    ```bash
    # Get current sources
-   aimgr repo sources
+   aimgr config get sync.sources
    
    # Remove problematic source
    aimgr repo remove https://github.com/user/repo
    
    # Re-add it
-   aimgr repo add https://github.com/user/repo
+   aimgr repo import https://github.com/user/repo
    ```
 
 4. **Manual git fix**:
@@ -642,7 +643,7 @@ aimgr repo show skill/resource-name
 aimgr repo list --format=json | jq '.[] | select(.name=="duplicate-name")'
 
 # Check sources
-aimgr repo sources
+aimgr config get sync.sources
 ```
 
 **Solutions:**
@@ -658,7 +659,7 @@ aimgr repo sources
    ```bash
    # Remove one source
    aimgr repo remove source-name
-   aimgr repo update
+   aimgr repo sync
    ```
 
 3. **Prioritize sources** (if supported):
@@ -698,8 +699,8 @@ git fsck
    mkdir -p ~/.local/share/ai-config/repo
    
    # Re-add sources
-   aimgr repo add <your-sources>
-   aimgr repo update
+   aimgr repo import <your-sources>
+   aimgr repo sync
    ```
 
 2. **Fix git repository**:
@@ -901,14 +902,11 @@ If none of these solutions work:
    ```bash
    aimgr --version
    
-   # Update if outdated
+   # Expected output: aimgr version X.Y.Z (commit: abc1234, built: 2026-02-13T13:40:59Z)
    ```
 
 2. **Enable debug mode** (if supported):
    ```bash
-   AIMGR_DEBUG=1 aimgr install skill/test
-   ```
-
 3. **Check system compatibility**:
    - OS: Linux, macOS, Windows WSL
    - Shell: bash, zsh, fish
@@ -947,9 +945,9 @@ If none of these solutions work:
 | Permission denied | `ls -la $(which aimgr)` | `chmod +x` |
 | Broken symlinks | `ls -la .claude/skills/` | Reinstall resource |
 | Skills not loading | Verify symlinks exist | **Restart AI tool** |
-| Resource not found | `aimgr repo list` | `aimgr repo update` |
+| Resource not found | `aimgr repo list` | `aimgr repo sync` |
 | Config errors | `cat ~/.config/aimgr/aimgr.yaml` | Fix YAML syntax |
 | Wrong directory | `ls -d .claude .opencode` | Use `--target` flag |
-| Update fails | Check network | `aimgr repo update --force` |
+| Update fails | Check network | `aimgr repo sync --force` |
 
 **Remember:** After installing or modifying resources, **always restart your AI tool** (Claude Code, OpenCode, etc.). Resources are loaded at startup, not dynamically.
