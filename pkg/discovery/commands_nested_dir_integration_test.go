@@ -25,7 +25,7 @@ func TestNestedCommandsDirectory_EndToEnd(t *testing.T) {
 	repoDir := t.TempDir()
 
 	// Create nested commands directory structure:
-	// sourceDir/knowledge-base/company/commands/dt/critical-incident/test-cmd.md
+	// sourceDir/knowledge-base/company/commands/dept/critical-incident/test-cmd.md
 	nestedCmdsDir := filepath.Join(sourceDir, "knowledge-base", "company", "commands", "dept", "critical-incident")
 	if err := os.MkdirAll(nestedCmdsDir, 0755); err != nil {
 		t.Fatalf("Failed to create nested commands dir: %v", err)
@@ -57,7 +57,7 @@ This is a test command in a deeply nested commands directory.
 	// Should find command with nested path relative to commands directory
 	foundCommand := false
 	for _, cmd := range commands {
-		if cmd.Name == "dt/critical-incident/test-cmd" {
+		if cmd.Name == "dept/critical-incident/test-cmd" {
 			foundCommand = true
 			t.Logf("✓ Discovery found command: %s", cmd.Name)
 			break
@@ -69,7 +69,7 @@ This is a test command in a deeply nested commands directory.
 		for _, cmd := range commands {
 			foundNames = append(foundNames, cmd.Name)
 		}
-		t.Fatalf("Command 'dt/critical-incident/test-cmd' not found. Found: %v", foundNames)
+		t.Fatalf("Command 'dept/critical-incident/test-cmd' not found. Found: %v", foundNames)
 	}
 
 	// Step 2: Import via AddBulk (using discovered file paths, not directory)
@@ -111,7 +111,7 @@ This is a test command in a deeply nested commands directory.
 
 	// Step 4: Verify metadata file exists
 	t.Log("Step 4: Verifying metadata files")
-	expectedMetadata := filepath.Join(repoDir, ".metadata", "commands", "dt-critical-incident-test-cmd-metadata.json")
+	expectedMetadata := filepath.Join(repoDir, ".metadata", "commands", "dept-critical-incident-test-cmd-metadata.json")
 	if _, err := os.Stat(expectedMetadata); os.IsNotExist(err) {
 		t.Errorf("Metadata file not created at: %s", expectedMetadata)
 	} else {
@@ -131,8 +131,8 @@ This is a test command in a deeply nested commands directory.
 	}
 
 	// Verify metadata fields
-	if meta.Name != "dt/critical-incident/test-cmd" {
-		t.Errorf("Metadata name = %q, want %q", meta.Name, "dt/critical-incident/test-cmd")
+	if meta.Name != "dept/critical-incident/test-cmd" {
+		t.Errorf("Metadata name = %q, want %q", meta.Name, "dept/critical-incident/test-cmd")
 	}
 	if meta.Type != resource.Command {
 		t.Errorf("Metadata type = %q, want %q", meta.Type, resource.Command)
@@ -153,7 +153,7 @@ This is a test command in a deeply nested commands directory.
 
 	foundInList := false
 	for _, res := range resources {
-		if res.Name == "dt/critical-incident/test-cmd" {
+		if res.Name == "dept/critical-incident/test-cmd" {
 			foundInList = true
 			t.Logf("✓ List() returns command: %s", res.Name)
 			break

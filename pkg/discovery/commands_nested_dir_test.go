@@ -33,7 +33,7 @@ description: Test command in nested commands directory
 		t.Fatalf("DiscoverCommands failed: %v", err)
 	}
 
-	// Should find the command in knowledge-base/company/commands/dt/test-cmd.md
+	// Should find the command in knowledge-base/company/commands/dept/test-cmd.md
 	if len(commands) == 0 {
 		t.Fatalf("Expected to find command in nested 'commands' directory, but found none")
 	}
@@ -41,14 +41,14 @@ description: Test command in nested commands directory
 	// Verify the command was found
 	found := false
 	for _, cmd := range commands {
-		// Command should be named "dt/test-cmd" relative to the commands directory
-		if cmd.Name == "dt/test-cmd" {
+		// Command should be named "dept/test-cmd" relative to the commands directory
+		if cmd.Name == "dept/test-cmd" {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		t.Errorf("Command 'dt/test-cmd' not found. Found commands: %v", commands)
+		t.Errorf("Command 'dept/test-cmd' not found. Found commands: %v", commands)
 	}
 }
