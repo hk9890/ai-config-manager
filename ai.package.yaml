@@ -1,2 +1,4 @@
 resources:
     - package/opencode-coder
+    - skill/skill-validator
+    - skill/skill-creator
