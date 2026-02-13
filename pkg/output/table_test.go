@@ -234,6 +234,7 @@ func TestTableBuilder_Chaining(t *testing.T) {
 		t.Error("Expected ShowBorders to be false after chaining")
 	}
 }
+
 // ========================================
 // Test Helpers for Responsive Table Testing
 // ========================================
@@ -305,16 +306,19 @@ func measureColumnWidths(output string) []int {
 		return nil // Table too short to analyze
 	}
 
-	// Find the header line (usually third line, after top border and header text)
-	// Format is typically:
-	// +------+------+
-	// | COL1 | COL2 |
-	// +------+------+
+	// Find the border line (supports both ASCII and Unicode box-drawing)
+	// ASCII format:  +------+------+
+	// Unicode format: ┌──────┬──────┐ or ├──────┼──────┤
 	var borderLine string
 	for _, line := range lines {
-		if strings.HasPrefix(line, "+") && strings.Contains(line, "+") {
-			borderLine = line
-			break
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) > 0 {
+			firstChar := rune(trimmed[0])
+			// Check for border characters (ASCII or Unicode box-drawing)
+			if firstChar == '+' || firstChar == '┌' || firstChar == '├' || firstChar == '└' {
+				borderLine = trimmed
+				break
+			}
 		}
 	}
 
@@ -322,11 +326,13 @@ func measureColumnWidths(output string) []int {
 		return nil
 	}
 
-	// Count column widths by measuring distance between + characters
+	// Count column widths by measuring distance between separator characters
+	// Separators: + (ASCII), ┬ ┼ ┴ (Unicode)
 	widths := []int{}
 	lastPos := 0
 	for i, ch := range borderLine {
-		if ch == '+' && i > 0 {
+		isSeparator := ch == '+' || ch == '┬' || ch == '┼' || ch == '┴' || ch == '┐' || ch == '┤' || ch == '┘'
+		if isSeparator && i > 0 {
 			widths = append(widths, i-lastPos)
 			lastPos = i
 		}
@@ -348,8 +354,14 @@ func measureColumnWidths(output string) []int {
 func measureTotalTableWidth(output string) int {
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, "+") {
-			return len(strings.TrimSpace(line))
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) > 0 {
+			firstChar := rune(trimmed[0])
+			// Check for border characters (ASCII or Unicode box-drawing)
+			if firstChar == '+' || firstChar == '┌' || firstChar == '├' || firstChar == '└' {
+				// Measure visible width (character count)
+				return len(trimmed)
+			}
 		}
 	}
 	return 0
