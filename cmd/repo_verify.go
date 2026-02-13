@@ -456,16 +456,17 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		hasIssues = true
 		fmt.Printf("⚠ Resources without metadata: %d\n\n", len(result.ResourcesWithoutMetadata))
 
-		table := output.NewTable("Type", "Name", "Status")
+		table := output.NewTable("Name", "Status")
 		table.WithResponsive().
-			WithDynamicColumn(1).          // Name stretches
-			WithMinColumnWidths(8, 40, 18) // Type min=8, Name min=40, Status min=18
+			WithDynamicColumn(0).          // Name stretches
+			WithMinColumnWidths(40, 18)    // Name min=40, Status min=18
 		for _, issue := range result.ResourcesWithoutMetadata {
 			status := "Missing metadata"
 			if fixed {
 				status = "✓ Created metadata"
 			}
-			table.AddRow(string(issue.Type), issue.Name, status)
+			resourceRef := formatResourceReference(issue.Type, issue.Name)
+			table.AddRow(resourceRef, status)
 		}
 		table.Format(output.Table)
 		fmt.Println()
@@ -476,16 +477,17 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		hasIssues = true
 		fmt.Printf("✗ Orphaned metadata (resource missing): %d\n\n", len(result.OrphanedMetadata))
 
-		table := output.NewTable("Type", "Name", "Status")
+		table := output.NewTable("Name", "Status")
 		table.WithResponsive().
-			WithDynamicColumn(1).          // Name stretches
-			WithMinColumnWidths(8, 40, 18) // Type min=8, Name min=40, Status min=18
+			WithDynamicColumn(0).          // Name stretches
+			WithMinColumnWidths(40, 18)    // Name min=40, Status min=18
 		for _, issue := range result.OrphanedMetadata {
 			status := "Resource missing"
 			if fixed {
 				status = "✓ Removed metadata"
 			}
-			table.AddRow(string(issue.Type), issue.Name, status)
+			resourceRef := formatResourceReference(issue.Type, issue.Name)
+			table.AddRow(resourceRef, status)
 		}
 		table.Format(output.Table)
 		fmt.Println()
@@ -496,12 +498,13 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 		hasIssues = true
 		fmt.Printf("⚠ Metadata with missing source paths: %d\n\n", len(result.MissingSourcePaths))
 
-		table := output.NewTable("Type", "Name", "Source Path")
+		table := output.NewTable("Name", "Source Path")
 		table.WithResponsive().
-			WithDynamicColumn(2).          // Source Path stretches
-			WithMinColumnWidths(8, 40, 20) // Type min=8, Name min=40, Source Path min=20
+			WithDynamicColumn(1).          // Source Path stretches
+			WithMinColumnWidths(40, 20)    // Name min=40, Source Path min=20
 		for _, issue := range result.MissingSourcePaths {
-			table.AddRow(string(issue.Type), issue.Name, issue.SourcePath)
+			resourceRef := formatResourceReference(issue.Type, issue.Name)
+			table.AddRow(resourceRef, issue.SourcePath)
 		}
 		table.Format(output.Table)
 		fmt.Println()
@@ -558,6 +561,22 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 			fmt.Println()
 			fmt.Println("Run 'aimgr repo verify --fix' to automatically resolve these issues.")
 		}
+	}
+}
+
+// formatResourceReference returns a formatted resource reference like "command/skip" or "skill/pdf-skill"
+func formatResourceReference(resourceType resource.ResourceType, name string) string {
+	switch resourceType {
+	case resource.Command:
+		return fmt.Sprintf("command/%s", name)
+	case resource.Skill:
+		return fmt.Sprintf("skill/%s", name)
+	case resource.Agent:
+		return fmt.Sprintf("agent/%s", name)
+	case resource.PackageType:
+		return fmt.Sprintf("package/%s", name)
+	default:
+		return name
 	}
 }
 
