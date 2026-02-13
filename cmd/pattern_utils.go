@@ -93,7 +93,9 @@ func parseResourceType(s string) (resource.ResourceType, error) {
 		return resource.Command, nil
 	case "agent", "agents":
 		return resource.Agent, nil
+	case "package", "packages":
+		return resource.PackageType, nil
 	default:
-		return "", fmt.Errorf("invalid resource type '%s': must be one of 'skill', 'command', or 'agent'", s)
+		return "", fmt.Errorf("invalid resource type '%s': must be one of 'skill', 'command', 'agent', or 'package'", s)
 	}
 }

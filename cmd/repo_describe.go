@@ -27,16 +27,19 @@ type DescribeResourceOutput struct {
 	Metadata    *metadata.ResourceMetadata `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Location    string                     `json:"location" yaml:"location"`
 	// Type-specific fields
-	Compatibility []string `json:"compatibility,omitempty" yaml:"compatibility,omitempty"`   // skill only
-	HasScripts    *bool    `json:"has_scripts,omitempty" yaml:"has_scripts,omitempty"`       // skill only
-	HasReferences *bool    `json:"has_references,omitempty" yaml:"has_references,omitempty"` // skill only
-	HasAssets     *bool    `json:"has_assets,omitempty" yaml:"has_assets,omitempty"`         // skill only
-	Agent         string   `json:"agent,omitempty" yaml:"agent,omitempty"`                   // command only
-	Model         string   `json:"model,omitempty" yaml:"model,omitempty"`                   // command only
-	AllowedTools  []string `json:"allowed_tools,omitempty" yaml:"allowed_tools,omitempty"`   // command only
-	AgentType     string   `json:"agent_type,omitempty" yaml:"agent_type,omitempty"`         // agent only
-	Instructions  string   `json:"instructions,omitempty" yaml:"instructions,omitempty"`     // agent only
-	Capabilities  []string `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`     // agent only
+	Compatibility   []string                  `json:"compatibility,omitempty" yaml:"compatibility,omitempty"`       // skill only
+	HasScripts      *bool                     `json:"has_scripts,omitempty" yaml:"has_scripts,omitempty"`           // skill only
+	HasReferences   *bool                     `json:"has_references,omitempty" yaml:"has_references,omitempty"`     // skill only
+	HasAssets       *bool                     `json:"has_assets,omitempty" yaml:"has_assets,omitempty"`             // skill only
+	Agent           string                    `json:"agent,omitempty" yaml:"agent,omitempty"`                       // command only
+	Model           string                    `json:"model,omitempty" yaml:"model,omitempty"`                       // command only
+	AllowedTools    []string                  `json:"allowed_tools,omitempty" yaml:"allowed_tools,omitempty"`       // command only
+	AgentType       string                    `json:"agent_type,omitempty" yaml:"agent_type,omitempty"`             // agent only
+	Instructions    string                    `json:"instructions,omitempty" yaml:"instructions,omitempty"`         // agent only
+	Capabilities    []string                  `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`         // agent only
+	ResourceCount   *int                      `json:"resource_count,omitempty" yaml:"resource_count,omitempty"`     // package only
+	Resources       []string                  `json:"resources,omitempty" yaml:"resources,omitempty"`               // package only
+	PackageMetadata *metadata.PackageMetadata `json:"package_metadata,omitempty" yaml:"package_metadata,omitempty"` // package only
 }
 
 // repoDescribeCmd represents the repo describe command
@@ -51,6 +54,7 @@ Examples:
   aimgr repo describe skill/pdf-processing    # Describe specific skill
   aimgr repo describe command/test            # Describe specific command
   aimgr repo describe agent/code-reviewer     # Describe specific agent
+  aimgr repo describe package/dynatrace-core  # Describe specific package
   aimgr repo describe skill/*                 # Describe all skills (summary)
   aimgr repo describe *pdf*                   # Describe all resources with "pdf"
 
@@ -100,6 +104,11 @@ func describeDetailedResource(manager *repo.Manager, resourceArg string, format 
 	resourceType, name, err := ParseResourceArg(resourceArg)
 	if err != nil {
 		return err
+	}
+
+	// Handle packages separately (they use different structure)
+	if resourceType == resource.PackageType {
+		return describePackage(manager, name, format)
 	}
 
 	// Load the resource
@@ -331,14 +340,25 @@ func outputDescribeSummaryTable(manager *repo.Manager, matches []string) error {
 			continue
 		}
 
-		res, err := manager.Get(name, resourceType)
-		if err != nil {
-			// Skip if can't load
-			continue
+		var desc string
+		if resourceType == resource.PackageType {
+			// Handle packages separately
+			pkg, err := manager.GetPackage(name)
+			if err != nil {
+				continue
+			}
+			desc = pkg.Description
+		} else {
+			// Handle regular resources
+			res, err := manager.Get(name, resourceType)
+			if err != nil {
+				// Skip if can't load
+				continue
+			}
+			desc = res.Description
 		}
 
 		// Truncate description if too long
-		desc := res.Description
 		if len(desc) > 45 {
 			desc = desc[:42] + "..."
 		}
@@ -362,15 +382,27 @@ func outputDescribeSummaryJSON(manager *repo.Manager, matches []string) error {
 			continue
 		}
 
-		res, err := manager.Get(name, resourceType)
-		if err != nil {
-			continue
+		var desc string
+		if resourceType == resource.PackageType {
+			// Handle packages separately
+			pkg, err := manager.GetPackage(name)
+			if err != nil {
+				continue
+			}
+			desc = pkg.Description
+		} else {
+			// Handle regular resources
+			res, err := manager.Get(name, resourceType)
+			if err != nil {
+				continue
+			}
+			desc = res.Description
 		}
 
 		resources = append(resources, map[string]string{
 			"type":        string(resourceType),
 			"name":        name,
-			"description": res.Description,
+			"description": desc,
 		})
 	}
 
@@ -394,21 +426,162 @@ func outputDescribeSummaryYAML(manager *repo.Manager, matches []string) error {
 			continue
 		}
 
-		res, err := manager.Get(name, resourceType)
-		if err != nil {
-			continue
+		var desc string
+		if resourceType == resource.PackageType {
+			// Handle packages separately
+			pkg, err := manager.GetPackage(name)
+			if err != nil {
+				continue
+			}
+			desc = pkg.Description
+		} else {
+			// Handle regular resources
+			res, err := manager.Get(name, resourceType)
+			if err != nil {
+				continue
+			}
+			desc = res.Description
 		}
 
 		resources = append(resources, map[string]string{
 			"type":        string(resourceType),
 			"name":        name,
-			"description": res.Description,
+			"description": desc,
 		})
 	}
 
 	output := map[string]interface{}{
 		"count":     len(resources),
 		"resources": resources,
+	}
+
+	encoder := yaml.NewEncoder(os.Stdout)
+	defer encoder.Close()
+	return encoder.Encode(output)
+}
+
+// describePackage handles package description (separate flow from other resources)
+func describePackage(manager *repo.Manager, name string, format string) error {
+	// Load the package
+	packagePath := resource.GetPackagePath(name, manager.GetRepoPath())
+	if _, err := os.Stat(packagePath); err != nil {
+		return fmt.Errorf("package '%s' not found", name)
+	}
+
+	pkg, err := resource.LoadPackage(packagePath)
+	if err != nil {
+		return fmt.Errorf("failed to load package: %w", err)
+	}
+
+	// Convert to Resource format for consistency
+	res := &resource.Resource{
+		Name:        pkg.Name,
+		Type:        resource.PackageType,
+		Description: pkg.Description,
+		Path:        packagePath,
+	}
+
+	// Load package metadata
+	pkgMeta, pkgMetaErr := metadata.LoadPackageMetadata(name, manager.GetRepoPath())
+	pkgMetadataAvailable := pkgMetaErr == nil
+
+	// Route to format-specific output
+	switch format {
+	case "json":
+		return outputDescribePackageJSON(manager, res, pkg, pkgMetadataAvailable, pkgMeta)
+	case "yaml":
+		return outputDescribePackageYAML(manager, res, pkg, pkgMetadataAvailable, pkgMeta)
+	case "table":
+		return describePackageDetails(manager, res, pkgMetadataAvailable, pkgMeta)
+	default:
+		return fmt.Errorf("invalid format: %s", format)
+	}
+}
+
+// describePackageDetails displays detailed information for a package
+func describePackageDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.PackageMetadata) error {
+	// Load full package resource for additional details
+	packagePath := resource.GetPackagePath(res.Name, manager.GetRepoPath())
+	pkg, err := resource.LoadPackage(packagePath)
+	if err != nil {
+		return fmt.Errorf("failed to load package details: %w", err)
+	}
+
+	// Display information
+	fmt.Printf("Package: %s\n", res.Name)
+	fmt.Printf("Description: %s\n", res.Description)
+	fmt.Printf("Resource Count: %d\n", len(pkg.Resources))
+
+	// Display resources list
+	if len(pkg.Resources) > 0 {
+		fmt.Println("\nResources:")
+		for _, resRef := range pkg.Resources {
+			fmt.Printf("  - %s\n", resRef)
+		}
+	}
+
+	fmt.Println()
+
+	// Display metadata if available
+	if metadataAvailable {
+		fmt.Printf("Source: %s\n", meta.SourceURL)
+		fmt.Printf("Source Type: %s\n", meta.SourceType)
+		if meta.SourceRef != "" {
+			fmt.Printf("Source Ref: %s\n", meta.SourceRef)
+		}
+		fmt.Printf("First Added: %s\n", formatTimestamp(meta.FirstAdded))
+		fmt.Printf("Last Updated: %s\n", formatTimestamp(meta.LastUpdated))
+		if meta.OriginalFormat != "" {
+			fmt.Printf("Original Format: %s\n", meta.OriginalFormat)
+		}
+		fmt.Println()
+	} else {
+		fmt.Println("Metadata: Not available")
+		fmt.Println()
+	}
+
+	fmt.Printf("Location: %s\n", packagePath)
+
+	return nil
+}
+
+// outputDescribePackageJSON outputs package details in JSON format
+func outputDescribePackageJSON(manager *repo.Manager, res *resource.Resource, pkg *resource.Package, metadataAvailable bool, meta *metadata.PackageMetadata) error {
+	output := &DescribeResourceOutput{
+		Type:        string(resource.PackageType),
+		Name:        res.Name,
+		Description: res.Description,
+		Location:    resource.GetPackagePath(res.Name, manager.GetRepoPath()),
+	}
+
+	resourceCount := len(pkg.Resources)
+	output.ResourceCount = &resourceCount
+	output.Resources = pkg.Resources
+
+	if metadataAvailable {
+		output.PackageMetadata = meta
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+// outputDescribePackageYAML outputs package details in YAML format
+func outputDescribePackageYAML(manager *repo.Manager, res *resource.Resource, pkg *resource.Package, metadataAvailable bool, meta *metadata.PackageMetadata) error {
+	output := &DescribeResourceOutput{
+		Type:        string(resource.PackageType),
+		Name:        res.Name,
+		Description: res.Description,
+		Location:    resource.GetPackagePath(res.Name, manager.GetRepoPath()),
+	}
+
+	resourceCount := len(pkg.Resources)
+	output.ResourceCount = &resourceCount
+	output.Resources = pkg.Resources
+
+	if metadataAvailable {
+		output.PackageMetadata = meta
 	}
 
 	encoder := yaml.NewEncoder(os.Stdout)
@@ -501,6 +674,21 @@ func buildDescribeOutput(manager *repo.Manager, res *resource.Resource, resource
 		output.AgentType = agent.Type
 		output.Instructions = agent.Instructions
 		output.Capabilities = agent.Capabilities
+
+	case resource.PackageType:
+		packagePath := resource.GetPackagePath(res.Name, manager.GetRepoPath())
+		pkg, err := resource.LoadPackage(packagePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load package details: %w", err)
+		}
+		resourceCount := len(pkg.Resources)
+		output.ResourceCount = &resourceCount
+		output.Resources = pkg.Resources
+		// Load package metadata
+		pkgMeta, pkgMetaErr := metadata.LoadPackageMetadata(res.Name, manager.GetRepoPath())
+		if pkgMetaErr == nil {
+			output.PackageMetadata = pkgMeta
+		}
 	}
 
 	return output, nil

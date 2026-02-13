@@ -537,7 +537,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 
 		table := output.NewTable("Package", "Missing Count", "Missing Resources")
 		table.WithResponsive().
-			WithDynamicColumn(2).          // Missing Resources stretches
+			WithDynamicColumn(2).           // Missing Resources stretches
 			WithMinColumnWidths(40, 13, 20) // Package min=40, Missing Count min=13, Missing Resources min=20
 		for _, issue := range result.PackagesWithMissingRefs {
 			missingStr := strings.Join(issue.MissingResources, ", ")
