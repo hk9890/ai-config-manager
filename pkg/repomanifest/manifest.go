@@ -1,12 +1,14 @@
 package repomanifest
 
 import (
+	"time"
+
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,9 +31,18 @@ type Source struct {
 	URL        string    `yaml:"url,omitempty"`
 	Ref        string    `yaml:"ref,omitempty"`
 	Subpath    string    `yaml:"subpath,omitempty"`
-	Mode       string    `yaml:"mode"`
-	Added      time.Time `yaml:"added"`
-	LastSynced time.Time `yaml:"last_synced,omitempty"`
+}
+
+// GetMode returns the implicit mode for this source
+// path sources use symlink, url sources use copy
+func (s *Source) GetMode() string {
+	if s.Path != "" {
+		return "symlink"
+	}
+	if s.URL != "" {
+		return "copy"
+	}
+	return ""
 }
 
 // Load loads a manifest from the repository's ai.repo.yaml file
@@ -55,6 +66,12 @@ func Load(repoPath string) (*Manifest, error) {
 	var m Manifest
 	if err := yaml.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("failed to parse manifest YAML: %w", err)
+	}
+
+	// Migrate old format if needed (has Mode, Added, LastSynced in sources)
+	// This migrates from the old format where state was mixed with config
+	if err := migrateIfNeeded(repoPath, &m); err != nil {
+		return nil, fmt.Errorf("failed to migrate manifest: %w", err)
 	}
 
 	// Validate the manifest
@@ -134,10 +151,6 @@ func (m *Manifest) AddSource(source *Source) error {
 		return fmt.Errorf("cannot add nil source")
 	}
 
-	// Set added timestamp if not set (must be done before validation)
-	if source.Added.IsZero() {
-		source.Added = time.Now()
-	}
 
 	// Auto-generate name if not provided
 	if source.Name == "" {
@@ -230,15 +243,7 @@ func validateSource(source *Source) error {
 		return fmt.Errorf("source cannot have both path and url")
 	}
 
-	// Mode must be symlink or copy
-	if source.Mode != "symlink" && source.Mode != "copy" {
-		return fmt.Errorf("invalid mode '%s': must be 'symlink' or 'copy'", source.Mode)
-	}
 
-	// Added timestamp is required
-	if source.Added.IsZero() {
-		return fmt.Errorf("added timestamp is required")
-	}
 
 	return nil
 }
@@ -325,4 +330,94 @@ func generateSourceName(source *Source) string {
 	}
 
 	return name
+}
+
+// migrateIfNeeded migrates old manifest format to new format
+// Old format had Mode, Added, LastSynced in Source struct
+// New format moves these to .metadata/sources.json
+func migrateIfNeeded(repoPath string, m *Manifest) error {
+	// Check if migration is needed by looking for old-format data in raw YAML
+	// We need to re-parse to detect fields that aren't in our struct anymore
+	path := filepath.Join(repoPath, ManifestFileName)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	// Parse into a generic map to detect old fields
+	var rawManifest map[string]interface{}
+	if err := yaml.Unmarshal(data, &rawManifest); err != nil {
+		return err
+	}
+
+	sources, ok := rawManifest["sources"].([]interface{})
+	if !ok || len(sources) == 0 {
+		return nil // No sources, nothing to migrate
+	}
+
+	// Check if any source has old-format fields
+	needsMigration := false
+	for _, src := range sources {
+		srcMap, ok := src.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if _, hasMode := srcMap["mode"]; hasMode {
+			needsMigration = true
+			break
+		}
+		if _, hasAdded := srcMap["added"]; hasAdded {
+			needsMigration = true
+			break
+		}
+	}
+
+	if !needsMigration {
+		return nil // Already migrated or new format
+	}
+
+	// Load existing sourcemetadata or create new
+	metadata, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to load source metadata: %w", err)
+	}
+
+	// Extract state from each source
+	for _, src := range sources {
+		srcMap, ok := src.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := srcMap["name"].(string)
+		if name == "" {
+			continue
+		}
+
+		// Extract Added timestamp
+		if addedStr, ok := srcMap["added"].(string); ok {
+			if added, err := time.Parse(time.RFC3339, addedStr); err == nil {
+				metadata.SetAdded(name, added)
+			}
+		}
+
+		// Extract LastSynced timestamp
+		if syncedStr, ok := srcMap["last_synced"].(string); ok {
+			if synced, err := time.Parse(time.RFC3339, syncedStr); err == nil {
+				metadata.SetLastSynced(name, synced)
+			}
+		}
+	}
+
+	// Save metadata
+	if err := metadata.Save(repoPath); err != nil {
+		return fmt.Errorf("failed to save source metadata: %w", err)
+	}
+
+	// Save cleaned manifest (without Mode, Added, LastSynced)
+	if err := m.Save(repoPath); err != nil {
+		return fmt.Errorf("failed to save migrated manifest: %w", err)
+	}
+
+	return nil
 }
