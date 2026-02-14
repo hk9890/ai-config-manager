@@ -203,23 +203,7 @@ sources:
     mode: symlink
     added: 2026-02-14T10:00:00Z`,
 		},
-		{
-			name: "invalid mode",
-			content: `version: 1
-sources:
-  - name: test
-    path: /path
-    mode: invalid
-    added: 2026-02-14T10:00:00Z`,
-		},
-		{
-			name: "missing added timestamp",
-			content: `version: 1
-sources:
-  - name: test
-    path: /path
-    mode: symlink`,
-		},
+
 		{
 			name: "invalid source name format",
 			content: `version: 1

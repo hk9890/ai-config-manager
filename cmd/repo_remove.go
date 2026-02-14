@@ -18,14 +18,19 @@ var (
 	removeKeepResourcesFlag bool
 )
 
-// repoDropSourceCmd represents the drop-source command
-var repoDropSourceCmd = &cobra.Command{
-	Use:   "drop-source <name|path|url>",
-	Short: "Remove a source from the repository manifest",
-	Long: `Remove a source from the repository manifest (ai.repo.yaml) and clean up orphaned resources.
+// repoRemoveCmd represents the remove command
+var repoRemoveCmd = &cobra.Command{
+	Use:   "remove <name|path|url>",
+	Short: "Remove a source from the repository",
+	Long: `Remove a source from the repository (symmetrical with 'repo add').
 
 This command removes a source entry from ai.repo.yaml and by default also removes
 any resources that came from that source (orphan cleanup).
+
+This command operates on SOURCES (not individual resources). It is symmetrical
+with 'repo add', which adds sources.
+
+To remove individual resources, modify the source and run 'repo sync'.
 
 Matching Priority:
   Sources are matched by name first, then by path, then by URL.
@@ -36,19 +41,19 @@ Orphan Cleanup:
 
 Examples:
   # Remove source by name
-  aimgr repo drop-source my-source
+  aimgr repo remove my-source
 
   # Remove source by path
-  aimgr repo drop-source ~/my-resources/
+  aimgr repo remove ~/my-resources/
 
   # Remove source by URL
-  aimgr repo drop-source https://github.com/owner/repo
+  aimgr repo remove https://github.com/owner/repo
 
   # Preview what would be removed
-  aimgr repo drop-source my-source --dry-run
+  aimgr repo remove my-source --dry-run
 
   # Remove source but keep resources
-  aimgr repo drop-source my-source --keep-resources`,
+  aimgr repo remove my-source --keep-resources`,
 	Args: cobra.ExactArgs(1),
 	RunE: runRemove,
 }
@@ -191,7 +196,7 @@ func formatSourcesList(manifest *repomanifest.Manifest) string {
 }
 
 func init() {
-	repoCmd.AddCommand(repoDropSourceCmd)
-	repoDropSourceCmd.Flags().BoolVar(&removeDryRunFlag, "dry-run", false, "Show what would be removed without actually removing")
-	repoDropSourceCmd.Flags().BoolVar(&removeKeepResourcesFlag, "keep-resources", false, "Remove source from manifest but keep resources")
+	repoCmd.AddCommand(repoRemoveCmd)
+	repoRemoveCmd.Flags().BoolVar(&removeDryRunFlag, "dry-run", false, "Show what would be removed without actually removing")
+	repoRemoveCmd.Flags().BoolVar(&removeKeepResourcesFlag, "keep-resources", false, "Remove source from manifest but keep resources")
 }
