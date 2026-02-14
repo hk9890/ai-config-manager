@@ -12,6 +12,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/source"
 	"github.com/hk9890/ai-config-manager/pkg/workspace"
@@ -24,21 +25,22 @@ var (
 	skipExistingFlag bool
 	dryRunFlag       bool
 	filterFlag       string
-	importFormatFlag string
+	addFormatFlag    string
 	copyFlag         bool
+	nameFlag         string
 )
 
-// repoImportCmd represents the import command
-var repoImportCmd = &cobra.Command{
-	Use:   "import <source>",
-	Short: "Import resources to the repository",
-	Long: `Import resources to the aimgr repository.
+// repoAddCmd represents the add command
+var repoAddCmd = &cobra.Command{
+	Use:   "add <source>",
+	Short: "Add resources to the repository",
+	Long: `Add resources to the aimgr repository.
 
-This command auto-discovers and imports all resources (commands, skills, agents, packages)
-from the specified source location. It also automatically detects and imports marketplace.json
+This command auto-discovers and adds all resources (commands, skills, agents, packages)
+from the specified source location. It also automatically detects and adds marketplace.json
 files if present.
 
-Import Modes:
+Add Modes:
   - URLs (git repositories): Auto-detected and copied to repository
   - Local paths: Auto-detected and symlinked by default (use --copy to force copy)
 
@@ -106,33 +108,49 @@ Examples:
 		// Auto-detect: URL or local path?
 		isRemote := parsed.Type == source.GitHub || parsed.Type == source.GitURL
 
+		var addErr error
+		var importMode string
+
 		if isRemote {
 			// Remote source: always use copy mode
-			return addBulkFromGitHub(parsed, manager)
-		}
-
-		// Local source: use symlink mode by default, copy if --copy flag is set
-		importMode := "symlink"
-		if copyFlag {
 			importMode = "copy"
+			addErr = addBulkFromGitHub(parsed, manager)
+		} else {
+			// Local source: use symlink mode by default, copy if --copy flag is set
+			importMode = "symlink"
+			if copyFlag {
+				importMode = "copy"
+			}
+			addErr = addBulkFromLocalWithMode(parsed.LocalPath, manager, filterFlag, importMode)
 		}
 
-		// Pass import mode to local import handler
-		return addBulkFromLocalWithMode(parsed.LocalPath, manager, filterFlag, importMode)
+		// If add operation failed or in dry-run mode, return early
+		if addErr != nil || dryRunFlag {
+			return addErr
+		}
+
+		// Add source to manifest after successful add
+		if err := addSourceToManifest(manager, parsed, importMode); err != nil {
+			// Don't fail the entire operation if manifest tracking fails
+			fmt.Fprintf(os.Stderr, "Warning: Failed to track source in manifest: %v\n", err)
+		}
+
+		return nil
 	},
 }
 
 func init() {
-	repoCmd.AddCommand(repoImportCmd)
+	repoCmd.AddCommand(repoAddCmd)
 
 	// Add flags
-	repoImportCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resources")
-	repoImportCmd.Flags().BoolVar(&skipExistingFlag, "skip-existing", false, "Skip conflicts silently")
-	repoImportCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without importing")
-	repoImportCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
-	repoImportCmd.Flags().StringVar(&importFormatFlag, "format", "table", "Output format: table, json, yaml")
-	repoImportCmd.Flags().BoolVar(&copyFlag, "copy", false, "Force copy mode for local paths (default: symlink)")
-	repoImportCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	repoAddCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Overwrite existing resources")
+	repoAddCmd.Flags().BoolVar(&skipExistingFlag, "skip-existing", false, "Skip conflicts silently")
+	repoAddCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without adding")
+	repoAddCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
+	repoAddCmd.Flags().StringVar(&addFormatFlag, "format", "table", "Output format: table, json, yaml")
+	repoAddCmd.Flags().BoolVar(&copyFlag, "copy", false, "Force copy mode for local paths (default: symlink)")
+	repoAddCmd.Flags().StringVar(&nameFlag, "name", "", "Override auto-generated source name")
+	repoAddCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
 
 // Helper functions for bulk add integration
@@ -426,7 +444,7 @@ func importFromLocalPathWithMode(
 	origPackageCount := len(packages)
 
 	// Determine if we should print informational output
-	isHumanFormat := importFormatFlag == "" || importFormatFlag == "table"
+	isHumanFormat := addFormatFlag == "" || addFormatFlag == "table"
 
 	// Apply filter if specified
 	if filter != "" {
@@ -611,15 +629,15 @@ func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter st
 	absPath, _ := filepath.Abs(localPath)
 
 	// Print header (LOCAL-SPECIFIC) - only for table format
-	if importFormatFlag == "" || importFormatFlag == "table" {
-		fmt.Printf("Importing from: %s\n", absPath)
+	if addFormatFlag == "" || addFormatFlag == "table" {
+		fmt.Printf("Adding from: %s\n", absPath)
 		if dryRunFlag {
 			fmt.Println("  Mode: DRY RUN (preview only)")
 		}
 		if importMode == "symlink" {
-			fmt.Println("  Import Mode: SYMLINK (local paths linked, not copied)")
+			fmt.Println("  Add Mode: SYMLINK (local paths linked, not copied)")
 		} else {
-			fmt.Println("  Import Mode: COPY (resources copied to repository)")
+			fmt.Println("  Add Mode: COPY (resources copied to repository)")
 		}
 		if filter != "" {
 			fmt.Printf("  Filter: %s\n", filter)
@@ -672,8 +690,8 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 	}
 
 	// Print header (GitHub-specific) - only for table format
-	if importFormatFlag == "" || importFormatFlag == "table" {
-		fmt.Printf("Importing from: %s\n", parsed.URL)
+	if addFormatFlag == "" || addFormatFlag == "table" {
+		fmt.Printf("Adding from: %s\n", parsed.URL)
 		if parsed.Ref != "" {
 			fmt.Printf("  Branch/Tag: %s\n", parsed.Ref)
 		}
@@ -1043,10 +1061,66 @@ func formatGitHubShortURL(parsed *source.ParsedSource) string {
 	return result
 }
 
+// addSourceToManifest adds the source to ai.repo.yaml manifest
+func addSourceToManifest(manager *repo.Manager, parsed *source.ParsedSource, importMode string) error {
+	// Load existing manifest
+	manifest, err := repomanifest.Load(manager.GetRepoPath())
+	if err != nil {
+		return fmt.Errorf("failed to load manifest: %w", err)
+	}
+
+	// Create source entry
+	manifestSource := &repomanifest.Source{
+		Name: nameFlag, // Will be auto-generated if empty
+		Mode: importMode,
+	}
+
+	// Set path or URL based on source type
+	if parsed.Type == source.Local {
+		// For local sources, store absolute path
+		absPath, err := filepath.Abs(parsed.LocalPath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+		manifestSource.Path = absPath
+	} else {
+		// For remote sources (GitHub, GitURL), store URL
+		manifestSource.URL = parsed.URL
+		manifestSource.Ref = parsed.Ref
+		manifestSource.Subpath = parsed.Subpath
+	}
+
+	// Check if source already exists
+	if existing, found := manifest.GetSource(manifestSource.Path + manifestSource.URL); found {
+		// Source already exists, skip
+		if addFormatFlag == "" || addFormatFlag == "table" {
+			fmt.Printf("\nℹ Source '%s' already tracked in manifest\n", existing.Name)
+		}
+		return nil
+	}
+
+	// Add source to manifest
+	if err := manifest.AddSource(manifestSource); err != nil {
+		return fmt.Errorf("failed to add source to manifest: %w", err)
+	}
+
+	// Save manifest
+	if err := manifest.Save(manager.GetRepoPath()); err != nil {
+		return fmt.Errorf("failed to save manifest: %w", err)
+	}
+
+	// Print success message for human-readable format
+	if addFormatFlag == "" || addFormatFlag == "table" {
+		fmt.Printf("\n✓ Source '%s' tracked in ai.repo.yaml\n", manifestSource.Name)
+	}
+
+	return nil
+}
+
 // printImportResults prints a formatted summary of import results
 func printImportResults(result *repo.BulkImportResult) {
 	// Parse format flag
-	format, err := output.ParseFormat(importFormatFlag)
+	format, err := output.ParseFormat(addFormatFlag)
 	if err != nil {
 		// Fall back to default human-readable output if format is invalid
 		fmt.Fprintf(os.Stderr, "Warning: %v, using table format\n", err)

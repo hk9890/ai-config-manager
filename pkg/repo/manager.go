@@ -13,6 +13,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/config"
 	pkgerrors "github.com/hk9890/ai-config-manager/pkg/errors"
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
@@ -109,6 +110,28 @@ func (m *Manager) Init() error {
 		}
 	}
 
+	// Create ai.repo.yaml if it doesn't exist
+	// NOTE: This handles the upgrade path for existing users. When upgrading from a version
+	// without ai.repo.yaml, Init() will automatically create an empty manifest on first run.
+	// This is idempotent and safe - the file is only created if missing.
+	// TODO(release): Document in migration guide that ai.repo.yaml is auto-created on upgrade.
+	manifestPath := filepath.Join(m.repoPath, repomanifest.ManifestFileName)
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		// Create empty manifest
+		manifest := &repomanifest.Manifest{
+			Version: 1,
+			Sources: []*repomanifest.Source{},
+		}
+		if err := manifest.Save(m.repoPath); err != nil {
+			return fmt.Errorf("failed to create ai.repo.yaml: %w", err)
+		}
+		// Log that manifest was created (helpful for upgrades from pre-manifest versions)
+		fmt.Fprintf(os.Stderr, "Created ai.repo.yaml\n")
+	} else if err != nil {
+		return fmt.Errorf("failed to check ai.repo.yaml: %w", err)
+	}
+	// If file exists, do nothing (idempotent)
+
 	// Create/update .gitignore (idempotent)
 	gitignorePath := filepath.Join(m.repoPath, ".gitignore")
 	gitignoreContent := `# aimgr workspace cache (Git clones for remote sources)
@@ -154,8 +177,8 @@ func (m *Manager) Init() error {
 
 	// Initial commit if git was just initialized
 	if !alreadyGit {
-		// Add .gitignore
-		addCmd := exec.Command("git", "add", ".gitignore")
+		// Add .gitignore and ai.repo.yaml
+		addCmd := exec.Command("git", "add", ".gitignore", repomanifest.ManifestFileName)
 		addCmd.Dir = m.repoPath
 		if _, err := addCmd.CombinedOutput(); err != nil {
 			// Don't fail on add error - might not have anything to add
@@ -288,7 +311,9 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
-	if err := metadata.Save(meta, m.repoPath); err != nil {
+	// Derive source name from URL
+	sourceName := metadata.DeriveSourceName(sourceURL)
+	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
@@ -353,7 +378,9 @@ func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref str
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
-	if err := metadata.Save(meta, m.repoPath); err != nil {
+	// Derive source name from URL
+	sourceName := metadata.DeriveSourceName(sourceURL)
+	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
@@ -418,7 +445,9 @@ func (m *Manager) addAgentWithOptions(sourcePath, sourceURL, sourceType, ref str
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
-	if err := metadata.Save(meta, m.repoPath); err != nil {
+	// Derive source name from URL
+	sourceName := metadata.DeriveSourceName(sourceURL)
+	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
@@ -1272,12 +1301,15 @@ func (m *Manager) GetPackage(name string) (*resource.Package, error) {
 
 // Drop removes the entire repository directory and recreates the empty structure.
 // WARNING: This is a destructive operation that cannot be undone.
+// NOTE: After drop, Init() is called which recreates an empty ai.repo.yaml manifest
+// with no sources. This is the expected behavior for soft drop - the repository
+// is ready to accept new sources via 'repo add' or 'repo sync'.
 func (m *Manager) Drop() error {
 	// Remove entire repo directory
 	if err := os.RemoveAll(m.repoPath); err != nil {
 		return fmt.Errorf("failed to remove repository: %w", err)
 	}
 
-	// Recreate empty structure
+	// Recreate empty structure (including empty ai.repo.yaml)
 	return m.Init()
 }

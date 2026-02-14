@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/spf13/cobra"
 )
@@ -81,6 +83,12 @@ Examples:
 		// Calculate disk usage
 		size, _ := calculateDirSize(repoPath)
 
+		// Load manifest to get sources
+		manifest, err := repomanifest.Load(repoPath)
+		if err != nil {
+			return fmt.Errorf("failed to load manifest: %w", err)
+		}
+
 		// Build output using KeyValueBuilder
 		info := output.NewKeyValue("Repository Information").
 			Add("Location", repoPath).
@@ -93,6 +101,18 @@ Examples:
 		// Add disk usage if calculated successfully
 		if size > 0 {
 			info.AddSection().Add("Disk Usage", formatBytes(size))
+		}
+
+		// Add sources information
+		if manifest != nil && len(manifest.Sources) > 0 {
+			sourcesValue := fmt.Sprintf("%d\n", len(manifest.Sources))
+			for _, source := range manifest.Sources {
+				sourceLine := formatSource(source)
+				sourcesValue += sourceLine + "\n"
+			}
+			info.AddSection().Add("Sources", sourcesValue)
+		} else {
+			info.AddSection().Add("Sources", "0 (use 'aimgr repo add' to add sources)")
 		}
 
 		// Format output
@@ -127,6 +147,85 @@ func formatBytes(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// formatSource formats a source with health indicator, type, path/URL, mode, and last synced
+func formatSource(source *repomanifest.Source) string {
+	// Health check
+	health := checkSourceHealth(source)
+	healthIcon := "✓"
+	if !health {
+		healthIcon = "✗"
+	}
+
+	// Determine source type and location
+	sourceType := "local"
+	location := source.Path
+	if source.URL != "" {
+		sourceType = "remote"
+		location = source.URL
+	}
+
+	// Format last synced time
+	lastSynced := "never"
+	if !source.LastSynced.IsZero() {
+		lastSynced = formatTimeSince(source.LastSynced)
+	}
+
+	// Build the formatted line
+	return fmt.Sprintf("  %s %s (%s: %s) [%s] - synced %s",
+		healthIcon,
+		source.Name,
+		sourceType,
+		location,
+		source.Mode,
+		lastSynced)
+}
+
+// checkSourceHealth checks if a source is accessible
+// For local sources, checks if the path exists
+// For remote sources, always returns true (shows "remote")
+func checkSourceHealth(source *repomanifest.Source) bool {
+	if source.Path != "" {
+		// Local source - check if path exists
+		_, err := os.Stat(source.Path)
+		return err == nil
+	}
+	// Remote source - always healthy (we don't do network checks)
+	return true
+}
+
+// formatTimeSince formats a time duration in human-readable format
+// Examples: "2h ago", "1d ago", "3w ago"
+func formatTimeSince(t time.Time) string {
+	if t.IsZero() {
+		return "never"
+	}
+
+	duration := time.Since(t)
+
+	// Format as human-readable duration
+	if duration < time.Minute {
+		return "just now"
+	} else if duration < time.Hour {
+		minutes := int(duration.Minutes())
+		return fmt.Sprintf("%dm ago", minutes)
+	} else if duration < 24*time.Hour {
+		hours := int(duration.Hours())
+		return fmt.Sprintf("%dh ago", hours)
+	} else if duration < 7*24*time.Hour {
+		days := int(duration.Hours() / 24)
+		return fmt.Sprintf("%dd ago", days)
+	} else if duration < 30*24*time.Hour {
+		weeks := int(duration.Hours() / 24 / 7)
+		return fmt.Sprintf("%dw ago", weeks)
+	} else if duration < 365*24*time.Hour {
+		months := int(duration.Hours() / 24 / 30)
+		return fmt.Sprintf("%dmo ago", months)
+	} else {
+		years := int(duration.Hours() / 24 / 365)
+		return fmt.Sprintf("%dy ago", years)
+	}
 }
 
 func init() {

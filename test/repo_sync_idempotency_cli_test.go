@@ -42,15 +42,10 @@ func TestRepoSyncIdempotency_CLI(t *testing.T) {
 	setupAllResourcesForCLI(t, sourceDir)
 	t.Logf("Created test resources in: %s", sourceDir)
 
-	// Create config file with sync source
+	// Create minimal config file (only install.targets required)
 	configContent := &config.Config{
 		Install: config.InstallConfig{
 			Targets: []string{"claude"},
-		},
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: sourceDir},
-			},
 		},
 	}
 
@@ -70,16 +65,16 @@ func TestRepoSyncIdempotency_CLI(t *testing.T) {
 	}
 	t.Logf("Created config file: %s", configPath)
 
-	// Helper function to run aimgr repo sync
-	runSync := func(testName string) (string, int) {
+	// Build path to aimgr binary
+	binPath := filepath.Join("..", "aimgr")
+	repoDir := filepath.Join(dataDir, "repo")
+
+	// Helper function to run aimgr commands
+	runCommand := func(testName string, args ...string) (string, int) {
 		t.Helper()
-		t.Logf("[%s] Running: aimgr repo sync", testName)
+		t.Logf("[%s] Running: aimgr %s", testName, strings.Join(args, " "))
 
-		// Build path to aimgr binary
-		binPath := filepath.Join("..", "aimgr")
-
-		cmd := exec.Command(binPath, "repo", "sync")
-		repoDir := filepath.Join(dataDir, "repo")
+		cmd := exec.Command(binPath, args...)
 		cmd.Env = append(os.Environ(),
 			"XDG_CONFIG_HOME="+configDir,
 			"XDG_DATA_HOME="+dataDir,
@@ -101,29 +96,34 @@ func TestRepoSyncIdempotency_CLI(t *testing.T) {
 		return string(output), exitCode
 	}
 
-	// FIRST SYNC: Import all resources
+	// STEP 1: Add source to repository (populates ai.repo.yaml)
 	t.Log("========================================")
-	t.Log("FIRST SYNC: Importing resources...")
+	t.Log("STEP 1: Adding source to repository...")
 	t.Log("========================================")
 
-	output1, exitCode1 := runSync("first_sync")
+	outputAdd, exitCodeAdd := runCommand("repo_add", "repo", "add", sourceDir)
+	if exitCodeAdd != 0 {
+		t.Fatalf("Failed to add source with exit code %d\nOutput: %s", exitCodeAdd, outputAdd)
+	}
+
+	// STEP 2: First sync - should succeed
+	t.Log("========================================")
+	t.Log("STEP 2: FIRST SYNC (should be no-op)...")
+	t.Log("========================================")
+
+	output1, exitCode1 := runCommand("first_sync", "repo", "sync")
 
 	// Verify first sync succeeded
 	if exitCode1 != 0 {
 		t.Fatalf("First sync failed with exit code %d\nOutput: %s", exitCode1, output1)
 	}
 
-	// Parse first sync output
-	if !strings.Contains(output1, "Summary:") {
-		t.Errorf("First sync output missing summary\nOutput: %s", output1)
-	}
-
-	// SECOND SYNC: Import the same resources again (should be idempotent)
+	// STEP 3: Second sync - should also succeed (idempotent)
 	t.Log("========================================")
-	t.Log("SECOND SYNC: Importing same resources again...")
+	t.Log("STEP 3: SECOND SYNC (should be idempotent)...")
 	t.Log("========================================")
 
-	output2, exitCode2 := runSync("second_sync")
+	output2, exitCode2 := runCommand("second_sync", "repo", "sync")
 
 	// Analyze second sync results
 	t.Log("========================================")
@@ -186,15 +186,10 @@ func TestRepoSyncIdempotency_CLI_SkipExisting(t *testing.T) {
 	setupAllResourcesForCLI(t, sourceDir)
 	t.Logf("Created test resources in: %s", sourceDir)
 
-	// Create config file with sync source
+	// Create minimal config file (only install.targets required)
 	configContent := &config.Config{
 		Install: config.InstallConfig{
 			Targets: []string{"claude"},
-		},
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: sourceDir},
-			},
 		},
 	}
 
@@ -214,20 +209,16 @@ func TestRepoSyncIdempotency_CLI_SkipExisting(t *testing.T) {
 	}
 	t.Logf("Created config file: %s", configPath)
 
-	// Helper function to run aimgr repo sync
-	runSync := func(testName string, skipExisting bool) (string, int) {
+	// Build path to aimgr binary
+	binPath := filepath.Join("..", "aimgr")
+	repoDir := filepath.Join(dataDir, "repo")
+
+	// Helper function to run aimgr commands
+	runCommand := func(testName string, args ...string) (string, int) {
 		t.Helper()
-		args := []string{"repo", "sync"}
-		if skipExisting {
-			args = append(args, "--skip-existing")
-		}
 		t.Logf("[%s] Running: aimgr %s", testName, strings.Join(args, " "))
 
-		// Build path to aimgr binary
-		binPath := filepath.Join("..", "aimgr")
-
 		cmd := exec.Command(binPath, args...)
-		repoDir := filepath.Join(dataDir, "repo")
 		cmd.Env = append(os.Environ(),
 			"XDG_CONFIG_HOME="+configDir,
 			"XDG_DATA_HOME="+dataDir,
@@ -249,24 +240,34 @@ func TestRepoSyncIdempotency_CLI_SkipExisting(t *testing.T) {
 		return string(output), exitCode
 	}
 
-	// FIRST SYNC: Import all resources
+	// STEP 1: Add source to repository (populates ai.repo.yaml)
 	t.Log("========================================")
-	t.Log("FIRST SYNC: Importing resources...")
+	t.Log("STEP 1: Adding source to repository...")
 	t.Log("========================================")
 
-	output1, exitCode1 := runSync("first_sync", false)
+	outputAdd, exitCodeAdd := runCommand("repo_add", "repo", "add", sourceDir)
+	if exitCodeAdd != 0 {
+		t.Fatalf("Failed to add source with exit code %d\nOutput: %s", exitCodeAdd, outputAdd)
+	}
+
+	// STEP 2: First sync - should succeed
+	t.Log("========================================")
+	t.Log("STEP 2: FIRST SYNC (should be no-op)...")
+	t.Log("========================================")
+
+	output1, exitCode1 := runCommand("first_sync", "repo", "sync")
 
 	// Verify first sync succeeded
 	if exitCode1 != 0 {
 		t.Fatalf("First sync failed with exit code %d\nOutput: %s", exitCode1, output1)
 	}
 
-	// SECOND SYNC with --skip-existing: Should skip all resources
+	// STEP 3: Second sync with --skip-existing - should also succeed
 	t.Log("========================================")
-	t.Log("SECOND SYNC with --skip-existing: Should skip resources...")
+	t.Log("STEP 3: SECOND SYNC with --skip-existing...")
 	t.Log("========================================")
 
-	output2, exitCode2 := runSync("second_sync", true)
+	output2, exitCode2 := runCommand("second_sync", "repo", "sync", "--skip-existing")
 
 	// Verify second sync succeeded
 	if exitCode2 != 0 {

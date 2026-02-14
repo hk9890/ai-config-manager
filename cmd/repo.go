@@ -10,11 +10,11 @@ var repoCmd = &cobra.Command{
 	Short: "Manage resources in the aimgr repository",
 	Long: `Manage resources in the aimgr repository.
 
-The repo command group provides subcommands for importing, removing, and listing
+The repo command group provides subcommands for adding, removing, and listing
 resources (commands, skills, and agents) in the centralized aimgr repository.
 
 Available subcommands:
-  import  - Import resources to the repository
+  add     - Add resources to the repository
   remove  - Remove resources from the repository
   list    - List resources in the repository`,
 }

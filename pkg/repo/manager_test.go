@@ -2,12 +2,14 @@ package repo
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
@@ -29,6 +31,69 @@ func TestManagerInit(t *testing.T) {
 	skillsPath := filepath.Join(tmpDir, "skills")
 	if _, err := os.Stat(skillsPath); err != nil {
 		t.Errorf("skills directory was not created: %v", err)
+	}
+}
+
+func TestInitCreatesManifestInExistingRepo(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Manually create repo structure without ai.repo.yaml (simulates existing repo before upgrade)
+	commandsPath := filepath.Join(tmpDir, "commands")
+	if err := os.MkdirAll(commandsPath, 0755); err != nil {
+		t.Fatalf("Failed to create commands directory: %v", err)
+	}
+
+	skillsPath := filepath.Join(tmpDir, "skills")
+	if err := os.MkdirAll(skillsPath, 0755); err != nil {
+		t.Fatalf("Failed to create skills directory: %v", err)
+	}
+
+	agentsPath := filepath.Join(tmpDir, "agents")
+	if err := os.MkdirAll(agentsPath, 0755); err != nil {
+		t.Fatalf("Failed to create agents directory: %v", err)
+	}
+
+	packagesPath := filepath.Join(tmpDir, "packages")
+	if err := os.MkdirAll(packagesPath, 0755); err != nil {
+		t.Fatalf("Failed to create packages directory: %v", err)
+	}
+
+	// Initialize git repository
+	gitCmd := exec.Command("git", "init")
+	gitCmd.Dir = tmpDir
+	if output, err := gitCmd.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to initialize git: %v\nOutput: %s", err, output)
+	}
+
+	// Verify ai.repo.yaml does NOT exist yet
+	manifestPath := filepath.Join(tmpDir, repomanifest.ManifestFileName)
+	if _, err := os.Stat(manifestPath); !os.IsNotExist(err) {
+		t.Fatalf("ai.repo.yaml should not exist before Init(), but it does")
+	}
+
+	// Now call Init() on existing repo
+	manager := NewManagerWithPath(tmpDir)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	// Verify ai.repo.yaml now exists
+	if _, err := os.Stat(manifestPath); err != nil {
+		t.Errorf("ai.repo.yaml should exist after Init(): %v", err)
+	}
+
+	// Verify manifest has empty sources
+	manifest, err := repomanifest.Load(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	if manifest.Version != 1 {
+		t.Errorf("manifest.Version = %v, want 1", manifest.Version)
+	}
+
+	if len(manifest.Sources) != 0 {
+		t.Errorf("manifest.Sources length = %v, want 0 (empty sources)", len(manifest.Sources))
 	}
 }
 
