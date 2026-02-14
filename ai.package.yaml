@@ -2,3 +2,7 @@ resources:
     - package/opencode-coder
     - skill/skill-validator
     - skill/skill-creator
+    - skill/github-releases
+    - skill/fix-documentation
+    - skill/task-sync
+    - skill/github-task-sync
