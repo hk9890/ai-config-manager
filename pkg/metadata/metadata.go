@@ -19,20 +19,27 @@ import (
 //   - Skills:   ~/.local/share/ai-config/repo/.metadata/skills/myskill-metadata.json
 //   - Agents:   ~/.local/share/ai-config/repo/.metadata/agents/myagent-metadata.json
 type ResourceMetadata struct {
-	Name           string                `json:"name"`            // Resource name
-	Type           resource.ResourceType `json:"type"`            // Resource type (command, skill, agent)
-	SourceType     string                `json:"source_type"`     // Source type: "github", "local", "file"
-	SourceURL      string                `json:"source_url"`      // Source URL or file path
-	Ref            string                `json:"ref,omitempty"`   // Git ref (branch/tag/commit), defaults to "main" if empty
-	FirstInstalled time.Time             `json:"first_installed"` // When resource was first added
-	LastUpdated    time.Time             `json:"last_updated"`    // When resource was last updated
+	Name           string                `json:"name"`                  // Resource name
+	Type           resource.ResourceType `json:"type"`                  // Resource type (command, skill, agent)
+	SourceType     string                `json:"source_type"`           // Source type: "github", "local", "file"
+	SourceURL      string                `json:"source_url"`            // Source URL or file path
+	SourceName     string                `json:"source_name,omitempty"` // Source name from ai.repo.yaml or derived from URL/path
+	Ref            string                `json:"ref,omitempty"`         // Git ref (branch/tag/commit), defaults to "main" if empty
+	FirstInstalled time.Time             `json:"first_installed"`       // When resource was first added
+	LastUpdated    time.Time             `json:"last_updated"`          // When resource was last updated
 }
 
 // Save writes metadata to a JSON file in the .metadata/ directory.
 // Metadata is stored in a centralized location separate from resource files.
-func Save(metadata *ResourceMetadata, repoPath string) error {
+// The sourceName parameter identifies which source the resource came from (optional, can be empty for backward compatibility).
+func Save(metadata *ResourceMetadata, repoPath, sourceName string) error {
 	if metadata == nil {
 		return fmt.Errorf("metadata cannot be nil")
+	}
+
+	// Set source name if provided
+	if sourceName != "" {
+		metadata.SourceName = sourceName
 	}
 
 	metadataPath := GetMetadataPath(metadata.Name, metadata.Type, repoPath)
@@ -59,6 +66,7 @@ func Save(metadata *ResourceMetadata, repoPath string) error {
 
 // Load reads metadata from a JSON file in the .metadata/ directory.
 // Returns an error if the metadata file doesn't exist or can't be parsed.
+// Handles legacy metadata files that don't have the source_name field (backward compatible).
 func Load(name string, resourceType resource.ResourceType, repoPath string) (*ResourceMetadata, error) {
 	metadataPath := GetMetadataPath(name, resourceType, repoPath)
 
@@ -78,6 +86,70 @@ func Load(name string, resourceType resource.ResourceType, repoPath string) (*Re
 	}
 
 	return &metadata, nil
+}
+
+// HasSource checks if a resource has the specified source name.
+// Returns false if the metadata doesn't exist or if the source name doesn't match.
+// Legacy resources without source_name are treated as having an unknown source (returns false).
+func HasSource(name string, resourceType resource.ResourceType, sourceName, repoPath string) bool {
+	metadata, err := Load(name, resourceType, repoPath)
+	if err != nil {
+		return false
+	}
+	return metadata.SourceName != "" && metadata.SourceName == sourceName
+}
+
+// DeriveSourceName derives a human-readable source name from a sourceURL.
+// This is used when an explicit source name is not provided.
+// Examples:
+//   - "gh:owner/repo" -> "owner-repo"
+//   - "https://github.com/owner/repo" -> "owner-repo"
+//   - "file:///home/user/resources" -> "resources"
+//   - "/home/user/resources" -> "resources"
+func DeriveSourceName(sourceURL string) string {
+	if sourceURL == "" {
+		return "unknown"
+	}
+
+	// Handle gh: prefix
+	if strings.HasPrefix(sourceURL, "gh:") {
+		parts := strings.Split(strings.TrimPrefix(sourceURL, "gh:"), "/")
+		if len(parts) >= 2 {
+			return parts[0] + "-" + parts[1]
+		}
+		return strings.ReplaceAll(strings.TrimPrefix(sourceURL, "gh:"), "/", "-")
+	}
+
+	// Handle file:// URLs
+	if strings.HasPrefix(sourceURL, "file://") {
+		path := strings.TrimPrefix(sourceURL, "file://")
+		return filepath.Base(path)
+	}
+
+	// Handle https://github.com URLs
+	if strings.HasPrefix(sourceURL, "https://github.com/") {
+		parts := strings.Split(strings.TrimPrefix(sourceURL, "https://github.com/"), "/")
+		if len(parts) >= 2 {
+			return parts[0] + "-" + parts[1]
+		}
+	}
+
+	// Handle other URLs
+	if strings.HasPrefix(sourceURL, "http://") || strings.HasPrefix(sourceURL, "https://") {
+		// Extract domain or last path component
+		parts := strings.Split(sourceURL, "/")
+		if len(parts) > 0 {
+			return parts[len(parts)-1]
+		}
+	}
+
+	// Handle local file paths
+	if strings.HasPrefix(sourceURL, "/") || strings.HasPrefix(sourceURL, "./") || strings.HasPrefix(sourceURL, "../") {
+		return filepath.Base(sourceURL)
+	}
+
+	// Fallback: sanitize the URL by replacing slashes with hyphens
+	return strings.ReplaceAll(sourceURL, "/", "-")
 }
 
 // GetMetadataPath returns the path to the metadata file for a resource.

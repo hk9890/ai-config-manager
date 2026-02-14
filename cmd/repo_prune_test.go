@@ -101,7 +101,7 @@ func TestFindUnreferencedCaches_AllReferenced(t *testing.T) {
 		FirstInstalled: time.Now(),
 		LastUpdated:    time.Now(),
 	}
-	if err := metadata.Save(meta, tempDir); err != nil {
+	if err := metadata.Save(meta, tempDir, "test-source"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -180,7 +180,7 @@ func TestFindUnreferencedCaches_WithUnreferenced(t *testing.T) {
 		FirstInstalled: time.Now(),
 		LastUpdated:    time.Now(),
 	}
-	if err := metadata.Save(meta, tempDir); err != nil {
+	if err := metadata.Save(meta, tempDir, "test-source"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -288,7 +288,7 @@ func TestCollectReferencedGitURLs(t *testing.T) {
 
 	for _, meta := range metas {
 		m := meta // Create copy for pointer
-		if err := metadata.Save(&m, tempDir); err != nil {
+		if err := metadata.Save(&m, tempDir, "test-source"); err != nil {
 			t.Fatal(err)
 		}
 	}

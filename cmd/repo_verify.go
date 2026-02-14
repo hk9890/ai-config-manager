@@ -418,7 +418,9 @@ func createMetadataForResource(manager *repo.Manager, res resource.Resource) err
 		LastUpdated:    fileInfo.ModTime(),
 	}
 
-	return metadata.Save(meta, repoPath)
+	// Derive source name from the file path
+	sourceName := metadata.DeriveSourceName("file://" + absPath)
+	return metadata.Save(meta, repoPath, sourceName)
 }
 
 // outputVerifyResults outputs verification results in the requested format

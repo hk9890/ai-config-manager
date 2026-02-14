@@ -71,7 +71,7 @@ func TestCLIRepoAdd(t *testing.T) {
 	cmdPath := createTestCommand(t, "test-cmd", "A test command")
 
 	// Test: aimgr repo add (unified command)
-	output, err := runAimgr(t, "repo", "import", "--force", cmdPath)
+	output, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v\nOutput: %s", err, output)
 	}
@@ -91,7 +91,7 @@ func TestCLIRepoList(t *testing.T) {
 	cmdPath := createTestCommand(t, "list-test", "A command for list testing")
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -135,7 +135,7 @@ license: MIT
 	}
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -192,7 +192,7 @@ license: Apache-2.0
 	}
 
 	// Add the skill
-	addOutput, err := runAimgr(t, "repo", "import", "--force", skillDir)
+	addOutput, err := runAimgr(t, "repo", "add", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addOutput)
 	}
@@ -246,7 +246,7 @@ version: "1.5.0"
 	}
 
 	// Add the agent
-	_, err := runAimgr(t, "repo", "import", "--force", agentPath)
+	_, err := runAimgr(t, "repo", "add", "--force", agentPath)
 	if err != nil {
 		t.Fatalf("Failed to add agent: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestCLIInstall(t *testing.T) {
 	skillDir := createTestSkill(t, "install-skill", "A skill for install testing")
 
 	// Add to repository
-	addOutput, err := runAimgr(t, "repo", "import", "--force", skillDir)
+	addOutput, err := runAimgr(t, "repo", "add", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addOutput)
 	}
@@ -326,12 +326,12 @@ func TestCLIInstallMultiple(t *testing.T) {
 	skillDir := createTestSkill(t, "multi-skill", "Multi test skill")
 
 	// Add both to repository
-	addCmdOutput, err := runAimgr(t, "repo", "import", "--force", cmdPath)
+	addCmdOutput, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v\nOutput: %s", err, addCmdOutput)
 	}
 
-	addSkillOutput, err := runAimgr(t, "repo", "import", "--force", skillDir)
+	addSkillOutput, err := runAimgr(t, "repo", "add", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addSkillOutput)
 	}
@@ -376,7 +376,7 @@ func TestCLIUninstall(t *testing.T) {
 	skillDir := createTestSkill(t, "uninstall-skill", "A skill for uninstall testing")
 
 	// Add to repository
-	addOutput, err := runAimgr(t, "repo", "import", "--force", skillDir)
+	addOutput, err := runAimgr(t, "repo", "add", "--force", skillDir)
 	if err != nil {
 		t.Fatalf("Failed to add skill: %v\nOutput: %s", err, addOutput)
 	}
@@ -490,7 +490,7 @@ func TestCLIMetadataTracking(t *testing.T) {
 	cmdPath := createTestCommand(t, "metadata-test", "Metadata test command")
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}
@@ -532,7 +532,7 @@ func TestCLIMetadataDeletedOnRemove(t *testing.T) {
 	cmdPath := createTestCommand(t, "meta-remove-test", "Remove test")
 
 	// Add the command
-	_, err := runAimgr(t, "repo", "import", "--force", cmdPath)
+	_, err := runAimgr(t, "repo", "add", "--force", cmdPath)
 	if err != nil {
 		t.Fatalf("Failed to add command: %v", err)
 	}

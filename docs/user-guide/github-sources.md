@@ -1,60 +1,67 @@
 # GitHub Sources Guide
 
-This guide provides detailed information about using GitHub sources with `ai-repo`.
+This guide provides detailed information about using GitHub sources with `aimgr`.
 
 ## Overview
 
-`ai-repo` can add resources directly from GitHub repositories, making it easy to discover, share, and use community-contributed resources. When you add a resource from GitHub, `ai-repo`:
+`aimgr` can add resources directly from GitHub repositories, making it easy to discover, share, and use community-contributed resources. When you add a resource from GitHub, `aimgr`:
 
-1. Clones the repository to a temporary directory
+1. Clones the repository to a workspace cache
 2. Auto-discovers resources in standard locations
 3. Copies resources to your centralized repository (`~/.local/share/ai-config/repo/`)
-4. Cleans up the temporary directory
+4. Tracks the source in `ai.repo.yaml` for future syncing
+
+GitHub sources are stored in **copy mode** (not symlink mode), meaning resources are copied to your repository rather than symlinked.
 
 ## Source Format Syntax
 
 ### Basic GitHub Source
 
 ```bash
-aimgr repo import skill gh:owner/repo
+aimgr repo add https://github.com/owner/repo
 ```
 
-This clones the repository and auto-discovers all skills.
+This clones the repository and auto-discovers all resources (skills, commands, agents).
 
-### GitHub Source with Path
+### GitHub Source with Ref (Branch/Tag)
 
 ```bash
-aimgr repo import skill gh:owner/repo/path/to/skill
+# With branch
+aimgr repo add https://github.com/owner/repo#branch-name
+
+# With tag
+aimgr repo add https://github.com/owner/repo#v1.0.0
 ```
 
-Looks for a skill in a specific path within the repository.
+Uses a specific branch or tag reference.
 
-### GitHub Source with Branch/Tag
+### GitHub Source with Subpath
 
 ```bash
-aimgr repo import skill gh:owner/repo@branch-name
-aimgr repo import skill gh:owner/repo@v1.0.0
+aimgr repo add https://github.com/owner/repo/path/to/resources
 ```
 
-Clones from a specific branch or tag.
+Looks for resources in a specific path within the repository.
 
-### Combined Path and Reference
+### Combined Subpath and Reference
 
 ```bash
-aimgr repo import skill gh:owner/repo/skills/my-skill@v2.0.0
+aimgr repo add https://github.com/owner/repo/skills/my-skill#v2.0.0
 ```
 
-Uses both a specific path and a version reference.
+Uses both a specific subpath and a version reference.
 
-### Shorthand Syntax
-
-The `gh:` prefix can be omitted for `owner/repo` format:
+### Custom Source Name
 
 ```bash
-# These are equivalent
-aimgr repo import skill vercel-labs/agent-skills
-aimgr repo import skill gh:vercel-labs/agent-skills
+# Auto-generated name (e.g., "owner-repo")
+aimgr repo add https://github.com/owner/repo
+
+# Custom name
+aimgr repo add https://github.com/owner/repo --name=my-gh-source
 ```
+
+Custom names make it easier to identify and manage sources.
 
 ### Git URL Sources
 
@@ -62,19 +69,83 @@ Use any Git URL directly:
 
 ```bash
 # HTTPS
-aimgr repo import skill https://github.com/owner/repo.git
-aimgr repo import skill https://gitlab.com/owner/repo.git
+aimgr repo add https://github.com/owner/repo.git
+aimgr repo add https://gitlab.com/owner/repo.git
 
 # SSH
-aimgr repo import skill git@github.com:owner/repo.git
+aimgr repo add git@github.com:owner/repo.git
 
-# With branch
-aimgr repo import skill https://github.com/owner/repo.git@develop
+# With ref
+aimgr repo add https://github.com/owner/repo.git#develop
 ```
+
+## Source Tracking in ai.repo.yaml
+
+When you add a GitHub source, it's automatically tracked in `ai.repo.yaml` at the root of your repository. This manifest file records:
+
+- Source URL and ref
+- Subpath (if specified)
+- Source name
+- Mode (always `copy` for GitHub sources)
+- Last sync time
+
+**Example ai.repo.yaml entry:**
+
+```yaml
+sources:
+  - name: owner-repo
+    url: https://github.com/owner/repo
+    ref: main
+    mode: copy
+    added: 2026-02-14T10:30:00Z
+    last_synced: 2026-02-14T10:30:00Z
+  
+  - name: my-skills
+    url: https://github.com/myorg/skills
+    ref: v2.0.0
+    subpath: skills/frontend
+    mode: copy
+    added: 2026-02-14T11:00:00Z
+    last_synced: 2026-02-14T11:00:00Z
+```
+
+### Syncing GitHub Sources
+
+Once tracked, you can sync sources to pull latest changes:
+
+```bash
+# Sync all sources
+aimgr repo sync
+
+# Sync specific source
+aimgr repo sync my-skills
+
+# Sync with specific ref
+aimgr repo sync owner-repo --ref=v2.1.0
+```
+
+Syncing updates resources in your repository to match the current state of the GitHub source.
+
+### Removing GitHub Sources
+
+Remove sources and optionally clean up their resources:
+
+```bash
+# Remove by name (keeps resources)
+aimgr repo remove my-gh-source
+
+# Remove by URL (keeps resources)
+aimgr repo remove https://github.com/owner/repo
+
+# Remove and delete orphaned resources
+aimgr repo remove my-gh-source --clean-orphans
+```
+
+When you remove a source, its entry is removed from `ai.repo.yaml`. By default, resources are kept in the repository. Use `--clean-orphans` to delete resources that are no longer tracked by any source.
 
 ## Auto-Discovery Algorithm
 
-When adding resources from GitHub, `ai-repo` searches for resources in standard locations following tool conventions.
+When adding resources from GitHub, `aimgr` searches for resources in standard locations following tool conventions.
 
 ### Skills Discovery
 
@@ -137,39 +208,28 @@ When adding resources from GitHub, `ai-repo` searches for resources in standard 
 
 ## Resource Selection
 
-### Single Resource Found
+### Auto-Discovery in Action
 
-If exactly one resource is found, it's automatically added:
+When you add a GitHub source, all discoverable resources are automatically added:
 
 ```bash
-$ aimgr repo import skill gh:myorg/my-skill
+$ aimgr repo add https://github.com/myorg/my-resources
 Cloning repository...
-Found skill: my-skill
-✓ Added skill 'my-skill' to repository
-  Version: 1.0.0
-  Description: My custom skill
+Discovering resources...
+✓ Added 2 skills, 3 commands, 1 agent
+✓ Source 'myorg-my-resources' tracked in ai.repo.yaml
 ```
 
-### Multiple Resources Found
+### Specific Subpath
 
-If multiple resources are found and no specific path was provided, you'll be prompted to select:
+To add resources from a specific directory, use a subpath:
 
 ```bash
-$ aimgr repo import skill gh:myorg/multi-skill-repo
+$ aimgr repo add https://github.com/myorg/mono-repo/skills/frontend
 Cloning repository...
-Found 3 skills:
-  1. skill-one - Frontend development skill
-  2. skill-two - Backend API skill
-  3. skill-three - Database management skill
-
-Select a skill to add (1-3): 2
-✓ Added skill 'skill-two' to repository
-```
-
-To avoid the prompt, specify the exact path:
-
-```bash
-aimgr repo import skill gh:myorg/multi-skill-repo/skills/skill-two
+Discovering resources in 'skills/frontend'...
+✓ Added skill 'frontend-design'
+✓ Source 'myorg-mono-repo' tracked in ai.repo.yaml
 ```
 
 ### No Resources Found
@@ -177,12 +237,12 @@ aimgr repo import skill gh:myorg/multi-skill-repo/skills/skill-two
 If no resources are found, an error is displayed:
 
 ```bash
-$ aimgr repo import skill gh:myorg/empty-repo
+$ aimgr repo add https://github.com/myorg/empty-repo
 Cloning repository...
-Error: no skills found in repository: https://github.com/myorg/empty-repo
+Error: no resources found in repository: https://github.com/myorg/empty-repo
 ```
 
-Check the repository's structure or documentation to find where resources are located.
+Check the repository's structure or documentation to find where resources are located. You may need to specify a subpath.
 
 ## Precedence Rules
 
@@ -196,64 +256,77 @@ The first valid resource found wins.
 
 ## Examples
 
-### Example 1: Add a Single Skill from GitHub
+### Example 1: Add All Resources from GitHub
 
 ```bash
-# Add the entire vercel-labs/agent-skills repository
-aimgr repo import skill gh:vercel-labs/agent-skills
-
-# Or use shorthand
-aimgr repo import skill vercel-labs/agent-skills
+# Add entire repository (auto-discovers all resources)
+aimgr repo add https://github.com/myorg/my-resources
 ```
 
-### Example 2: Add a Specific Skill from Multi-Skill Repo
+### Example 2: Add with Custom Name
 
 ```bash
-# Specify the exact skill path
-aimgr repo import skill gh:vercel-labs/agent-skills/skills/frontend-design
+# Custom name for easier management
+aimgr repo add https://github.com/myorg/resources --name=my-tools
 ```
 
-### Example 3: Add from a Specific Version
+### Example 3: Add from Specific Version
 
 ```bash
 # Add from a tagged release
-aimgr repo import skill gh:anthropics/skills@v2.1.0
+aimgr repo add https://github.com/myorg/skills#v2.1.0
 
 # Add from a branch
-aimgr repo import skill gh:myorg/experimental-skills@develop
+aimgr repo add https://github.com/myorg/experimental-skills#develop
 ```
 
-### Example 4: Add Commands from GitHub
+### Example 4: Add Specific Subpath
 
 ```bash
-# Auto-discover commands in a repository
-aimgr repo import command gh:myorg/commands
+# Add resources from specific directory
+aimgr repo add https://github.com/myorg/mono-repo/skills/frontend
 
-# Add a specific command
-aimgr repo import command gh:myorg/repo/commands/deploy.md
+# Add with both subpath and ref
+aimgr repo add https://github.com/myorg/repo/commands#v1.0.0
 ```
 
-### Example 5: Add Agents from GitHub
-
-```bash
-# Auto-discover agents
-aimgr repo import agent gh:myorg/agents
-
-# Add specific agent
-aimgr repo import agent gh:myorg/agents/code-reviewer.md
-```
-
-### Example 6: Use Git URLs
+### Example 5: Use Git URLs
 
 ```bash
 # HTTPS URL
-aimgr repo import skill https://github.com/myorg/custom-skills.git
+aimgr repo add https://github.com/myorg/custom-skills.git
 
 # SSH URL (if you have keys configured)
-aimgr repo import skill git@github.com:myorg/private-skills.git
+aimgr repo add git@github.com:myorg/private-skills.git
 
 # GitLab or other Git hosting
-aimgr repo import skill https://gitlab.com/mygroup/skills.git
+aimgr repo add https://gitlab.com/mygroup/skills.git
+```
+
+### Example 6: Sync and Update Sources
+
+```bash
+# Add source
+aimgr repo add https://github.com/myorg/skills --name=my-skills
+
+# Later, sync to get latest changes
+aimgr repo sync my-skills
+
+# Update to different version
+aimgr repo sync my-skills --ref=v2.0.0
+```
+
+### Example 7: Remove Sources
+
+```bash
+# Remove source (keeps resources)
+aimgr repo remove my-skills
+
+# Remove and clean up orphaned resources
+aimgr repo remove my-skills --clean-orphans
+
+# Remove by URL
+aimgr repo remove https://github.com/myorg/skills
 ```
 
 ## Centralized Storage
@@ -262,6 +335,7 @@ All resources added from GitHub are stored in your centralized repository:
 
 ```
 ~/.local/share/ai-config/repo/
+├── ai.repo.yaml          # Source tracking manifest
 ├── commands/
 │   └── deploy.md
 ├── skills/
@@ -272,29 +346,53 @@ All resources added from GitHub are stored in your centralized repository:
 ```
 
 This means:
-- Resources are downloaded once, regardless of how many projects use them
-- Updates to a resource in the repo affect all projects (via symlinks)
-- No duplication across projects
+- Resources are downloaded once and stored centrally
+- Sources are tracked in `ai.repo.yaml` for easy syncing
+- GitHub sources use **copy mode** (resources are copied, not symlinked)
+- You can sync sources to pull latest changes from GitHub
+- No duplication across projects when you install resources to project directories
 
 ## Performance Considerations
 
+### Workspace Caching
+
+`aimgr` uses a workspace cache to dramatically improve performance for Git operations:
+
+**First add** (cold cache):
+```bash
+$ aimgr repo add https://github.com/large-org/big-repo
+Cloning repository...  # Takes ~30 seconds for large repos
+Discovering resources...
+✓ Added resources
+```
+
+**Subsequent syncs** (warm cache):
+```bash
+$ aimgr repo sync large-org-big-repo
+Using cached repository...  # Takes <1 second
+Pulling latest changes...
+✓ Synced resources
+```
+
+**Benefits:**
+- First clone is slower (full git clone)
+- Subsequent operations are 10-50x faster (uses cached repository)
+- Cache is stored in `~/.cache/aimgr/workspace/` (XDG cache directory)
+- Safe to delete cache - will re-clone on next sync
+
 ### Shallow Clones
 
-`ai-repo` uses shallow clones (`git clone --depth 1`) for speed:
+For initial clones, `aimgr` uses shallow clones (`git clone --depth 1`) for speed:
 - Only downloads the latest commit
 - Significantly faster for large repositories
 - Sufficient for resource discovery
 
-### Temporary Directories
+### Storage Efficiency
 
-Repositories are cloned to temporary directories and cleaned up automatically:
-- No disk space waste from cloned repos
-- Cleanup happens even if errors occur
-- Temp directory location respects system defaults
-
-### Caching
-
-Currently, `ai-repo` does not cache cloned repositories. Each `add` operation clones fresh. Future versions may add caching.
+- Workspace cache stores cloned repositories for reuse
+- Resources are copied to your repository (not symlinked for GitHub sources)
+- Cache grows with number of unique GitHub sources you add
+- Clear cache with: `rm -rf ~/.cache/aimgr/workspace/`
 
 ## Troubleshooting
 
@@ -348,73 +446,96 @@ git --version
 
 ### Problem: Resource not found after clone
 
-**Error:** `no skills found in repository`
+**Error:** `no resources found in repository`
 
 **Solutions:**
 - Check the repository structure - resources must be in standard locations
-- Use a specific path: `gh:owner/repo/path/to/skill`
+- Use a specific subpath: `aimgr repo add https://github.com/owner/repo/path/to/resources`
 - Verify the resource has valid frontmatter (SKILL.md with name and description)
 - Clone manually and inspect: `git clone https://github.com/owner/repo && ls -R`
 
-### Problem: Multiple resources found
+### Problem: Source already exists
 
-**Error:** `multiple skills found, please specify path`
+**Error:** `source already exists: my-source`
 
 **Solutions:**
-- Add the specific path: `aimgr repo import skill gh:owner/repo/skills/specific-skill`
-- Or select interactively from the prompt
+- Use a different name: `aimgr repo add URL --name=my-source-2`
+- Remove existing source first: `aimgr repo remove my-source`
+- Update existing source: `aimgr repo sync my-source --ref=new-version`
 
 ## Best Practices
 
-### 1. Use Version Tags
+### 1. Use Custom Names for Clarity
+
+Give sources meaningful names for easier management:
+
+```bash
+# Good - clear name
+aimgr repo add https://github.com/myorg/skills --name=company-skills
+
+# Auto-generated name works but less clear
+aimgr repo add https://github.com/myorg/skills  # → "myorg-skills"
+```
+
+### 2. Pin to Version Tags for Stability
 
 For production use, pin to specific versions:
 
 ```bash
 # Good - pinned version
-aimgr repo import skill gh:myorg/skills@v1.2.0
+aimgr repo add https://github.com/myorg/skills#v1.2.0
 
 # Risky - uses latest code
-aimgr repo import skill gh:myorg/skills
+aimgr repo add https://github.com/myorg/skills
 ```
 
-### 2. Specify Paths for Multi-Resource Repos
+### 3. Use Subpaths for Large Repositories
 
-Avoid ambiguity by specifying the exact resource:
+For mono-repos, specify the exact subpath:
 
 ```bash
-# Specific - no prompt needed
-aimgr repo import skill gh:myorg/mono-repo/skills/my-skill
+# Specific - only gets what you need
+aimgr repo add https://github.com/myorg/mono-repo/skills/frontend
 
-# Generic - may prompt for selection
-aimgr repo import skill gh:myorg/mono-repo
+# Generic - may pull unnecessary resources
+aimgr repo add https://github.com/myorg/mono-repo
 ```
 
-### 3. Use Shorthand for Public Repos
+### 4. Track Sources in Version Control
 
-The shorthand syntax is cleaner for GitHub repos:
+Commit your `ai.repo.yaml` to share sources with your team:
 
 ```bash
-# Preferred
-aimgr repo import skill vercel-labs/agent-skills
-
-# Also works, but more verbose
-aimgr repo import skill gh:vercel-labs/agent-skills
+git add ai.repo.yaml
+git commit -m "Add GitHub sources for project resources"
+git push
 ```
 
-### 4. Check Repository Documentation
+Team members can then sync sources:
+
+```bash
+aimgr repo sync  # Syncs all sources in ai.repo.yaml
+```
+
+### 5. Regular Syncing for Updates
+
+Keep resources up-to-date by syncing periodically:
+
+```bash
+# Sync all sources
+aimgr repo sync
+
+# Or sync specific source
+aimgr repo sync company-skills
+```
+
+### 6. Check Repository Documentation
 
 Before adding, check the repository's README for:
 - Resource locations (if not in standard directories)
 - Available resources and their purposes
 - Version compatibility
-
-### 5. Keep Local Copies for Critical Resources
-
-For production-critical resources, consider:
-1. Add from GitHub to your repo
-2. Export to local directory: `cp -r ~/.local/share/ai-config/repo/skills/my-skill ~/backups/`
-3. Re-add from local if needed: `aimgr repo import skill ~/backups/my-skill --force`
+- Recommended version tags
 
 ## Contributing GitHub Sources
 
@@ -497,7 +618,7 @@ git push origin v1.0.0
 Users can then reference specific versions:
 
 ```bash
-aimgr repo import skill gh:yourorg/your-repo@v1.0.0
+aimgr repo add https://github.com/yourorg/your-repo#v1.0.0
 ```
 
 ### Documentation

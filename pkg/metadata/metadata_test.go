@@ -116,7 +116,7 @@ func TestSaveMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := Save(tt.metadata, tt.repoPath)
+			err := Save(tt.metadata, tt.repoPath, "test-source")
 			if (err != nil) != tt.wantError {
 				t.Errorf("Save() error = %v, wantError %v", err, tt.wantError)
 				return
@@ -180,7 +180,7 @@ func TestLoadMetadata(t *testing.T) {
 	}
 
 	// Save it first
-	if err := Save(testMetadata, tmpDir); err != nil {
+	if err := Save(testMetadata, tmpDir, "test-source"); err != nil {
 		t.Fatalf("Failed to save test metadata: %v", err)
 	}
 
@@ -261,7 +261,7 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	}
 
 	// Save
-	if err := Save(original, tmpDir); err != nil {
+	if err := Save(original, tmpDir, "test-source"); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 
@@ -368,7 +368,7 @@ func TestTimestampFormat(t *testing.T) {
 	}
 
 	// Save
-	if err := Save(metadata, tmpDir); err != nil {
+	if err := Save(metadata, tmpDir, "test-source"); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 
@@ -454,7 +454,7 @@ func TestSaveCreatesDirectory(t *testing.T) {
 	}
 
 	// Save should create all necessary directories
-	if err := Save(metadata, nestedRepo); err != nil {
+	if err := Save(metadata, nestedRepo, "test-source"); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 
@@ -462,5 +462,194 @@ func TestSaveCreatesDirectory(t *testing.T) {
 	metadataPath := GetMetadataPath(metadata.Name, metadata.Type, nestedRepo)
 	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
 		t.Errorf("Save() did not create file at %s", metadataPath)
+	}
+}
+
+func TestSourceNameTracking(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	metadata := &ResourceMetadata{
+		Name:           "source-test",
+		Type:           resource.Command,
+		SourceType:     "github",
+		SourceURL:      "gh:owner/repo",
+		FirstInstalled: time.Now().UTC(),
+		LastUpdated:    time.Now().UTC(),
+	}
+
+	// Save with source name
+	sourceName := "my-source"
+	if err := Save(metadata, tmpDir, sourceName); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load and verify source name
+	loaded, err := Load(metadata.Name, metadata.Type, tmpDir)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if loaded.SourceName != sourceName {
+		t.Errorf("SourceName = %v, want %v", loaded.SourceName, sourceName)
+	}
+}
+
+func TestHasSource(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	metadata := &ResourceMetadata{
+		Name:           "source-check-test",
+		Type:           resource.Skill,
+		SourceType:     "local",
+		SourceURL:      "file:///test",
+		FirstInstalled: time.Now().UTC(),
+		LastUpdated:    time.Now().UTC(),
+	}
+
+	sourceName := "test-source"
+	if err := Save(metadata, tmpDir, sourceName); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		resName    string
+		resType    resource.ResourceType
+		sourceName string
+		want       bool
+	}{
+		{
+			name:       "matching source",
+			resName:    "source-check-test",
+			resType:    resource.Skill,
+			sourceName: "test-source",
+			want:       true,
+		},
+		{
+			name:       "different source",
+			resName:    "source-check-test",
+			resType:    resource.Skill,
+			sourceName: "other-source",
+			want:       false,
+		},
+		{
+			name:       "non-existent resource",
+			resName:    "does-not-exist",
+			resType:    resource.Skill,
+			sourceName: "test-source",
+			want:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := HasSource(tt.resName, tt.resType, tt.sourceName, tmpDir)
+			if got != tt.want {
+				t.Errorf("HasSource() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeriveSourceName(t *testing.T) {
+	tests := []struct {
+		name      string
+		sourceURL string
+		want      string
+	}{
+		{
+			name:      "gh prefix",
+			sourceURL: "gh:owner/repo",
+			want:      "owner-repo",
+		},
+		{
+			name:      "gh prefix with path",
+			sourceURL: "gh:owner/repo/path/to/resource",
+			want:      "owner-repo",
+		},
+		{
+			name:      "github https URL",
+			sourceURL: "https://github.com/owner/repo",
+			want:      "owner-repo",
+		},
+		{
+			name:      "github https URL with path",
+			sourceURL: "https://github.com/owner/repo/tree/main/commands",
+			want:      "owner-repo",
+		},
+		{
+			name:      "file URL",
+			sourceURL: "file:///home/user/resources",
+			want:      "resources",
+		},
+		{
+			name:      "file URL nested",
+			sourceURL: "file:///home/user/my-resources",
+			want:      "my-resources",
+		},
+		{
+			name:      "absolute path",
+			sourceURL: "/home/user/resources",
+			want:      "resources",
+		},
+		{
+			name:      "relative path",
+			sourceURL: "./resources",
+			want:      "resources",
+		},
+		{
+			name:      "parent relative path",
+			sourceURL: "../resources",
+			want:      "resources",
+		},
+		{
+			name:      "empty string",
+			sourceURL: "",
+			want:      "unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := DeriveSourceName(tt.sourceURL)
+			if got != tt.want {
+				t.Errorf("DeriveSourceName(%q) = %v, want %v", tt.sourceURL, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBackwardCompatibilityWithLegacyMetadata(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create metadata without source_name (legacy format)
+	legacyMetadata := &ResourceMetadata{
+		Name:           "legacy-test",
+		Type:           resource.Agent,
+		SourceType:     "github",
+		SourceURL:      "gh:owner/repo",
+		FirstInstalled: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+		LastUpdated:    time.Date(2024, 1, 2, 12, 0, 0, 0, time.UTC),
+	}
+
+	// Save without source name (empty string)
+	if err := Save(legacyMetadata, tmpDir, ""); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load should work without error
+	loaded, err := Load(legacyMetadata.Name, legacyMetadata.Type, tmpDir)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// SourceName should be empty for legacy metadata
+	if loaded.SourceName != "" {
+		t.Errorf("SourceName = %v, want empty string for legacy metadata", loaded.SourceName)
+	}
+
+	// HasSource should return false for legacy metadata
+	if HasSource(legacyMetadata.Name, legacyMetadata.Type, "any-source", tmpDir) {
+		t.Error("HasSource() should return false for legacy metadata")
 	}
 }

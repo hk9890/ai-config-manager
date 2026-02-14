@@ -135,7 +135,7 @@ func runAimgrWithEnv(t *testing.T, configPath string, env map[string]string, arg
 //
 // Example:
 //
-//	output, err := runAimgrCombined(t, configPath, "repo", "import", sourcePath)
+//	output, err := runAimgrCombined(t, configPath, "repo", "add", sourcePath)
 func runAimgrCombined(t *testing.T, configPath string, args ...string) (string, error) {
 	t.Helper()
 

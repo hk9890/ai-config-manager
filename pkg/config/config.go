@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
-	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -72,9 +71,6 @@ type Config struct {
 	// Install configuration for default installation targets
 	Install InstallConfig `yaml:"install"`
 
-	// Sync configuration for syncing resources from external sources
-	Sync SyncConfig `yaml:"sync"`
-
 	// Repo configuration for repository settings
 	Repo RepoConfig `yaml:"repo"`
 }
@@ -84,72 +80,6 @@ type InstallConfig struct {
 	// Targets specifies which AI tools to install to by default
 	// Valid values: claude, opencode, copilot
 	Targets []string `yaml:"targets"`
-}
-
-// SyncSource represents a source for syncing resources
-type SyncSource struct {
-	// URL is the source URL (e.g., "https://github.com/owner/repo" or "gh:owner/repo")
-	URL string `yaml:"url,omitempty"`
-	// Path is the local filesystem path (alternative to URL)
-	Path string `yaml:"path,omitempty"`
-	// Filter is an optional glob pattern to filter resources (e.g., "skill/*", "skill/pdf*")
-	Filter string `yaml:"filter,omitempty"`
-}
-
-// SyncConfig holds sync-related configuration
-type SyncConfig struct {
-	// Sources is a list of sources to sync from
-	Sources []SyncSource `yaml:"sources"`
-}
-
-// Validate checks if the SyncSource is valid
-func (s *SyncSource) Validate() error {
-	hasURL := s.URL != ""
-	hasPath := s.Path != ""
-
-	// Check exactly one is set
-	if hasURL && hasPath {
-		return fmt.Errorf("cannot specify both 'url' and 'path'")
-	}
-	if !hasURL && !hasPath {
-		return fmt.Errorf("must specify either 'url' or 'path'")
-	}
-
-	// Validate URL format
-	if hasURL {
-		if !strings.HasPrefix(s.URL, "http://") &&
-			!strings.HasPrefix(s.URL, "https://") &&
-			!strings.HasPrefix(s.URL, "git@") &&
-			!strings.HasPrefix(s.URL, "git://") &&
-			!strings.HasPrefix(s.URL, "gh:") {
-			return fmt.Errorf("url must start with http://, https://, git@, git://, or gh:")
-		}
-	}
-
-	// Validate path format (but don't check if it exists, as it might not exist yet
-	// or might be on a different machine)
-	if hasPath {
-		// Just validate that we can convert it to an absolute path
-		// This checks if the path format is valid
-		if _, err := filepath.Abs(s.Path); err != nil {
-			return fmt.Errorf("invalid path format: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// IsRemote returns true if this source uses a remote URL
-func (s *SyncSource) IsRemote() bool {
-	return s.URL != ""
-}
-
-// GetSourcePath returns the source path for display purposes
-func (s *SyncSource) GetSourcePath() string {
-	if s.URL != "" {
-		return s.URL
-	}
-	return s.Path
 }
 
 // RepoConfig holds repository-related configuration
@@ -335,22 +265,6 @@ func (c *Config) Validate() error {
 	for _, target := range c.Install.Targets {
 		if _, err := tools.ParseTool(target); err != nil {
 			return fmt.Errorf("install.targets: invalid tool '%s': %w", target, err)
-		}
-	}
-
-	// Validate sync sources
-	for i, source := range c.Sync.Sources {
-		// Validate source
-		if err := source.Validate(); err != nil {
-			return fmt.Errorf("sync.sources[%d]: %w", i, err)
-		}
-
-		// Validate filter pattern if present
-		if source.Filter != "" {
-			_, err := pattern.NewMatcher(source.Filter)
-			if err != nil {
-				return fmt.Errorf("sync.sources[%d]: invalid filter pattern '%s': %w", i, source.Filter, err)
-			}
 		}
 	}
 

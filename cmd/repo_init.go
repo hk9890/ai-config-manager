@@ -17,6 +17,7 @@ var repoInitCmd = &cobra.Command{
 This command:
   - Creates the repository directory structure (commands/, skills/, agents/, packages/)
   - Initializes a git repository for tracking changes
+  - Creates ai.repo.yaml manifest for source tracking
   - Creates .gitignore to exclude .workspace/ cache directory
 
 The repository location is determined by (in order of precedence):
@@ -42,7 +43,8 @@ Examples:
 
 		fmt.Printf("✓ Repository initialized at: %s\n", mgr.GetRepoPath())
 		fmt.Println("\n✨ Repository ready for git-tracked operations")
-		fmt.Println("   All aimgr operations (import, sync, remove) will be tracked in git")
+		fmt.Println("   Created ai.repo.yaml manifest for source tracking")
+		fmt.Println("   All aimgr operations (add, sync, remove) will be tracked in git")
 
 		return nil
 	},

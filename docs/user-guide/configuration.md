@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This guide covers all configuration options for `aimgr`, including repository path customization, installation targets, and sync sources.
+This guide covers all configuration options for `aimgr`, including repository path customization and installation targets.
 
 ## Config File Location
 
@@ -14,26 +14,19 @@ The config file is automatically created when you first run commands that need c
 
 ## Config File Format
 
-The config file uses YAML format with three main sections:
+The config file uses YAML format with two main sections:
 
 ```yaml
-# Repository configuration
-repo:
-  path: ~/my-custom-repo
-
 # Installation configuration
 install:
-  targets:
-    - claude
-    - opencode
+  targets: [claude, opencode]
 
-# Sync configuration
-sync:
-  sources:
-    - url: gh:anthropics/skills
-    - url: gh:myorg/resources
-      filter: "skill/*"
+# Repository configuration
+repo:
+  path: ~/.local/share/ai-config/repo
 ```
+
+**Note:** Source management for automatic syncing is configured separately via `ai.repo.yaml` files. See [sync-sources.md](./sync-sources.md) for details.
 
 ---
 
@@ -216,17 +209,14 @@ repo:
 repo:
   path: ${AIMGR_REPO_PATH:-~/.local/share/ai-config/repo}
 
-sync:
-  sources:
-    - url: ${SYNC_REPO:-https://github.com/hk9890/ai-tools}
-      filter: ${RESOURCE_FILTER:-skill/*}
+install:
+  targets: [${DEFAULT_TOOL:-claude}]
 ```
 
 **Multiple variables:**
 ```yaml
-sync:
-  sources:
-    - url: ${PROTOCOL:-https}://${HOST}/owner/repo
+repo:
+  path: ${BASE_PATH:-~/.local}/share/${APP_NAME:-ai-config}/repo
 ```
 
 **Environment-specific configs:**
@@ -244,7 +234,7 @@ repo:
 
 1. Environment variables are expanded **before** YAML parsing
 2. Variable expansion happens in both `Load()` and `LoadGlobal()`
-3. Works in **any config field** (repo.path, sync.sources, etc.)
+3. Works in **any config field** (repo.path, install.targets, etc.)
 4. If variable is unset/empty and no default provided, expands to empty string
 5. Existing validation applies **after** expansion
 
@@ -257,9 +247,8 @@ Different paths per environment without maintaining multiple config files:
 repo:
   path: ${CI_REPO_PATH:-~/.local/share/ai-config/repo}
 
-sync:
-  sources:
-    - url: ${CI_RESOURCE_REPO:-https://github.com/myorg/resources}
+install:
+  targets: [${CI_TOOL:-claude}]
 ```
 
 **Team configurations:**
@@ -269,10 +258,8 @@ Shared config with user-specific overrides:
 repo:
   path: ${USER_REPO_PATH:-~/team-ai-resources}
 
-sync:
-  sources:
-    - url: ${TEAM_RESOURCES:-https://github.com/team/resources}
-      filter: ${USER_FILTER:-*}
+install:
+  targets: [${USER_TOOLS:-claude,opencode}]
 ```
 
 **Testing:**
@@ -289,13 +276,12 @@ unset AIMGR_REPO_PATH
 aimgr list  # Uses default config path
 ```
 
-**Secret management:**
-Reference secrets from environment (for private repositories):
+**Custom paths with variables:**
+Construct paths dynamically:
 
 ```yaml
-sync:
-  sources:
-    - url: https://${GH_TOKEN}@github.com/private/repo
+repo:
+  path: ${HOME}/${PROJECT:-ai-config}/repo
 ```
 
 ---
@@ -316,6 +302,7 @@ install:
 - `claude` - Claude Code (`.claude/` directories)
 - `opencode` - OpenCode (`.opencode/` directories)
 - `copilot` or `vscode` - VSCode / GitHub Copilot (`.github/skills/` directories, skills only)
+- `windsurf` - Windsurf (`.windsurf/skills/` directories, skills only)
 
 **Behavior:**
 - Used when installing to fresh projects (no existing tool directories)
@@ -339,125 +326,7 @@ aimgr config set install.targets claude,opencode
 aimgr config get install.targets
 ```
 
----
 
-## Sync Configuration
-
-Configure sources to automatically sync resources from remote repositories or local directories.
-
-### URL vs Path: Remote vs Local Sources
-
-**Important:** Sources can be either remote (Git repositories) or local (filesystem paths). Use the appropriate field for your source type:
-
-```yaml
-sync:
-  sources:
-    # Remote source (copied from Git)
-    - url: "gh:anthropics/skills"
-    
-    # Local source (symlinked for live editing)  
-    - path: "~/my-custom-skills"
-    
-    # Remote with version and filter
-    - url: "gh:myorg/tools@v1.0.0"
-      filter: "skill/*"
-    
-    # Local with filter
-    - path: "/home/user/dev-resources"
-      filter: "*test*"
-```
-
-**Key differences:**
-
-| Field | Source Type | Behavior | Use Case |
-|-------|-------------|----------|----------|
-| `url` | Remote Git repository | **Copied** to repository | Stable, versioned resources from GitHub/GitLab |
-| `path` | Local filesystem | **Symlinked** to repository | Active development, live editing |
-
-### Remote URL Sources (Copied)
-
-Remote sources use the `url` field and are cloned then copied to your repository:
-
-```yaml
-sync:
-  sources:
-    - url: "gh:anthropics/skills@v2.0.0"
-    - url: "https://github.com/myorg/tools.git"
-      filter: "skill/*"
-```
-
-**Supported formats:**
-- GitHub: `gh:owner/repo` or `owner/repo`
-- Git URLs: `https://github.com/owner/repo.git`
-- Version tags: `gh:owner/repo@v1.0.0`
-- Branches: `gh:owner/repo@main`
-
-**Behavior:**
-- Resources are copied from Git repository to your aimgr repository
-- Changes require running `aimgr repo sync` again
-- Best for stable, versioned, or shared resources
-
-### Local Path Sources (Symlinked)
-
-Local sources use the `path` field and are symlinked for live editing:
-
-```yaml
-sync:
-  sources:
-    - path: "~/my-skills"
-    - path: "/home/user/dev-resources"
-      filter: "skill/experimental-*"
-```
-
-**Supported formats:**
-- Home directory: `~/path/to/resources`
-- Absolute paths: `/absolute/path/to/resources`
-- Relative paths: `./resources` (resolved from current directory)
-
-**Behavior:**
-- Resources are symlinked from source directory to your aimgr repository
-- Changes to source files are immediately reflected (no re-sync needed)
-- Best for active development and experimentation
-
-### Filter Patterns
-
-Both remote and local sources support optional filters:
-
-```yaml
-sync:
-  sources:
-    - url: "gh:myorg/all-resources"
-      filter: "skill/*"           # Only skills
-    
-    - path: "~/dev/resources"
-      filter: "command/*test*"    # Commands with "test" in name
-```
-
-**Common patterns:**
-- `"skill/*"` - Only skills
-- `"command/*"` - Only commands
-- `"agent/*"` - Only agents
-- `"*test*"` - Resources with "test" in name
-- `"skill/pdf*"` - Skills starting with "pdf"
-
-See [pattern-matching.md](./pattern-matching.md) for complete syntax.
-
-### Running Sync
-
-Once configured, sync all sources with one command:
-
-```bash
-# Sync all configured sources (overwrites existing)
-aimgr repo sync
-
-# Sync without overwriting existing resources
-aimgr repo sync --skip-existing
-
-# Preview what would be synced
-aimgr repo sync --dry-run
-```
-
-For comprehensive details on sync behavior, symlinks, troubleshooting, and migration, see **[sync-sources.md](./sync-sources.md)**.
 
 ---
 
@@ -468,37 +337,16 @@ Here's a complete example config file with all options:
 ```yaml
 # ~/.config/aimgr/aimgr.yaml
 
-# Repository location (optional)
-# If not specified, uses: ~/.local/share/ai-config/repo
-repo:
-  path: ~/ai-resources
-
 # Default installation targets (required)
 install:
   targets:
     - claude
     - opencode
 
-# Sync sources (optional)
-sync:
-  sources:
-    # Remote: Public repositories (copied)
-    - url: gh:anthropics/skills
-
-    # Remote: Organization resources with filter (copied)
-    - url: gh:myorg/company-resources@v2.1.0
-      filter: "skill/*"
-
-    # Remote: Direct Git URL (copied)
-    - url: https://github.com/community/awesome-tools.git
-
-    # Local: Development directory (symlinked for live editing)
-    - path: ~/dev/custom-tools
-      filter: "*test*"
-    
-    # Local: Team shared resources (symlinked)
-    - path: /mnt/shared/team-resources
-      filter: "skill/*"
+# Repository location (optional)
+# If not specified, uses: ~/.local/share/ai-config/repo
+repo:
+  path: ~/ai-resources
 ```
 
 ---
@@ -541,28 +389,18 @@ aimgr repo import gh:myorg/resources
 aimgr install skill/linter
 ```
 
-### Example 4: Multi-Source Sync
+### Example 4: Multi-Tool Configuration
 
 ```yaml
-# Automatically sync from multiple sources
-repo:
-  path: ~/ai-resources
-
+# Support multiple AI tools
 install:
   targets:
     - claude
+    - opencode
+    - copilot
 
-sync:
-  sources:
-    # Remote: Base skills from Anthropic (copied, stable)
-    - url: gh:anthropics/skills@v2.0.0
-
-    # Remote: Company internal tools (copied, versioned)
-    - url: gh:mycompany/internal-tools@stable
-      filter: "skill/*"
-
-    # Local: Personal custom tools (symlinked for live editing)
-    - path: ~/personal/custom-tools
+repo:
+  path: ~/ai-resources
 ```
 
 ### Example 5: Testing Environment
@@ -758,7 +596,7 @@ rm ~/.ai-repo.yaml
 ## See Also
 
 - [README.md](../../README.md) - Quick start and overview
-- [sync-sources.md](./sync-sources.md) - Comprehensive sync sources guide (URL vs path, symlinks, troubleshooting)
+- [sync-sources.md](./sync-sources.md) - Source management via ai.repo.yaml files
 - [workspace-caching.md](./workspace-caching.md) - Git repository caching
 - [output-formats.md](./output-formats.md) - CLI output formats
 - [pattern-matching.md](./pattern-matching.md) - Pattern syntax for filtering

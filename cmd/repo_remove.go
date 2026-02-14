@@ -1,0 +1,197 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
+)
+
+var (
+	removeDryRunFlag        bool
+	removeKeepResourcesFlag bool
+)
+
+// repoDropSourceCmd represents the drop-source command
+var repoDropSourceCmd = &cobra.Command{
+	Use:   "drop-source <name|path|url>",
+	Short: "Remove a source from the repository manifest",
+	Long: `Remove a source from the repository manifest (ai.repo.yaml) and clean up orphaned resources.
+
+This command removes a source entry from ai.repo.yaml and by default also removes
+any resources that came from that source (orphan cleanup).
+
+Matching Priority:
+  Sources are matched by name first, then by path, then by URL.
+
+Orphan Cleanup:
+  By default, resources that came from the removed source are deleted (orphans).
+  Use --keep-resources to preserve resources while removing the source entry.
+
+Examples:
+  # Remove source by name
+  aimgr repo drop-source my-source
+
+  # Remove source by path
+  aimgr repo drop-source ~/my-resources/
+
+  # Remove source by URL
+  aimgr repo drop-source https://github.com/owner/repo
+
+  # Preview what would be removed
+  aimgr repo drop-source my-source --dry-run
+
+  # Remove source but keep resources
+  aimgr repo drop-source my-source --keep-resources`,
+	Args: cobra.ExactArgs(1),
+	RunE: runRemove,
+}
+
+func runRemove(cmd *cobra.Command, args []string) error {
+	nameOrPathOrURL := args[0]
+
+	mgr, err := repo.NewManager()
+	if err != nil {
+		return err
+	}
+
+	return performRemove(mgr, nameOrPathOrURL, removeDryRunFlag, removeKeepResourcesFlag)
+}
+
+// performRemove removes a source from the manifest and optionally cleans up orphaned resources
+func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepResources bool) error {
+	repoPath := mgr.GetRepoPath()
+
+	// Load manifest
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to load manifest: %w", err)
+	}
+
+	// Find source by name, path, or URL
+	source, found := manifest.GetSource(nameOrPathOrURL)
+	if !found {
+		return fmt.Errorf("source not found: %s\n\nAvailable sources:\n%s",
+			nameOrPathOrURL, formatSourcesList(manifest))
+	}
+
+	// Find orphaned resources (resources from this source)
+	orphanedResources := []resource.Resource{}
+	if !keepResources {
+		resources, err := mgr.List(nil)
+		if err != nil {
+			return fmt.Errorf("failed to list resources: %w", err)
+		}
+
+		for _, res := range resources {
+			// Check if resource came from this source
+			if metadata.HasSource(res.Name, res.Type, source.Name, repoPath) {
+				orphanedResources = append(orphanedResources, res)
+			}
+		}
+	}
+
+	// Dry run mode: show what would be removed
+	if dryRun {
+		fmt.Printf("Would remove source: %s\n", source.Name)
+		fmt.Printf("  Type: %s\n", getSourceType(source))
+		fmt.Printf("  Location: %s\n", getSourceLocation(source))
+
+		if keepResources {
+			fmt.Println("\nResources would be kept (--keep-resources)")
+		} else if len(orphanedResources) > 0 {
+			fmt.Printf("\nWould remove %d orphaned resource(s):\n", len(orphanedResources))
+			for _, res := range orphanedResources {
+				fmt.Printf("  - %s/%s\n", res.Type, res.Name)
+			}
+		} else {
+			fmt.Println("\nNo orphaned resources found")
+		}
+
+		return nil
+	}
+
+	// Remove source from manifest
+	_, err = manifest.RemoveSource(nameOrPathOrURL)
+	if err != nil {
+		return fmt.Errorf("failed to remove source: %w", err)
+	}
+
+	// Save manifest
+	if err := manifest.Save(repoPath); err != nil {
+		return fmt.Errorf("failed to save manifest: %w", err)
+	}
+
+	fmt.Printf("✓ Removed source: %s\n", source.Name)
+
+	// Remove orphaned resources unless --keep-resources is specified
+	if !keepResources {
+		if len(orphanedResources) > 0 {
+			removeCount := 0
+			for _, res := range orphanedResources {
+				if err := mgr.Remove(res.Name, res.Type); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to remove %s/%s: %v\n",
+						res.Type, res.Name, err)
+				} else {
+					removeCount++
+				}
+			}
+			fmt.Printf("✓ Removed %d orphaned resource(s)\n", removeCount)
+		} else {
+			fmt.Println("  No orphaned resources found")
+		}
+	} else {
+		fmt.Println("  Resources kept (--keep-resources)")
+	}
+
+	return nil
+}
+
+// getSourceType returns a human-readable source type
+func getSourceType(source *repomanifest.Source) string {
+	if source.URL != "" {
+		return "remote"
+	}
+	return "local"
+}
+
+// getSourceLocation returns the path or URL of the source
+func getSourceLocation(source *repomanifest.Source) string {
+	if source.URL != "" {
+		location := source.URL
+		if source.Ref != "" {
+			location += "@" + source.Ref
+		}
+		if source.Subpath != "" {
+			location += " (subpath: " + source.Subpath + ")"
+		}
+		return location
+	}
+	return source.Path
+}
+
+// formatSourcesList formats the list of available sources for error messages
+func formatSourcesList(manifest *repomanifest.Manifest) string {
+	if len(manifest.Sources) == 0 {
+		return "  (no sources configured)"
+	}
+
+	var lines []string
+	for _, source := range manifest.Sources {
+		location := getSourceLocation(source)
+		lines = append(lines, fmt.Sprintf("  - %s (%s)", source.Name, location))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func init() {
+	repoCmd.AddCommand(repoDropSourceCmd)
+	repoDropSourceCmd.Flags().BoolVar(&removeDryRunFlag, "dry-run", false, "Show what would be removed without actually removing")
+	repoDropSourceCmd.Flags().BoolVar(&removeKeepResourcesFlag, "keep-resources", false, "Remove source from manifest but keep resources")
+}

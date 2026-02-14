@@ -6,12 +6,13 @@ This directory contains user-facing documentation for **aimgr** (ai-config-manag
 
 The user guide provides comprehensive documentation for:
 - **Resource Management**: Understanding and working with commands, skills, agents, and packages
-- **Configuration**: Customizing repository paths, installation targets, and sync sources
-- **Sync Sources**: Remote URLs (copied) vs local paths (symlinked) for development workflows
+- **Source Management**: Tracking sources in `ai.repo.yaml` for automatic synchronization
+- **Configuration**: Customizing repository paths and installation targets
 - **Pattern Matching**: Using patterns to filter and select resources
 - **Output Formats**: Controlling CLI output for scripting and automation
 - **GitHub Integration**: Working with GitHub repositories as resource sources
 - **Performance Optimization**: Leveraging workspace caching for efficient Git operations
+- **Resource Validation**: Testing resources before publishing
 
 ## Documentation Index
 
@@ -21,13 +22,14 @@ The user guide provides comprehensive documentation for:
 **Key Topics:**
 - Installation on Linux, macOS, and Windows
 - Configuring your AI tool targets
-- Adding your first resources
-- Common operations (install, uninstall, list)
+- Adding sources with `repo add` (tracks in `ai.repo.yaml`)
+- Installing resources into projects
+- Common operations (install, uninstall, list, sync)
 - Practical workflows and examples
 - Troubleshooting tips
 
 ### [Configuration](configuration.md)
-Complete guide to configuring aimgr, including repository path customization, installation targets, and sync sources.
+Complete guide to configuring aimgr, including repository path customization and installation targets.
 
 **Key Topics:**
 - Config file location (`~/.config/aimgr/aimgr.yaml`)
@@ -35,18 +37,20 @@ Complete guide to configuring aimgr, including repository path customization, in
 - Precedence rules (ENV > config > XDG default)
 - Path expansion (tilde, relative, absolute)
 - Installation targets configuration
-- Sync sources (URL vs path overview)
 - Complete examples and troubleshooting
 
+**Note:** Source management is configured in `ai.repo.yaml` (see [Sync Sources](sync-sources.md)).
+
 ### [Sync Sources](sync-sources.md)
-Comprehensive guide to sync sources, explaining remote URLs vs local paths, symlink behavior, and development workflows.
+Comprehensive guide to source management using `ai.repo.yaml`, explaining remote URLs vs local paths, symlink behavior, and development workflows.
 
 **Key Topics:**
-- URL vs path configuration (remote vs local)
-- Remote sources: Git repositories (copied)
-- Local sources: Filesystem paths (symlinked for live editing)
+- `ai.repo.yaml` manifest format and structure
+- Adding sources with `repo add` command
+- Remote sources: Git repositories (copied, mode=copy)
+- Local sources: Filesystem paths (symlinked, mode=symlink)
+- Syncing resources with `repo sync`
 - Development workflows and best practices
-- Migration from old config format
 - Troubleshooting broken symlinks and permission issues
 
 ### [Pattern Matching](pattern-matching.md)
@@ -99,6 +103,26 @@ Understanding workspace caching for Git repositories, which dramatically improve
 - Cache pruning and maintenance
 - Troubleshooting cache issues
 
+### [Validating Resources](validating-resources.md)
+Guide for resource developers on validating skills, agents, commands, and packages before publishing them.
+
+**Key Topics:**
+- Quick validation workflow using `--dry-run`
+- Validating skills, agents, commands, and packages
+- Testing installation locally
+- Common validation errors and fixes
+- CI/CD integration for automated testing
+
+### [Resource Developer Guide](developer-guide.md)
+Developer guide for creating and testing AI resources (skills, agents, commands, packages) that work with aimgr.
+
+**Key Topics:**
+- Resource validation methods
+- Local testing workflows
+- Common validation errors and solutions
+- Best practices for resource development
+- Publishing resources to repositories
+
 ### [Git-Backed Repository Tracking](git-tracking.md)
 Learn how to enable git-based tracking of your AI resource repository for full auditability, change history, and recoverability.
 
@@ -121,15 +145,15 @@ Quick start:
    make install
    ```
 
-2. **Configure your AI tool**: Set your installation targets
+2. **Initialize repository**: Create `ai.repo.yaml` manifest
    ```bash
-   aimgr config set install.targets claude
+   aimgr repo init
    ```
 
-3. **Import resources**: Add resources from a directory or GitHub
+3. **Add sources**: Track sources in `ai.repo.yaml`
    ```bash
-   aimgr repo import ~/.claude
-   aimgr repo import gh:owner/repo
+   aimgr repo add gh:hk9890/ai-tools
+   aimgr repo add ~/my-local-resources
    ```
 
 4. **Install resources**: Install resources to your projects
@@ -142,9 +166,11 @@ Quick start:
 
 | Command | Description |
 |---------|-------------|
-| `aimgr repo import <source>` | Import resources from directory or GitHub |
+| `aimgr repo init` | Initialize repository and create `ai.repo.yaml` |
+| `aimgr repo add <source>` | Add source to `ai.repo.yaml` (imports resources) |
+| `aimgr repo sync` | Sync all sources from `ai.repo.yaml` |
+| `aimgr repo info` | View sources and repository status |
 | `aimgr repo list` | List all resources in repository |
-| `aimgr repo sync <source>` | Sync and update resources from source |
 | `aimgr list [tool]` | List installed resources for a tool |
 | `aimgr install <pattern>` | Install resources matching pattern |
 | `aimgr uninstall <pattern>` | Uninstall resources matching pattern |

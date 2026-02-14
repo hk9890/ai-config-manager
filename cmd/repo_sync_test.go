@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
-	"github.com/hk9890/ai-config-manager/pkg/config"
+	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
-	"gopkg.in/yaml.v3"
 )
 
 // Test helper: create a minimal test source directory with resources
@@ -85,6 +85,69 @@ func createTestSource(t *testing.T) string {
 	return sourceDir
 }
 
+// setupTestManifest creates a test repository with ai.repo.yaml
+// Returns the repo path for verification and a cleanup function
+func setupTestManifest(t *testing.T, sources []*repomanifest.Source) (string, func()) {
+	t.Helper()
+
+	// Create temp directory for repo
+	repoPath := t.TempDir()
+
+	// Create manifest
+	manifest := &repomanifest.Manifest{
+		Version: 1,
+		Sources: sources,
+	}
+
+	// Save manifest to repo
+	if err := manifest.Save(repoPath); err != nil {
+		t.Fatalf("failed to save test manifest: %v", err)
+	}
+
+	// Use AIMGR_REPO_PATH to override repo location
+	// This is the highest priority override in repo.NewManager()
+	originalRepoPath := os.Getenv("AIMGR_REPO_PATH")
+	os.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	cleanup := func() {
+		if originalRepoPath != "" {
+			os.Setenv("AIMGR_REPO_PATH", originalRepoPath)
+		} else {
+			os.Unsetenv("AIMGR_REPO_PATH")
+		}
+	}
+
+	return repoPath, cleanup
+}
+
+// verifySourceSynced checks that a source was successfully synced
+// Verifies that last_synced timestamp was updated
+func verifySourceSynced(t *testing.T, repoPath string, sourceName string) {
+	t.Helper()
+
+	// Load manifest
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+
+	// Find source
+	source, found := manifest.GetSource(sourceName)
+	if !found {
+		t.Fatalf("source %s not found in manifest", sourceName)
+	}
+
+	// Verify last_synced was updated
+	if source.LastSynced.IsZero() {
+		t.Errorf("source %s last_synced timestamp not updated", sourceName)
+	}
+
+	// Verify timestamp is recent (within last minute)
+	if time.Since(source.LastSynced) > time.Minute {
+		t.Errorf("source %s last_synced timestamp is too old: %v", sourceName, source.LastSynced)
+	}
+}
+
 // Test helper: verify resources exist in repo
 func verifyResourcesInRepo(t *testing.T, repoPath string, resourceType resource.ResourceType, names ...string) {
 	t.Helper()
@@ -127,109 +190,24 @@ func verifyResourcesNotInRepo(t *testing.T, repoPath string, resourceType resour
 	}
 }
 
-// setupTestConfig temporarily replaces the user's config for testing
-// Returns a cleanup function that must be called with defer
-func setupTestConfig(t *testing.T, cfg *config.Config) (repoPath string, cleanup func()) {
-	t.Helper()
-
-	// Get actual config path that LoadGlobal will use
-	realConfigPath, err := config.GetConfigPath()
-	if err != nil {
-		t.Fatalf("failed to get config path: %v", err)
-	}
-
-	// Backup existing config if it exists
-	var backupContent []byte
-	var hadConfig bool
-	if data, err := os.ReadFile(realConfigPath); err == nil {
-		backupContent = data
-		hadConfig = true
-	}
-
-	// Write test config
-	if err := os.MkdirAll(filepath.Dir(realConfigPath), 0755); err != nil {
-		t.Fatalf("failed to create config dir: %v", err)
-	}
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		t.Fatalf("failed to marshal config: %v", err)
-	}
-	if err := os.WriteFile(realConfigPath, data, 0644); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
-	}
-
-	// Get the actual repo path that repo.NewManager() will use
-	// Since we can't override xdg.DataHome after package init, we need to use the real one
-	// and clean it up after the test
-	home := os.Getenv("HOME")
-	if home == "" {
-		var err error
-		home, err = os.UserHomeDir()
-		if err != nil {
-			t.Fatalf("failed to get home dir: %v", err)
-		}
-	}
-
-	// The real path will be ~/.local/share/ai-config/repo (or XDG_DATA_HOME/ai-config/repo)
-	dataHome := os.Getenv("XDG_DATA_HOME")
-	if dataHome == "" {
-		dataHome = filepath.Join(home, ".local", "share")
-	}
-	repoPath = filepath.Join(dataHome, "ai-config", "repo")
-
-	// Backup existing repo contents if they exist
-	var repoBackup string
-	if _, err := os.Stat(repoPath); err == nil {
-		repoBackup = repoPath + ".test-backup"
-		if err := os.Rename(repoPath, repoBackup); err != nil {
-			t.Fatalf("failed to backup repo: %v", err)
-		}
-	}
-
-	// Create fresh repo directory
-	if err := os.MkdirAll(repoPath, 0755); err != nil {
-		t.Fatalf("failed to create repo dir: %v", err)
-	}
-
-	cleanup = func() {
-		// Clean up test repo
-		os.RemoveAll(repoPath)
-
-		// Restore backed up repo if it existed
-		if repoBackup != "" {
-			os.Rename(repoBackup, repoPath)
-		}
-
-		// Restore original config
-		if hadConfig {
-			os.WriteFile(realConfigPath, backupContent, 0644)
-		} else {
-			os.Remove(realConfigPath)
-		}
-	}
-
-	return repoPath, cleanup
-}
-
 // TestRunSync_SingleSource tests syncing from a single local source
 func TestRunSync_SingleSource(t *testing.T) {
 	source1 := createTestSource(t)
 
-	// Create test config with one source
-	cfg := &config.Config{
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: source1},
-			},
+	// Create manifest with one source
+	sources := []*repomanifest.Source{
+		{
+			Name:  "test-source-1",
+			Path:  source1,
+			Mode:  "symlink",
+			Added: time.Now(),
 		},
 	}
-
-	repoPath, cleanup := setupTestConfig(t, cfg)
+	repoPath, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
 
-	// Run sync command directly
+	// Run sync command
 	err := runSync(syncCmd, []string{})
-
 	if err != nil {
 		t.Fatalf("sync command failed: %v", err)
 	}
@@ -238,29 +216,36 @@ func TestRunSync_SingleSource(t *testing.T) {
 	verifyResourcesInRepo(t, repoPath, resource.Command, "sync-test-cmd", "test-command", "pdf-command")
 	verifyResourcesInRepo(t, repoPath, resource.Skill, "sync-test-skill", "pdf-processing", "image-processing")
 	verifyResourcesInRepo(t, repoPath, resource.Agent, "sync-test-agent", "code-reviewer")
+
+	// Verify source was marked as synced
+	verifySourceSynced(t, repoPath, "test-source-1")
 }
 
 // TestRunSync_MultipleSources tests syncing from multiple sources
 func TestRunSync_MultipleSources(t *testing.T) {
 	source1 := createTestSource(t)
-	source2 := createTestSource(t) // Create a second source
+	source2 := createTestSource(t)
 
-	// Create test config with multiple sources
-	cfg := &config.Config{
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: source1},
-				{URL: source2},
-			},
+	// Create manifest with multiple sources
+	sources := []*repomanifest.Source{
+		{
+			Name:  "test-source-1",
+			Path:  source1,
+			Mode:  "symlink",
+			Added: time.Now(),
+		},
+		{
+			Name:  "test-source-2",
+			Path:  source2,
+			Mode:  "copy",
+			Added: time.Now(),
 		},
 	}
-
-	repoPath, cleanup := setupTestConfig(t, cfg)
+	repoPath, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
 
-	// Run sync command directly
+	// Run sync command
 	err := runSync(syncCmd, []string{})
-
 	if err != nil {
 		t.Fatalf("sync command failed: %v", err)
 	}
@@ -269,132 +254,26 @@ func TestRunSync_MultipleSources(t *testing.T) {
 	verifyResourcesInRepo(t, repoPath, resource.Command, "sync-test-cmd", "test-command", "pdf-command")
 	verifyResourcesInRepo(t, repoPath, resource.Skill, "sync-test-skill", "pdf-processing", "image-processing")
 	verifyResourcesInRepo(t, repoPath, resource.Agent, "sync-test-agent", "code-reviewer")
-}
 
-// TestRunSync_WithFilter tests syncing with per-source filters
-func TestRunSync_WithFilter(t *testing.T) {
-	tests := []struct {
-		name               string
-		filter             string
-		expectedCommands   []string
-		expectedSkills     []string
-		expectedAgents     []string
-		unexpectedCommands []string
-		unexpectedSkills   []string
-		unexpectedAgents   []string
-	}{
-		{
-			name:             "filter skills only",
-			filter:           "skill/*",
-			expectedCommands: []string{},
-			expectedSkills:   []string{"sync-test-skill", "pdf-processing", "image-processing"},
-			expectedAgents:   []string{},
-			// These should NOT be imported
-			unexpectedCommands: []string{"sync-test-cmd", "test-command"},
-			unexpectedAgents:   []string{"sync-test-agent"},
-		},
-		{
-			name:             "filter commands only",
-			filter:           "command/*",
-			expectedCommands: []string{"sync-test-cmd", "test-command", "pdf-command"},
-			expectedSkills:   []string{},
-			expectedAgents:   []string{},
-			unexpectedSkills: []string{"sync-test-skill"},
-			unexpectedAgents: []string{"sync-test-agent"},
-		},
-		{
-			name:               "filter agents only",
-			filter:             "agent/*",
-			expectedCommands:   []string{},
-			expectedSkills:     []string{},
-			expectedAgents:     []string{"sync-test-agent", "code-reviewer"},
-			unexpectedCommands: []string{"sync-test-cmd"},
-			unexpectedSkills:   []string{"sync-test-skill"},
-		},
-		{
-			name:               "filter by name pattern - pdf",
-			filter:             "*pdf*",
-			expectedCommands:   []string{"pdf-command"},
-			expectedSkills:     []string{"pdf-processing"},
-			expectedAgents:     []string{},
-			unexpectedCommands: []string{"sync-test-cmd", "test-command"},
-			unexpectedSkills:   []string{"sync-test-skill", "image-processing"},
-			unexpectedAgents:   []string{"sync-test-agent", "code-reviewer"},
-		},
-		{
-			name:               "filter by type and pattern",
-			filter:             "skill/pdf*",
-			expectedCommands:   []string{},
-			expectedSkills:     []string{"pdf-processing"},
-			expectedAgents:     []string{},
-			unexpectedCommands: []string{"pdf-command"},
-			unexpectedSkills:   []string{"sync-test-skill", "image-processing"},
-			unexpectedAgents:   []string{"sync-test-agent"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			source1 := createTestSource(t)
-
-			// Create test config with filter
-			cfg := &config.Config{
-				Sync: config.SyncConfig{
-					Sources: []config.SyncSource{
-						{URL: source1, Filter: tt.filter},
-					},
-				},
-			}
-
-			repoPath, cleanup := setupTestConfig(t, cfg)
-			defer cleanup()
-
-			// Run sync command directly
-			err := runSync(syncCmd, []string{})
-
-			if err != nil {
-				t.Fatalf("sync command failed: %v", err)
-			}
-
-			// Verify expected resources were imported
-			if len(tt.expectedCommands) > 0 {
-				verifyResourcesInRepo(t, repoPath, resource.Command, tt.expectedCommands...)
-			}
-			if len(tt.expectedSkills) > 0 {
-				verifyResourcesInRepo(t, repoPath, resource.Skill, tt.expectedSkills...)
-			}
-			if len(tt.expectedAgents) > 0 {
-				verifyResourcesInRepo(t, repoPath, resource.Agent, tt.expectedAgents...)
-			}
-
-			// Verify unexpected resources were NOT imported
-			if len(tt.unexpectedCommands) > 0 {
-				verifyResourcesNotInRepo(t, repoPath, resource.Command, tt.unexpectedCommands...)
-			}
-			if len(tt.unexpectedSkills) > 0 {
-				verifyResourcesNotInRepo(t, repoPath, resource.Skill, tt.unexpectedSkills...)
-			}
-			if len(tt.unexpectedAgents) > 0 {
-				verifyResourcesNotInRepo(t, repoPath, resource.Agent, tt.unexpectedAgents...)
-			}
-		})
-	}
+	// Verify both sources were marked as synced
+	verifySourceSynced(t, repoPath, "test-source-1")
+	verifySourceSynced(t, repoPath, "test-source-2")
 }
 
 // TestRunSync_DryRun tests that --dry-run doesn't actually import
 func TestRunSync_DryRun(t *testing.T) {
 	source1 := createTestSource(t)
 
-	// Create test config
-	cfg := &config.Config{
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: source1},
-			},
+	// Create manifest
+	sources := []*repomanifest.Source{
+		{
+			Name:  "test-source-1",
+			Path:  source1,
+			Mode:  "symlink",
+			Added: time.Now(),
 		},
 	}
-
-	repoPath, cleanup := setupTestConfig(t, cfg)
+	repoPath, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
 
 	// Run sync command with --dry-run
@@ -410,22 +289,35 @@ func TestRunSync_DryRun(t *testing.T) {
 	verifyResourcesNotInRepo(t, repoPath, resource.Command, "sync-test-cmd", "test-command", "pdf-command")
 	verifyResourcesNotInRepo(t, repoPath, resource.Skill, "sync-test-skill", "pdf-processing", "image-processing")
 	verifyResourcesNotInRepo(t, repoPath, resource.Agent, "sync-test-agent", "code-reviewer")
+
+	// Verify last_synced was NOT updated (dry run)
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+	source, found := manifest.GetSource("test-source-1")
+	if !found {
+		t.Fatalf("source not found")
+	}
+	if !source.LastSynced.IsZero() {
+		t.Errorf("dry run should not update last_synced timestamp")
+	}
 }
 
 // TestRunSync_SkipExisting tests that --skip-existing doesn't overwrite
 func TestRunSync_SkipExisting(t *testing.T) {
 	source1 := createTestSource(t)
 
-	// Create test config
-	cfg := &config.Config{
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: source1},
-			},
+	// Create manifest
+	sources := []*repomanifest.Source{
+		{
+			Name:  "test-source-1",
+			Path:  source1,
+			Mode:  "symlink",
+			Added: time.Now(),
 		},
 	}
-
-	repoPath, cleanup := setupTestConfig(t, cfg)
+	repoPath, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
 
 	// Pre-populate repo with one resource (modified version)
@@ -472,22 +364,25 @@ func TestRunSync_SkipExisting(t *testing.T) {
 	verifyResourcesInRepo(t, repoPath, resource.Command, "test-command", "pdf-command")
 	verifyResourcesInRepo(t, repoPath, resource.Skill, "sync-test-skill", "pdf-processing", "image-processing")
 	verifyResourcesInRepo(t, repoPath, resource.Agent, "sync-test-agent", "code-reviewer")
+
+	// Verify source was marked as synced
+	verifySourceSynced(t, repoPath, "test-source-1")
 }
 
 // TestRunSync_DefaultForce tests that by default, existing resources are overwritten
 func TestRunSync_DefaultForce(t *testing.T) {
 	source1 := createTestSource(t)
 
-	// Create test config
-	cfg := &config.Config{
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: source1},
-			},
+	// Create manifest
+	sources := []*repomanifest.Source{
+		{
+			Name:  "test-source-1",
+			Path:  source1,
+			Mode:  "symlink",
+			Added: time.Now(),
 		},
 	}
-
-	repoPath, cleanup := setupTestConfig(t, cfg)
+	repoPath, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
 
 	// Pre-populate repo with one resource (modified version)
@@ -537,21 +432,19 @@ func TestRunSync_DefaultForce(t *testing.T) {
 	verifyResourcesInRepo(t, repoPath, resource.Command, "sync-test-cmd", "test-command", "pdf-command")
 	verifyResourcesInRepo(t, repoPath, resource.Skill, "sync-test-skill", "pdf-processing", "image-processing")
 	verifyResourcesInRepo(t, repoPath, resource.Agent, "sync-test-agent", "code-reviewer")
+
+	// Verify source was marked as synced
+	verifySourceSynced(t, repoPath, "test-source-1")
 }
 
 // TestRunSync_NoSources tests error when no sources configured
 func TestRunSync_NoSources(t *testing.T) {
-	// Create test config with NO sources
-	cfg := &config.Config{
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{},
-		},
-	}
-
-	_, cleanup := setupTestConfig(t, cfg)
+	// Create manifest with NO sources
+	sources := []*repomanifest.Source{}
+	_, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
 
-	// Run sync command directly
+	// Run sync command
 	err := runSync(syncCmd, []string{})
 
 	// Should return error
@@ -568,19 +461,19 @@ func TestRunSync_NoSources(t *testing.T) {
 
 // TestRunSync_InvalidSource tests error handling for invalid sources
 func TestRunSync_InvalidSource(t *testing.T) {
-	// Create test config with invalid source (non-existent path)
-	cfg := &config.Config{
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: "/nonexistent/path/that/does/not/exist"},
-			},
+	// Create manifest with invalid source (non-existent path)
+	sources := []*repomanifest.Source{
+		{
+			Name:  "invalid-source",
+			Path:  "/nonexistent/path/that/does/not/exist",
+			Mode:  "symlink",
+			Added: time.Now(),
 		},
 	}
-
-	_, cleanup := setupTestConfig(t, cfg)
+	_, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
 
-	// Run sync command directly
+	// Run sync command
 	err := runSync(syncCmd, []string{})
 
 	// Should return error since all sources failed
@@ -598,20 +491,25 @@ func TestRunSync_InvalidSource(t *testing.T) {
 func TestRunSync_MixedValidInvalidSources(t *testing.T) {
 	validSource := createTestSource(t)
 
-	// Create test config with one valid and one invalid source
-	cfg := &config.Config{
-		Sync: config.SyncConfig{
-			Sources: []config.SyncSource{
-				{URL: validSource},         // Valid
-				{URL: "/nonexistent/path"}, // Invalid
-			},
+	// Create manifest with one valid and one invalid source
+	sources := []*repomanifest.Source{
+		{
+			Name:  "valid-source",
+			Path:  validSource,
+			Mode:  "symlink",
+			Added: time.Now(),
+		},
+		{
+			Name:  "invalid-source",
+			Path:  "/nonexistent/path",
+			Mode:  "symlink",
+			Added: time.Now(),
 		},
 	}
-
-	repoPath, cleanup := setupTestConfig(t, cfg)
+	repoPath, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
 
-	// Run sync command directly
+	// Run sync command
 	err := runSync(syncCmd, []string{})
 
 	// Should succeed since at least one source worked
@@ -623,4 +521,133 @@ func TestRunSync_MixedValidInvalidSources(t *testing.T) {
 	verifyResourcesInRepo(t, repoPath, resource.Command, "sync-test-cmd", "test-command", "pdf-command")
 	verifyResourcesInRepo(t, repoPath, resource.Skill, "sync-test-skill", "pdf-processing", "image-processing")
 	verifyResourcesInRepo(t, repoPath, resource.Agent, "sync-test-agent", "code-reviewer")
+
+	// Verify valid source was marked as synced
+	verifySourceSynced(t, repoPath, "valid-source")
+
+	// Verify invalid source was NOT marked as synced
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+	invalidSource, found := manifest.GetSource("invalid-source")
+	if !found {
+		t.Fatalf("invalid-source not found in manifest")
+	}
+	if !invalidSource.LastSynced.IsZero() {
+		t.Errorf("invalid source should not have last_synced timestamp updated")
+	}
+}
+
+// TestRunSync_UpdatesLastSynced tests that last_synced timestamps are updated
+func TestRunSync_UpdatesLastSynced(t *testing.T) {
+	source1 := createTestSource(t)
+
+	// Create manifest with old last_synced timestamp
+	oldTimestamp := time.Now().Add(-24 * time.Hour)
+	sources := []*repomanifest.Source{
+		{
+			Name:       "test-source-1",
+			Path:       source1,
+			Mode:       "symlink",
+			Added:      time.Now().Add(-48 * time.Hour),
+			LastSynced: oldTimestamp,
+		},
+	}
+	repoPath, cleanup := setupTestManifest(t, sources)
+	defer cleanup()
+
+	// Run sync command
+	err := runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("sync command failed: %v", err)
+	}
+
+	// Load manifest and verify timestamp was updated
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+
+	source, found := manifest.GetSource("test-source-1")
+	if !found {
+		t.Fatalf("source not found")
+	}
+
+	// Verify timestamp was updated (should be recent, not old)
+	if source.LastSynced.Equal(oldTimestamp) {
+		t.Errorf("last_synced timestamp was not updated")
+	}
+
+	if time.Since(source.LastSynced) > time.Minute {
+		t.Errorf("last_synced timestamp is not recent: %v", source.LastSynced)
+	}
+}
+
+// TestRunSync_PreservesManifest tests that manifest structure is preserved
+func TestRunSync_PreservesManifest(t *testing.T) {
+	source1 := createTestSource(t)
+
+	// Create manifest with specific structure
+	addedTime := time.Now().Add(-48 * time.Hour)
+	sources := []*repomanifest.Source{
+		{
+			Name:  "test-source-1",
+			Path:  source1,
+			Mode:  "symlink",
+			Added: addedTime,
+		},
+	}
+	repoPath, cleanup := setupTestManifest(t, sources)
+	defer cleanup()
+
+	// Run sync command
+	err := runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("sync command failed: %v", err)
+	}
+
+	// Load manifest and verify structure is preserved
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+
+	// Verify version
+	if manifest.Version != 1 {
+		t.Errorf("manifest version changed: expected 1, got %d", manifest.Version)
+	}
+
+	// Verify source count
+	if len(manifest.Sources) != 1 {
+		t.Errorf("source count changed: expected 1, got %d", len(manifest.Sources))
+	}
+
+	// Verify source fields are preserved
+	source := manifest.Sources[0]
+	if source.Name != "test-source-1" {
+		t.Errorf("source name changed: expected test-source-1, got %s", source.Name)
+	}
+	if source.Path != source1 {
+		t.Errorf("source path changed: expected %s, got %s", source1, source.Path)
+	}
+	if source.Mode != "symlink" {
+		t.Errorf("source mode changed: expected symlink, got %s", source.Mode)
+	}
+
+	// Verify added timestamp is preserved (within 1 second tolerance for rounding)
+	if source.Added.Sub(addedTime).Abs() > time.Second {
+		t.Errorf("added timestamp changed: expected %v, got %v", addedTime, source.Added)
+	}
+
+	// Verify last_synced was added
+	if source.LastSynced.IsZero() {
+		t.Errorf("last_synced timestamp was not added")
+	}
+}
+
+// TestRunSync_WithFilter is skipped since sync doesn't support filtering
+// Filters are per-source at add time, not at sync time
+func TestRunSync_WithFilter(t *testing.T) {
+	t.Skip("Sync does not support filtering - filters are applied at 'repo add' time, not sync time")
 }

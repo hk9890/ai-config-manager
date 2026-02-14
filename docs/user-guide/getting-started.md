@@ -9,9 +9,41 @@ This guide will help you get started with **aimgr**, a command-line tool for man
 `aimgr` helps you:
 
 - **Store** AI resources (commands, skills, agents) in a centralized repository
+- **Track** resource sources in `ai.repo.yaml` (local directories or Git repositories)
 - **Install** them in your projects using symlinks (no duplication)
-- **Share** resources across multiple AI tools (Claude Code, OpenCode, GitHub Copilot)
+- **Share** resources across multiple AI tools (Claude Code, OpenCode, GitHub Copilot, Windsurf)
+- **Sync** resources from tracked sources to keep them up-to-date
 - **Organize** your AI workflow with packages and resource collections
+
+**Key concept:** Sources (tracked in `ai.repo.yaml`) provide resources, which you install into projects.
+
+---
+
+## Quick Start
+
+Here's the typical workflow in 4 steps:
+
+```bash
+# 1. Initialize your repository (creates ai.repo.yaml)
+aimgr repo init
+
+# 2. Add a source (local directory or GitHub repo)
+aimgr repo add gh:hk9890/ai-tools
+
+# 3. View what's available
+aimgr repo info        # See sources
+aimgr repo list        # See resources
+
+# 4. Install resources into your project
+cd ~/my-project
+aimgr install skill/pdf-processing
+```
+
+**Key commands:**
+- `repo add` - Add a new source (updates ai.repo.yaml)
+- `repo sync` - Update resources from all sources
+- `repo info` - View sources and repository status
+- `install` - Install resources into current project
 
 ---
 
@@ -86,64 +118,72 @@ aimgr config set install.targets claude,opencode,copilot
 - VSCode / GitHub Copilot only supports skills (no commands or agents)
 - Use either `copilot` or `vscode` as the tool name (both work)
 
-### 2. Add Your First Resource
+### 2. Initialize Your Repository
 
-Now let's add a resource to your centralized repository. You can add resources from:
-- Local files/directories
-- GitHub repositories
+First, initialize your aimgr repository. This creates an `ai.repo.yaml` file to track your resource sources:
+
+```bash
+aimgr repo init
+```
+
+This creates the repository directory and the `ai.repo.yaml` manifest file that tracks all your sources.
+
+### 3. Add Your First Resource Source
+
+Now let's add a source to your repository. Sources are tracked in `ai.repo.yaml` and can be:
+- Local directories (symlinked for live editing)
+- GitHub repositories (copied and versioned)
 - Existing tool directories (`.claude/`, `.opencode/`, etc.)
 
-#### Example: Add from a Local File
+#### Example: Add from a Local Directory
 
-If you have a command file:
+If you have resources in a local directory:
 ```bash
-aimgr repo import ~/.claude/commands/my-command.md
+# Add from your existing tool directory
+aimgr repo add ~/.claude/
+
+# Add from your own resource folder
+aimgr repo add ~/my-resources/
 ```
 
-If you have a skill directory:
+**Note:** Local sources are symlinked by default for live editing. Use `--copy` to copy instead.
+
+#### Example: Add from GitHub
+
+You can also add resources directly from GitHub repositories:
+
 ```bash
-aimgr repo import ~/my-skills/pdf-processing
+# Add all resources from a GitHub repo
+aimgr repo add gh:hk9890/ai-tools
+
+# Add specific resources using filters
+aimgr repo add gh:hk9890/ai-tools --filter "skill/*"
+
+# Add a specific version
+aimgr repo add gh:hk9890/ai-tools@v1.0.0
 ```
 
-If you have an agent file:
-```bash
-aimgr repo import ~/.claude/agents/code-reviewer.md
-```
+**Note:** GitHub sources are automatically copied to your repository.
 
-**Note:** Resource types are auto-detected based on file structure and content.
+#### What Happens When You Add
 
-#### Example: Import from GitHub
+When you run `aimgr repo add`:
+1. Resources are auto-discovered from the source
+2. The source is recorded in `ai.repo.yaml` 
+3. Resources are added to your repository (symlinked for local, copied for remote)
+4. You can now install them in your projects
 
-You can also add resources directly from GitHub:
+**Tip:** Run `aimgr repo info` to see all your sources and their status.
 
-```bash
-# Import all resources from a GitHub repo
-aimgr repo import gh:hk9890/ai-tools
+### 4. View Your Resources
 
-# Import specific resources
-aimgr repo import gh:hk9890/ai-tools --filter "skill/*"
-```
-
-#### Example: Bulk Import from Existing Tools
-
-If you already have Claude Code or OpenCode installed with resources:
+Check what resources and sources are now in your repository:
 
 ```bash
-# Import everything from .claude directory
-aimgr repo import ~/.claude/
+# View repository information and sources
+aimgr repo info
 
-# Import everything from .opencode directory
-aimgr repo import ~/.opencode/
-```
-
-This discovers and imports all commands, skills, agents, and packages from the directory.
-
-### 3. List Your Resources
-
-Check what resources are now in your repository:
-
-```bash
-# List everything
+# List all resources
 aimgr repo list
 
 # List only commands
@@ -156,11 +196,38 @@ aimgr repo list skill
 aimgr repo list agent
 ```
 
-You should see a table showing all your imported resources.
+The `repo info` command shows your tracked sources, while `repo list` shows individual resources.
 
 ---
 
 ## Common Operations
+
+### Managing Sources
+
+aimgr tracks resource sources in `ai.repo.yaml`. Here are the key commands:
+
+```bash
+# Add a new source (local or remote)
+aimgr repo add ~/my-resources/          # Local (symlinked)
+aimgr repo add gh:owner/repo            # GitHub (copied)
+aimgr repo add gh:owner/repo@v1.0.0    # Specific version
+
+# Sync resources from all tracked sources
+aimgr repo sync
+
+# View sources and their status
+aimgr repo info
+
+# Remove a source from tracking
+aimgr repo drop-source source-name
+```
+
+**Three key concepts:**
+- **Add** - Track a new source in ai.repo.yaml and import its resources
+- **Sync** - Update resources from all tracked sources
+- **Remove** - Stop tracking a source (use `repo drop-source`)
+
+See [sync-sources.md](sync-sources.md) for detailed source management information.
 
 ### Install Resources in a Project
 
@@ -291,8 +358,8 @@ aimgr uninstall package/web-dev-tools
 ### Workflow 1: Adding and Using a Skill from GitHub
 
 ```bash
-# 1. Import from GitHub
-aimgr repo import gh:hk9890/ai-tools --filter "skill/typescript-helper"
+# 1. Add GitHub source (adds all resources)
+aimgr repo add gh:hk9890/ai-tools --filter "skill/typescript-helper"
 
 # 2. Navigate to your project
 cd ~/my-typescript-project
@@ -308,8 +375,8 @@ aimgr install skill/typescript-helper
 
 ```bash
 # 1. Create a GitHub repository with your resources
-# 2. Team members import your repo:
-aimgr repo import gh:myorg/ai-resources
+# 2. Team members add your repo as a source:
+aimgr repo add gh:myorg/ai-resources
 
 # 3. They install what they need:
 aimgr install skill/company-coding-standards
@@ -319,8 +386,8 @@ aimgr install agent/code-reviewer
 ### Workflow 3: Using Packages for Project Setup
 
 ```bash
-# 1. Import a package collection
-aimgr repo import gh:myorg/project-templates
+# 1. Add a package collection source
+aimgr repo add gh:myorg/project-templates
 
 # 2. Start a new project
 cd ~/new-react-app
@@ -376,49 +443,46 @@ aimgr install "skill/pdf*"
 Preview operations before executing:
 
 ```bash
-# Preview what would be imported
-aimgr repo import ~/resources/ --dry-run
+# Preview what would be added
+aimgr repo add ~/resources/ --dry-run
 
-# Preview what would be installed
-# (Note: --dry-run not yet implemented for install)
+# Preview what would be synced
+aimgr repo sync --dry-run
 ```
 
 ### Tip 4: Keep Your Repository Synced
 
-Use `repo sync` to automatically update from configured sources:
+Use `repo sync` to update from your tracked sources in `ai.repo.yaml`:
 
 ```bash
-# Add sources to ~/.config/aimgr/aimgr.yaml:
-# sync:
-#   sources:
-#     - url: gh:myorg/ai-resources
-#     - url: gh:anthropics/skills
-#       filter: "skill/*"
-
-# Then sync regularly:
+# Sync all sources (updates from remote, reflects local changes)
 aimgr repo sync
+
+# View your sources and their status
+aimgr repo info
 ```
 
-### Tip 5: Use Environment Variables in Config
+**Note:** Sources are tracked in `ai.repo.yaml` (created by `repo init` or `repo add`). See [sync-sources.md](sync-sources.md) for detailed source management.
 
-Config files support environment variable interpolation (Docker Compose style):
+### Tip 5: Manage Sources with Commands
 
-```yaml
-# ~/.config/aimgr/aimgr.yaml
-repo:
-  path: ${AIMGR_REPO_PATH:-~/.local/share/ai-config/repo}
+Use `repo` commands to manage your sources:
 
-sync:
-  sources:
-    - url: ${TEAM_REPO:-https://github.com/myorg/resources}
-      filter: ${RESOURCE_FILTER:-skill/*}
+```bash
+# View all sources and their status
+aimgr repo info
+
+# Add a new source
+aimgr repo add gh:myorg/resources
+
+# Sync all sources
+aimgr repo sync
+
+# Remove a source (from ai.repo.yaml)
+aimgr repo drop-source myorg-resources
 ```
 
-This is useful for:
-- Different environments (dev, staging, prod)
-- Team shared configs with user overrides
-- CI/CD pipelines
-- Testing with temporary paths
+Your sources are stored in `ai.repo.yaml` at the root of your repository. You can also edit this file directly if needed. See [sync-sources.md](sync-sources.md) for more details on source management.
 
 ---
 
@@ -475,9 +539,27 @@ aimgr install $(aimgr repo list --format=json | jq -r '.resources[] | select(.sy
 
 **Solution:** Use `--force` to overwrite:
 ```bash
-aimgr repo import ~/resource/ --force
+aimgr repo add ~/resource/ --force
 aimgr install skill/foo --force
 ```
+
+### Issue: Source not showing in repo info
+
+**What it means:** The source was not successfully added to `ai.repo.yaml`.
+
+**Solution:**
+1. Check if `ai.repo.yaml` exists in your repository:
+   ```bash
+   aimgr repo info
+   ```
+2. If missing, initialize the repository:
+   ```bash
+   aimgr repo init
+   ```
+3. Re-add your sources:
+   ```bash
+   aimgr repo add ~/my-resources/
+   ```
 
 ### Issue: Symlinks are broken after removing resource
 
@@ -499,7 +581,8 @@ Now that you're familiar with the basics, explore these guides:
 
 - **[Pattern Matching](pattern-matching.md)** - Learn advanced pattern syntax for filtering and bulk operations
 - **[Output Formats](output-formats.md)** - Use JSON/YAML output for scripting and automation
-- **[GitHub Sources](github-sources.md)** - Import resources from GitHub repositories
+- **[Sync Sources](sync-sources.md)** - Detailed guide to managing sources in ai.repo.yaml
+- **[GitHub Sources](github-sources.md)** - Add resources from GitHub repositories
 - **[Resource Formats](resource-formats.md)** - Understand resource file structures and create your own
 - **[Workspace Caching](workspace-caching.md)** - Learn about Git repository caching for faster operations
 
@@ -515,10 +598,11 @@ Ready to create your own commands, skills, or agents? Check out:
 
 Explore advanced `aimgr` features:
 
+- **Source tracking** - Use ai.repo.yaml to manage resource sources
 - **Packages** - Group related resources for easier distribution
-- **Marketplace import** - Import entire plugin collections
 - **Workspace caching** - Speed up Git operations with repository caching
 - **Multi-tool support** - Install to multiple AI tools simultaneously
+- **Local development** - Use symlinked sources for live editing
 
 ---
 

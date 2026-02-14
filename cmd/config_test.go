@@ -35,23 +35,6 @@ func TestSaveConfig(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "save config with sync sources",
-			cfg: &config.Config{
-				Install: config.InstallConfig{
-					Targets: []string{"claude"},
-				},
-				Sync: config.SyncConfig{
-					Sources: []config.SyncSource{
-						{
-							URL:    "gh:owner/repo",
-							Filter: "skill/*",
-						},
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
 			name: "save empty config",
 			cfg: &config.Config{
 				Install: config.InstallConfig{
@@ -107,22 +90,6 @@ func TestSaveConfig(t *testing.T) {
 			for i, target := range tt.cfg.Install.Targets {
 				if actualConfig.Install.Targets[i] != target {
 					t.Errorf("Expected target[%d] to be '%s', got '%s'", i, target, actualConfig.Install.Targets[i])
-				}
-			}
-
-			// Compare sync sources if present
-			if len(tt.cfg.Sync.Sources) > 0 {
-				if len(actualConfig.Sync.Sources) != len(tt.cfg.Sync.Sources) {
-					t.Fatalf("Expected %d sync sources, got %d", len(tt.cfg.Sync.Sources), len(actualConfig.Sync.Sources))
-				}
-
-				for i, source := range tt.cfg.Sync.Sources {
-					if actualConfig.Sync.Sources[i].URL != source.URL {
-						t.Errorf("Expected sync source[%d] URL to be '%s', got '%s'", i, source.URL, actualConfig.Sync.Sources[i].URL)
-					}
-					if actualConfig.Sync.Sources[i].Filter != source.Filter {
-						t.Errorf("Expected sync source[%d] filter to be '%s', got '%s'", i, source.Filter, actualConfig.Sync.Sources[i].Filter)
-					}
 				}
 			}
 		})
