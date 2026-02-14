@@ -15,6 +15,7 @@ import (
 )
 
 var formatFlag string
+var sourceFilterFlag string
 
 // listCmd represents the list command
 var listCmd = &cobra.Command{
@@ -24,6 +25,7 @@ var listCmd = &cobra.Command{
 
 The list command shows resources available in the global repository:
   - NAME: Resource reference (e.g., skill/pdf-processing, command/test)
+  - SOURCE: Source name the resource came from (e.g., ai-tools, anthropics-skills)
   - DESCRIPTION: Brief description of the resource
 
 This is a pure repository view showing what resources are available.
@@ -42,15 +44,17 @@ Examples:
   aimgr repo list *pdf*              # List all resources with "pdf" in name
   aimgr repo list --format=json      # Output as JSON with full details
   aimgr repo list --format=yaml      # Output as YAML
+  aimgr repo list --source ai-tools  # Filter by source name
+  aimgr repo list "skill/*" --source ai-tools  # Combine pattern and source filter
 
 Output Format Examples:
   Table format (default):
-  ┌──────────────────────┬────────────────────────────────────────┐
-  │         NAME         │              DESCRIPTION               │
-  ├──────────────────────┼────────────────────────────────────────┤
-  │ skill/skill-creator  │ Guide for creating effective skills... │
-  │ skill/webapp-testing │ Toolkit for interacting with webapps.. │
-  └──────────────────────┴────────────────────────────────────────┘
+  ┌──────────────────────┬──────────────────┬────────────────────────────────────────┐
+  │         NAME         │      SOURCE      │              DESCRIPTION               │
+  ├──────────────────────┼──────────────────┼────────────────────────────────────────┤
+  │ skill/skill-creator  │ ai-tools         │ Guide for creating effective skills... │
+  │ skill/webapp-testing │ anthropics-skills│ Toolkit for interacting with webapps.. │
+  └──────────────────────┴──────────────────┴────────────────────────────────────────┘
 
   JSON format includes full resource details for scripting:
   {
@@ -150,9 +154,25 @@ See also:
 				}
 			}
 
+			// Apply source filter if specified
+			if sourceFilterFlag != "" {
+				var sourceFiltered []resource.Resource
+				for _, res := range filtered {
+					meta, err := manager.GetMetadata(res.Name, res.Type)
+					if err == nil && meta.SourceName == sourceFilterFlag {
+						sourceFiltered = append(sourceFiltered, res)
+					}
+				}
+				filtered = sourceFiltered
+			}
+
 			// Handle empty results
 			if len(filtered) == 0 {
-				fmt.Printf("No resources matching pattern '%s' found in repository.\n", args[0])
+				if sourceFilterFlag != "" {
+					fmt.Printf("No resources matching pattern '%s' from source '%s' found in repository.\n", args[0], sourceFilterFlag)
+				} else {
+					fmt.Printf("No resources matching pattern '%s' found in repository.\n", args[0])
+				}
 				return nil
 			}
 
@@ -163,7 +183,7 @@ See also:
 			case "yaml":
 				return outputWithPackagesYAML(filtered, nil)
 			case "table":
-				return outputWithPackagesTable(filtered, nil)
+				return outputWithPackagesTable(manager, filtered, nil)
 			default:
 				return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", formatFlag)
 			}
@@ -180,10 +200,26 @@ See also:
 			return fmt.Errorf("failed to list packages: %w", err)
 		}
 
+		// Apply source filter if specified
+		if sourceFilterFlag != "" {
+			var filtered []resource.Resource
+			for _, res := range resources {
+				meta, err := manager.GetMetadata(res.Name, res.Type)
+				if err == nil && meta.SourceName == sourceFilterFlag {
+					filtered = append(filtered, res)
+				}
+			}
+			resources = filtered
+		}
+
 		// Handle empty results
 		if len(resources) == 0 && len(packages) == 0 {
-			fmt.Println("No resources or packages found in repository.")
-			fmt.Println("\nAdd resources with: aimgr repo add command <file>, aimgr repo add skill <folder>, or aimgr repo add agent <file>")
+			if sourceFilterFlag != "" {
+				fmt.Printf("No resources from source '%s' found in repository.\n", sourceFilterFlag)
+			} else {
+				fmt.Println("No resources or packages found in repository.")
+				fmt.Println("\nAdd resources with: aimgr repo add command <file>, aimgr repo add skill <folder>, or aimgr repo add agent <file>")
+			}
 			return nil
 		}
 
@@ -194,14 +230,14 @@ See also:
 		case "yaml":
 			return outputWithPackagesYAML(resources, packages)
 		case "table":
-			return outputWithPackagesTable(resources, packages)
+			return outputWithPackagesTable(manager, resources, packages)
 		default:
 			return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", formatFlag)
 		}
 	},
 }
 
-func outputWithPackagesTable(resources []resource.Resource, packages []repo.PackageInfo) error {
+func outputWithPackagesTable(manager *repo.Manager, resources []resource.Resource, packages []repo.PackageInfo) error {
 	// Group resources by type
 	commands := []resource.Resource{}
 	skills := []resource.Resource{}
@@ -222,15 +258,20 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 		return packages[i].Name < packages[j].Name
 	})
 
-	// Create table with NAME and DESCRIPTION only using shared infrastructure
-	table := output.NewTable("Name", "Description")
+	// Create table with NAME, SOURCE, and DESCRIPTION using shared infrastructure
+	table := output.NewTable("Name", "Source", "Description")
 	table.WithResponsive().
-		WithDynamicColumn(1).       // Description stretches
-		WithMinColumnWidths(40, 30) // Name min=40, Description min=30
+		WithDynamicColumn(2).           // Description stretches
+		WithMinColumnWidths(30, 15, 30) // Name min=30, Source min=15, Description min=30
 
 	// Add commands
 	for _, cmd := range commands {
-		table.AddRow(fmt.Sprintf("command/%s", cmd.Name), cmd.Description)
+		meta, err := manager.GetMetadata(cmd.Name, cmd.Type)
+		sourceName := "-"
+		if err == nil && meta.SourceName != "" {
+			sourceName = meta.SourceName
+		}
+		table.AddRow(fmt.Sprintf("command/%s", cmd.Name), sourceName, cmd.Description)
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
@@ -240,7 +281,12 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 
 	// Add skills
 	for _, skill := range skills {
-		table.AddRow(fmt.Sprintf("skill/%s", skill.Name), skill.Description)
+		meta, err := manager.GetMetadata(skill.Name, skill.Type)
+		sourceName := "-"
+		if err == nil && meta.SourceName != "" {
+			sourceName = meta.SourceName
+		}
+		table.AddRow(fmt.Sprintf("skill/%s", skill.Name), sourceName, skill.Description)
 	}
 
 	// Add empty row between types if skills exist and agents exist
@@ -250,7 +296,12 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 
 	// Add agents
 	for _, agent := range agents {
-		table.AddRow(fmt.Sprintf("agent/%s", agent.Name), agent.Description)
+		meta, err := manager.GetMetadata(agent.Name, agent.Type)
+		sourceName := "-"
+		if err == nil && meta.SourceName != "" {
+			sourceName = meta.SourceName
+		}
+		table.AddRow(fmt.Sprintf("agent/%s", agent.Name), sourceName, agent.Description)
 	}
 
 	// Add empty row between agents and packages if both exist
@@ -260,9 +311,14 @@ func outputWithPackagesTable(resources []resource.Resource, packages []repo.Pack
 
 	// Add packages
 	for _, pkg := range packages {
+		meta, err := manager.GetMetadata(pkg.Name, resource.PackageType)
+		sourceName := "-"
+		if err == nil && meta.SourceName != "" {
+			sourceName = meta.SourceName
+		}
 		countStr := fmt.Sprintf("%d resources", pkg.ResourceCount)
 		fullDesc := fmt.Sprintf("%s %s", countStr, pkg.Description)
-		table.AddRow(fmt.Sprintf("package/%s", pkg.Name), fullDesc)
+		table.AddRow(fmt.Sprintf("package/%s", pkg.Name), sourceName, fullDesc)
 	}
 
 	// Render the table
@@ -320,8 +376,8 @@ func outputPackagesYAML(packages []repo.PackageInfo) error {
 	return encoder.Encode(packages)
 }
 
-func outputTable(resources []resource.Resource) error {
-	return outputWithPackagesTable(resources, nil)
+func outputTable(manager *repo.Manager, resources []resource.Resource) error {
+	return outputWithPackagesTable(manager, resources, nil)
 }
 
 func outputJSON(resources []resource.Resource) error {
@@ -339,5 +395,6 @@ func outputYAML(resources []resource.Resource) error {
 func init() {
 	repoCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVar(&formatFlag, "format", "table", "Output format (table|json|yaml)")
+	listCmd.Flags().StringVar(&sourceFilterFlag, "source", "", "Filter by source name")
 	listCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
