@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestLoad_ValidManifest(t *testing.T) {
@@ -19,10 +18,7 @@ func TestLoad_ValidManifest(t *testing.T) {
 			content: `version: 1
 sources:
   - name: my-local-commands
-    path: /home/user/my-resources
-    mode: symlink
-    added: 2026-02-14T10:30:00Z
-    last_synced: 2026-02-14T15:45:00Z`,
+    path: /home/user/my-resources`,
 			wantErr: false,
 			checkFn: func(t *testing.T, m *Manifest) {
 				if m.Version != 1 {
@@ -38,8 +34,8 @@ sources:
 				if s.Path != "/home/user/my-resources" {
 					t.Errorf("unexpected path: %s", s.Path)
 				}
-				if s.Mode != "symlink" {
-					t.Errorf("unexpected mode: %s", s.Mode)
+				if s.GetMode() != "symlink" {
+					t.Errorf("unexpected mode: %s", s.GetMode())
 				}
 			},
 		},
@@ -50,10 +46,7 @@ sources:
   - name: agentskills-catalog
     url: https://github.com/agentskills/catalog
     ref: main
-    subpath: resources
-    mode: copy
-    added: 2026-02-14T11:00:00Z
-    last_synced: 2026-02-14T15:45:00Z`,
+    subpath: resources`,
 			wantErr: false,
 			checkFn: func(t *testing.T, m *Manifest) {
 				if len(m.Sources) != 1 {
@@ -80,12 +73,8 @@ sources:
 sources:
   - name: source-a
     path: /path/a
-    mode: symlink
-    added: 2026-02-14T10:00:00Z
   - name: source-b
-    url: https://github.com/user/repo
-    mode: copy
-    added: 2026-02-14T11:00:00Z`,
+    url: https://github.com/user/repo`,
 			wantErr: false,
 			checkFn: func(t *testing.T, m *Manifest) {
 				if len(m.Sources) != 2 {
@@ -265,10 +254,8 @@ func TestSave(t *testing.T) {
 		Version: 1,
 		Sources: []*Source{
 			{
-				Name:  "test-source",
-				Path:  "/test/path",
-				Mode:  "symlink",
-				Added: time.Date(2026, 2, 14, 10, 0, 0, 0, time.UTC),
+				Name: "test-source",
+				Path: "/test/path",
 			},
 		},
 	}
@@ -346,10 +333,8 @@ func TestValidate(t *testing.T) {
 				Version: 1,
 				Sources: []*Source{
 					{
-						Name:  "test",
-						Path:  "/path",
-						Mode:  "symlink",
-						Added: time.Now(),
+						Name: "test",
+						Path: "/path",
 					},
 				},
 			},
@@ -382,16 +367,12 @@ func TestValidate(t *testing.T) {
 				Version: 1,
 				Sources: []*Source{
 					{
-						Name:  "duplicate",
-						Path:  "/path1",
-						Mode:  "symlink",
-						Added: time.Now(),
+						Name: "duplicate",
+						Path: "/path1",
 					},
 					{
-						Name:  "duplicate",
-						Path:  "/path2",
-						Mode:  "symlink",
-						Added: time.Now(),
+						Name: "duplicate",
+						Path: "/path2",
 					},
 				},
 			},
@@ -417,10 +398,8 @@ func TestAddSource(t *testing.T) {
 
 	// Add valid source
 	source := &Source{
-		Name:  "test-source",
-		Path:  "/test/path",
-		Mode:  "symlink",
-		Added: time.Now(),
+		Name: "test-source",
+		Path: "/test/path",
 	}
 
 	if err := m.AddSource(source); err != nil {
@@ -433,10 +412,8 @@ func TestAddSource(t *testing.T) {
 
 	// Try to add duplicate name
 	duplicate := &Source{
-		Name:  "test-source",
-		Path:  "/different/path",
-		Mode:  "copy",
-		Added: time.Now(),
+		Name: "test-source",
+		Path: "/different/path",
 	}
 
 	if err := m.AddSource(duplicate); err == nil {
@@ -452,9 +429,7 @@ func TestAddSource_AutoGenerateName(t *testing.T) {
 
 	// Add source without name
 	source := &Source{
-		Path:  "/home/user/my-resources",
-		Mode:  "symlink",
-		Added: time.Now(),
+		Path: "/home/user/my-resources",
 	}
 
 	if err := m.AddSource(source); err != nil {
@@ -468,41 +443,13 @@ func TestAddSource_AutoGenerateName(t *testing.T) {
 	t.Logf("Auto-generated name: %s", source.Name)
 }
 
-func TestAddSource_SetsAddedTimestamp(t *testing.T) {
-	m := &Manifest{
-		Version: 1,
-		Sources: []*Source{},
-	}
-
-	// Add source without added timestamp
-	source := &Source{
-		Name: "test",
-		Path: "/test",
-		Mode: "symlink",
-	}
-
-	before := time.Now()
-	if err := m.AddSource(source); err != nil {
-		t.Fatalf("AddSource() error = %v", err)
-	}
-	after := time.Now()
-
-	if source.Added.IsZero() {
-		t.Error("AddSource() did not set added timestamp")
-	}
-
-	if source.Added.Before(before) || source.Added.After(after) {
-		t.Errorf("AddSource() set timestamp outside expected range: %v", source.Added)
-	}
-}
+// TestAddSource_SetsAddedTimestamp removed - timestamp handling moved to sourcemetadata package
 
 func TestAddSource_NilManifest(t *testing.T) {
 	var m *Manifest
 	source := &Source{
-		Name:  "test",
-		Path:  "/test",
-		Mode:  "symlink",
-		Added: time.Now(),
+		Name: "test",
+		Path: "/test",
 	}
 
 	err := m.AddSource(source)
@@ -528,16 +475,12 @@ func TestRemoveSource(t *testing.T) {
 		Version: 1,
 		Sources: []*Source{
 			{
-				Name:  "source-a",
-				Path:  "/path/a",
-				Mode:  "symlink",
-				Added: time.Now(),
+				Name: "source-a",
+				Path: "/path/a",
 			},
 			{
-				Name:  "source-b",
-				URL:   "https://github.com/user/repo",
-				Mode:  "copy",
-				Added: time.Now(),
+				Name: "source-b",
+				URL:  "https://github.com/user/repo",
 			},
 		},
 	}
@@ -581,10 +524,8 @@ func TestRemoveSource_ByPath(t *testing.T) {
 		Version: 1,
 		Sources: []*Source{
 			{
-				Name:  "test",
-				Path:  "/test/path",
-				Mode:  "symlink",
-				Added: time.Now(),
+				Name: "test",
+				Path: "/test/path",
 			},
 		},
 	}
@@ -623,16 +564,12 @@ func TestGetSource(t *testing.T) {
 		Version: 1,
 		Sources: []*Source{
 			{
-				Name:  "test",
-				Path:  "/test/path",
-				Mode:  "symlink",
-				Added: time.Now(),
+				Name: "test",
+				Path: "/test/path",
 			},
 			{
-				Name:  "git-source",
-				URL:   "https://github.com/user/repo",
-				Mode:  "copy",
-				Added: time.Now(),
+				Name: "git-source",
+				URL:  "https://github.com/user/repo",
 			},
 		},
 	}
@@ -696,10 +633,8 @@ func TestHasSource(t *testing.T) {
 		Version: 1,
 		Sources: []*Source{
 			{
-				Name:  "test",
-				Path:  "/test/path",
-				Mode:  "symlink",
-				Added: time.Now(),
+				Name: "test",
+				Path: "/test/path",
 			},
 		},
 	}
@@ -734,20 +669,16 @@ func TestValidateSource(t *testing.T) {
 		{
 			name: "valid local source",
 			source: &Source{
-				Name:  "test",
-				Path:  "/test",
-				Mode:  "symlink",
-				Added: time.Now(),
+				Name: "test",
+				Path: "/test",
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid git source",
 			source: &Source{
-				Name:  "test",
-				URL:   "https://github.com/user/repo",
-				Mode:  "copy",
-				Added: time.Now(),
+				Name: "test",
+				URL:  "https://github.com/user/repo",
 			},
 			wantErr: false,
 		},
@@ -759,58 +690,31 @@ func TestValidateSource(t *testing.T) {
 		{
 			name: "empty name",
 			source: &Source{
-				Path:  "/test",
-				Mode:  "symlink",
-				Added: time.Now(),
+				Path: "/test",
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid name format",
 			source: &Source{
-				Name:  "Invalid_Name",
-				Path:  "/test",
-				Mode:  "symlink",
-				Added: time.Now(),
+				Name: "Invalid_Name",
+				Path: "/test",
 			},
 			wantErr: true,
 		},
 		{
 			name: "missing path and url",
 			source: &Source{
-				Name:  "test",
-				Mode:  "symlink",
-				Added: time.Now(),
+				Name: "test",
 			},
 			wantErr: true,
 		},
 		{
 			name: "both path and url",
 			source: &Source{
-				Name:  "test",
-				Path:  "/test",
-				URL:   "https://github.com/user/repo",
-				Mode:  "symlink",
-				Added: time.Now(),
-			},
-			wantErr: true,
-		},
-		{
-			name: "invalid mode",
-			source: &Source{
-				Name:  "test",
-				Path:  "/test",
-				Mode:  "invalid",
-				Added: time.Now(),
-			},
-			wantErr: true,
-		},
-		{
-			name: "missing added timestamp",
-			source: &Source{
 				Name: "test",
 				Path: "/test",
-				Mode: "symlink",
+				URL:  "https://github.com/user/repo",
 			},
 			wantErr: true,
 		},
@@ -927,43 +831,4 @@ func TestGenerateSourceName(t *testing.T) {
 	}
 }
 
-func TestTimestampFormat(t *testing.T) {
-	// Test that timestamps are properly formatted as RFC3339
-	tmpDir := t.TempDir()
-
-	testTime := time.Date(2026, 2, 14, 10, 30, 0, 0, time.UTC)
-	m := &Manifest{
-		Version: 1,
-		Sources: []*Source{
-			{
-				Name:       "test",
-				Path:       "/test",
-				Mode:       "symlink",
-				Added:      testTime,
-				LastSynced: testTime,
-			},
-		},
-	}
-
-	// Save manifest
-	if err := m.Save(tmpDir); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-
-	// Read raw YAML
-	path := filepath.Join(tmpDir, ManifestFileName)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("failed to read file: %v", err)
-	}
-
-	content := string(data)
-	// Check for RFC3339 format
-	if !contains(content, "2026-02-14T10:30:00Z") {
-		t.Errorf("timestamp not in RFC3339 format, got: %s", content)
-	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || (len(s) > 0 && (s[:len(substr)] == substr || contains(s[1:], substr))))
-}
+// TestTimestampFormat removed - timestamp handling moved to sourcemetadata package

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/discovery"
 	"github.com/hk9890/ai-config-manager/pkg/marketplace"
@@ -15,6 +16,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/source"
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 	"github.com/hk9890/ai-config-manager/pkg/workspace"
 	"github.com/spf13/cobra"
 )
@@ -1072,7 +1074,6 @@ func addSourceToManifest(manager *repo.Manager, parsed *source.ParsedSource, imp
 	// Create source entry
 	manifestSource := &repomanifest.Source{
 		Name: nameFlag, // Will be auto-generated if empty
-		Mode: importMode,
 	}
 
 	// Set path or URL based on source type
@@ -1107,6 +1108,27 @@ func addSourceToManifest(manager *repo.Manager, parsed *source.ParsedSource, imp
 	// Save manifest
 	if err := manifest.Save(manager.GetRepoPath()); err != nil {
 		return fmt.Errorf("failed to save manifest: %w", err)
+	}
+
+	// Load and update source metadata
+	metadata, err := sourcemetadata.Load(manager.GetRepoPath())
+	if err != nil {
+		// If metadata doesn't exist, create new one
+		metadata = &sourcemetadata.SourceMetadata{
+			Version: 1,
+			Sources: make(map[string]*sourcemetadata.SourceState),
+		}
+	}
+
+	// Add source state with current timestamp
+	metadata.Sources[manifestSource.Name] = &sourcemetadata.SourceState{
+		Added:      time.Now(),
+		LastSynced: time.Time{}, // Zero time for "never synced"
+	}
+
+	// Save metadata
+	if err := metadata.Save(manager.GetRepoPath()); err != nil {
+		return fmt.Errorf("failed to save source metadata: %w", err)
 	}
 
 	// Print success message for human-readable format

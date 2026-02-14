@@ -10,6 +10,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 	"github.com/spf13/cobra"
 )
 
@@ -89,6 +90,16 @@ Examples:
 			return fmt.Errorf("failed to load manifest: %w", err)
 		}
 
+		// Load source metadata for timestamps
+		metadata, err := sourcemetadata.Load(repoPath)
+		if err != nil {
+			// If metadata doesn't exist yet, create empty one
+			metadata = &sourcemetadata.SourceMetadata{
+				Version: 1,
+				Sources: make(map[string]*sourcemetadata.SourceState),
+			}
+		}
+
 		// Build output using KeyValueBuilder
 		info := output.NewKeyValue("Repository Information").
 			Add("Location", repoPath).
@@ -107,7 +118,7 @@ Examples:
 		if manifest != nil && len(manifest.Sources) > 0 {
 			sourcesValue := fmt.Sprintf("%d\n", len(manifest.Sources))
 			for _, source := range manifest.Sources {
-				sourceLine := formatSource(source)
+				sourceLine := formatSource(source, metadata)
 				sourcesValue += sourceLine + "\n"
 			}
 			info.AddSection().Add("Sources", sourcesValue)
@@ -150,7 +161,7 @@ func formatBytes(bytes int64) string {
 }
 
 // formatSource formats a source with health indicator, type, path/URL, mode, and last synced
-func formatSource(source *repomanifest.Source) string {
+func formatSource(source *repomanifest.Source, metadata *sourcemetadata.SourceMetadata) string {
 	// Health check
 	health := checkSourceHealth(source)
 	healthIcon := "✓"
@@ -166,10 +177,13 @@ func formatSource(source *repomanifest.Source) string {
 		location = source.URL
 	}
 
-	// Format last synced time
+	// Get mode from source (implicit based on path/url)
+	mode := source.GetMode()
+
+	// Format last synced time from metadata
 	lastSynced := "never"
-	if !source.LastSynced.IsZero() {
-		lastSynced = formatTimeSince(source.LastSynced)
+	if state, ok := metadata.Sources[source.Name]; ok && !state.LastSynced.IsZero() {
+		lastSynced = formatTimeSince(state.LastSynced)
 	}
 
 	// Build the formatted line
@@ -178,7 +192,7 @@ func formatSource(source *repomanifest.Source) string {
 		source.Name,
 		sourceType,
 		location,
-		source.Mode,
+		mode,
 		lastSynced)
 }
 

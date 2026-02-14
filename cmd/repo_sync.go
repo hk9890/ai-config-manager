@@ -8,6 +8,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/source"
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 	"github.com/hk9890/ai-config-manager/pkg/workspace"
 	"github.com/spf13/cobra"
 )
@@ -129,7 +130,7 @@ func syncSource(src *repomanifest.Source, manager *repo.Manager) error {
 	} else if src.Path != "" {
 		// Local source (path): use path directly, symlink to repo
 		fmt.Printf("  Mode: Local (symlink)\n")
-		mode = src.Mode // Use mode from manifest (symlink or copy)
+		mode = src.GetMode() // Use mode from source (implicit: path=symlink, url=copy)
 
 		// Convert to absolute path
 		absPath, err := filepath.Abs(src.Path)
@@ -164,6 +165,16 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// Check if any sources configured
 	if len(manifest.Sources) == 0 {
 		return fmt.Errorf("no sync sources configured\n\nAdd sources using:\n  aimgr repo add <source>\n\nSources are automatically tracked in ai.repo.yaml")
+	}
+
+	// Load source metadata for timestamps
+	metadata, err := sourcemetadata.Load(manager.GetRepoPath())
+	if err != nil {
+		// If metadata doesn't exist yet, create empty one
+		metadata = &sourcemetadata.SourceMetadata{
+			Version: 1,
+			Sources: make(map[string]*sourcemetadata.SourceState),
+		}
 	}
 
 	// Print header
@@ -219,9 +230,17 @@ func runSync(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		// Update last_synced timestamp after successful sync
+		// Update last_synced timestamp in metadata after successful sync
 		if !syncDryRunFlag {
-			src.LastSynced = time.Now()
+			if state, ok := metadata.Sources[src.Name]; ok {
+				state.LastSynced = time.Now()
+			} else {
+				// Create new state if it doesn't exist
+				metadata.Sources[src.Name] = &sourcemetadata.SourceState{
+					Added:      time.Now(),
+					LastSynced: time.Now(),
+				}
+			}
 		}
 
 		// Source processed successfully
@@ -229,11 +248,11 @@ func runSync(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 
-	// Save updated manifest with new timestamps
+	// Save updated metadata with new timestamps
 	if !syncDryRunFlag && sourcesProcessed > 0 {
-		if err := manifest.Save(manager.GetRepoPath()); err != nil {
+		if err := metadata.Save(manager.GetRepoPath()); err != nil {
 			// Don't fail, just warn
-			fmt.Printf("⚠ Warning: Failed to save manifest: %v\n", err)
+			fmt.Printf("⚠ Warning: Failed to save metadata: %v\n", err)
 		}
 	}
 
