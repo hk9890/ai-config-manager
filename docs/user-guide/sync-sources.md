@@ -17,7 +17,7 @@ This guide explains how to manage sources in your aimgr repository using the `ai
 
 - **`ai.repo.yaml`**: Manifest file in your repository root that tracks all configured sources
 - **Source**: A location (local path or remote URL) containing AI resources
-- **Mode**: How resources are stored - `symlink` (live editing) or `copy` (stable snapshot)
+- **Import Mode**: How resources are stored - automatically determined by source type (`symlink` for paths, `copy` for URLs)
 - **Sync**: Re-import all resources from configured sources to get latest changes
 
 ---
@@ -33,16 +33,10 @@ version: 1
 sources:
   - name: my-local-commands
     path: /home/user/my-resources
-    mode: symlink
-    added: 2026-02-14T10:30:00Z
-    last_synced: 2026-02-14T15:45:00Z
   - name: agentskills-catalog
     url: https://github.com/agentskills/catalog
     ref: main
     subpath: resources
-    mode: copy
-    added: 2026-02-14T11:00:00Z
-    last_synced: 2026-02-14T15:45:00Z
 ```
 
 ### Field Reference
@@ -56,23 +50,22 @@ sources:
 | `url` | string | Git repository URL (for remote sources) | One of path/url |
 | `ref` | string | Git branch/tag/commit (for remote sources) | No |
 | `subpath` | string | Subdirectory within repository (for remote sources) | No |
-| `mode` | string | Import mode: `symlink` or `copy` | Yes |
-| `added` | timestamp | When source was first added | Yes |
-| `last_synced` | timestamp | Last successful sync time | No |
+
+**Note:** Import mode is implicit based on source type and not stored in the manifest. Path sources use `symlink` mode (for live editing), while URL sources use `copy` mode (for stable snapshots).
 
 ### Source Types
 
 #### Local Sources (`path`)
 
-Local sources point to directories on your filesystem. Resources are typically **symlinked** for live editing.
+Local sources point to directories on your filesystem. Resources are automatically **symlinked** for live editing.
 
 ```yaml
 sources:
   - name: my-local-skills
     path: /home/user/dev/my-skills
-    mode: symlink
-    added: 2026-02-14T10:30:00Z
 ```
+
+**Import mode:** Symlink (automatic for path sources)
 
 **Benefits:**
 - Changes to source files immediately reflect in repository
@@ -87,16 +80,16 @@ sources:
 
 #### Remote Sources (`url`)
 
-Remote sources point to Git repositories. Resources are **copied** to your repository.
+Remote sources point to Git repositories. Resources are automatically **copied** to your repository.
 
 ```yaml
 sources:
   - name: community-catalog
     url: https://github.com/owner/repo
     ref: v1.2.0
-    mode: copy
-    added: 2026-02-14T11:00:00Z
 ```
+
+**Import mode:** Copy (automatic for URL sources)
 
 **Benefits:**
 - Stable, versioned resources
@@ -112,12 +105,14 @@ sources:
 
 ### Import Modes
 
-| Mode | Behavior | Best For |
-|------|----------|----------|
-| `symlink` | Creates symbolic links to source files | Local development, live editing |
-| `copy` | Copies files to repository | Remote sources, stable deployments |
+Import mode is **implicit** and determined automatically based on source type:
 
-**Note:** Remote sources (URL) always use `copy` mode. Local sources (path) use `symlink` by default but can be forced to `copy` mode with the `--copy` flag.
+| Source Type | Import Mode | Behavior | Best For |
+|-------------|-------------|----------|----------|
+| Path (`path:`) | `symlink` | Creates symbolic links to source files | Local development, live editing |
+| URL (`url:`) | `copy` | Copies files to repository | Remote sources, stable deployments |
+
+**Note:** You don't configure the mode - it's automatic. Path sources always use symlink mode for live editing. URL sources always use copy mode for stable snapshots.
 
 ---
 
@@ -134,19 +129,16 @@ aimgr repo add <source> [flags]
 **Behavior:**
 1. Discovers and imports all resources from the source
 2. Adds source entry to `ai.repo.yaml`
-3. Sets appropriate mode (`symlink` for local, `copy` for remote)
-4. Records timestamps for tracking
+3. Uses appropriate mode automatically (`symlink` for path sources, `copy` for URL sources)
+4. Records source metadata
 
 #### Adding Local Sources
 
 ```bash
-# Add from local directory (symlinked by default)
+# Add from local directory (automatically uses symlink mode)
 aimgr repo add ~/my-skills
 aimgr repo add /opt/team-resources
 aimgr repo add ./local-resources
-
-# Force copy mode for local source
-aimgr repo add ~/my-skills --copy
 ```
 
 #### Adding Remote Sources
@@ -171,7 +163,6 @@ aimgr repo add gh:owner/repo/resources@v1.0.0
 | Flag | Description |
 |------|-------------|
 | `--name=<name>` | Custom name for source (auto-generated if omitted) |
-| `--copy` | Force copy mode for local paths (default: symlink) |
 | `--filter=<pattern>` | Only import matching resources (e.g., `skill/*`) |
 | `--force` | Overwrite existing resources |
 | `--skip-existing` | Skip resources that already exist |
@@ -257,9 +248,9 @@ aimgr repo sync [flags]
 **Behavior:**
 1. Reads all sources from `ai.repo.yaml`
 2. For each source:
-   - **Local sources**: Re-symlink from path
-   - **Remote sources**: Download latest version, copy to repository
-3. Updates `last_synced` timestamp for each source
+   - **Path sources**: Re-symlink from path (symlink mode)
+   - **URL sources**: Download latest version, copy to repository (copy mode)
+3. Updates source metadata
 4. By default, overwrites existing resources (force mode)
 
 **When to use:**
@@ -486,7 +477,7 @@ Moving from local development to production:
 ```bash
 # 1. Currently using local source
 aimgr repo info
-# Shows: my-skills (path: ~/dev/my-skills, mode: symlink)
+# Shows: my-skills (path: ~/dev/my-skills, symlink mode)
 
 # 2. Push to GitHub
 cd ~/dev/my-skills
@@ -508,7 +499,7 @@ aimgr repo add gh:myuser/my-skills@v1.0.0 --name=my-skills --force
 
 # 5. Verify change
 aimgr repo info
-# Shows: my-skills (url: gh:myuser/my-skills@v1.0.0, mode: copy)
+# Shows: my-skills (url: gh:myuser/my-skills@v1.0.0, copy mode)
 ```
 
 #### Scenario: Convert remote to local for development
@@ -516,7 +507,7 @@ aimgr repo info
 ```bash
 # 1. Currently using remote source
 aimgr repo info
-# Shows: upstream-repo (url: gh:owner/repo, mode: copy)
+# Shows: upstream-repo (url: gh:owner/repo, copy mode)
 
 # 2. Clone locally
 git clone https://github.com/owner/repo ~/dev/upstream-repo
@@ -827,9 +818,17 @@ aimgr repo add ~/local/path --name=source2
 # Option 1: Enable Developer Mode in Windows Settings
 # Settings > Update & Security > For Developers > Developer Mode
 
-# Option 2: Use copy mode instead
+# Option 2: Push local source to Git and add as URL source (uses copy mode)
+cd ~/my-resources
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/myuser/my-resources.git
+git push -u origin main
+
+# Add as URL source (automatically uses copy mode)
 aimgr repo drop-source my-source --keep-resources
-aimgr repo add ~/my-resources --name=my-source --copy
+aimgr repo add https://github.com/myuser/my-resources --name=my-source --force
 
 # Re-sync after each change
 aimgr repo sync
@@ -892,16 +891,14 @@ Maintain clear boundaries:
 ```yaml
 # ai.repo.yaml example
 sources:
-  # Production (stable, versioned)
+  # Production (stable, versioned, automatic copy mode)
   - name: prod-resources
     url: https://github.com/company/resources
     ref: v2.1.0
-    mode: copy
     
-  # Development (local, live editing)
+  # Development (local, live editing, automatic symlink mode)
   - name: dev-resources
     path: /home/user/dev/resources
-    mode: symlink
 ```
 
 ---
@@ -963,18 +960,14 @@ Add comments to your `ai.repo.yaml`:
 # ai.repo.yaml
 version: 1
 sources:
-  # Company-approved resources for production use
+  # Company-approved resources for production use (copy mode)
   - name: company-prod
     url: https://github.com/company/resources
     ref: v2.0.0
-    mode: copy
-    added: 2026-02-14T10:00:00Z
     
-  # Personal development experiments (not for production)
+  # Personal development experiments (symlink mode)
   - name: personal-dev
     path: /home/user/dev/experiments
-    mode: symlink
-    added: 2026-02-14T11:00:00Z
 ```
 
 ---

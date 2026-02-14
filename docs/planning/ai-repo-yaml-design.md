@@ -1,8 +1,19 @@
 # ai.repo.yaml Design Specification
 
-**Status**: Draft
+**Status**: ARCHIVED - Design has evolved
 **Created**: 2026-02-14
 **Beads Issue**: ai-config-manager-d9g
+
+> **⚠️ OUTDATED:** This document describes an early design for ai.repo.yaml. The actual implementation has evolved significantly. For current documentation, see:
+> - [docs/user-guide/sync-sources.md](../user-guide/sync-sources.md) - Current source management guide
+> - [docs/user-guide/github-sources.md](../user-guide/github-sources.md) - GitHub sources guide
+>
+> **Key changes from this design:**
+> - Import mode is now **implicit** (path → symlink, url → copy), not configured via `mode:` field
+> - State tracking moved to `.metadata/sources.json` (separate from configuration)
+> - `ai.repo.yaml` contains only configuration (no `added`, `last_synced`, or `mode` fields)
+
+---
 
 ## Problem Statement
 
@@ -76,11 +87,9 @@ filter:
     - "command/test-*"     # Exclude test fixtures
     - "skill/experimental-*"
 
-# Default import mode (optional, can be overridden by consumer)
-# "copy" = copy files into repo (default for remote)
-# "symlink" = create symlinks (default for local)
-# "auto" = let aimgr decide based on source type (default)
-mode: auto
+# NOTE: Import mode is now implicit (not in this file)
+# Path sources → symlink mode (automatic)
+# URL sources → copy mode (automatic)
 ```
 
 ### Struct Definition
@@ -108,8 +117,7 @@ type Manifest struct {
     // Mutually exclusive with Resources
     Filter *FilterConfig `yaml:"filter,omitempty"`
 
-    // Mode is the default import mode: "copy", "symlink", or "auto" (default)
-    Mode string `yaml:"mode,omitempty"`
+    // NOTE: Mode field was removed - mode is now implicit based on source type
 }
 
 // FilterConfig declares which resources to include/exclude via glob patterns

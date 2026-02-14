@@ -86,8 +86,6 @@ When you add a GitHub source, it's automatically tracked in `ai.repo.yaml` at th
 - Source URL and ref
 - Subpath (if specified)
 - Source name
-- Mode (always `copy` for GitHub sources)
-- Last sync time
 
 **Example ai.repo.yaml entry:**
 
@@ -96,18 +94,14 @@ sources:
   - name: owner-repo
     url: https://github.com/owner/repo
     ref: main
-    mode: copy
-    added: 2026-02-14T10:30:00Z
-    last_synced: 2026-02-14T10:30:00Z
   
   - name: my-skills
     url: https://github.com/myorg/skills
     ref: v2.0.0
     subpath: skills/frontend
-    mode: copy
-    added: 2026-02-14T11:00:00Z
-    last_synced: 2026-02-14T11:00:00Z
 ```
+
+**Note:** Import mode is **implicit** based on source type. URL sources (like GitHub) always use **copy mode** (resources are copied to your repository). Path sources use **symlink mode** (resources are symlinked for live editing). You don't need to configure this - it's automatic.
 
 ### Syncing GitHub Sources
 
