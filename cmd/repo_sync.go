@@ -43,15 +43,9 @@ Example ai.repo.yaml:
   sources:
     - name: my-team-resources
       path: /home/user/resources
-      mode: symlink
-      added: 2024-01-15T10:30:00Z
-      last_synced: 2024-01-16T14:20:00Z
     - name: community-skills
       url: https://github.com/owner/repo
       ref: main
-      mode: copy
-      added: 2024-01-15T11:00:00Z
-      last_synced: 2024-01-16T14:21:00Z
 
 Examples:
   # Sync all configured sources (overwrites existing)

@@ -28,7 +28,6 @@ var (
 	dryRunFlag       bool
 	filterFlag       string
 	addFormatFlag    string
-	copyFlag         bool
 	nameFlag         string
 )
 
@@ -41,10 +40,6 @@ var repoAddCmd = &cobra.Command{
 This command auto-discovers and adds all resources (commands, skills, agents, packages)
 from the specified source location. It also automatically detects and adds marketplace.json
 files if present.
-
-Add Modes:
-  - URLs (git repositories): Auto-detected and copied to repository
-  - Local paths: Auto-detected and symlinked by default (use --copy to force copy)
 
 Source Formats:
   Local folders:
@@ -65,12 +60,12 @@ Packages are .package.json files in the packages/ directory.
 Marketplace files (marketplace.json) are automatically discovered and converted to packages.
 
 Examples:
-  # Add all resources from local folder (symlinked by default)
+  # Add all resources from local folder
   aimgr repo add ~/.opencode/
   aimgr repo add ~/project/.claude/
   aimgr repo add ./my-resources/
 
-  # Add all resources from GitHub (copied automatically)
+  # Add all resources from GitHub
   aimgr repo add https://github.com/owner/repo
   aimgr repo add git@github.com:owner/repo.git
   aimgr repo add gh:owner/repo
@@ -83,7 +78,6 @@ Examples:
   aimgr repo add ~/resources/ --force
   aimgr repo add gh:owner/repo --skip-existing
   aimgr repo add ./test/ --dry-run
-  aimgr repo add ~/resources/ --copy  # Force copy mode for local path
   
   # Filter resources (pattern matching)
   aimgr repo add gh:owner/repo --filter "skill/*"
@@ -118,11 +112,8 @@ Examples:
 			importMode = "copy"
 			addErr = addBulkFromGitHub(parsed, manager)
 		} else {
-			// Local source: use symlink mode by default, copy if --copy flag is set
+			// Local source: always use symlink mode
 			importMode = "symlink"
-			if copyFlag {
-				importMode = "copy"
-			}
 			addErr = addBulkFromLocalWithMode(parsed.LocalPath, manager, filterFlag, importMode)
 		}
 
@@ -150,7 +141,6 @@ func init() {
 	repoAddCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without adding")
 	repoAddCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
 	repoAddCmd.Flags().StringVar(&addFormatFlag, "format", "table", "Output format: table, json, yaml")
-	repoAddCmd.Flags().BoolVar(&copyFlag, "copy", false, "Force copy mode for local paths (default: symlink)")
 	repoAddCmd.Flags().StringVar(&nameFlag, "name", "", "Override auto-generated source name")
 	repoAddCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
