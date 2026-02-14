@@ -192,6 +192,9 @@ func describeSkillDetails(manager *repo.Manager, res *resource.Resource, metadat
 	if metadataAvailable {
 		fmt.Printf("Source: %s\n", meta.SourceURL)
 		fmt.Printf("Source Type: %s\n", meta.SourceType)
+		if meta.SourceName != "" {
+			fmt.Printf("Source Name: %s\n", meta.SourceName)
+		}
 		fmt.Printf("First Installed: %s\n", formatTimestamp(meta.FirstInstalled))
 		fmt.Printf("Last Updated: %s\n", formatTimestamp(meta.LastUpdated))
 		fmt.Println()
@@ -244,6 +247,9 @@ func describeCommandDetails(manager *repo.Manager, res *resource.Resource, metad
 	if metadataAvailable {
 		fmt.Printf("Source: %s\n", meta.SourceURL)
 		fmt.Printf("Source Type: %s\n", meta.SourceType)
+		if meta.SourceName != "" {
+			fmt.Printf("Source Name: %s\n", meta.SourceName)
+		}
 		fmt.Printf("First Installed: %s\n", formatTimestamp(meta.FirstInstalled))
 		fmt.Printf("Last Updated: %s\n", formatTimestamp(meta.LastUpdated))
 		fmt.Println()
@@ -296,6 +302,9 @@ func describeAgentDetails(manager *repo.Manager, res *resource.Resource, metadat
 	if metadataAvailable {
 		fmt.Printf("Source: %s\n", meta.SourceURL)
 		fmt.Printf("Source Type: %s\n", meta.SourceType)
+		if meta.SourceName != "" {
+			fmt.Printf("Source Name: %s\n", meta.SourceName)
+		}
 		fmt.Printf("First Installed: %s\n", formatTimestamp(meta.FirstInstalled))
 		fmt.Printf("Last Updated: %s\n", formatTimestamp(meta.LastUpdated))
 		fmt.Println()
@@ -526,6 +535,9 @@ func describePackageDetails(manager *repo.Manager, res *resource.Resource, metad
 	if metadataAvailable {
 		fmt.Printf("Source: %s\n", meta.SourceURL)
 		fmt.Printf("Source Type: %s\n", meta.SourceType)
+		if meta.SourceName != "" {
+			fmt.Printf("Source Name: %s\n", meta.SourceName)
+		}
 		if meta.SourceRef != "" {
 			fmt.Printf("Source Ref: %s\n", meta.SourceRef)
 		}

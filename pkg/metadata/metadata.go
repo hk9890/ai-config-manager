@@ -253,6 +253,7 @@ type PackageMetadata struct {
 	Name           string    `json:"name"`
 	SourceType     string    `json:"source_type"`
 	SourceURL      string    `json:"source_url,omitempty"`
+	SourceName     string    `json:"source_name,omitempty"`
 	SourceRef      string    `json:"source_ref,omitempty"`
 	FirstAdded     time.Time `json:"first_added"`
 	LastUpdated    time.Time `json:"last_updated"`
