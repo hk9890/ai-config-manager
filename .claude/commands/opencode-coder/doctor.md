@@ -1,1 +1,0 @@
-/home/hans/.local/share/ai-config/repo/commands/opencode-coder/doctor.md
