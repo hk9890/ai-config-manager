@@ -163,9 +163,25 @@ func TestOutputFormatYAML(t *testing.T) {
 	}
 
 	// Parse YAML output
+	// Note: May contain stderr messages like "Created ai.repo.yaml" before the YAML
+	// Try to find the start of the YAML by looking for the first line with "added:"
+	yamlOutput := output
+	if strings.Contains(output, "Created ai.repo.yaml") {
+		// Strip lines before the actual YAML starts
+		lines := strings.Split(output, "\n")
+		yamlStart := 0
+		for i, line := range lines {
+			if strings.HasPrefix(line, "added:") || strings.HasPrefix(line, "updated:") {
+				yamlStart = i
+				break
+			}
+		}
+		yamlOutput = strings.Join(lines[yamlStart:], "\n")
+	}
+
 	var result map[string]interface{}
-	if err := yaml.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Failed to parse YAML output: %v\nOutput: %s", err, output)
+	if err := yaml.Unmarshal([]byte(yamlOutput), &result); err != nil {
+		t.Fatalf("Failed to parse YAML output: %v\nOutput: %s", err, yamlOutput)
 	}
 
 	// Verify YAML structure
