@@ -34,8 +34,6 @@ func TestRepoRemove_ByName(t *testing.T) {
 	source := &repomanifest.Source{
 		Name:  "test-source",
 		Path:  "/home/user/resources",
-		Mode:  "symlink",
-		Added: time.Now(),
 	}
 
 	if err := manifest.AddSource(source); err != nil {
@@ -125,10 +123,8 @@ func TestRepoRemove_ByPath(t *testing.T) {
 
 	sourcePath := "/home/user/my-resources"
 	source := &repomanifest.Source{
-		Name:  "my-resources",
-		Path:  sourcePath,
-		Mode:  "symlink",
-		Added: time.Now(),
+		Name: "my-resources",
+		Path: sourcePath,
 	}
 
 	if err := manifest.AddSource(source); err != nil {
@@ -173,8 +169,6 @@ func TestRepoRemove_ByURL(t *testing.T) {
 	source := &repomanifest.Source{
 		Name:  "owner-repo",
 		URL:   sourceURL,
-		Mode:  "copy",
-		Added: time.Now(),
 	}
 
 	if err := manifest.AddSource(source); err != nil {
@@ -218,8 +212,6 @@ func TestRepoRemove_DryRun(t *testing.T) {
 	source := &repomanifest.Source{
 		Name:  "test-source",
 		Path:  "/home/user/resources",
-		Mode:  "symlink",
-		Added: time.Now(),
 	}
 
 	if err := manifest.AddSource(source); err != nil {
@@ -293,8 +285,6 @@ func TestRepoRemove_KeepResources(t *testing.T) {
 	source := &repomanifest.Source{
 		Name:  "test-source",
 		Path:  "/home/user/resources",
-		Mode:  "symlink",
-		Added: time.Now(),
 	}
 
 	if err := manifest.AddSource(source); err != nil {
@@ -392,8 +382,6 @@ func TestRepoRemove_MultipleResources(t *testing.T) {
 	source := &repomanifest.Source{
 		Name:  "test-source",
 		Path:  "/home/user/resources",
-		Mode:  "symlink",
-		Added: time.Now(),
 	}
 
 	if err := manifest.AddSource(source); err != nil {
@@ -499,14 +487,10 @@ func TestRepoRemove_OnlyOrphansFromSource(t *testing.T) {
 	source1 := &repomanifest.Source{
 		Name:  "source-1",
 		Path:  "/home/user/resources1",
-		Mode:  "symlink",
-		Added: time.Now(),
 	}
 	source2 := &repomanifest.Source{
 		Name:  "source-2",
 		Path:  "/home/user/resources2",
-		Mode:  "symlink",
-		Added: time.Now(),
 	}
 
 	if err := manifest.AddSource(source1); err != nil {

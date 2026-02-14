@@ -9,6 +9,7 @@ import (
 
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 )
 
 // Test helper: create a minimal test source directory with resources
@@ -132,20 +133,32 @@ func verifySourceSynced(t *testing.T, repoPath string, sourceName string) {
 	}
 
 	// Find source
-	source, found := manifest.GetSource(sourceName)
+	_, found := manifest.GetSource(sourceName)
 	if !found {
 		t.Fatalf("source %s not found in manifest", sourceName)
 	}
 
+	// Load source metadata to check last_synced
+	metadata, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load source metadata: %v", err)
+	}
+
+	state := metadata.Get(sourceName)
+	if state == nil {
+		t.Fatalf("source %s state not found in metadata", sourceName)
+	}
+
 	// Verify last_synced was updated
-	if source.LastSynced.IsZero() {
+	if state.LastSynced.IsZero() {
 		t.Errorf("source %s last_synced timestamp not updated", sourceName)
 	}
 
 	// Verify timestamp is recent (within last minute)
-	if time.Since(source.LastSynced) > time.Minute {
-		t.Errorf("source %s last_synced timestamp is too old: %v", sourceName, source.LastSynced)
+	if time.Since(state.LastSynced) > time.Minute {
+		t.Errorf("source %s last_synced timestamp is too old: %v", sourceName, state.LastSynced)
 	}
+
 }
 
 // Test helper: verify resources exist in repo
@@ -199,8 +212,6 @@ func TestRunSync_SingleSource(t *testing.T) {
 		{
 			Name:  "test-source-1",
 			Path:  source1,
-			Mode:  "symlink",
-			Added: time.Now(),
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -231,14 +242,10 @@ func TestRunSync_MultipleSources(t *testing.T) {
 		{
 			Name:  "test-source-1",
 			Path:  source1,
-			Mode:  "symlink",
-			Added: time.Now(),
 		},
 		{
 			Name:  "test-source-2",
 			Path:  source2,
-			Mode:  "copy",
-			Added: time.Now(),
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -269,8 +276,6 @@ func TestRunSync_DryRun(t *testing.T) {
 		{
 			Name:  "test-source-1",
 			Path:  source1,
-			Mode:  "symlink",
-			Added: time.Now(),
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -295,11 +300,17 @@ func TestRunSync_DryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load manifest: %v", err)
 	}
-	source, found := manifest.GetSource("test-source-1")
+	_, found := manifest.GetSource("test-source-1")
 	if !found {
 		t.Fatalf("source not found")
 	}
-	if !source.LastSynced.IsZero() {
+	// Check that last_synced was not updated in metadata
+	metadata, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load source metadata: %v", err)
+	}
+	state := metadata.Get("test-source-1")
+	if state != nil && !state.LastSynced.IsZero() {
 		t.Errorf("dry run should not update last_synced timestamp")
 	}
 }
@@ -313,8 +324,6 @@ func TestRunSync_SkipExisting(t *testing.T) {
 		{
 			Name:  "test-source-1",
 			Path:  source1,
-			Mode:  "symlink",
-			Added: time.Now(),
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -378,8 +387,6 @@ func TestRunSync_DefaultForce(t *testing.T) {
 		{
 			Name:  "test-source-1",
 			Path:  source1,
-			Mode:  "symlink",
-			Added: time.Now(),
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -466,8 +473,6 @@ func TestRunSync_InvalidSource(t *testing.T) {
 		{
 			Name:  "invalid-source",
 			Path:  "/nonexistent/path/that/does/not/exist",
-			Mode:  "symlink",
-			Added: time.Now(),
 		},
 	}
 	_, cleanup := setupTestManifest(t, sources)
@@ -496,14 +501,10 @@ func TestRunSync_MixedValidInvalidSources(t *testing.T) {
 		{
 			Name:  "valid-source",
 			Path:  validSource,
-			Mode:  "symlink",
-			Added: time.Now(),
 		},
 		{
 			Name:  "invalid-source",
 			Path:  "/nonexistent/path",
-			Mode:  "symlink",
-			Added: time.Now(),
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -530,11 +531,17 @@ func TestRunSync_MixedValidInvalidSources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load manifest: %v", err)
 	}
-	invalidSource, found := manifest.GetSource("invalid-source")
+	_, found := manifest.GetSource("invalid-source")
 	if !found {
 		t.Fatalf("invalid-source not found in manifest")
 	}
-	if !invalidSource.LastSynced.IsZero() {
+	// Check that invalid source has no last_synced in metadata
+	metadata, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load source metadata: %v", err)
+	}
+	state := metadata.Get("invalid-source")
+	if state != nil && !state.LastSynced.IsZero() {
 		t.Errorf("invalid source should not have last_synced timestamp updated")
 	}
 }
@@ -549,9 +556,6 @@ func TestRunSync_UpdatesLastSynced(t *testing.T) {
 		{
 			Name:       "test-source-1",
 			Path:       source1,
-			Mode:       "symlink",
-			Added:      time.Now().Add(-48 * time.Hour),
-			LastSynced: oldTimestamp,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -569,18 +573,26 @@ func TestRunSync_UpdatesLastSynced(t *testing.T) {
 		t.Fatalf("failed to load manifest: %v", err)
 	}
 
-	source, found := manifest.GetSource("test-source-1")
+	_, found := manifest.GetSource("test-source-1")
 	if !found {
 		t.Fatalf("source not found")
 	}
 
 	// Verify timestamp was updated (should be recent, not old)
-	if source.LastSynced.Equal(oldTimestamp) {
+	// Check via metadata
+	metadata, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load metadata: %v", err)
+	}
+	state := metadata.Get("test-source-1")
+	if state == nil {
+		t.Fatalf("state not found")
+	}
+	if state.LastSynced.Equal(oldTimestamp) {
 		t.Errorf("last_synced timestamp was not updated")
 	}
-
-	if time.Since(source.LastSynced) > time.Minute {
-		t.Errorf("last_synced timestamp is not recent: %v", source.LastSynced)
+	if time.Since(state.LastSynced) > time.Minute {
+		t.Errorf("last_synced timestamp is not recent: %v", state.LastSynced)
 	}
 }
 
@@ -594,8 +606,6 @@ func TestRunSync_PreservesManifest(t *testing.T) {
 		{
 			Name:  "test-source-1",
 			Path:  source1,
-			Mode:  "symlink",
-			Added: addedTime,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -631,17 +641,25 @@ func TestRunSync_PreservesManifest(t *testing.T) {
 	if source.Path != source1 {
 		t.Errorf("source path changed: expected %s, got %s", source1, source.Path)
 	}
-	if source.Mode != "symlink" {
-		t.Errorf("source mode changed: expected symlink, got %s", source.Mode)
+	if source.GetMode() != "symlink" {
+		t.Errorf("source mode changed: expected symlink, got %s", source.GetMode())
 	}
 
-	// Verify added timestamp is preserved (within 1 second tolerance for rounding)
-	if source.Added.Sub(addedTime).Abs() > time.Second {
-		t.Errorf("added timestamp changed: expected %v, got %v", addedTime, source.Added)
+	// Verify added timestamp is preserved in metadata
+	metadata, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load metadata: %v", err)
+	}
+	state := metadata.Get("test-source-1")
+	if state == nil {
+		t.Fatalf("state not found")
+	}
+	if state.Added.Sub(addedTime).Abs() > time.Second {
+		t.Errorf("added timestamp changed: expected %v, got %v", addedTime, state.Added)
 	}
 
 	// Verify last_synced was added
-	if source.LastSynced.IsZero() {
+	if state.LastSynced.IsZero() {
 		t.Errorf("last_synced timestamp was not added")
 	}
 }
