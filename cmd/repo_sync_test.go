@@ -210,8 +210,8 @@ func TestRunSync_SingleSource(t *testing.T) {
 	// Create manifest with one source
 	sources := []*repomanifest.Source{
 		{
-			Name:  "test-source-1",
-			Path:  source1,
+			Name: "test-source-1",
+			Path: source1,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -240,12 +240,12 @@ func TestRunSync_MultipleSources(t *testing.T) {
 	// Create manifest with multiple sources
 	sources := []*repomanifest.Source{
 		{
-			Name:  "test-source-1",
-			Path:  source1,
+			Name: "test-source-1",
+			Path: source1,
 		},
 		{
-			Name:  "test-source-2",
-			Path:  source2,
+			Name: "test-source-2",
+			Path: source2,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -274,8 +274,8 @@ func TestRunSync_DryRun(t *testing.T) {
 	// Create manifest
 	sources := []*repomanifest.Source{
 		{
-			Name:  "test-source-1",
-			Path:  source1,
+			Name: "test-source-1",
+			Path: source1,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -322,8 +322,8 @@ func TestRunSync_SkipExisting(t *testing.T) {
 	// Create manifest
 	sources := []*repomanifest.Source{
 		{
-			Name:  "test-source-1",
-			Path:  source1,
+			Name: "test-source-1",
+			Path: source1,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -385,8 +385,8 @@ func TestRunSync_DefaultForce(t *testing.T) {
 	// Create manifest
 	sources := []*repomanifest.Source{
 		{
-			Name:  "test-source-1",
-			Path:  source1,
+			Name: "test-source-1",
+			Path: source1,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -471,8 +471,8 @@ func TestRunSync_InvalidSource(t *testing.T) {
 	// Create manifest with invalid source (non-existent path)
 	sources := []*repomanifest.Source{
 		{
-			Name:  "invalid-source",
-			Path:  "/nonexistent/path/that/does/not/exist",
+			Name: "invalid-source",
+			Path: "/nonexistent/path/that/does/not/exist",
 		},
 	}
 	_, cleanup := setupTestManifest(t, sources)
@@ -499,12 +499,12 @@ func TestRunSync_MixedValidInvalidSources(t *testing.T) {
 	// Create manifest with one valid and one invalid source
 	sources := []*repomanifest.Source{
 		{
-			Name:  "valid-source",
-			Path:  validSource,
+			Name: "valid-source",
+			Path: validSource,
 		},
 		{
-			Name:  "invalid-source",
-			Path:  "/nonexistent/path",
+			Name: "invalid-source",
+			Path: "/nonexistent/path",
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -554,8 +554,8 @@ func TestRunSync_UpdatesLastSynced(t *testing.T) {
 	oldTimestamp := time.Now().Add(-24 * time.Hour)
 	sources := []*repomanifest.Source{
 		{
-			Name:       "test-source-1",
-			Path:       source1,
+			Name: "test-source-1",
+			Path: source1,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
@@ -604,12 +604,26 @@ func TestRunSync_PreservesManifest(t *testing.T) {
 	addedTime := time.Now().Add(-48 * time.Hour)
 	sources := []*repomanifest.Source{
 		{
-			Name:  "test-source-1",
-			Path:  source1,
+			Name: "test-source-1",
+			Path: source1,
 		},
 	}
 	repoPath, cleanup := setupTestManifest(t, sources)
 	defer cleanup()
+
+	// Create metadata with specific added time
+	metadata := &sourcemetadata.SourceMetadata{
+		Version: 1,
+		Sources: map[string]*sourcemetadata.SourceState{
+			"test-source-1": {
+				Added:      addedTime,
+				LastSynced: time.Time{}, // Not yet synced
+			},
+		},
+	}
+	if err := metadata.Save(repoPath); err != nil {
+		t.Fatalf("failed to save metadata: %v", err)
+	}
 
 	// Run sync command
 	err := runSync(syncCmd, []string{})
@@ -646,11 +660,11 @@ func TestRunSync_PreservesManifest(t *testing.T) {
 	}
 
 	// Verify added timestamp is preserved in metadata
-	metadata, err := sourcemetadata.Load(repoPath)
+	loadedMetadata, err := sourcemetadata.Load(repoPath)
 	if err != nil {
 		t.Fatalf("failed to load metadata: %v", err)
 	}
-	state := metadata.Get("test-source-1")
+	state := loadedMetadata.Get("test-source-1")
 	if state == nil {
 		t.Fatalf("state not found")
 	}
