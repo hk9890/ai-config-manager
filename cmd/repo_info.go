@@ -114,20 +114,25 @@ Examples:
 			info.AddSection().Add("Disk Usage", formatBytes(size))
 		}
 
-		// Add sources information
+		// Add sources count (but not the details - we'll render table separately for table format)
 		if manifest != nil && len(manifest.Sources) > 0 {
-			sourcesValue := fmt.Sprintf("%d\n", len(manifest.Sources))
-			for _, source := range manifest.Sources {
-				sourceLine := formatSource(source, metadata)
-				sourcesValue += sourceLine + "\n"
-			}
-			info.AddSection().Add("Sources", sourcesValue)
+			info.AddSection().Add("Sources", fmt.Sprintf("%d", len(manifest.Sources)))
 		} else {
 			info.AddSection().Add("Sources", "0 (use 'aimgr repo add' to add sources)")
 		}
 
-		// Format output
-		return info.Format(parsedFormat)
+		// Format key-value output first
+		if err := info.Format(parsedFormat); err != nil {
+			return err
+		}
+
+		// For table format, render sources table after key-value section
+		if parsedFormat == output.Table && manifest != nil && len(manifest.Sources) > 0 {
+			fmt.Println() // Add blank line between key-value and table
+			return renderSourcesTable(manifest.Sources, metadata)
+		}
+
+		return nil
 	},
 }
 
@@ -158,6 +163,55 @@ func formatBytes(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+
+// renderSourcesTable renders sources as a table
+func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata.SourceMetadata) error {
+	// Create table with columns: NAME, TYPE, LOCATION, MODE, LAST SYNCED
+	table := output.NewTable("NAME", "TYPE", "LOCATION", "MODE", "LAST SYNCED")
+	table.WithResponsive().
+		WithDynamicColumn(2).       // LOCATION column stretches
+		WithMinColumnWidths(20, 8, 30, 10, 12) // NAME, TYPE, LOCATION, MODE, LAST SYNCED
+
+	// Add row for each source
+	for _, source := range sources {
+		// Health check
+		health := checkSourceHealth(source)
+		healthIcon := "✓"
+		if !health {
+			healthIcon = "✗"
+		}
+
+		// Determine source type and location
+		sourceType := "local"
+		location := source.Path
+		if source.URL != "" {
+			sourceType = "remote"
+			location = source.URL
+		}
+
+		// Get mode from source (implicit based on path/url)
+		mode := source.GetMode()
+
+		// Format last synced time from metadata
+		lastSynced := "never"
+		if state, ok := metadata.Sources[source.Name]; ok && !state.LastSynced.IsZero() {
+			lastSynced = formatTimeSince(state.LastSynced)
+		}
+
+		// Add row with health indicator prepended to name
+		table.AddRow(
+			fmt.Sprintf("%s %s", healthIcon, source.Name),
+			sourceType,
+			location,
+			mode,
+			lastSynced,
+		)
+	}
+
+	// Render the table
+	return table.Format(output.Table)
 }
 
 // formatSource formats a source with health indicator, type, path/URL, mode, and last synced

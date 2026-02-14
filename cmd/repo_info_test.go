@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 )
 
 func TestFormatTimeSince(t *testing.T) {
@@ -76,7 +77,6 @@ func TestCheckSourceHealth(t *testing.T) {
 			source: &repomanifest.Source{
 				Name: "test-local",
 				Path: existingPath,
-				Mode: "symlink",
 			},
 			expected: true,
 		},
@@ -85,7 +85,6 @@ func TestCheckSourceHealth(t *testing.T) {
 			source: &repomanifest.Source{
 				Name: "test-missing",
 				Path: filepath.Join(tempDir, "nonexistent"),
-				Mode: "symlink",
 			},
 			expected: false,
 		},
@@ -94,7 +93,6 @@ func TestCheckSourceHealth(t *testing.T) {
 			source: &repomanifest.Source{
 				Name: "test-remote",
 				URL:  "https://github.com/user/repo",
-				Mode: "copy",
 			},
 			expected: true,
 		},
@@ -114,20 +112,35 @@ func TestFormatSource(t *testing.T) {
 	now := time.Now()
 	twoHoursAgo := now.Add(-2 * time.Hour)
 
+	// Create metadata with sync time for first test
+	metadataWithSync := &sourcemetadata.SourceMetadata{
+		Version: 1,
+		Sources: map[string]*sourcemetadata.SourceState{
+			"my-local-commands": {
+				LastSynced: twoHoursAgo,
+			},
+		},
+	}
+
+	// Create empty metadata for second test
+	emptyMetadata := &sourcemetadata.SourceMetadata{
+		Version: 1,
+		Sources: make(map[string]*sourcemetadata.SourceState),
+	}
+
 	tests := []struct {
 		name     string
 		source   *repomanifest.Source
+		metadata *sourcemetadata.SourceMetadata
 		contains []string // Substrings that should be present
 	}{
 		{
 			name: "local source with sync time",
 			source: &repomanifest.Source{
-				Name:       "my-local-commands",
-				Path:       "/home/user/resources",
-				Mode:       "symlink",
-				Added:      now,
-				LastSynced: twoHoursAgo,
+				Name: "my-local-commands",
+				Path: "/home/user/resources",
 			},
+			metadata: metadataWithSync,
 			contains: []string{
 				"my-local-commands",
 				"local:",
@@ -139,11 +152,10 @@ func TestFormatSource(t *testing.T) {
 		{
 			name: "remote source never synced",
 			source: &repomanifest.Source{
-				Name:  "agentskills-catalog",
-				URL:   "https://github.com/agentskills/catalog",
-				Mode:  "copy",
-				Added: now,
+				Name: "agentskills-catalog",
+				URL:  "https://github.com/agentskills/catalog",
 			},
+			metadata: emptyMetadata,
 			contains: []string{
 				"agentskills-catalog",
 				"remote:",
@@ -156,7 +168,7 @@ func TestFormatSource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatSource(tt.source)
+			result := formatSource(tt.source, tt.metadata)
 			for _, substr := range tt.contains {
 				if !strings.Contains(result, substr) {
 					t.Errorf("formatSource() result missing %q\nGot: %s", substr, result)
