@@ -124,27 +124,31 @@ func TestE2E_BasicReadOperations(t *testing.T) {
 
 		// Verify JSON structure has expected fields
 		for i, item := range items {
-			// Check for Name field (always present)
-			if name, ok := item["Name"].(string); !ok || name == "" {
-				t.Errorf("Resource %d has invalid 'Name' field: %v", i, item["Name"])
-			}
-
-			// Check if this is a package (has ResourceCount) or a resource (has Type)
+			// Check if this is a package (has ResourceCount) or a resource (has type)
 			if resourceCount, isPackage := item["ResourceCount"]; isPackage {
-				// This is a package
+				// This is a package - uses uppercase fields
 				if _, ok := resourceCount.(float64); !ok {
 					t.Errorf("Package %d has invalid 'ResourceCount' field: %v", i, resourceCount)
+				}
+				// Packages should have Name (uppercase)
+				if name, ok := item["Name"].(string); !ok || name == "" {
+					t.Errorf("Package %d has invalid 'Name' field: %v", i, item["Name"])
 				}
 				// Packages should have Description
 				if desc, ok := item["Description"].(string); !ok {
 					t.Errorf("Package %d missing or invalid 'Description' field: %v", i, desc)
 				}
 			} else {
-				// This is a resource (command, skill, agent)
-				if resType, ok := item["Type"].(string); !ok || resType == "" {
-					t.Errorf("Resource %d has invalid 'Type' field: %v", i, item["Type"])
+				// This is a resource (command, skill, agent) - uses lowercase fields
+				// Check for name field (lowercase)
+				if name, ok := item["name"].(string); !ok || name == "" {
+					t.Errorf("Resource %d has invalid 'name' field: %v", i, item["name"])
+				}
+				
+				if resType, ok := item["type"].(string); !ok || resType == "" {
+					t.Errorf("Resource %d has invalid 'type' field: %v", i, item["type"])
 				} else {
-					// Verify type is one of the known types (including package from Type field)
+					// Verify type is one of the known types
 					validTypes := map[string]bool{
 						"command": true,
 						"skill":   true,
@@ -156,11 +160,9 @@ func TestE2E_BasicReadOperations(t *testing.T) {
 					}
 				}
 
-				// Path is optional for packages, required for other resources
-				if resType, _ := item["Type"].(string); resType != "package" {
-					if path, ok := item["Path"].(string); !ok || path == "" {
-						t.Errorf("Resource %d has invalid 'Path' field: %v", i, item["Path"])
-					}
+				// path is required for resources
+				if path, ok := item["path"].(string); !ok || path == "" {
+					t.Errorf("Resource %d has invalid 'path' field: %v", i, item["path"])
 				}
 			}
 		}
@@ -186,7 +188,7 @@ func TestE2E_BasicReadOperations(t *testing.T) {
 		// Test with different resource types
 		testedTypes := make(map[string]bool)
 		for _, item := range items {
-			resType, ok := item["Type"].(string)
+			resType, ok := item["type"].(string)
 			if !ok {
 				// Skip packages (they don't have a Type field)
 				continue
@@ -198,7 +200,7 @@ func TestE2E_BasicReadOperations(t *testing.T) {
 			}
 
 			// Get resource name
-			resName, ok := item["Name"].(string)
+			resName, ok := item["name"].(string)
 			if !ok || resName == "" {
 				continue
 			}
@@ -278,7 +280,7 @@ func TestE2E_BasicReadOperations(t *testing.T) {
 		// Count resources by type
 		typeCounts := make(map[string]int)
 		for _, item := range items {
-			if resType, ok := item["Type"].(string); ok {
+			if resType, ok := item["type"].(string); ok {
 				typeCounts[resType]++
 			}
 		}
@@ -394,7 +396,7 @@ func TestE2E_RepoListFiltering(t *testing.T) {
 
 		// Verify all items are commands
 		for i, item := range items {
-			resType, ok := item["Type"].(string)
+			resType, ok := item["type"].(string)
 			if !ok {
 				t.Errorf("Resource %d missing Type field", i)
 				continue
@@ -426,7 +428,7 @@ func TestE2E_RepoListFiltering(t *testing.T) {
 
 		// Verify all items are skills
 		for i, item := range items {
-			resType, ok := item["Type"].(string)
+			resType, ok := item["type"].(string)
 			if !ok {
 				t.Errorf("Resource %d missing Type field", i)
 				continue
