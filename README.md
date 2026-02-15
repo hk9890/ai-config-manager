@@ -402,13 +402,13 @@ aimgr repo import gh:myorg/repo --filter "agent/*"
 aimgr repo list
 
 # List only commands
-aimgr repo list command
+aimgr repo list "command/*"
 
 # List only skills
-aimgr repo list skill
+aimgr repo list "skill/*"
 
 # List only agents
-aimgr repo list agent
+aimgr repo list "agent/*"
 
 # JSON output
 aimgr repo list --format=json
@@ -914,7 +914,7 @@ aimgr repo list --format=json
 aimgr list --format=json
 ```
 
-For comprehensive documentation with scripting examples, see [docs/output-formats.md](docs/output-formats.md).
+For comprehensive documentation with scripting examples, see [docs/user-guide/output-formats.md](docs/user-guide/output-formats.md).
 
 ## Commands
 
@@ -1175,10 +1175,10 @@ List resources in the repository.
 aimgr repo list
 
 # Filter by type
-aimgr repo list command
-aimgr repo list skill
-aimgr repo list agent
-aimgr repo list package
+aimgr repo list "command/*"
+aimgr repo list "skill/*"
+aimgr repo list "agent/*"
+aimgr repo list "package/*"
 
 # Output formats
 aimgr repo list --format=table  # Default
@@ -1234,9 +1234,9 @@ List resources installed in the current project directory.
 aimgr list
 
 # Filter by type
-aimgr list command
-aimgr list skill
-aimgr list agent
+aimgr list "command/*"
+aimgr list "skill/*"
+aimgr list "agent/*"
 
 # Output formats
 aimgr list --format=table  # Default
@@ -1245,7 +1245,7 @@ aimgr list --format=yaml
 
 # List in specific directory
 aimgr list --path ~/my-project
-aimgr list skill --path /path/to/project
+aimgr list "skill/*" --path /path/to/project
 ```
 
 **Key Differences from `aimgr repo list`:**

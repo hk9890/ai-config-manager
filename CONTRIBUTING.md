@@ -187,7 +187,7 @@ For in-depth information, see the comprehensive guides in `docs/contributor-guid
 ### Running Tests
 
 ```bash
-make test              # All tests (vet → unit → integration → e2e)
+make test              # All tests (vet → unit → integration → test/...)
 make unit-test         # Fast unit tests only
 make integration-test  # Integration tests (slower)
 make e2e-test          # End-to-end tests (slowest)

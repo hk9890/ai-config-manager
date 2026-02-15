@@ -16,7 +16,7 @@ make build      # Build binary
 make install    # Build and install to ~/bin
 
 # Testing
-make test                # All tests (vet → unit → integration)
+make test                # All tests (vet → unit → integration → test/...)
 make unit-test           # Fast unit tests only
 make integration-test    # Slow integration tests
 

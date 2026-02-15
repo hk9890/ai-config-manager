@@ -71,7 +71,6 @@ func runAimgr(t *testing.T, args ...string) (string, error) {
 		}
 	}
 
-
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }
@@ -80,24 +79,24 @@ func runAimgr(t *testing.T, args ...string) (string, error) {
 // to prevent tests from reading the user's actual config
 func setupTestEnvironment(t *testing.T) (repoDir string, configDir string) {
 	t.Helper()
-	
+
 	// Create isolated repo directory
 	repoDir = t.TempDir()
-	
+
 	// Create isolated config directory
 	configDir = t.TempDir()
-	
+
 	// Set environment variables for complete isolation
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 	t.Setenv("XDG_CONFIG_HOME", configDir)
 	t.Setenv("XDG_DATA_HOME", repoDir)
-	
+
 	// Create a default config file in the isolated config directory
 	aimgrConfigDir := filepath.Join(configDir, "aimgr")
 	if err := os.MkdirAll(aimgrConfigDir, 0755); err != nil {
 		t.Fatalf("Failed to create config directory: %v", err)
 	}
-	
+
 	configContent := `install:
   targets:
     - claude
@@ -106,10 +105,9 @@ func setupTestEnvironment(t *testing.T) (repoDir string, configDir string) {
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-	
+
 	return repoDir, configDir
 }
-
 
 // TestCLIRepoAdd tests the 'aimgr repo add' command
 func TestCLIRepoAdd(t *testing.T) {

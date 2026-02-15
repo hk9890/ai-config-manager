@@ -220,7 +220,6 @@ func LoadGlobal() (*Config, error) {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
-
 	// Provide default if install.targets is empty
 	if len(config.Install.Targets) == 0 {
 		config.Install.Targets = []string{"claude"}
