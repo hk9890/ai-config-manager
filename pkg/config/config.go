@@ -220,15 +220,10 @@ func LoadGlobal() (*Config, error) {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
-	// Require install.targets
+
+	// Provide default if install.targets is empty
 	if len(config.Install.Targets) == 0 {
-		return nil, fmt.Errorf("install.targets is required\n\n"+
-			"Expected format:\n"+
-			"  install:\n"+
-			"    targets:\n"+
-			"      - claude\n"+
-			"      - opencode\n\n"+
-			"Config location: %s", configPath)
+		config.Install.Targets = []string{"claude"}
 	}
 
 	// Validate

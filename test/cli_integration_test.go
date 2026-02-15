@@ -55,17 +55,67 @@ func runAimgr(t *testing.T, args ...string) (string, error) {
 		}
 	}
 
+	// Propagate XDG_CONFIG_HOME
+	if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
+		// Replace or add XDG_CONFIG_HOME in the environment
+		found := false
+		for i, env := range cmd.Env {
+			if strings.HasPrefix(env, "XDG_CONFIG_HOME=") {
+				cmd.Env[i] = "XDG_CONFIG_HOME=" + xdgConfigHome
+				found = true
+				break
+			}
+		}
+		if !found {
+			cmd.Env = append(cmd.Env, "XDG_CONFIG_HOME="+xdgConfigHome)
+		}
+	}
+
+
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }
 
+// setupTestEnvironment creates isolated test directories and sets environment variables
+// to prevent tests from reading the user's actual config
+func setupTestEnvironment(t *testing.T) (repoDir string, configDir string) {
+	t.Helper()
+	
+	// Create isolated repo directory
+	repoDir = t.TempDir()
+	
+	// Create isolated config directory
+	configDir = t.TempDir()
+	
+	// Set environment variables for complete isolation
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	t.Setenv("XDG_CONFIG_HOME", configDir)
+	t.Setenv("XDG_DATA_HOME", repoDir)
+	
+	// Create a default config file in the isolated config directory
+	aimgrConfigDir := filepath.Join(configDir, "aimgr")
+	if err := os.MkdirAll(aimgrConfigDir, 0755); err != nil {
+		t.Fatalf("Failed to create config directory: %v", err)
+	}
+	
+	configContent := `install:
+  targets:
+    - claude
+`
+	configPath := filepath.Join(aimgrConfigDir, "aimgr.yaml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+	
+	return repoDir, configDir
+}
+
+
 // TestCLIRepoAdd tests the 'aimgr repo add' command
 func TestCLIRepoAdd(t *testing.T) {
 	// Create temporary repo directory
-	repoDir := t.TempDir()
-
-	// Set custom repo path
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 
 	// Create test command using helper
 	cmdPath := createTestCommand(t, "test-cmd", "A test command")
@@ -83,9 +133,8 @@ func TestCLIRepoAdd(t *testing.T) {
 
 // TestCLIRepoList tests the 'aimgr repo list' command
 func TestCLIRepoList(t *testing.T) {
-	repoDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 
 	// Create test command using helper
 	cmdPath := createTestCommand(t, "list-test", "A command for list testing")
@@ -109,9 +158,8 @@ func TestCLIRepoList(t *testing.T) {
 
 // TestCLIRepoShow tests the 'aimgr repo show' command
 func TestCLIRepoShow(t *testing.T) {
-	repoDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 
 	// Create test command using helper, but we need custom metadata
 	// So we'll create it manually but in proper structure
@@ -165,9 +213,8 @@ license: MIT
 
 // TestCLIRepoShowSkill tests 'aimgr repo show skill'
 func TestCLIRepoShowSkill(t *testing.T) {
-	repoDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 
 	// Create test skill using helper, but we need custom metadata
 	// So we'll create it manually but in proper structure
@@ -221,9 +268,8 @@ license: Apache-2.0
 
 // TestCLIRepoShowAgent tests 'aimgr repo show agent'
 func TestCLIRepoShowAgent(t *testing.T) {
-	repoDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 
 	// Create test agent using helper, but we need custom metadata
 	// So we'll create it manually but in proper structure
@@ -273,10 +319,9 @@ version: "1.5.0"
 
 // TestCLIInstall tests 'aimgr install' command
 func TestCLIInstall(t *testing.T) {
-	repoDir := t.TempDir()
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 	projectDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create .claude directory to trigger Claude detection
 	claudeDir := filepath.Join(projectDir, ".claude")
@@ -308,10 +353,9 @@ func TestCLIInstall(t *testing.T) {
 
 // TestCLIInstallMultiple tests installing multiple resources at once
 func TestCLIInstallMultiple(t *testing.T) {
-	repoDir := t.TempDir()
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 	projectDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create .claude directory
 	claudeDir := filepath.Join(projectDir, ".claude")
@@ -361,10 +405,9 @@ func TestCLIInstallMultiple(t *testing.T) {
 
 // TestCLIUninstall tests the 'aimgr uninstall' command
 func TestCLIUninstall(t *testing.T) {
-	repoDir := t.TempDir()
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 	projectDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	// Create .claude directory
 	claudeDir := filepath.Join(projectDir, ".claude")
@@ -482,9 +525,8 @@ func TestCLIUninstallSkipsExternalSymlinks(t *testing.T) {
 
 // TestCLIMetadataTracking tests that metadata is properly tracked
 func TestCLIMetadataTracking(t *testing.T) {
-	repoDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 
 	// Create test command using helper
 	cmdPath := createTestCommand(t, "metadata-test", "Metadata test command")
@@ -527,9 +569,8 @@ func TestCLIMetadataTracking(t *testing.T) {
 // See: https://github.com/hk9890/ai-config-manager/issues/TBD
 func TestCLIMetadataDeletedOnRemove(t *testing.T) {
 	t.Skip("Orphan cleanup not yet implemented for file-path sources - needs architecture fix")
-	repoDir := t.TempDir()
-
-	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	repoDir, _ := setupTestEnvironment(t)
+	_ = repoDir // Test environment setup (repo path set via env var)
 
 	// Create test command using helper
 	cmdPath := createTestCommand(t, "meta-remove-test", "Remove test")
