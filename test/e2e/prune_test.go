@@ -23,6 +23,9 @@ func TestE2E_PruneOnCleanRepo(t *testing.T) {
 		cleanTestRepo(t, repoPath)
 	})
 
+	// Setup: Create ai.repo.yaml with test sources
+	setupTestRepoWithSources(t, repoPath)
+
 	// Step 1: Sync repo to populate it with resources
 	// This will clone Git repos into .workspace/ and create metadata
 	t.Log("Step 1: Syncing repository to populate with resources...")
@@ -94,6 +97,9 @@ func TestE2E_PruneActuallyRemovesNothing(t *testing.T) {
 	t.Cleanup(func() {
 		cleanTestRepo(t, repoPath)
 	})
+
+	// Setup: Create ai.repo.yaml with test sources
+	setupTestRepoWithSources(t, repoPath)
 
 	// Step 1: Sync repo to populate it with resources
 	t.Log("Step 1: Syncing repository to populate with resources...")
@@ -198,6 +204,9 @@ func TestE2E_PruneOutputFormats(t *testing.T) {
 	t.Cleanup(func() {
 		cleanTestRepo(t, repoPath)
 	})
+
+	// Setup: Create ai.repo.yaml with test sources
+	setupTestRepoWithSources(t, repoPath)
 
 	// Step 1: Sync repo to populate it
 	t.Log("Step 1: Syncing repository...")

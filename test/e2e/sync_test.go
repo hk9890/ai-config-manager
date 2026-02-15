@@ -34,6 +34,9 @@ func TestE2E_SyncIdempotency(t *testing.T) {
 		cleanTestRepo(t, repoPath)
 	})
 
+	// Setup: Create ai.repo.yaml with test sources
+	setupTestRepoWithSources(t, repoPath)
+
 	// Step 1: Run first sync
 	// Note: We need to set AIMGR_REPO_PATH because sync command doesn't read repo.path from config yet
 	t.Log("Step 1: Running first sync on empty repository...")

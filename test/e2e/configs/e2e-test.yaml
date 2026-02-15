@@ -1,6 +1,6 @@
 # E2E Test Configuration
 # This config is used for end-to-end testing of aimgr CLI
-# It uses a test-specific repository path and includes realistic sync sources
+# It uses a test-specific repository path
 
 install:
     targets:
@@ -13,16 +13,5 @@ repo:
   # Path is relative to the config file location (test/e2e/configs/)
   path: ../repos/test-repo-1
 
-sync:
-  sources:
-    # Import all resources from ai-tools repository
-    - url: "https://github.com/hk9890/ai-tools/tree/main/src"
-    
-    # Import all skills from Anthropic's repository (filter after sync)
-    - url: "https://github.com/anthropics/skills"
-
-    # Import all resources from opencode-coder repository
-    - url: "https://github.com/hk9890/opencode-coder/tree/main/ai-resources"
-
-    # Import all resources from local knowledge base (commented out for CI/CD)
-    # - url: "/home/hans/dev/dt/copilot/knowledge-base/ai-agent-knowledge-base/knowledge-base/"
+# Note: Sync sources are configured per-repository via ai.repo.yaml
+# E2E tests use setupTestRepoWithSources() to create ai.repo.yaml with test sources

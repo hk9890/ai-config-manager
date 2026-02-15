@@ -423,3 +423,45 @@ func getTestRepoPath(t *testing.T, repoName string) string {
 
 	return repoPath
 }
+
+// setupTestRepoWithSources creates ai.repo.yaml in the test repository with realistic GitHub sources.
+// This configures the sources that repo sync will use to populate the repository.
+//
+// The sources include:
+//   - ai-config-examples (uses local path to examples directory)
+//
+// Note: Using local `path:` source instead of remote `url:` to avoid network dependencies in E2E tests.
+// The path source is a realistic production configuration for local development.
+//
+// Example:
+//
+//	repoPath := getRepoPathFromConfig(t, configPath)
+//	setupTestRepoWithSources(t, repoPath)
+//	// Now repo sync will use sources from ai.repo.yaml
+func setupTestRepoWithSources(t *testing.T, repoPath string) {
+	t.Helper()
+
+	// Ensure repo directory exists
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		t.Fatalf("Failed to create repo directory: %v", err)
+	}
+
+	// Get absolute path to examples directory
+	projectRoot := getProjectRoot(t)
+	examplesPath := filepath.Join(projectRoot, "examples")
+
+	// Create ai.repo.yaml with local path source
+	// Using path instead of url for reliable E2E testing without network dependencies
+	aiRepoYAML := fmt.Sprintf(`version: 1
+sources:
+  - name: ai-config-examples
+    path: %s
+`, examplesPath)
+
+	aiRepoPath := filepath.Join(repoPath, "ai.repo.yaml")
+	if err := os.WriteFile(aiRepoPath, []byte(aiRepoYAML), 0644); err != nil {
+		t.Fatalf("Failed to write ai.repo.yaml: %v", err)
+	}
+
+	t.Logf("Created ai.repo.yaml at %s", aiRepoPath)
+}

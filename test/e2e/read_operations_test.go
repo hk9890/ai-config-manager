@@ -26,6 +26,9 @@ func TestE2E_BasicReadOperations(t *testing.T) {
 		cleanTestRepo(t, repoPath)
 	})
 
+	// Setup: Create ai.repo.yaml with test sources
+	setupTestRepoWithSources(t, repoPath)
+
 	// Sync resources first to populate the repository
 	// Note: We need to set AIMGR_REPO_PATH because sync command doesn't read repo.path from config yet
 	t.Log("Step 1: Syncing resources to populate repository...")
@@ -361,6 +364,9 @@ func TestE2E_RepoListFiltering(t *testing.T) {
 		cleanTestRepo(t, repoPath)
 	})
 
+	// Setup: Create ai.repo.yaml with test sources
+	setupTestRepoWithSources(t, repoPath)
+
 	// Sync resources
 	t.Log("Syncing resources...")
 	env := map[string]string{"AIMGR_REPO_PATH": repoPath}
@@ -443,6 +449,9 @@ func TestE2E_RepoShowInvalidID(t *testing.T) {
 	t.Cleanup(func() {
 		cleanTestRepo(t, repoPath)
 	})
+
+	// Setup: Create ai.repo.yaml with test sources
+	setupTestRepoWithSources(t, repoPath)
 
 	// Sync resources first
 	t.Log("Syncing resources...")
