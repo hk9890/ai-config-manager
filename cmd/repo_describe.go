@@ -465,7 +465,7 @@ func outputDescribeSummaryYAML(manager *repo.Manager, matches []string) error {
 	}
 
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(output)
 }
 
@@ -597,7 +597,7 @@ func outputDescribePackageYAML(manager *repo.Manager, res *resource.Resource, pk
 	}
 
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(output)
 }
 
@@ -627,7 +627,7 @@ func outputDescribeYAML(manager *repo.Manager, res *resource.Resource, resourceT
 	}
 
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(output)
 }
 
@@ -709,5 +709,5 @@ func buildDescribeOutput(manager *repo.Manager, res *resource.Resource, resource
 func init() {
 	repoCmd.AddCommand(repoDescribeCmd)
 	repoDescribeCmd.Flags().StringVar(&describeFormatFlag, "format", "table", "Output format (table|json|yaml)")
-	repoDescribeCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	_ = repoDescribeCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }

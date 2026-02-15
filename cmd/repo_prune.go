@@ -162,7 +162,7 @@ func init() {
 	repoPruneCmd.Flags().BoolVar(&pruneForceFlag, "force", false, "Skip confirmation prompt")
 	repoPruneCmd.Flags().BoolVar(&pruneDryRunFlag, "dry-run", false, "Preview what would be removed without removing")
 	repoPruneCmd.Flags().StringVar(&pruneFormatFlag, "format", "table", "Output format (table|json|yaml)")
-	repoPruneCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	_ = repoPruneCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
 
 // buildPruneResult constructs a PruneResult from unreferenced caches
@@ -199,7 +199,7 @@ func outputPruneResult(result *PruneResult, format output.Format, force bool, dr
 
 	case output.YAML:
 		encoder := yaml.NewEncoder(os.Stdout)
-		defer encoder.Close()
+		defer func() { _ = encoder.Close() }()
 		return encoder.Encode(result)
 
 	case output.Table:

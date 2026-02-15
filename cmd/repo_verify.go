@@ -433,7 +433,7 @@ func outputVerifyResults(result *VerifyResult, format output.Format, fixed bool)
 
 	case output.YAML:
 		encoder := yaml.NewEncoder(os.Stdout)
-		defer encoder.Close()
+		defer func() { _ = encoder.Close() }()
 		return encoder.Encode(result)
 
 	case output.Table:
@@ -588,7 +588,7 @@ func init() {
 
 	// Add new --format flag
 	repoVerifyCmd.Flags().StringVar(&verifyFormatFlag, "format", "table", "Output format (table|json|yaml)")
-	repoVerifyCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	_ = repoVerifyCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 
 	// Keep --json for backward compatibility but mark deprecated
 	repoVerifyCmd.Flags().BoolVar(&verifyJSON, "json", false, "Output results in JSON format (deprecated: use --format=json)")

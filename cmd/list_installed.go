@@ -377,7 +377,7 @@ func outputInstalledJSON(infos []ResourceInfo) error {
 
 func outputInstalledYAML(infos []ResourceInfo) error {
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(infos)
 }
 

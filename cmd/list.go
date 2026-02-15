@@ -388,7 +388,7 @@ func outputJSON(resources []resource.Resource) error {
 
 func outputYAML(resources []resource.Resource) error {
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(resources)
 }
 

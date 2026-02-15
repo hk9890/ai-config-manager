@@ -493,7 +493,7 @@ func TestListEnhanced_InSync(t *testing.T) {
 
 	// Change to project directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	if err := os.Chdir(projectPath); err != nil {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
@@ -584,7 +584,7 @@ func TestListEnhanced_NoManifest(t *testing.T) {
 
 	// Change to project directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	if err := os.Chdir(projectPath); err != nil {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
@@ -669,7 +669,7 @@ func TestListEnhanced_CopilotOnly(t *testing.T) {
 
 	// Change to project directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	if err := os.Chdir(projectPath); err != nil {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
@@ -744,7 +744,7 @@ func TestListEnhanced_NoInstallations(t *testing.T) {
 
 	// Change to project directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	if err := os.Chdir(projectPath); err != nil {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
@@ -972,7 +972,7 @@ func captureListOutput(t *testing.T, format string, pattern string) string {
 	outChan := make(chan string)
 	go func() {
 		var buf bytes.Buffer
-		_, _ = buf.ReadFrom(r)
+		_, _ = _, _ = buf.ReadFrom(r)
 		outChan <- buf.String()
 	}()
 
@@ -980,7 +980,7 @@ func captureListOutput(t *testing.T, format string, pattern string) string {
 	err = listCmd.RunE(listCmd, args)
 
 	// Restore stdout
-	_ = w.Close()
+	_ =	_ = w.Close()
 	os.Stdout = oldStdout
 
 	output := <-outChan

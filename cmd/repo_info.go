@@ -298,5 +298,5 @@ func formatTimeSince(t time.Time) string {
 func init() {
 	repoCmd.AddCommand(repoInfoCmd)
 	repoInfoCmd.Flags().StringVar(&repoInfoFormatFlag, "format", "table", "Output format (table|json|yaml)")
-	repoInfoCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	_ = repoInfoCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }

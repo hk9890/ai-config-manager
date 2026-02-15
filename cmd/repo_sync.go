@@ -67,7 +67,7 @@ func init() {
 	syncCmd.Flags().BoolVar(&syncDryRunFlag, "dry-run", false, "Preview without importing")
 	syncCmd.Flags().BoolVar(&syncForceFlag, "force", false, "Overwrite existing resources (default: true)")
 	syncCmd.Flags().StringVar(&syncFormatFlag, "format", "table", "Output format: table, json, yaml")
-	syncCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	_ = syncCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
 
 // syncSource syncs resources from a single manifest source
