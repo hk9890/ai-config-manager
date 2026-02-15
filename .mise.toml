@@ -1,0 +1,11 @@
+# Mise configuration for ai-config-manager
+# Ensures consistent Go version across all development environments
+# Install mise: https://mise.jdx.dev/
+
+[tools]
+go = "1.25.6"
+
+[env]
+# Disable CGO for static binary compilation
+_.file = ".env"
+CGO_ENABLED = "0"

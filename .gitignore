@@ -42,3 +42,6 @@ vendor/
 test/e2e/repos/
 test/e2e/configs/*.local.yaml
 .opencode/
+
+# Environment variables (local overrides)
+.env.local

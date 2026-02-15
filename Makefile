@@ -26,9 +26,9 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
 build: ## Build the binary
-	$(GOBUILD) $(LDFLAGS) -o $(BINARY) -v
+	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BINARY) -v
 
-test: unit-test integration-test vet ## Run all tests
+test: vet unit-test integration-test ## Run all tests (matches CI order)
 
 unit-test: ## Run only unit tests (fast, no external dependencies)
 	@echo "Running unit tests..."
@@ -45,7 +45,9 @@ test-integration: ## Run integration tests (requires network, uses real GitHub r
 
 e2e-test: ## Run end-to-end tests (slowest, requires network, tests full CLI)
 	@echo "Running E2E tests..."
-	$(GOTEST) -v -tags=e2e ./test/e2e/
+	@command -v timeout >/dev/null 2>&1 && \
+		timeout 10m $(GOTEST) -v -tags=e2e ./test/e2e/ || \
+		$(GOTEST) -v -tags=e2e ./test/e2e/
 
 install: build ## Install binary to ~/bin
 	mkdir -p $(INSTALL_PATH)
