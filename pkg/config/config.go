@@ -159,6 +159,7 @@ func Load(projectPath string) (*Config, error) {
 // LoadGlobal loads the global configuration from XDG config directory
 // Checks ~/.config/aimgr/aimgr.yaml and falls back to ~/.ai-repo.yaml
 // Automatically migrates from old location if found
+// If no config exists, returns a default config with "claude" as the default target
 func LoadGlobal() (*Config, error) {
 	var configPath string
 	var err error
@@ -191,15 +192,16 @@ func LoadGlobal() (*Config, error) {
 			fmt.Fprintf(os.Stderr, "⚠️  Migrated config from %s to %s\n", oldPath, configPath)
 			fmt.Fprintf(os.Stderr, "   Old config file left intact for safety\n")
 		} else {
-			// No config exists - return default
-			// No config exists - return error
-			return nil, fmt.Errorf("no config found\n\n"+
-				"Please create a config file at: %s\n\n"+
-				"Example:\n"+
-				"  install:\n"+
-				"    targets:\n"+
-				"      - claude\n"+
-				"      - opencode", configPath)
+			// No config exists - return default config
+			defaultConfig := &Config{
+				Install: InstallConfig{
+					Targets: []string{"claude"},
+				},
+				Repo: RepoConfig{
+					Path: "",
+				},
+			}
+			return defaultConfig, nil
 		}
 	}
 

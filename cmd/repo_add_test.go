@@ -77,7 +77,7 @@ func TestPrintDiscoveryErrors_Deduplication(t *testing.T) {
 			_ = w.Close()
 			os.Stdout = oldStdout
 			var buf bytes.Buffer
-			_ , _ = io.Copy(&buf, r)
+			_, _ = io.Copy(&buf, r)
 			output := buf.String()
 
 			// If no errors, output should be empty

@@ -441,12 +441,17 @@ func TestLoadGlobal_NoConfig(t *testing.T) {
 	// Reload XDG paths to pick up new environment variables
 	xdg.Reload()
 
-	// LoadGlobal should return error when no config exists
-	_, err = LoadGlobal()
+	// LoadGlobal should return default config when no config exists
+	cfg, err := LoadGlobal()
 
-	// Should return error when no config file exists
-	if err == nil {
-		t.Fatalf("LoadGlobal() expected error when no config exists, got nil")
+	// Should not return error - returns default config instead
+	if err != nil {
+		t.Fatalf("LoadGlobal() unexpected error: %v", err)
+	}
+
+	// Verify default config has expected values
+	if len(cfg.Install.Targets) != 1 || cfg.Install.Targets[0] != "claude" {
+		t.Errorf("LoadGlobal() default config should have claude as target, got %v", cfg.Install.Targets)
 	}
 }
 

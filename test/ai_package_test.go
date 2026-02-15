@@ -798,11 +798,11 @@ func TestPackageResourceValidation(t *testing.T) {
 
 	t.Run("invalid formats", func(t *testing.T) {
 		invalidRefs := []string{
-			"command",            // Missing name
-			"command/",           // Empty name
-			"test",               // Missing type
-			"invalid-type/test",  // Invalid type
-			"",                   // Empty string
+			"command",           // Missing name
+			"command/",          // Empty name
+			"test",              // Missing type
+			"invalid-type/test", // Invalid type
+			"",                  // Empty string
 		}
 
 		for _, ref := range invalidRefs {
