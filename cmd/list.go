@@ -366,7 +366,7 @@ func outputWithPackagesYAML(resources []resource.Resource, packages []repo.Packa
 		"packages":  packages,
 	}
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(output)
 }
 
@@ -396,5 +396,5 @@ func init() {
 	repoCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVar(&formatFlag, "format", "table", "Output format (table|json|yaml)")
 	listCmd.Flags().StringVar(&sourceFilterFlag, "source", "", "Filter by source name")
-	listCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	_ = listCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }

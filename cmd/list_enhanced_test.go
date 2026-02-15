@@ -47,7 +47,7 @@ func TestListEnhanced_SingleTarget(t *testing.T) {
 
 	// Change to project directory (list command uses os.Getwd())
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	if err := os.Chdir(projectPath); err != nil {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
