@@ -623,7 +623,7 @@ for _, entry := range entries {
 
 **Key Rule:** Use `os.Stat()` to follow symlinks, not `entry.IsDir()` from `os.ReadDir()`.
 
-See [Architecture Rules - Rule 5](docs/architecture/architecture-rules.md#rule-5-symlink-handling-for-filesystem-operations) for complete details.
+See [Architecture Rules - Rule 5](docs/contributor-guide/architecture.md#rule-5-symlink-handling) for complete details.
 
 ### Resource Name Validation
 

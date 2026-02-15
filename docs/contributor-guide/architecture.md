@@ -1,174 +1,228 @@
-# Architecture Overview
+# Architecture Guide
 
-This document provides a high-level architectural overview of the ai-config-manager project for contributors. For detailed architectural rules and implementation guidelines, see [docs/architecture/](../architecture/).
-
-## Table of Contents
-- [System Overview](#system-overview)
-- [Package Structure](#package-structure)
-- [Key Concepts](#key-concepts)
-- [Data Flow](#data-flow)
-- [Directory Layout](#directory-layout)
-- [Related Documentation](#related-documentation)
-
----
+High-level architecture overview and design rules for ai-config-manager contributors.
 
 ## System Overview
 
-**aimgr** (AI Config Manager) is a command-line tool that manages AI resources across multiple AI coding environments. It solves the problem of resource fragmentation by providing:
+**aimgr** manages AI resources across multiple AI coding environments with:
 
-### What It Does
-
-1. **Centralized Repository**: Maintains a single source of truth for all AI resources in `~/.local/share/ai-config/repo/` (configurable via `repo.path` or `AIMGR_REPO_PATH`)
-2. **Multi-Tool Support**: Installs resources to Claude Code (`.claude/`), OpenCode (`.opencode/`), and GitHub Copilot (`.github/`)
-3. **Symlink-Based Installation**: Creates symlinks from tool directories to the central repository (no duplication)
-4. **Git Integration**: Imports resources from Git repositories with intelligent caching
-5. **Pattern Matching**: Install/uninstall multiple resources using glob patterns (`skill/pdf*`)
-6. **Package Management**: Group resources into packages for easy distribution
+1. **Centralized Repository**: Single source at `~/.local/share/ai-config/repo/` (configurable)
+2. **Multi-Tool Support**: Claude Code (`.claude/`), OpenCode (`.opencode/`), GitHub Copilot (`.github/`), Windsurf (`.windsurf/`)
+3. **Symlink-Based Installation**: No duplication - symlinks to central repository
+4. **Git Integration**: Imports from Git with intelligent workspace caching
+5. **Pattern Matching**: Install/uninstall using glob patterns (`skill/pdf*`)
 
 ### Resource Types
 
-The system manages four types of resources:
+- **Commands**: Single `.md` files (e.g., `build.md`, `api/deploy.md`)
+- **Skills**: Directories with `SKILL.md` (e.g., `pdf-processing/`)
+- **Agents**: Single `.md` files with YAML frontmatter (e.g., `code-reviewer.md`)
+- **Packages**: Collections in `.package.json` (e.g., `web-tools.package.json`)
 
-- **Commands**: Single-file markdown commands (e.g., `build.md`, `api/deploy.md`)
-- **Skills**: Multi-file skills with documentation and resources (e.g., `pdf-processing/`)
-- **Agents**: Single-file agent definitions with YAML frontmatter (e.g., `code-reviewer.md`)
-- **Packages**: Collections of resources grouped together (e.g., `web-tools.package.json`)
+### Architecture
 
-### Architecture Style
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLI Layer                             │
+│                    (cobra commands)                          │
+└───────────────────┬─────────────────────────────────────────┘
+                    │
+┌───────────────────┴─────────────────────────────────────────┐
+│                   Business Logic Layer                       │
+├──────────────────────────────────────────────────────────────┤
+│  • Resource Management (resource/)                           │
+│  • Repository Operations (repo/)                             │
+│  • Installation/Symlinks (install/)                          │
+│  • Auto-Discovery (discovery/)                               │
+│  • Pattern Matching (pattern/)                               │
+│  • Workspace Caching (workspace/)                            │
+└───────────────────┬─────────────────────────────────────────┘
+                    │
+┌───────────────────┴─────────────────────────────────────────┐
+│                   Infrastructure Layer                       │
+├──────────────────────────────────────────────────────────────┤
+│  • Configuration (config/)                                   │
+│  • Git Operations (source/)                                  │
+│  • Metadata Tracking (metadata/)                             │
+│  • Tool Detection (tools/)                                   │
+│  • XDG Directory Support                                     │
+└──────────────────────────────────────────────────────────────┘
+```
 
-- **Language**: Go 1.25.6
-- **CLI Framework**: Cobra for command structure
-- **Storage**: XDG Base Directory Specification compliant
-- **Installation**: Symlink-based (not file copying)
-- **Caching**: Workspace-based Git repository caching
+### Storage Layout
 
----
+```
+~/.local/share/ai-config/repo/
+├── commands/          # Command resources
+├── skills/            # Skill resources
+├── agents/            # Agent resources
+├── packages/          # Package resources
+├── .workspace/        # Git repository cache
+└── .metadata/         # Metadata tracking
+```
 
 ## Package Structure
 
-The codebase is organized into three main directories:
-
-```
-ai-config-manager/
-├── cmd/              # CLI command definitions
-├── pkg/              # Core business logic packages
-├── test/             # Integration tests
-├── examples/         # Example resources
-└── main.go          # Application entry point
-```
-
 ### cmd/ - Command Definitions
 
-Cobra command tree mirroring the CLI structure:
-
-```
-cmd/
-├── root.go           # Root command and global flags
-├── install.go        # aimgr install
-├── uninstall.go      # aimgr uninstall
-├── list.go          # aimgr list
-├── repo/            # aimgr repo subcommands
-│   ├── repo.go      # Repo command group
-│   ├── import.go    # aimgr repo import
-│   ├── sync.go      # aimgr repo sync
-│   ├── list.go      # aimgr repo list
-│   └── prune.go     # aimgr repo prune
-└── marketplace/     # aimgr marketplace subcommands
-    └── import.go    # aimgr marketplace import
-```
-
-**Pattern**: Each command file contains Cobra command setup and delegates to pkg/ packages for logic.
+Cobra command tree matching CLI structure. Each command delegates to `pkg/` for logic.
 
 ### pkg/ - Business Logic
-
-Core packages organized by responsibility:
 
 | Package | Purpose |
 |---------|---------|
 | `config/` | Configuration file parsing and validation |
 | `discovery/` | Auto-discovery of resources in directories |
 | `install/` | Symlink creation and installation logic |
-| `manifest/` | `ai.package.yaml` project manifest handling |
-| `marketplace/` | Marketplace JSON parsing and generation |
-| `metadata/` | Metadata tracking and schema migration |
-| `pattern/` | Resource pattern matching (glob-style) |
 | `repo/` | Central repository management (add, list, remove) |
 | `resource/` | Resource type definitions and loaders |
 | `source/` | Git operations and source parsing |
-| `tools/` | Tool-specific information (Claude, OpenCode, Copilot) |
-| `version/` | Version information embedded at build time |
-| `workspace/` | Git repository caching and workspace management |
-
-**Pattern**: Each package has a clear, single responsibility. Packages do not depend on `cmd/`.
+| `tools/` | Tool-specific information (Claude, OpenCode, Copilot, Windsurf) |
+| `workspace/` | Git repository caching (10-50x performance) |
 
 ### test/ - Integration Tests
 
-End-to-end integration tests that exercise the full system:
+End-to-end tests exercising the full system.
 
+## Architecture Rules
+
+### Rule 1: Git Operations Use Workspace Cache
+
+**All Git operations MUST use `pkg/workspace` cache.** Direct temporary cloning is prohibited.
+
+**Why**: 10-50x faster for repeated operations, single source of truth, simplified error handling.
+
+**Correct Usage**:
+```go
+import "github.com/hk9890/ai-config-manager/pkg/workspace"
+
+mgr, _ := workspace.NewManager(repoPath)
+clonePath, err := mgr.GetOrClone(gitURL, ref)  // Cached
+// Use clonePath - no cleanup needed
 ```
-test/
-├── integration_test.go      # Main integration test suite
-└── testdata/               # Test fixtures and resources
+
+**Prohibited**:
+```go
+// WRONG: Temporary directory clone
+tempDir, _ := os.MkdirTemp("", "git-clone-*")
+defer os.RemoveAll(tempDir)
+cmd := exec.Command("git", "clone", url, tempDir)
 ```
 
-**Pattern**: Unit tests live alongside code in `pkg/*/`, integration tests live in `test/`.
+**Exceptions**: Unit/integration tests may use temporary directories.
 
----
+### Rule 2: XDG Base Directory Specification
+
+**All application data MUST follow XDG Base Directory Specification.**
+
+```go
+import "github.com/adrg/xdg"
+
+// Data: ~/.local/share/ai-config/repo/
+repoPath := filepath.Join(xdg.DataHome, "ai-config", "repo")
+
+// Config: ~/.config/ai-config/
+configPath := filepath.Join(xdg.ConfigHome, "ai-config")
+```
+
+**Why**: Cross-platform, respects environment variables, integrates with backup tools.
+
+### Rule 3: Build Tags for Test Categories
+
+**Tests MUST use build tags** to categorize: `unit` or `integration`.
+
+```go
+//go:build unit
+package mypackage_test
+func TestFast(t *testing.T) { }
+
+//go:build integration
+package test
+func TestSlow(t *testing.T) { }
+```
+
+**Running Tests**:
+```bash
+go test -tags=unit ./...           # Fast unit tests
+go test -tags=integration ./...    # Slow integration tests
+go test -tags="unit integration" ./...  # All tests
+```
+
+### Rule 4: Error Wrapping Requirements
+
+**All errors MUST be wrapped** with context using `fmt.Errorf` with `%w`.
+
+```go
+// ✅ CORRECT
+if err != nil {
+    return fmt.Errorf("failed to load command: %w", err)
+}
+
+// ❌ WRONG: No context
+if err != nil {
+    return err
+}
+
+// ❌ WRONG: Loses error chain
+if err != nil {
+    return fmt.Errorf("error: %s", err.Error())
+}
+```
+
+**Why**: Full error chain for debugging, enables `errors.Is()` and `errors.As()`, clear user messages.
+
+### Rule 5: Symlink Handling
+
+**All filesystem traversal MUST support both real files (COPY mode) and symlinks (SYMLINK mode).**
+
+**Problem**: `entry.IsDir()` from `os.ReadDir()` returns `false` for symlinks to directories.
+
+**Correct Usage**:
+```go
+entries, _ := os.ReadDir(dir)
+for _, entry := range entries {
+    path := filepath.Join(dir, entry.Name())
+    
+    // Follow symlinks to check if target is a directory
+    info, err := os.Stat(path)  // os.Stat follows symlinks
+    if err != nil || !info.IsDir() { continue }
+    
+    processDirectory(path)  // Works for both real and symlinked dirs
+}
+```
+
+**Prohibited**:
+```go
+// WRONG: Skips symlinked directories
+entries, _ := os.ReadDir(dir)
+for _, entry := range entries {
+    if entry.IsDir() {  // ← Returns false for symlinks!
+        processDirectory(entry.Name())
+    }
+}
+```
+
+**Testing Requirements**: Every discovery function MUST test both real and symlinked resources.
 
 ## Key Concepts
 
-### 1. Central Repository
+### Central Repository
 
-**Default Location**: `~/.local/share/ai-config/repo/` (configurable)
+Single source at `~/.local/share/ai-config/repo/` (configurable via `repo.path` or `AIMGR_REPO_PATH`).
 
-The repository is the single source of truth for all resources:
-
-```
-~/.local/share/ai-config/repo/
-├── commands/
-│   ├── build.md
-│   └── api/
-│       └── deploy.md
-├── skills/
-│   └── pdf-processing/
-│       ├── SKILL.md
-│       └── resources/
-├── agents/
-│   └── code-reviewer.md
-├── packages/
-│   └── web-tools.package.json
-└── .metadata/
-    ├── commands.json
-    ├── skills.json
-    └── agents.json
-```
-
-**Why**: Single location eliminates duplication, simplifies updates, enables version control.
-
-### 2. Resources
-
-Resources are structured artifacts with metadata:
+### Resources
 
 ```go
 type Resource struct {
     Type        ResourceType  // command, skill, agent, package
-    Name        string       // e.g., "build", "api/deploy", "pdf-processing"
-    Description string       // Human-readable description
-    Path        string       // Absolute path to resource
-    Source      string       // Origin (local path or git URL)
-    Tool        tools.Tool   // Target tool (Claude, OpenCode, Copilot)
+    Name        string        // e.g., "build", "api/deploy", "pdf-processing"
+    Description string
+    Path        string        // Absolute path to resource
+    Source      string        // Origin (local path or git URL)
 }
 ```
 
-**Key Properties**:
-- Resources have **types** (command, skill, agent, package)
-- Resources have **names** (lowercase alphanumeric + hyphens, max 64 chars)
-- Commands support **nested names** (`api/deploy`)
-- Resources track their **source** for updates
-
-### 3. Symlink-Based Installation
-
-Installation creates symlinks, not copies:
+### Symlink-Based Installation
 
 ```
 # Repository (source)
@@ -178,126 +232,70 @@ Installation creates symlinks, not copies:
 .claude/commands/build.md -> ~/.local/share/ai-config/repo/commands/build.md
 ```
 
-**Benefits**:
-- No duplication (saves disk space)
-- Updates propagate automatically (update repo, all installs updated)
-- Uninstall is simple (remove symlink, keep source)
+**Benefits**: No duplication, automatic updates, simple uninstall.
 
-### 4. Metadata Tracking
+### Workspace Caching
 
-The `.metadata/` directory tracks installed resources:
-
-```json
-{
-  "version": 2,
-  "resources": [
-    {
-      "name": "build",
-      "description": "Build the project",
-      "path": "/absolute/path/to/repo/commands/build.md",
-      "source": "gh:owner/repo",
-      "added": "2026-01-29T12:00:00Z"
-    }
-  ]
-}
-```
-
-**Purpose**: Enables listing, updating, and removing resources without scanning filesystem.
-
-### 5. Workspace Caching
-
-Git repositories are cached in `.workspace/` for performance:
+Git repositories cached in `.workspace/` for 10-50x performance improvement:
 
 ```
 ~/.local/share/ai-config/repo/.workspace/
-└── github.com/
-    └── hk9890/
-        └── ai-tools/
-            └── main/          # Cached clone at 'main' ref
-                ├── .git/
-                └── resources/
+└── github.com/owner/repo/main/  # Cached clone at 'main' ref
 ```
 
-**Performance**: 10-50x faster for repeated operations (subsequent imports, syncs).
-
----
-
-## Data Flow
+## Data Flows
 
 ### Flow 1: Import from Git Repository
 
 ```
-User runs: aimgr repo import gh:owner/repo
-
 1. Parse source → Extract Git URL and ref
 2. Workspace cache → Get or clone repository
 3. Discovery → Find all resources in clone
 4. Repository → Add resources to central repo
 5. Metadata → Track added resources
-6. Output → Display results to user
 ```
 
-**Packages Involved**: `source` → `workspace` → `discovery` → `repo` → `metadata`
+**Packages**: `source` → `workspace` → `discovery` → `repo` → `metadata`
 
 ### Flow 2: Install Resource to Tool
 
 ```
-User runs: aimgr install skill/pdf-processing --tool=claude
-
 1. Pattern matching → Resolve pattern to resources
 2. Repository → Find resource in central repo
 3. Tool detection → Get tool directories (.claude/)
 4. Install → Create symlink to target directory
-5. Manifest → Update ai.package.yaml (if exists)
-6. Output → Confirm installation
 ```
 
-**Packages Involved**: `pattern` → `repo` → `tools` → `install` → `manifest`
+**Packages**: `pattern` → `repo` → `tools` → `install`
 
-### Flow 3: Sync Resources (Update from Git)
+### Flow 3: Sync Resources
 
 ```
-User runs: aimgr repo sync
-
 1. Metadata → Load all resources with Git sources
 2. Workspace → Update cached repositories (git pull)
 3. Discovery → Find updated resources
 4. Repository → Replace resources in central repo
-5. Metadata → Update tracking info
-6. Output → Show updated resources
 ```
 
-**Packages Involved**: `metadata` → `workspace` → `discovery` → `repo` → `metadata`
-
----
+**Packages**: `metadata` → `workspace` → `discovery` → `repo`
 
 ## Directory Layout
 
-### User Data Directory
+### User Data
 
-The application uses XDG Base Directory Specification:
-
-**Linux/macOS**:
 ```
-~/.local/share/ai-config/     # Data directory
-├── repo/                     # Central repository
+~/.local/share/ai-config/
+├── repo/
 │   ├── commands/
 │   ├── skills/
 │   ├── agents/
 │   ├── packages/
 │   ├── .metadata/           # Resource tracking
 │   └── .workspace/          # Git cache
-└── config.yaml              # Optional user config
+└── config.yaml              # Optional
 ```
 
-**Windows** (automatically mapped):
-```
-%LOCALAPPDATA%\ai-config\    # Data directory
-```
-
-### Project Installation Targets
-
-Tool-specific directories (where symlinks are created):
+### Project Installation
 
 ```
 project-root/
@@ -305,54 +303,15 @@ project-root/
 │   ├── commands/            # Claude Code commands
 │   ├── skills/              # Claude Code skills
 │   └── agents/              # Claude Code agents
-├── .opencode/
-│   ├── commands/            # OpenCode commands
-│   ├── skills/              # OpenCode skills
-│   └── agents/              # OpenCode agents
-├── .github/
-│   └── skills/              # GitHub Copilot skills
+├── .opencode/               # OpenCode resources
+├── .github/skills/          # GitHub Copilot skills
+├── .windsurf/skills/        # Windsurf skills
 └── ai.package.yaml          # Project manifest (optional)
 ```
 
-### Tool Detection
-
-The system automatically detects which tool to use based on:
-
-1. **Explicit flag**: `--tool=claude`
-2. **Project detection**: Presence of `.claude/`, `.opencode/`, `.github/`
-3. **Manifest**: Tool specified in `ai.package.yaml`
-
----
-
 ## Related Documentation
 
-### Architecture Details
-
-For in-depth architectural information:
-
-- **[Architecture Rules](../architecture/architecture-rules.md)** - Strict architectural rules and patterns (Git operations, XDG directories, error handling)
-
-### Implementation Guides
-
-For detailed implementation specifications:
-
-- **[Resource Formats](../resource-formats.md)** - Complete format specifications for all resource types
-- **[Workspace Caching](../workspace-caching.md)** - Git repository caching implementation and performance
-- **[Pattern Matching](../pattern-matching.md)** - Pattern syntax and matching logic
-- **[Output Formats](../output-formats.md)** - CLI output formats (JSON, YAML, table)
-
-### Development
-
-For development workflows:
-
-- **[AGENTS.md](../../AGENTS.md)** - AI agent development guidelines
-- **[Release Process](release-process.md)** - Release and versioning workflow
-
----
-
-## Next Steps
-
-- **Read**: [Architecture Rules](../architecture/architecture-rules.md) for strict coding patterns
-- **Build**: Run `make build` to compile the project
-- **Test**: Run `make test` to run the test suite
-- **Contribute**: Follow patterns in existing code, add tests for new features
+- **[Testing Guide](testing.md)** - Comprehensive testing documentation
+- **[Development Environment](development-environment.md)** - Setup and tools
+- **[Release Process](release-process.md)** - Release workflow
+- **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Complete development guide

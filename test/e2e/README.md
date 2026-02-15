@@ -243,7 +243,7 @@ Consider:
 
 ## References
 
-- **Architecture**: See `docs/architecture/architecture-rules.md`
+- **Architecture**: See `docs/contributor-guide/architecture.md`
 - **Config format**: See `docs/user-guide/config.md`
 - **Testing strategy**: See `docs/planning/test-refactoring.md`
 - **Unit tests**: See `test/*_test.go` with `//go:build unit`

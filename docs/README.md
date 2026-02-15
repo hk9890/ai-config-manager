@@ -44,7 +44,7 @@ Technical design documentation covering architectural decisions, design rules, a
 
 **What's inside:**
 - [Architecture Overview](architecture/README.md) - System design, core principles, and component layout
-- [Architecture Rules](architecture/architecture-rules.md) - Strict architectural rules and patterns
+- [Architecture Rules](contributor-guide/architecture.md) - System overview, design rules, and patterns
   - Git operations with workspace cache
   - XDG Base Directory compliance
   - Build tags for test categories

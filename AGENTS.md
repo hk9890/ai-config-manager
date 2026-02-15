@@ -1,368 +1,148 @@
 # AGENTS.md
 
-**This document provides essential guidelines for AI coding agents working in the ai-config-manager repository.**
-
----
+Quick reference for AI coding agents working in the ai-config-manager repository.
 
 ## Project Overview
 
-**aimgr** is a CLI tool for managing AI resources (commands, skills, and agents) across multiple AI coding tools (Claude Code, OpenCode, VSCode / GitHub Copilot, Windsurf). It uses a centralized repository with symlink-based installation.
+**aimgr** is a CLI tool (Go 1.25.6) for managing AI resources (commands, skills, agents, packages) across multiple AI coding tools. It uses a centralized repository (`~/.local/share/ai-config/repo/`) with symlink-based installation to tool directories (`.claude/`, `.opencode/`, `.github/skills/`, `.windsurf/skills/`).
 
-**Key Concepts:**
-- **Language**: Go 1.25.6
-- **Architecture**: CLI built with Cobra, resource management with symlinks  
-- **Storage**: `~/.local/share/ai-config/repo/` (XDG data directory, configurable via `repo.path` or `AIMGR_REPO_PATH`)
-- **Supported Resources**: Commands, Skills, Agents, Packages
-- **Supported Tools**: Claude Code, OpenCode, VSCode / GitHub Copilot, Windsurf
+**Architecture**: CLI (Cobra) → Business Logic (`pkg/`) → Storage (XDG directories)
 
-The tool discovers resources from various sources (local directories, Git repositories, GitHub), stores them in a central repository, and installs them via symlinks to tool-specific directories (`.claude/`, `.opencode/`, `.github/skills/`, `.windsurf/skills/`).
+## Quick Commands
 
----
+```bash
+# Build & Install
+make build      # Build binary
+make install    # Build and install to ~/bin
+
+# Testing
+make test                # All tests (vet → unit → integration)
+make unit-test           # Fast unit tests only
+make integration-test    # Slow integration tests
+
+# Code Quality
+make fmt        # Format all Go code
+make vet        # Run go vet
+```
 
 ## Repository Structure
 
 ```
 ai-config-manager/
 ├── cmd/              # Cobra command definitions (CLI entry points)
-├── pkg/              # Core business logic (see breakdown below)
-├── test/             # Integration tests
-├── docs/             # Documentation (user-guide/, contributor-guide/, architecture/)
-├── examples/         # Example resources
+├── pkg/              # Core business logic packages
+│   ├── config/       # Configuration management
+│   ├── discovery/    # Auto-discovery of resources
+│   ├── install/      # Installation/symlink logic
+│   ├── repo/         # Repository management
+│   ├── resource/     # Resource types (command, skill, agent, package)
+│   ├── workspace/    # Git repository caching (10-50x faster)
+│   └── ...
+├── test/             # Integration and E2E tests
+├── docs/             # Documentation
 └── main.go           # Entry point
 ```
 
-### Key Packages (pkg/)
+## Code Style Essentials
 
-| Package | Purpose |
-|---------|---------|
-| `config/` | Configuration management |
-| `discovery/` | Auto-discovery of resources from directories/repos |
-| `install/` | Installation/symlink logic |
-| `manifest/` | ai.package.yaml handling |
-| `repo/` | Repository management (add, list, remove) |
-| `resource/` | Resource types (command, skill, agent, package) |
-| `source/` | Source parsing and Git operations |
-| `tools/` | Tool-specific info (Claude, OpenCode, Copilot, Windsurf) |
-| `workspace/` | Workspace caching for Git repos (10-50x faster) |
-
-**For detailed architecture:** See `docs/architecture/architecture-rules.md`
-
----
-
-## Quick Reference
-
-### Build Commands
-```bash
-make build      # Build binary
-make install    # Build and install to ~/bin
-make test       # Run all tests (unit + integration + vet)
-make fmt        # Format all Go code
-make vet        # Run go vet
-```
-
-### Run Tests
-```bash
-make test                # All tests
-make unit-test           # Fast unit tests only (<5 seconds)
-make integration-test    # Slow integration tests (~30 seconds)
-
-# Run specific tests
-go test -v ./pkg/resource/command_test.go
-go test -v ./pkg/config -run TestLoad_ValidConfig
-```
-
-### Documentation Locations
-
-- **User Guide**: `docs/user-guide/` - Resource formats, pattern matching, output formats, sync sources
-- **Architecture**: `docs/architecture/architecture-rules.md` - Strict architectural rules
-- **Contributor Guide**: `docs/contributor-guide/release-process.md`
-- **Planning/Archive**: `docs/planning/`, `docs/archive/`
-
----
-
-## Code Style Guidelines
-
-### Import Organization
-Three groups with blank lines:
+**Import Organization** - Three groups with blank lines:
 ```go
 import (
-	"fmt"           // 1. Standard library
-	"os"
+    "fmt"           // 1. Standard library
 
-	"github.com/spf13/cobra"  // 2. External dependencies
+    "github.com/spf13/cobra"  // 2. External dependencies
 
-	"github.com/hk9890/ai-config-manager/pkg/resource"  // 3. Internal
+    "github.com/hk9890/ai-config-manager/pkg/resource"  // 3. Internal
 )
 ```
 
-### Naming Conventions
-- **Files**: `lowercase_with_underscores.go`
-- **Packages**: Short, lowercase, single word (`resource`, `config`)
-- **Types**: PascalCase (`ResourceType`, `CommandResource`)
-- **Functions**: PascalCase (exported), camelCase (unexported)
-- **Variables**: camelCase (`repoPath`, `skillsDir`)
+**Naming**:
+- Files: `lowercase_with_underscores.go`
+- Types: `PascalCase`
+- Functions: `PascalCase` (exported), `camelCase` (unexported)
+- Resources: `lowercase-with-hyphens` (1-64 chars, no start/end hyphens)
 
-### Resource Names (User-Facing)
-Resources must follow agentskills.io naming:
-- Lowercase alphanumeric + hyphens only
-- Cannot start/end with hyphen
-- No consecutive hyphens (`--`)
-- 1-64 characters max
-- Examples: `test-command`, `pdf-processing`, `code-reviewer`
-
-### Error Handling
-Always wrap errors with context:
+**Error Handling** - Always wrap:
 ```go
 if err != nil {
     return fmt.Errorf("failed to load command: %w", err)
 }
 ```
 
-### File Operations
-- Use `filepath.Join()` for path construction
-- Check existence with `os.Stat(path)`
-- Use `defer file.Close()` for cleanup
-- Permissions: `0755` for dirs, `0644` for files
-
-### Symlink Handling
-
-When traversing directories:
-- Use `os.Stat()` to check if path is directory (follows symlinks)
-- Don't use `entry.IsDir()` from `os.ReadDir()` (doesn't follow symlinks)
-- Resources can be symlinked (SYMLINK mode) or real files (COPY mode)
-
-**Important**: Both modes must work identically. See [docs/architecture/architecture-rules.md Rule 5](docs/architecture/architecture-rules.md#rule-5-symlink-handling-for-filesystem-operations) for detailed guidelines.
-
-**Example**:
+**Symlink Handling** - CRITICAL for COPY and SYMLINK modes:
 ```go
-// WRONG: Skips symlinked directories
+// ❌ WRONG: Skips symlinked directories
 entries, _ := os.ReadDir(dir)
 for _, entry := range entries {
-    if entry.IsDir() { ... }  // ← Breaks SYMLINK mode
+    if entry.IsDir() { ... }  // Returns false for symlinks!
 }
 
-// CORRECT: Follows symlinks
+// ✅ CORRECT: Follows symlinks
 entries, _ := os.ReadDir(dir)
 for _, entry := range entries {
     path := filepath.Join(dir, entry.Name())
-    info, err := os.Stat(path)  // ← Follows symlinks
+    info, err := os.Stat(path)  // os.Stat follows symlinks
     if err != nil || !info.IsDir() { continue }
     // Process directory...
 }
 ```
 
----
+## Critical Patterns
 
-## Common Patterns
-
-### Loading Resources
-
-#### Commands
-Commands are loaded using `LoadCommand(filePath)` which automatically detects
-the base path by finding the nearest `commands/` directory in the path.
-
-```go
-// LoadCommand auto-detects base path and preserves nested structure
-res, err := resource.LoadCommand("path/to/commands/test.md")
-// → name = "test"
-
-res, err := resource.LoadCommand("path/to/commands/api/deploy.md")
-// → name = "api/deploy"
-
-// Commands MUST be in a directory named `commands/`
-// (or `.claude/commands/`, `.opencode/commands/`, etc.)
-```
-
-#### Skills, Agents, and Packages
-```go
-// Skills: directory with SKILL.md
-res, err := resource.LoadSkill("path/to/skill-dir")
-
-// Agents: single .md file
-res, err := resource.LoadAgent("path/to/agent.md")
-
-// Packages: .package.json file
-pkg, err := resource.LoadPackage("path/to/package.package.json")
-```
-
-### Repository Operations
-```go
-mgr, err := repo.NewManager()
-mgr.AddCommand(sourcePath)
-mgr.AddSkill(sourcePath)
-mgr.AddAgent(sourcePath)
-resources, err := mgr.List(nil)  // nil = all types
-
-// Bulk operations
-opts := repo.BulkImportOptions{
-    Force:        false,
-    SkipExisting: false,
-    DryRun:       false,
-}
-result, err := mgr.AddBulk(paths, opts)
-```
-
-### Tool Detection
-```go
-tool, err := tools.ParseTool("claude")   // Returns tools.Claude
-tool, err := tools.ParseTool("opencode") // Returns tools.OpenCode
-tool, err := tools.ParseTool("copilot")  // Returns tools.Copilot
-tool, err := tools.ParseTool("vscode")   // Returns tools.Copilot (alias)
-tool, err := tools.ParseTool("windsurf") // Returns tools.Windsurf
-info := tools.GetToolInfo(tool)          // Get dirs, etc.
-```
-
-**VSCode / GitHub Copilot Support:**
-- Use `--tool=copilot` or `--tool=vscode` when installing (both names work)
-- Only skills are supported (no commands or agents)
-- Skills install to `.github/skills/` directory
-- Example: `aimgr install skill/pdf-processing --tool=copilot`
-- Multi-tool example: `aimgr install skill/my-skill --tool=claude,opencode,copilot`
-
-**Windsurf Support:**
-- Use `--tool=windsurf` when installing
-- Only skills are supported (no commands or agents)
-- Skills install to `.windsurf/skills/` directory
-- Example: `aimgr install skill/pdf-processing --tool=windsurf`
-- Multi-tool example: `aimgr install skill/my-skill --tool=claude,opencode,windsurf`
-
-### Pattern Matching
-```go
-import "github.com/hk9890/ai-config-manager/pkg/pattern"
-
-// Parse pattern
-resourceType, patternStr, isPattern := pattern.ParsePattern("skill/pdf*")
-
-// Create matcher
-matcher, err := pattern.NewMatcher("skill/pdf*")
-if matcher.Match(res) {
-    fmt.Println("Matched!")
-}
-```
-
-See [docs/user-guide/pattern-matching.md](docs/user-guide/pattern-matching.md) for detailed examples.
-
-### Workspace Caching (Critical)
-
-**All Git operations MUST use `pkg/workspace` cache** (see Architecture Rule 1):
-
+**Git Operations** - Always use workspace cache:
 ```go
 import "github.com/hk9890/ai-config-manager/pkg/workspace"
 
-// Get repository path (clone if needed, reuse if cached)
-mgr, err := workspace.NewManager(repoPath)
-if err != nil {
-    return fmt.Errorf("failed to create workspace manager: %w", err)
-}
-
-// GetOrClone returns cached path or clones if needed
-clonePath, err := mgr.GetOrClone(gitURL, ref)
-if err != nil {
-    return fmt.Errorf("failed to get repository: %w", err)
-}
-
-// Use clonePath to access repository contents
-// No cleanup needed - cache is managed automatically
+mgr, _ := workspace.NewManager(repoPath)
+clonePath, err := mgr.GetOrClone(gitURL, ref)  // Cached, 10-50x faster
+// Use clonePath - no cleanup needed
 ```
 
-**Performance:** First clone is slow, subsequent operations are 10-50x faster.  
-**Commands:** `repo import`, `repo sync` use this automatically.  
-**See:** `docs/user-guide/workspace-caching.md`
+**Loading Resources**:
+```go
+// Commands (auto-detects base path)
+res, err := resource.LoadCommand("path/to/commands/test.md")
 
----
+// Skills (directory with SKILL.md)
+res, err := resource.LoadSkill("path/to/skill-dir")
+
+// Agents (single .md file)
+res, err := resource.LoadAgent("path/to/agent.md")
+```
+
+**Repository Operations**:
+```go
+mgr, err := repo.NewManager()
+mgr.AddCommand(sourcePath)
+resources, err := mgr.List(nil)  // nil = all types
+```
 
 ## Testing
 
-Tests are split into fast unit tests (default) and slow integration tests (opt-in).
-
-### Unit Tests (fixtures)
-- Use committed fixtures in `testdata/repos/`
-- No network calls
-- Run by default: `make test`
-- Execution time: <5 seconds
-- Build tag: `//go:build unit`
-
-### Integration Tests (network)
-- Use real GitHub repos (hk9890/ai-tools)
-- Run with: `make integration-test`
-- Execution time: ~30 seconds
-- Build tag: `//go:build integration`
-
-### Best Practices
-- Use table-driven tests
-- Use `t.TempDir()` for temporary directories
-- Test both success and error cases
-- Prefer unit tests with fixtures
-- Only add integration tests for new Git features
-
-**See:** `docs/planning/test-refactoring.md`
-
----
-
-## Output Formats
-
-Commands support multiple output formats via `--format` flag:
-
-```bash
-aimgr repo import ~/resources/               # Table (default, human-readable)
-aimgr repo import ~/resources/ --format=json # JSON (for scripting)
-aimgr repo import ~/resources/ --format=yaml # YAML (structured)
+Use isolated temporary directories:
+```go
+func TestFeature(t *testing.T) {
+    tmpDir := t.TempDir()  // Auto-cleanup
+    manager := repo.NewManagerWithPath(tmpDir)  // NOT NewManager()
+    // ... test operations ...
+}
 ```
 
-**Commands supporting --format:**
-- `repo import`, `repo sync`, `repo list`
-- `list`, `install`, `uninstall`
+**Test Types**:
+- Unit tests: Use fixtures in `testdata/`, no network, `//go:build unit`
+- Integration tests: Real repos, network calls, `//go:build integration`
 
-**See:** [docs/user-guide/output-formats.md](docs/user-guide/output-formats.md)
+## Documentation
 
----
+- **User Guide**: `docs/user-guide/` - Resource formats, patterns, output
+- **Contributor Guide**: `docs/contributor-guide/` - Architecture, testing, development
+- **README.md**: User-facing installation and usage
+- **CONTRIBUTING.md**: Complete development guide
 
-## When Making Changes
+## Before Committing
 
-1. Run `make fmt` before committing
-2. Run `make test` to verify all tests pass
+1. `make fmt` - Format code
+2. `make test` - All tests pass
 3. Add tests for new functionality
-4. Update documentation if adding user-facing features
-5. Follow existing code patterns and conventions
-6. Ensure Git operations use `pkg/workspace` (Architecture Rule 1)
-
----
-
-## Detailed Documentation
-
-For comprehensive information, see:
-
-- **[docs/architecture/architecture-rules.md](docs/architecture/architecture-rules.md)** - Strict architectural rules (Git workspace, XDG, error wrapping, build tags)
-- **[docs/user-guide/resource-formats.md](docs/user-guide/resource-formats.md)** - Complete format specifications for all resource types
-- **[docs/user-guide/workspace-caching.md](docs/user-guide/workspace-caching.md)** - Git repository caching, performance optimization
-- **[docs/user-guide/pattern-matching.md](docs/user-guide/pattern-matching.md)** - Pattern matching syntax, examples
-- **[docs/user-guide/output-formats.md](docs/user-guide/output-formats.md)** - CLI output formats with scripting examples
-- **[docs/user-guide/sync-sources.md](docs/user-guide/sync-sources.md)** - Sync sources (URL vs path, remote vs local, symlinks, development workflow)
-- **[docs/user-guide/github-sources.md](docs/user-guide/github-sources.md)** - Adding resources from GitHub repositories
-- **[docs/contributor-guide/release-process.md](docs/contributor-guide/release-process.md)** - Release workflow and GoReleaser configuration
-
-## Landing the Plane (Session Completion)
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+4. Follow existing patterns
+5. Git operations use `pkg/workspace`

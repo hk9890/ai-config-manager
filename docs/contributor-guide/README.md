@@ -1,117 +1,68 @@
 # Contributor Guide
 
-Welcome to the **aimgr** contributor guide! This section contains documentation for developers working on the ai-config-manager project.
+Documentation for developers working on ai-config-manager.
 
-## Getting Started
-
-### Prerequisites
-
-- **Go 1.25 or higher** (check with `go version`)
-- **Make** (optional, but recommended)
-- **Git**
-
-### Quick Setup
+## Quick Start
 
 ```bash
-# Clone the repository
+# Clone and setup
 git clone https://github.com/hk9890/ai-config-manager.git
 cd ai-config-manager
 
-# Build the binary
+# Build and test
 make build
-
-# Run all checks (format, vet, test, build)
-make all
+make test
 ```
 
-For detailed setup instructions, code style guidelines, and development workflow, see the main [CONTRIBUTING.md](../../CONTRIBUTING.md) file in the repository root.
+For detailed setup, see [Development Environment](development-environment.md).
 
-## Contributor Documentation
+## Core Documentation
 
-### Core Guides
+### Getting Started
 
-- **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Main contributor guide
-  - Development environment setup
-  - Project architecture overview
-  - Development workflow
-  - Code style guidelines
-  - Testing guidelines
-  - Submitting changes
+- **[Development Environment](development-environment.md)** - Setup guide (Go, mise, tools)
+- **[Testing Guide](testing.md)** - Testing approach, best practices, troubleshooting
+- **[Release Process](release-process.md)** - Version numbering, creating releases
 
-- **[Release Process](release-process.md)** - How to create and publish releases
-  - Version numbering
-  - Creating releases
-  - Testing releases locally
-  - Release workflow
-  - Troubleshooting
+### Architecture
 
-- **[Testing Guide](testing.md)** - Comprehensive testing documentation
-  - Running tests (unit, integration)
-  - Test isolation principles
-  - Writing new tests
-  - Test fixtures and helpers
-  - Best practices and troubleshooting
-
-### Architecture Documentation
-
-- **[Architecture Overview](architecture.md)** - High-level architecture overview for contributors
-  - System overview and resource types
-  - Package structure explanation
-  - Key concepts (repository, symlinks, metadata, workspace caching)
-  - Data flow through the system
-  - Directory layout
-
-- **[Architecture Rules](../architecture/architecture-rules.md)** - Detailed architecture rules and patterns
-  - Git operations with workspace cache
-  - XDG directory specification
-  - Build tags for test categories
-  - Error wrapping requirements
+- **[Architecture Guide](architecture.md)** - System overview, design rules, data flows
+  - Architecture rules (Git workspace, XDG, error handling, symlinks)
+  - Package structure and responsibilities
+  - Key concepts and patterns
 
 ### Additional Resources
 
-- **[AGENTS.md](../../AGENTS.md)** - Quick reference for AI coding agents
-  - Build & test commands
-  - Common patterns
-  - Resource formats
-  - Code style quick reference
+- **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Complete development guide
+  - Code style guidelines
+  - Development workflow
+  - Submitting changes
+- **[AGENTS.md](../../AGENTS.md)** - Quick reference for AI agents
 
 ## Essential Commands
 
-### Building
+### Build & Test
 
 ```bash
 make build      # Build binary
-make install    # Build and install to ~/bin
-make all        # Run all checks and build
+make install    # Install to ~/bin
+make test       # All tests (vet → unit → integration → e2e)
 ```
 
-### Testing
+### Code Quality
 
 ```bash
-make test              # Run all tests (unit + integration + vet)
-make unit-test         # Run only unit tests
-make integration-test  # Run only integration tests
-```
-
-### Linting & Formatting
-
-```bash
-make fmt        # Format all Go code
-make vet        # Run go vet
-make deps       # Download dependencies
-make clean      # Clean build artifacts
+make fmt        # Format Go code
+make vet        # Run static analysis
 ```
 
 ## Code Style Quick Reference
 
 ### Import Organization
 
-Three groups with blank lines:
-
 ```go
 import (
     "fmt"           // 1. Standard library
-    "os"
 
     "github.com/spf13/cobra"  // 2. External dependencies
 
@@ -119,38 +70,33 @@ import (
 )
 ```
 
-### Naming Conventions
+### Naming
 
-- **Files**: `lowercase_with_underscores.go`
-- **Packages**: Short, lowercase, single word (`resource`, `config`)
-- **Types**: PascalCase (`ResourceType`, `CommandResource`)
-- **Functions**: PascalCase (exported), camelCase (unexported)
-- **Variables**: camelCase (`repoPath`, `skillsDir`)
+- Files: `lowercase_with_underscores.go`
+- Types: `PascalCase`
+- Functions: `PascalCase` (exported), `camelCase` (unexported)
+- Resources: `lowercase-with-hyphens` (1-64 chars)
 
 ### Error Handling
 
-Always wrap errors with context:
-
 ```go
 if err != nil {
-    return fmt.Errorf("failed to load command: %w", err)
+    return fmt.Errorf("failed to load: %w", err)
 }
 ```
 
-## Before Submitting Changes
+## Before Submitting
 
-- [ ] All tests pass (`make test`)
-- [ ] Code is formatted (`make fmt`)
-- [ ] No linter warnings (`make vet`)
-- [ ] New code has tests
-- [ ] Documentation updated (if user-facing change)
-- [ ] Commit messages are clear and descriptive
+- [ ] Tests pass: `make test`
+- [ ] Code formatted: `make fmt`
+- [ ] No warnings: `make vet`
+- [ ] Tests added for new functionality
+- [ ] Documentation updated (if user-facing)
 
 ## Getting Help
 
 - **Issues**: [GitHub Issues](https://github.com/hk9890/ai-config-manager/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/hk9890/ai-config-manager/discussions)
-- **Main Documentation**: See [README.md](../../README.md) for user documentation
 
 ---
 
