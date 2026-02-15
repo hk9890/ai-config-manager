@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -463,6 +464,83 @@ description: Test skill
 	}
 	if _, err := os.Stat(skillPath); !os.IsNotExist(err) {
 		t.Error("Skill should be removed")
+	}
+}
+
+func TestRepoRemove_GitCommit(t *testing.T) {
+	// Create temp directory for test repo
+	tempDir := t.TempDir()
+
+	// Create repo manager
+	mgr := repo.NewManagerWithPath(tempDir)
+
+	// Initialize repo (creates git repo)
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Add a source to the manifest
+	manifest, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	source := &repomanifest.Source{
+		Name: "test-source",
+		Path: "/home/user/resources",
+	}
+
+	if err := manifest.AddSource(source); err != nil {
+		t.Fatalf("Failed to add source: %v", err)
+	}
+
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Commit the initial state
+	if err := mgr.CommitChanges("test: add source"); err != nil {
+		t.Fatalf("Failed to commit initial state: %v", err)
+	}
+
+	// Helper to get git status
+	gitStatus := func() string {
+		cmd := exec.Command("git", "status", "--porcelain")
+		cmd.Dir = tempDir
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Failed to get git status: %v", err)
+		}
+		return strings.TrimSpace(string(output))
+	}
+
+	// Verify repo is clean before removal
+	if status := gitStatus(); status != "" {
+		t.Fatalf("Expected clean working tree before removal, got: %s", status)
+	}
+
+	// Remove the source
+	if err := performRemove(mgr, "test-source", false, false); err != nil {
+		t.Fatalf("Failed to remove source: %v", err)
+	}
+
+	// Verify manifest changes are committed (repo is clean)
+	if status := gitStatus(); status != "" {
+		t.Errorf("Expected clean working tree after repo remove, but got uncommitted changes:\n%s", status)
+		t.Error("This indicates manifest changes were not committed (bug ai-config-manager-dvg)")
+	}
+
+	// Verify the commit message
+	cmd := exec.Command("git", "log", "--oneline", "-1")
+	cmd.Dir = tempDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to get git log: %v", err)
+	}
+	logOutput := string(output)
+	expectedMsg := "aimgr: remove source from manifest"
+	if !strings.Contains(logOutput, expectedMsg) {
+		t.Errorf("Expected commit message %q not found in git log:\n%s", expectedMsg, logOutput)
 	}
 }
 

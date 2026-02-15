@@ -134,6 +134,12 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 		return fmt.Errorf("failed to save manifest: %w", err)
 	}
 
+	// Commit manifest changes to git
+	if err := mgr.CommitChanges("aimgr: remove source from manifest"); err != nil {
+		// Don't fail if commit fails (e.g., not a git repo)
+		fmt.Fprintf(os.Stderr, "Warning: Failed to commit manifest: %v\n", err)
+	}
+
 	fmt.Printf("✓ Removed source: %s\n", source.Name)
 
 	// Remove orphaned resources unless --keep-resources is specified
