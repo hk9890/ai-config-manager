@@ -133,7 +133,10 @@ func TestDiscoverSkills_Deduplication(t *testing.T) {
 }
 
 func TestDiscoverSkills_EmptyRepo(t *testing.T) {
-	basePath := filepath.Join("testdata", "empty-repo")
+	// Use t.TempDir() for true isolation - don't rely on testdata which might
+	// resolve differently in CI vs local
+	basePath := t.TempDir()
+	// basePath is now an empty temporary directory
 
 	skills, err := DiscoverSkills(basePath, "")
 	if err != nil {
