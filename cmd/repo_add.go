@@ -126,6 +126,12 @@ Examples:
 		if err := addSourceToManifest(manager, parsed, importMode); err != nil {
 			// Don't fail the entire operation if manifest tracking fails
 			fmt.Fprintf(os.Stderr, "Warning: Failed to track source in manifest: %v\n", err)
+		} else {
+			// Commit manifest changes to git
+			if err := manager.CommitChanges("aimgr: track source in manifest"); err != nil {
+				// Don't fail if commit fails (e.g., not a git repo)
+				fmt.Fprintf(os.Stderr, "Warning: Failed to commit manifest: %v\n", err)
+			}
 		}
 
 		return nil

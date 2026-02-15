@@ -2,6 +2,61 @@
 
 Quick reference for AI coding agents working in the ai-config-manager repository.
 
+## ⚠️ CRITICAL: Repository Safety for Testing
+
+**NEVER run `aimgr repo` commands against the global repository during testing or bug reproduction!**
+
+The default repository location is `~/.local/share/ai-config/repo/` which contains your real aimgr configuration. Testing against this will corrupt your development environment.
+
+### ✅ Safe Testing Methods
+
+**Method 1: Environment Variable (RECOMMENDED)**
+```bash
+# Set up isolated test repository
+export AIMGR_REPO_PATH=/tmp/test-repo-$(date +%s)
+
+# Now all aimgr commands use the test repo
+aimgr repo init
+aimgr repo add /path/to/resources
+git -C "$AIMGR_REPO_PATH" status
+```
+
+**Method 2: Config File**
+```bash
+# Create temporary config
+cat > /tmp/test-config.yaml << 'YAML'
+repo:
+  path: /tmp/test-repo
+YAML
+
+# Use config for each command
+aimgr --config /tmp/test-config.yaml repo init
+aimgr --config /tmp/test-config.yaml repo add /path/to/resources
+```
+
+**Method 3: Programmatic Testing (Go tests)**
+```go
+// In test files, ALWAYS use NewManagerWithPath with t.TempDir()
+func TestSomething(t *testing.T) {
+    repoDir := t.TempDir()
+    manager := repo.NewManagerWithPath(repoDir)
+    // ... test code
+}
+```
+
+### ❌ NEVER Do This
+
+```bash
+# DON'T: This uses your global repo!
+aimgr repo add /some/test/resources
+
+# DON'T: This pollutes your actual repository!
+cd ~/.local/share/ai-config/repo
+aimgr repo add test-resource
+```
+
+**Bottom line**: Every test operation MUST explicitly specify a temporary repository location. No exceptions.
+
 ## Project Overview
 
 **aimgr** is a CLI tool (Go 1.25.6) for managing AI resources (commands, skills, agents, packages) across multiple AI coding tools. It uses a centralized repository (`~/.local/share/ai-config/repo/`) with symlink-based installation to tool directories (`.claude/`, `.opencode/`, `.github/skills/`, `.windsurf/skills/`).
