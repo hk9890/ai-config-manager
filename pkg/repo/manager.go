@@ -3,6 +3,7 @@ package repo
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/hk9890/ai-config-manager/pkg/config"
 	pkgerrors "github.com/hk9890/ai-config-manager/pkg/errors"
+	"github.com/hk9890/ai-config-manager/pkg/logging"
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -20,6 +22,7 @@ import (
 // Manager manages the AI resources repository
 type Manager struct {
 	repoPath string
+	logger   *slog.Logger
 }
 
 // NewManager creates a new repository manager
@@ -33,9 +36,11 @@ func NewManager() (*Manager, error) {
 	// Priority 1: Check for environment variable override first
 	repoPath = os.Getenv("AIMGR_REPO_PATH")
 	if repoPath != "" {
-		return &Manager{
+		m := &Manager{
 			repoPath: repoPath,
-		}, nil
+		}
+		m.initLogger()
+		return m, nil
 	}
 
 	// Priority 2: Check config file for repo.path
@@ -43,24 +48,49 @@ func NewManager() (*Manager, error) {
 	if err == nil && cfg.Repo.Path != "" {
 		// Config loaded successfully and has repo.path set
 		// Path is already validated and expanded by config.Validate()
-		return &Manager{
+		m := &Manager{
 			repoPath: cfg.Repo.Path,
-		}, nil
+		}
+		m.initLogger()
+		return m, nil
 	}
 
 	// Priority 3: Fall back to XDG default
 	// Ignore config errors - user may not have config file
 	repoPath = filepath.Join(xdg.DataHome, "ai-config", "repo")
-	return &Manager{
+	m := &Manager{
 		repoPath: repoPath,
-	}, nil
+	}
+	m.initLogger()
+	return m, nil
 }
 
 // NewManagerWithPath creates a manager with a custom repository path (for testing)
 func NewManagerWithPath(repoPath string) *Manager {
-	return &Manager{
+	m := &Manager{
 		repoPath: repoPath,
 	}
+	m.initLogger()
+	return m
+}
+
+// initLogger initializes the logger for this Manager.
+// If logger creation fails, logs a warning to stderr but continues.
+// Manager can operate without logging (graceful degradation).
+func (m *Manager) initLogger() {
+	logger, err := logging.NewRepoLogger(m.repoPath)
+	if err != nil {
+		// Log warning to stderr but don't fail
+		fmt.Fprintf(os.Stderr, "Warning: failed to initialize logger: %v\n", err)
+		m.logger = nil
+		return
+	}
+	m.logger = logger
+}
+
+// GetLogger returns the logger for this Manager, or nil if logger creation failed.
+func (m *Manager) GetLogger() *slog.Logger {
+	return m.logger
 }
 
 // Init initializes the repository directory structure and git repository.
@@ -68,30 +98,60 @@ func NewManagerWithPath(repoPath string) *Manager {
 func (m *Manager) Init() error {
 	// Create main repo directory
 	if err := os.MkdirAll(m.repoPath, 0755); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to create repo directory",
+				"path", m.repoPath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to create repo directory: %w", err)
 	}
 
 	// Create commands subdirectory
 	commandsPath := filepath.Join(m.repoPath, "commands")
 	if err := os.MkdirAll(commandsPath, 0755); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to create commands directory",
+				"path", commandsPath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to create commands directory: %w", err)
 	}
 
 	// Create skills subdirectory
 	skillsPath := filepath.Join(m.repoPath, "skills")
 	if err := os.MkdirAll(skillsPath, 0755); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to create skills directory",
+				"path", skillsPath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to create skills directory: %w", err)
 	}
 
 	// Create agents subdirectory
 	agentsPath := filepath.Join(m.repoPath, "agents")
 	if err := os.MkdirAll(agentsPath, 0755); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to create agents directory",
+				"path", agentsPath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to create agents directory: %w", err)
 	}
 
 	// Create packages subdirectory
 	packagesPath := filepath.Join(m.repoPath, "packages")
 	if err := os.MkdirAll(packagesPath, 0755); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to create packages directory",
+				"path", packagesPath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to create packages directory: %w", err)
 	}
 
@@ -106,8 +166,22 @@ func (m *Manager) Init() error {
 		gitCmd := exec.Command("git", "init")
 		gitCmd.Dir = m.repoPath
 		if output, err := gitCmd.CombinedOutput(); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to initialize git repository",
+					"path", m.repoPath,
+					"error", err.Error(),
+					"output", string(output),
+				)
+			}
 			return fmt.Errorf("failed to initialize git repository: %w\nOutput: %s", err, output)
 		}
+	}
+
+	// Log repo initialization
+	if m.logger != nil {
+		m.logger.Info("repo init",
+			"path", m.repoPath,
+		)
 	}
 
 	// Create ai.repo.yaml if it doesn't exist
@@ -123,6 +197,12 @@ func (m *Manager) Init() error {
 			Sources: []*repomanifest.Source{},
 		}
 		if err := manifest.Save(m.repoPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create ai.repo.yaml",
+					"path", manifestPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to create ai.repo.yaml: %w", err)
 		}
 		// Log that manifest was created (helpful for upgrades from pre-manifest versions)
@@ -136,6 +216,10 @@ func (m *Manager) Init() error {
 	gitignorePath := filepath.Join(m.repoPath, ".gitignore")
 	gitignoreContent := `# aimgr workspace cache (Git clones for remote sources)
 .workspace/
+
+# Log files
+logs/
+*.log
 
 # macOS
 .DS_Store
@@ -152,6 +236,12 @@ func (m *Manager) Init() error {
 		// .gitignore exists - check if it contains .workspace/
 		content, err := os.ReadFile(gitignorePath)
 		if err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to read .gitignore",
+					"path", gitignorePath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to read .gitignore: %w", err)
 		}
 
@@ -160,17 +250,35 @@ func (m *Manager) Init() error {
 			!strings.Contains(string(content), ".workspace") {
 			f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
+				if m.logger != nil {
+					m.logger.Error("failed to open .gitignore for append",
+						"path", gitignorePath,
+						"error", err.Error(),
+					)
+				}
 				return fmt.Errorf("failed to open .gitignore for append: %w", err)
 			}
 			defer f.Close()
 
 			if _, err := f.WriteString("\n" + gitignoreContent); err != nil {
+				if m.logger != nil {
+					m.logger.Error("failed to append to .gitignore",
+						"path", gitignorePath,
+						"error", err.Error(),
+					)
+				}
 				return fmt.Errorf("failed to append to .gitignore: %w", err)
 			}
 		}
 	} else {
 		// Create new .gitignore
 		if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create .gitignore",
+					"path", gitignorePath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to create .gitignore: %w", err)
 		}
 	}
@@ -270,6 +378,12 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 
 	res, err := resource.LoadCommandWithBase(sourcePath, basePath)
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load command",
+				"source", sourcePath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to load command: %w", err)
 	}
 
@@ -278,7 +392,23 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 
 	// Create parent directories if needed (for nested structure)
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to create parent directories",
+				"path", filepath.Dir(destPath),
+				"resource", res.Name,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to create parent directories: %w", err)
+	}
+
+	// Log before copying/symlinking
+	if m.logger != nil {
+		m.logger.Info("repo add",
+			"resource", res.Name,
+			"type", "command",
+			"source", sourcePath,
+		)
 	}
 
 	// Copy or symlink based on mode
@@ -286,16 +416,39 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 		// Ensure source is absolute path
 		absSource, err := filepath.Abs(sourcePath)
 		if err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to get absolute path",
+					"source", sourcePath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to get absolute path: %w", err)
 		}
 
 		// Create symlink
 		if err := os.Symlink(absSource, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create symlink",
+					"resource", res.Name,
+					"type", "command",
+					"source", absSource,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to create symlink: %w", err)
 		}
 	} else {
 		// Copy the file (default)
 		if err := copyFile(sourcePath, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to copy command",
+					"resource", res.Name,
+					"source", sourcePath,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to copy command: %w", err)
 		}
 	}
@@ -317,6 +470,14 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 		sourceName = metadata.DeriveSourceName(sourceURL)
 	}
 	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to save metadata",
+				"resource", res.Name,
+				"type", "command",
+				"path", metadata.GetMetadataPath(res.Name, resource.Command, m.repoPath),
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
@@ -345,27 +506,65 @@ func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref str
 	// Validate and load the skill
 	res, err := resource.LoadSkill(sourcePath)
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load skill",
+				"source", sourcePath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to load skill: %w", err)
 	}
 
 	// Get destination path
 	destPath := m.GetPath(res.Name, resource.Skill)
 
+	// Log before copying/symlinking
+	if m.logger != nil {
+		m.logger.Info("repo add",
+			"resource", res.Name,
+			"type", "skill",
+			"source", sourcePath,
+		)
+	}
+
 	// Copy or symlink based on mode
 	if opts.ImportMode == "symlink" {
 		// Ensure source is absolute path
 		absSource, err := filepath.Abs(sourcePath)
 		if err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to get absolute path",
+					"source", sourcePath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to get absolute path: %w", err)
 		}
 
 		// Create symlink to the entire directory
 		if err := os.Symlink(absSource, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create symlink",
+					"resource", res.Name,
+					"type", "skill",
+					"source", absSource,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to create symlink: %w", err)
 		}
 	} else {
 		// Copy the directory (default)
 		if err := copyDir(sourcePath, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to copy skill",
+					"resource", res.Name,
+					"source", sourcePath,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to copy skill: %w", err)
 		}
 	}
@@ -387,6 +586,14 @@ func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref str
 		sourceName = metadata.DeriveSourceName(sourceURL)
 	}
 	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to save metadata",
+				"resource", res.Name,
+				"type", "skill",
+				"path", metadata.GetMetadataPath(res.Name, resource.Skill, m.repoPath),
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
@@ -420,6 +627,15 @@ func (m *Manager) addAgentWithOptions(sourcePath, sourceURL, sourceType, ref str
 
 	// Get destination path
 	destPath := m.GetPath(res.Name, resource.Agent)
+
+	// Log before copying/symlinking
+	if m.logger != nil {
+		m.logger.Info("repo add",
+			"resource", res.Name,
+			"type", "agent",
+			"source", sourcePath,
+		)
+	}
 
 	// Copy or symlink based on mode
 	if opts.ImportMode == "symlink" {
@@ -485,27 +701,64 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 	// Validate and load the package
 	pkg, err := resource.LoadPackage(sourcePath)
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load package",
+				"source", sourcePath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to load package: %w", err)
 	}
 
 	// Get destination path
 	destPath := resource.GetPackagePath(pkg.Name, m.repoPath)
 
+	// Log before copying/symlinking
+	if m.logger != nil {
+		m.logger.Info("repo add",
+			"resource", pkg.Name,
+			"type", "package",
+			"source", sourcePath,
+		)
+	}
+
 	// Copy or symlink based on mode
 	if opts.ImportMode == "symlink" {
 		// Ensure source is absolute path
 		absSource, err := filepath.Abs(sourcePath)
 		if err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to get absolute path",
+					"source", sourcePath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to get absolute path: %w", err)
 		}
 
 		// Create symlink
 		if err := os.Symlink(absSource, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create symlink",
+					"package", pkg.Name,
+					"source", absSource,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to create symlink: %w", err)
 		}
 	} else {
 		// Copy the file (default)
 		if err := copyFile(sourcePath, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to copy package",
+					"package", pkg.Name,
+					"source", sourcePath,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to copy package: %w", err)
 		}
 	}
@@ -528,6 +781,13 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 		ResourceCount: len(pkg.Resources),
 	}
 	if err := metadata.SavePackageMetadata(pkgMeta, m.repoPath); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to save package metadata",
+				"package", pkg.Name,
+				"path", metadata.GetPackageMetadataPath(pkg.Name, m.repoPath),
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
@@ -758,8 +1018,24 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 		return fmt.Errorf("resource '%s' not found", name)
 	}
 
+	// Log before removing
+	if m.logger != nil {
+		m.logger.Info("repo remove",
+			"resource", name,
+			"type", string(resourceType),
+		)
+	}
+
 	// Remove the resource
 	if err := os.RemoveAll(path); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to remove resource",
+				"resource", name,
+				"type", string(resourceType),
+				"path", path,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to remove resource: %w", err)
 	}
 
@@ -767,6 +1043,14 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 	metadataPath := metadata.GetMetadataPath(name, resourceType, m.repoPath)
 	if _, err := os.Stat(metadataPath); err == nil {
 		if err := os.Remove(metadataPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to remove metadata",
+					"resource", name,
+					"type", string(resourceType),
+					"path", metadataPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to remove metadata: %w", err)
 		}
 	}
@@ -844,6 +1128,13 @@ func (m *Manager) CommitChanges(message string) error {
 	addCmd := exec.Command("git", "add", ".")
 	addCmd.Dir = m.repoPath
 	if output, err := addCmd.CombinedOutput(); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to stage changes",
+				"path", m.repoPath,
+				"error", err.Error(),
+				"output", string(output),
+			)
+		}
 		return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, output)
 	}
 
@@ -852,6 +1143,13 @@ func (m *Manager) CommitChanges(message string) error {
 	statusCmd.Dir = m.repoPath
 	output, err := statusCmd.CombinedOutput()
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to check git status",
+				"path", m.repoPath,
+				"error", err.Error(),
+				"output", string(output),
+			)
+		}
 		return fmt.Errorf("failed to check git status: %w\nOutput: %s", err, output)
 	}
 
@@ -864,6 +1162,14 @@ func (m *Manager) CommitChanges(message string) error {
 	commitCmd := exec.Command("git", "commit", "-m", message)
 	commitCmd.Dir = m.repoPath
 	if output, err := commitCmd.CombinedOutput(); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to commit changes",
+				"path", m.repoPath,
+				"message", message,
+				"error", err.Error(),
+				"output", string(output),
+			)
+		}
 		return fmt.Errorf("failed to commit changes: %w\nOutput: %s", err, output)
 	}
 

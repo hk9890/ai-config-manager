@@ -137,6 +137,17 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 		if err := os.Symlink(res.Path, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink for %s: %w", tool, err)
 		}
+
+		// Log successful installation
+		if logger := repoManager.GetLogger(); logger != nil {
+			logger.Info("resource installed",
+				"operation", "install",
+				"resource_type", "command",
+				"resource_name", res.Name,
+				"tool", tool,
+				"dest_path", symlinkPath,
+			)
+		}
 	}
 
 	return nil

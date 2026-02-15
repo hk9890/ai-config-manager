@@ -45,3 +45,7 @@ test/e2e/configs/*.local.yaml
 
 # Environment variables (local overrides)
 .env.local
+
+# Log files
+logs/
+*.log
