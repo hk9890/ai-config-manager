@@ -682,9 +682,9 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 
 // PackageInfo represents package information for listing
 type PackageInfo struct {
-	Name          string
-	Description   string
-	ResourceCount int
+	Name          string `json:"name" yaml:"name"`
+	Description   string `json:"description" yaml:"description"`
+	ResourceCount int    `json:"resource_count" yaml:"resource_count"`
 }
 
 // ListPackages lists all packages in the repository

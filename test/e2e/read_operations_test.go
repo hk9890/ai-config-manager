@@ -125,18 +125,18 @@ func TestE2E_BasicReadOperations(t *testing.T) {
 		// Verify JSON structure has expected fields
 		for i, item := range items {
 			// Check if this is a package (has ResourceCount) or a resource (has type)
-			if resourceCount, isPackage := item["ResourceCount"]; isPackage {
-				// This is a package - uses uppercase fields
+			if resourceCount, isPackage := item["resource_count"]; isPackage {
+				// This is a package - uses lowercase fields
 				if _, ok := resourceCount.(float64); !ok {
-					t.Errorf("Package %d has invalid 'ResourceCount' field: %v", i, resourceCount)
+					t.Errorf("Package %d has invalid 'resource_count' field: %v", i, resourceCount)
 				}
-				// Packages should have Name (uppercase)
-				if name, ok := item["Name"].(string); !ok || name == "" {
-					t.Errorf("Package %d has invalid 'Name' field: %v", i, item["Name"])
+				// Packages should have name (lowercase)
+				if name, ok := item["name"].(string); !ok || name == "" {
+					t.Errorf("Package %d has invalid 'name' field: %v", i, item["name"])
 				}
-				// Packages should have Description
-				if desc, ok := item["Description"].(string); !ok {
-					t.Errorf("Package %d missing or invalid 'Description' field: %v", i, desc)
+				// Packages should have description
+				if desc, ok := item["description"].(string); !ok {
+					t.Errorf("Package %d missing or invalid 'description' field: %v", i, desc)
 				}
 			} else {
 				// This is a resource (command, skill, agent) - uses lowercase fields

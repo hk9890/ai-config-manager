@@ -236,15 +236,102 @@ func isRepoPopulated(t *testing.T, repoPath string) bool {
 // TestE2E_SyncEmptyConfig verifies behavior when no sources are configured.
 // This is a negative test case.
 func TestE2E_SyncEmptyConfig(t *testing.T) {
-	t.Skip("TODO: Create a test config with no sources for this test")
-	// This test would verify that sync fails gracefully when no sources are configured
+	configPath := loadTestConfig(t, "e2e-test")
+	repoPath := getRepoPathFromConfig(t, configPath)
+
+	cleanTestRepo(t, repoPath)
+	t.Cleanup(func() { cleanTestRepo(t, repoPath) })
+
+	// Create ai.repo.yaml with NO sources (empty array)
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		t.Fatalf("Failed to create repo directory: %v", err)
+	}
+
+	emptyManifest := `version: 1
+sources: []
+`
+	aiRepoPath := filepath.Join(repoPath, "ai.repo.yaml")
+	if err := os.WriteFile(aiRepoPath, []byte(emptyManifest), 0644); err != nil {
+		t.Fatalf("Failed to write ai.repo.yaml: %v", err)
+	}
+
+	// Run sync - should fail
+	env := map[string]string{"AIMGR_REPO_PATH": repoPath}
+	stdout, stderr, err := runAimgrWithEnv(t, configPath, env, "repo", "sync")
+
+	// Verify it failed
+	if err == nil {
+		t.Error("Expected sync to fail with empty sources, but it succeeded")
+	}
+
+	// Verify helpful error message
+	output := stdout + stderr
+	if !strings.Contains(output, "no sync sources configured") {
+		t.Errorf("Expected 'no sync sources configured' error, got: %s", output)
+	}
+
+	// Verify guidance is provided
+	if !strings.Contains(output, "repo add") {
+		t.Error("Expected error to suggest using 'repo add' command")
+	}
+
+	t.Logf("✓ Empty config handling verified: %s", strings.TrimSpace(output))
 }
 
 // TestE2E_SyncInvalidSource verifies behavior when a source URL is invalid.
-// This is a negative test case.
+// This is a negative test case that verifies graceful error handling.
 func TestE2E_SyncInvalidSource(t *testing.T) {
-	t.Skip("TODO: Create a test config with invalid source for this test")
-	// This test would verify that sync handles invalid sources gracefully
+	configPath := loadTestConfig(t, "e2e-test")
+	repoPath := getRepoPathFromConfig(t, configPath)
+
+	cleanTestRepo(t, repoPath)
+	t.Cleanup(func() { cleanTestRepo(t, repoPath) })
+
+	// Create ai.repo.yaml with INVALID source (non-existent path)
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		t.Fatalf("Failed to create repo directory: %v", err)
+	}
+
+	invalidManifest := `version: 1
+sources:
+  - name: invalid-local-path
+    path: /this/path/does/not/exist/at/all
+`
+	aiRepoPath := filepath.Join(repoPath, "ai.repo.yaml")
+	if err := os.WriteFile(aiRepoPath, []byte(invalidManifest), 0644); err != nil {
+		t.Fatalf("Failed to write ai.repo.yaml: %v", err)
+	}
+
+	// Run sync - should fail since ALL sources are invalid
+	env := map[string]string{"AIMGR_REPO_PATH": repoPath}
+	stdout, stderr, err := runAimgrWithEnv(t, configPath, env, "repo", "sync")
+
+	// Verify it failed (all sources failed)
+	if err == nil {
+		t.Error("Expected sync to fail when all sources are invalid, but it succeeded")
+	}
+
+	// Check output mentions the failure
+	output := stdout + stderr
+
+	// Should mention "all sources failed" or similar
+	if !strings.Contains(output, "all sources failed") {
+		t.Logf("Output: %s", output)
+		t.Error("Expected error to mention 'all sources failed'")
+	}
+
+	// Should mention the invalid source name for debugging
+	if !strings.Contains(output, "invalid-local-path") {
+		t.Logf("Output: %s", output)
+		t.Error("Expected output to mention the invalid source name for debugging")
+	}
+
+	// Verify repo is empty (nothing synced)
+	if isRepoPopulated(t, repoPath) {
+		t.Error("Repository should be empty when all sources fail")
+	}
+
+	t.Logf("✓ Invalid source handling verified")
 }
 
 // Example of how to add more sync tests:

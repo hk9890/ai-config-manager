@@ -126,7 +126,7 @@ func TestRepoAdd_ManifestFailureHandling(t *testing.T) {
 	// Try to add resource - should show warning but not fail
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 	output, err := runAimgr(t, "repo", "add", resourceDir, "--name", "test-source")
-	
+
 	// The command might fail due to read-only manifest, which is expected
 	if err == nil {
 		// If it succeeded, at least verify the resource was added

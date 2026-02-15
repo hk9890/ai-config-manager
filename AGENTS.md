@@ -80,6 +80,29 @@ make fmt        # Format all Go code
 make vet        # Run go vet
 ```
 
+## ⚠️ CRITICAL: Use Locally Built Binary
+
+**ALWAYS use `./aimgr` (the locally built binary) when testing changes, NOT `aimgr` from PATH!**
+
+Version managers (mise, asdf, etc.) may install older versions at `~/.local/share/mise/installs/...` which will be found first in PATH. Testing with the wrong binary wastes time and causes confusion.
+
+```bash
+# ✅ CORRECT: Use local binary
+./aimgr --version
+./aimgr repo init
+
+# ❌ WRONG: May use mise/asdf version
+aimgr --version
+which aimgr  # Returns mise path, not ./aimgr!
+```
+
+**Quick check before testing:**
+```bash
+# Verify you're using the local build
+./aimgr --version  # Should show your current dev version
+which aimgr        # Shows mise/system version (ignore this!)
+```
+
 ## Use Case Guide
 
 Delegate to the right documentation based on what you need to do:
