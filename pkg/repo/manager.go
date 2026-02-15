@@ -311,8 +311,11 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
-	// Derive source name from URL
-	sourceName := metadata.DeriveSourceName(sourceURL)
+	// Use explicit sourceName from opts if provided, otherwise derive
+	sourceName := opts.SourceName
+	if sourceName == "" {
+		sourceName = metadata.DeriveSourceName(sourceURL)
+	}
 	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
@@ -378,8 +381,11 @@ func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref str
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
-	// Derive source name from URL
-	sourceName := metadata.DeriveSourceName(sourceURL)
+	// Use explicit sourceName from opts if provided, otherwise derive
+	sourceName := opts.SourceName
+	if sourceName == "" {
+		sourceName = metadata.DeriveSourceName(sourceURL)
+	}
 	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
@@ -445,8 +451,11 @@ func (m *Manager) addAgentWithOptions(sourcePath, sourceURL, sourceType, ref str
 		FirstInstalled: now,
 		LastUpdated:    now,
 	}
-	// Derive source name from URL
-	sourceName := metadata.DeriveSourceName(sourceURL)
+	// Use explicit sourceName from opts if provided, otherwise derive
+	sourceName := opts.SourceName
+	if sourceName == "" {
+		sourceName = metadata.DeriveSourceName(sourceURL)
+	}
 	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
@@ -503,10 +512,16 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 
 	// Create and save metadata
 	now := time.Now()
+	// Use explicit sourceName from opts if provided, otherwise derive
+	sourceName := opts.SourceName
+	if sourceName == "" {
+		sourceName = metadata.DeriveSourceName(sourceURL)
+	}
 	pkgMeta := &metadata.PackageMetadata{
 		Name:          pkg.Name,
 		SourceType:    sourceType,
 		SourceURL:     sourceURL,
+		SourceName:    sourceName,
 		SourceRef:     ref,
 		FirstAdded:    now,
 		LastUpdated:   now,
@@ -776,6 +791,8 @@ func (m *Manager) GetPath(name string, resourceType resource.ResourceType) strin
 		return filepath.Join(m.repoPath, "skills", name)
 	case resource.Agent:
 		return filepath.Join(m.repoPath, "agents", name+".md")
+	case resource.PackageType:
+		return filepath.Join(m.repoPath, "packages", name+".package.json")
 	default:
 		return ""
 	}
@@ -923,6 +940,7 @@ func copyDir(src, dst string) error {
 
 // BulkImportOptions contains options for bulk import operations
 type BulkImportOptions struct {
+	SourceName   string // Explicit source name from manifest (overrides derived name)
 	ImportMode   string // "copy" or "symlink"
 	Force        bool   // Overwrite existing resources
 	SkipExisting bool   // Skip conflicts silently
@@ -934,6 +952,7 @@ type BulkImportOptions struct {
 
 // ImportOptions contains options for single resource import operations
 type ImportOptions struct {
+	SourceName string // Explicit source name from manifest (overrides derived name)
 	ImportMode string // "copy" or "symlink"
 	Force      bool   // Overwrite existing resources
 }
@@ -1122,6 +1141,7 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 
 		// Create import options from bulk options
 		importOpts := ImportOptions{
+			SourceName: opts.SourceName,
 			ImportMode: opts.ImportMode,
 			Force:      opts.Force,
 		}
@@ -1255,6 +1275,7 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 
 		// Create import options from bulk options
 		importOpts := ImportOptions{
+			SourceName: opts.SourceName,
 			ImportMode: opts.ImportMode,
 			Force:      opts.Force,
 		}

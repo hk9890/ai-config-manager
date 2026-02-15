@@ -380,7 +380,7 @@ func importFromLocalPath(
 	sourceType string, // "local", "github", "git-url", "test"
 	ref string, // Git ref (empty for local/test)
 ) error {
-	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, ref, "copy")
+	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, ref, "copy", "")
 }
 
 // importFromLocalPathWithMode is the same as importFromLocalPath but allows specifying import mode.
@@ -392,6 +392,7 @@ func importFromLocalPathWithMode(
 	sourceType string, // "local", "github", "git-url", "test"
 	ref string, // Git ref (empty for local/test)
 	importMode string, // "copy" or "symlink"
+	sourceName string, // Explicit source name from manifest (empty = derive from URL)
 ) error {
 	// Discover all resources (with error collection)
 	commands, commandErrors, err := discovery.DiscoverCommandsWithErrors(localPath, "")
@@ -552,6 +553,7 @@ func importFromLocalPathWithMode(
 
 	// Import using bulk add
 	opts := repo.BulkImportOptions{
+		SourceName:   sourceName,
 		ImportMode:   importMode,
 		Force:        forceFlag,
 		SkipExisting: skipExistingFlag,
@@ -647,8 +649,15 @@ func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter st
 	sourceURL := "file://" + absPath
 	sourceType := "local"
 
+	// Determine source name (use --name flag if provided)
+	sourceName := nameFlag
+	if sourceName == "" {
+		// Derive from path (same logic as manifest generation)
+		sourceName = filepath.Base(absPath)
+	}
+
 	// Call common import function with import mode
-	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, "", importMode)
+	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, "", importMode, sourceName)
 }
 
 // addBulkFromGitHub handles bulk add from a GitHub repository
@@ -711,8 +720,26 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 		sourceType = "git-url"
 	}
 
+	// Determine source name (use --name flag if provided, otherwise derive from URL)
+	sourceName := nameFlag
+	if sourceName == "" {
+		// Derive from URL (extract repo name)
+		// Examples:
+		// https://github.com/user/repo -> repo
+		// https://github.com/user/repo.git -> repo
+		url := parsed.URL
+		url = strings.TrimSuffix(url, ".git")
+		parts := strings.Split(url, "/")
+		if len(parts) > 0 {
+			sourceName = parts[len(parts)-1]
+		}
+		if sourceName == "" {
+			sourceName = "source"
+		}
+	}
+
 	// Call common import function with workspace path
-	return importFromLocalPath(searchPath, manager, filter, parsed.URL, sourceType, parsed.Ref)
+	return importFromLocalPathWithMode(searchPath, manager, filter, parsed.URL, sourceType, parsed.Ref, "copy", sourceName)
 }
 
 // selectResource handles resource selection when multiple resources are found
