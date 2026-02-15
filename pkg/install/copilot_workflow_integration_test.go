@@ -136,7 +136,7 @@ Verify that skills can be imported, installed, listed, and uninstalled for Copil
 
 	// Step 6: Uninstall skill
 	t.Log("Step 6: Uninstalling skill")
-	if err := installer.Uninstall("test-copilot-skill", resource.Skill); err != nil {
+	if err := installer.Uninstall("test-copilot-skill", resource.Skill, mgr); err != nil {
 		t.Fatalf("Failed to uninstall skill: %v", err)
 	}
 	t.Logf("✓ Skill uninstalled")
@@ -348,7 +348,7 @@ This skill tests installation to multiple tools simultaneously.
 
 	// Uninstall should remove from all tools
 	t.Log("Uninstalling from all tools")
-	if err := installer.Uninstall("multi-tool-skill", resource.Skill); err != nil {
+	if err := installer.Uninstall("multi-tool-skill", resource.Skill, mgr); err != nil {
 		t.Fatalf("Failed to uninstall skill: %v", err)
 	}
 

@@ -144,7 +144,7 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 				"operation", "install",
 				"resource_type", "command",
 				"resource_name", res.Name,
-				"tool", tool,
+				"tool", tool.String(),
 				"dest_path", symlinkPath,
 			)
 		}
@@ -189,6 +189,17 @@ func (i *Installer) InstallSkill(name string, repoManager *repo.Manager) error {
 		if err := os.Symlink(res.Path, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink for %s: %w", tool, err)
 		}
+
+		// Log successful installation
+		if logger := repoManager.GetLogger(); logger != nil {
+			logger.Info("resource installed",
+				"operation", "install",
+				"resource_type", "skill",
+				"resource_name", res.Name,
+				"tool", tool.String(),
+				"dest_path", symlinkPath,
+			)
+		}
 	}
 
 	return nil
@@ -230,13 +241,24 @@ func (i *Installer) InstallAgent(name string, repoManager *repo.Manager) error {
 		if err := os.Symlink(res.Path, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink for %s: %w", tool, err)
 		}
+
+		// Log successful installation
+		if logger := repoManager.GetLogger(); logger != nil {
+			logger.Info("resource installed",
+				"operation", "install",
+				"resource_type", "agent",
+				"resource_name", res.Name,
+				"tool", tool.String(),
+				"dest_path", symlinkPath,
+			)
+		}
 	}
 
 	return nil
 }
 
 // Uninstall removes an installed resource by removing symlinks from all tool directories
-func (i *Installer) Uninstall(name string, resourceType resource.ResourceType) error {
+func (i *Installer) Uninstall(name string, resourceType resource.ResourceType, repoManager *repo.Manager) error {
 	removed := false
 	var lastErr error
 
@@ -282,6 +304,17 @@ func (i *Installer) Uninstall(name string, resourceType resource.ResourceType) e
 		if err := os.Remove(symlinkPath); err != nil {
 			lastErr = fmt.Errorf("failed to remove symlink from %s: %w", tool, err)
 			continue
+		}
+
+		// Log successful uninstallation
+		if logger := repoManager.GetLogger(); logger != nil {
+			logger.Info("resource uninstalled",
+				"operation", "uninstall",
+				"resource_type", resourceType,
+				"resource_name", name,
+				"tool", tool.String(),
+				"dest_path", symlinkPath,
+			)
 		}
 
 		removed = true

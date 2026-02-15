@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
+	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
@@ -101,6 +102,9 @@ func TestProcessUninstall(t *testing.T) {
 		t.Fatalf("failed to create repo: %v", err)
 	}
 
+	// Create a repo manager for the test
+	manager := repo.NewManagerWithPath(repoDir)
+
 	// Create a test project
 	projectDir := filepath.Join(tempDir, "project")
 	commandsDir := filepath.Join(projectDir, ".claude", "commands")
@@ -122,7 +126,7 @@ func TestProcessUninstall(t *testing.T) {
 	}
 
 	// Test uninstalling the command
-	result := processUninstall("command/test-command", projectDir, repoDir, []tools.Tool{tools.Claude})
+	result := processUninstall("command/test-command", projectDir, repoDir, []tools.Tool{tools.Claude}, manager)
 
 	if !result.success {
 		t.Errorf("processUninstall() failed: %v", result.message)
@@ -147,6 +151,9 @@ func TestProcessUninstall_NotManaged(t *testing.T) {
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
+
+	// Create a repo manager for the test
+	manager := repo.NewManagerWithPath(repoDir)
 
 	// Create a test project
 	projectDir := filepath.Join(tempDir, "project")
@@ -173,7 +180,7 @@ func TestProcessUninstall_NotManaged(t *testing.T) {
 	}
 
 	// Test uninstalling the command
-	result := processUninstall("command/test-command", projectDir, repoDir, []tools.Tool{tools.Claude})
+	result := processUninstall("command/test-command", projectDir, repoDir, []tools.Tool{tools.Claude}, manager)
 
 	// Should be skipped since it doesn't point to repo
 	if !result.skipped {
@@ -196,6 +203,9 @@ func TestProcessUninstall_NotSymlink(t *testing.T) {
 		t.Fatalf("failed to create repo: %v", err)
 	}
 
+	// Create a repo manager for the test
+	manager := repo.NewManagerWithPath(repoDir)
+
 	// Create a test project
 	projectDir := filepath.Join(tempDir, "project")
 	commandsDir := filepath.Join(projectDir, ".claude", "commands")
@@ -211,7 +221,7 @@ func TestProcessUninstall_NotSymlink(t *testing.T) {
 	}
 
 	// Test uninstalling the command
-	result := processUninstall("command/test-command", projectDir, repoDir, []tools.Tool{tools.Claude})
+	result := processUninstall("command/test-command", projectDir, repoDir, []tools.Tool{tools.Claude}, manager)
 
 	// Should be skipped since it's not a symlink
 	if !result.skipped {

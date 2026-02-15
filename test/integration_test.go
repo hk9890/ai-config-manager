@@ -155,11 +155,11 @@ echo "Test script"
 
 	// Step 5: Uninstall resources
 	t.Log("Step 5: Uninstalling resources")
-	if err := installer.Uninstall("test-cmd", resource.Command); err != nil {
+	if err := installer.Uninstall("test-cmd", resource.Command, manager); err != nil {
 		t.Errorf("Failed to uninstall command: %v", err)
 	}
 
-	if err := installer.Uninstall("test-skill", resource.Skill); err != nil {
+	if err := installer.Uninstall("test-skill", resource.Skill, manager); err != nil {
 		t.Errorf("Failed to uninstall skill: %v", err)
 	}
 
@@ -645,7 +645,7 @@ Follow these instructions to test the agent workflow.
 
 	// Step 4: Uninstall agent from Claude
 	t.Log("Step 4: Uninstalling agent from Claude")
-	if err := claudeInstaller.Uninstall("test-agent", resource.Agent); err != nil {
+	if err := claudeInstaller.Uninstall("test-agent", resource.Agent, manager); err != nil {
 		t.Errorf("Failed to uninstall agent from Claude: %v", err)
 	}
 
@@ -690,7 +690,7 @@ Follow these instructions to test the agent workflow.
 
 	// Step 6: Uninstall agent from OpenCode
 	t.Log("Step 6: Uninstalling agent from OpenCode")
-	if err := opencodeInstaller.Uninstall("test-agent", resource.Agent); err != nil {
+	if err := opencodeInstaller.Uninstall("test-agent", resource.Agent, manager); err != nil {
 		t.Errorf("Failed to uninstall agent from OpenCode: %v", err)
 	}
 

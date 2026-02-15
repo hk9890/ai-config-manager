@@ -822,6 +822,19 @@ func (m *Manager) validatePackageResources(pkg *resource.Package) []string {
 func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource, error) {
 	var resources []resource.Resource
 
+	// Log the list operation
+	if m.logger != nil {
+		if resourceType != nil {
+			m.logger.Debug("repo list",
+				"type_filter", string(*resourceType),
+			)
+		} else {
+			m.logger.Debug("repo list",
+				"type_filter", "all",
+			)
+		}
+	}
+
 	// List commands if no filter or filter is Command
 	if resourceType == nil || *resourceType == resource.Command {
 		commandsPath := filepath.Join(m.repoPath, "commands")
@@ -844,11 +857,18 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 					return nil
 				}
 				resources = append(resources, *res)
+
+				// Check for orphaned files (files without metadata)
+				m.checkOrphanedFiles(res.Name, resource.Command)
+
 				return nil
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to walk commands directory: %w", err)
 			}
+
+			// Check for orphaned metadata (metadata without files)
+			m.scanOrphanedMetadata(resource.Command, commandsPath)
 		}
 	}
 
@@ -876,7 +896,13 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 					continue
 				}
 				resources = append(resources, *res)
+
+				// Check for orphaned files (files without metadata)
+				m.checkOrphanedFiles(res.Name, resource.Skill)
 			}
+
+			// Check for orphaned metadata (metadata without files)
+			m.scanOrphanedMetadata(resource.Skill, skillsPath)
 		}
 	}
 
@@ -901,7 +927,13 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 					continue
 				}
 				resources = append(resources, *res)
+
+				// Check for orphaned files (files without metadata)
+				m.checkOrphanedFiles(res.Name, resource.Agent)
 			}
+
+			// Check for orphaned metadata (metadata without files)
+			m.scanOrphanedMetadata(resource.Agent, agentsPath)
 		}
 	}
 
@@ -937,6 +969,21 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 		}
 	}
 
+	// Log the result count
+	if m.logger != nil {
+		if resourceType != nil {
+			m.logger.Debug("repo list result",
+				"type_filter", string(*resourceType),
+				"count", len(resources),
+			)
+		} else {
+			m.logger.Debug("repo list result",
+				"type_filter", "all",
+				"count", len(resources),
+			)
+		}
+	}
+
 	return resources, nil
 }
 
@@ -950,6 +997,11 @@ type PackageInfo struct {
 // ListPackages lists all packages in the repository
 func (m *Manager) ListPackages() ([]PackageInfo, error) {
 	var packages []PackageInfo
+
+	// Log the list operation
+	if m.logger != nil {
+		m.logger.Debug("repo list packages")
+	}
 
 	packagesPath := filepath.Join(m.repoPath, "packages")
 	if _, err := os.Stat(packagesPath); err != nil {
@@ -981,11 +1033,26 @@ func (m *Manager) ListPackages() ([]PackageInfo, error) {
 		})
 	}
 
+	// Log the result count
+	if m.logger != nil {
+		m.logger.Debug("repo list packages result",
+			"count", len(packages),
+		)
+	}
+
 	return packages, nil
 }
 
 // Get retrieves a specific resource by name and type
 func (m *Manager) Get(name string, resourceType resource.ResourceType) (*resource.Resource, error) {
+	// Log the get operation
+	if m.logger != nil {
+		m.logger.Debug("repo get",
+			"resource", name,
+			"type", string(resourceType),
+		)
+	}
+
 	path := m.GetPath(name, resourceType)
 
 	// Check if resource exists
@@ -1105,6 +1172,14 @@ func (m *Manager) GetRepoPath() string {
 // GetMetadata retrieves metadata for a specific resource.
 // Loads metadata from .metadata/<type>s/<name>-metadata.json
 func (m *Manager) GetMetadata(name string, resourceType resource.ResourceType) (*metadata.ResourceMetadata, error) {
+	// Log the get metadata operation
+	if m.logger != nil {
+		m.logger.Debug("repo get metadata",
+			"resource", name,
+			"type", string(resourceType),
+		)
+	}
+
 	return metadata.Load(name, resourceType, m.repoPath)
 }
 
@@ -1622,6 +1697,13 @@ func (m *Manager) ValidatePackageResources(pkg *resource.Package) []string {
 
 // GetPackage loads a package by name from the repository
 func (m *Manager) GetPackage(name string) (*resource.Package, error) {
+	// Log the get package operation
+	if m.logger != nil {
+		m.logger.Debug("repo get package",
+			"package", name,
+		)
+	}
+
 	pkgPath := resource.GetPackagePath(name, m.repoPath)
 	return resource.LoadPackage(pkgPath)
 }

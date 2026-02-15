@@ -188,7 +188,7 @@ func TestPackageWorkflow(t *testing.T) {
 			t.Fatalf("Failed to parse resource reference %s: %v", ref, err)
 		}
 
-		err = installer.Uninstall(resName, resType)
+		err = installer.Uninstall(resName, resType, manager)
 		if err != nil {
 			t.Fatalf("Failed to uninstall %s: %v", ref, err)
 		}
@@ -547,7 +547,7 @@ func TestPackageWithSharedResources(t *testing.T) {
 			continue
 		}
 
-		err = installer.Uninstall(resName, resType)
+		err = installer.Uninstall(resName, resType, manager)
 		if err != nil {
 			t.Fatalf("Failed to uninstall %s: %v", ref, err)
 		}
@@ -692,7 +692,7 @@ func TestPackageForceReinstall(t *testing.T) {
 
 	// Force reinstall
 	t.Log("Force reinstalling command")
-	if err := installer.Uninstall("force-test", resource.Command); err != nil {
+	if err := installer.Uninstall("force-test", resource.Command, manager); err != nil {
 		t.Fatalf("Failed to uninstall for force reinstall: %v", err)
 	}
 	if err := installer.InstallCommand("force-test", manager); err != nil {

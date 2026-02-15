@@ -156,7 +156,7 @@ Examples:
 
 		// Process each resource argument
 		for _, arg := range expandedArgs {
-			result := processUninstall(arg, projectPath, repoPath, installer.GetTargetTools())
+			result := processUninstall(arg, projectPath, repoPath, installer.GetTargetTools(), manager)
 			results = append(results, result)
 		}
 		// Print results
@@ -302,7 +302,7 @@ func uninstallAllFromDir(projectPath, repoPath, toolDir string, resourceType res
 }
 
 // processUninstall processes uninstalling a single resource
-func processUninstall(arg string, projectPath string, repoPath string, targetTools []tools.Tool) uninstallResult {
+func processUninstall(arg string, projectPath string, repoPath string, targetTools []tools.Tool, manager *repo.Manager) uninstallResult {
 	// Parse resource argument
 	resourceType, name, err := parseResourceArg(arg)
 	if err != nil {
@@ -390,6 +390,17 @@ func processUninstall(arg string, projectPath string, repoPath string, targetToo
 		if err := os.Remove(symlinkPath); err != nil {
 			messages = append(messages, fmt.Sprintf("%s: failed to remove: %v", tool, err))
 			continue
+		}
+
+		// Log successful uninstallation
+		if logger := manager.GetLogger(); logger != nil {
+			logger.Info("resource uninstalled",
+				"operation", "uninstall",
+				"resource_type", resourceType,
+				"resource_name", name,
+				"tool", tool.String(),
+				"dest_path", symlinkPath,
+			)
 		}
 
 		removed = true
@@ -609,7 +620,7 @@ func uninstallPackage(packageName string, installer *install.Installer, manager 
 		}
 
 		// Uninstall the resource
-		err = installer.Uninstall(resName, resType)
+		err = installer.Uninstall(resName, resType, manager)
 		if err != nil {
 			fmt.Printf("  ✗ %s - failed to uninstall: %v\n", ref, err)
 			errors = append(errors, fmt.Sprintf("%s: %v", ref, err))

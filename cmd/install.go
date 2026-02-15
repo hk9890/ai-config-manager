@@ -446,7 +446,7 @@ func processInstall(arg string, installer *install.Installer, manager *repo.Mana
 
 	// Remove existing if force mode
 	if installForceFlag && installer.IsInstalled(name, resourceType) {
-		if err := installer.Uninstall(name, resourceType); err != nil {
+		if err := installer.Uninstall(name, resourceType, manager); err != nil {
 			result.success = false
 			result.message = fmt.Sprintf("failed to remove existing installation: %v", err)
 			return result
@@ -604,7 +604,7 @@ func installPackage(packageName string, projectPath string, installer *install.I
 
 		// Remove existing if force mode
 		if installForceFlag && installer.IsInstalled(resName, resType) {
-			if err := installer.Uninstall(resName, resType); err != nil {
+			if err := installer.Uninstall(resName, resType, manager); err != nil {
 				errors = append(errors, fmt.Sprintf("%s: failed to remove existing: %v", ref, err))
 				continue
 			}

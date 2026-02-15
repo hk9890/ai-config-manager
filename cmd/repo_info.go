@@ -41,6 +41,12 @@ Examples:
 			return err
 		}
 
+		// Log the repo info operation
+		logger := manager.GetLogger()
+		if logger != nil {
+			logger.Debug("repo info")
+		}
+
 		// Get repository path
 		repoPath := manager.GetRepoPath()
 

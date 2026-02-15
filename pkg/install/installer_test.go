@@ -354,7 +354,7 @@ func TestUninstall(t *testing.T) {
 	}
 
 	// Uninstall
-	err = installer.Uninstall("test-cmd", resource.Command)
+	err = installer.Uninstall("test-cmd", resource.Command, manager)
 	if err != nil {
 		t.Fatalf("Uninstall() error = %v", err)
 	}
@@ -366,6 +366,7 @@ func TestUninstall(t *testing.T) {
 }
 
 func TestUninstallNotInstalled(t *testing.T) {
+	manager, _ := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
@@ -374,7 +375,7 @@ func TestUninstallNotInstalled(t *testing.T) {
 	}
 
 	// Try to uninstall non-existent resource
-	err = installer.Uninstall("nonexistent", resource.Command)
+	err = installer.Uninstall("nonexistent", resource.Command, manager)
 	if err == nil {
 		t.Error("Uninstall() expected error for non-installed resource, got nil")
 	}
