@@ -1,8 +1,0 @@
-version: "2"
-
-linters:
-  disable:
-    - errcheck      # Temporarily disabled - ~50+ violations to fix
-    - staticcheck   # Temporarily disabled - deprecated function usage
-    - ineffassign   # Temporarily disabled - ineffectual assignments  
-    - unused        # Temporarily disabled - unused functions
