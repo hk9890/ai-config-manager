@@ -74,7 +74,7 @@ func TestPrintDiscoveryErrors_Deduplication(t *testing.T) {
 			printDiscoveryErrors(tt.errors)
 
 			// Restore stdout and read captured output
-			_ =	_ = w.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 			var buf bytes.Buffer
 			_ , _ = io.Copy(&buf, r)
