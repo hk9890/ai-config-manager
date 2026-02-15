@@ -16,14 +16,14 @@ type SourceState struct {
 
 // SourceMetadata tracks state for all sources in a repository
 type SourceMetadata struct {
-	Version int                      `json:"version"`
+	Version int                     `json:"version"`
 	Sources map[string]*SourceState `json:"sources"`
 }
 
 // Load reads source metadata from .metadata/sources.json
 func Load(repoPath string) (*SourceMetadata, error) {
 	metadataPath := filepath.Join(repoPath, ".metadata", "sources.json")
-	
+
 	data, err := os.ReadFile(metadataPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -56,7 +56,7 @@ func (m *SourceMetadata) Save(repoPath string) error {
 	}
 
 	metadataPath := filepath.Join(metadataDir, "sources.json")
-	
+
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal source metadata: %w", err)

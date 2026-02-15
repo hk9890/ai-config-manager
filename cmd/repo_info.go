@@ -165,13 +165,12 @@ func formatBytes(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-
 // renderSourcesTable renders sources as a table
 func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata.SourceMetadata) error {
 	// Create table with columns: NAME, TYPE, LOCATION, MODE, LAST SYNCED
 	table := output.NewTable("NAME", "TYPE", "LOCATION", "MODE", "LAST SYNCED")
 	table.WithResponsive().
-		WithDynamicColumn(2).       // LOCATION column stretches
+		WithDynamicColumn(2).                  // LOCATION column stretches
 		WithMinColumnWidths(20, 8, 30, 10, 12) // NAME, TYPE, LOCATION, MODE, LAST SYNCED
 
 	// Add row for each source

@@ -205,17 +205,19 @@ func Exists(path string) bool {
 
 // validateResourceReference validates that a resource reference is in the correct format
 // Expected format: "type/name" where type is command|skill|agent|package
+// Names can contain slashes for nested resources (e.g., "command/api/deploy")
 func validateResourceReference(ref string) error {
 	if ref == "" {
 		return fmt.Errorf("resource reference cannot be empty")
 	}
 
 	parts := strings.Split(ref, "/")
-	if len(parts) != 2 {
+	if len(parts) < 2 {
 		return fmt.Errorf("invalid format (expected type/name): %q", ref)
 	}
 
-	resourceType, name := parts[0], parts[1]
+	resourceType := parts[0]
+	name := strings.Join(parts[1:], "/")
 
 	// Validate resource type
 	validTypes := []string{"command", "skill", "agent", "package"}

@@ -3,8 +3,8 @@ package repomanifest
 import (
 	"time"
 
-	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 	"fmt"
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,11 +26,11 @@ type Manifest struct {
 
 // Source represents a single synced source in the repository
 type Source struct {
-	Name       string    `yaml:"name"`
-	Path       string    `yaml:"path,omitempty"`
-	URL        string    `yaml:"url,omitempty"`
-	Ref        string    `yaml:"ref,omitempty"`
-	Subpath    string    `yaml:"subpath,omitempty"`
+	Name    string `yaml:"name"`
+	Path    string `yaml:"path,omitempty"`
+	URL     string `yaml:"url,omitempty"`
+	Ref     string `yaml:"ref,omitempty"`
+	Subpath string `yaml:"subpath,omitempty"`
 }
 
 // GetMode returns the implicit mode for this source
@@ -151,7 +151,6 @@ func (m *Manifest) AddSource(source *Source) error {
 		return fmt.Errorf("cannot add nil source")
 	}
 
-
 	// Auto-generate name if not provided
 	if source.Name == "" {
 		source.Name = generateSourceName(source)
@@ -242,8 +241,6 @@ func validateSource(source *Source) error {
 	if source.Path != "" && source.URL != "" {
 		return fmt.Errorf("source cannot have both path and url")
 	}
-
-
 
 	return nil
 }
