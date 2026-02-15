@@ -785,6 +785,9 @@ func TestPackageResourceValidation(t *testing.T) {
 				"skill/pdf-processing",
 				"agent/code-reviewer",
 				"package/web-tools",
+				"command/nested/path",           // Nested commands are valid
+				"command/api/deploy",            // Nested commands are valid
+				"command/opencode-coder/doctor", // Nested commands are valid
 			},
 		}
 
@@ -799,9 +802,7 @@ func TestPackageResourceValidation(t *testing.T) {
 			"command/",           // Empty name
 			"test",               // Missing type
 			"invalid-type/test",  // Invalid type
-			"command/name/extra", // Too many parts
 			"",                   // Empty string
-			"command//test",      // Empty middle part
 		}
 
 		for _, ref := range invalidRefs {
