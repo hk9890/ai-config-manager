@@ -592,7 +592,10 @@ description: Test --fix flag
 	}
 
 	// Test: verify --fix should create missing metadata
-	output, _ := runAimgr(t, "repo", "verify", "--fix")
+	output, err := runAimgr(t, "repo", "verify", "--fix")
+	if err != nil {
+		t.Fatalf("repo verify --fix failed: %v\nOutput: %s", err, output)
+	}
 
 	if !strings.Contains(output, "fix-test") {
 		t.Errorf("Expected 'fix-test' in output, got: %s", output)
@@ -606,6 +609,12 @@ description: Test --fix flag
 	meta, err := manager.GetMetadata("fix-test", resource.Command)
 	if err != nil {
 		t.Errorf("Metadata should exist after --fix, got error: %v", err)
+		return
+	}
+
+	// Guard against nil pointer dereference
+	if meta == nil {
+		t.Fatal("Metadata is nil after --fix")
 	}
 
 	if meta.Name != "fix-test" {
