@@ -69,7 +69,7 @@ make build
 
 ## Shell Completion
 
-`aimgr` supports shell completion for Bash, Zsh, Fish, and PowerShell, making it easier to discover and install resources.
+`aimgr` supports shell completion for Bash and Zsh, making it easier to discover and install resources.
 
 ### Features
 
@@ -113,33 +113,7 @@ aimgr completion zsh > "${fpath[1]}/_aimgr"
 
 Then start a new shell.
 
-#### Fish
-
-**Option 1: Load for current session**
-```bash
-aimgr completion fish | source
-```
-
-**Option 2: Load automatically for all sessions**
-```bash
-aimgr completion fish > ~/.config/fish/completions/aimgr.fish
-```
-
-#### PowerShell
-
-**Option 1: Load for current session**
-```powershell
-aimgr completion powershell | Out-String | Invoke-Expression
-```
-
-**Option 2: Load automatically for all sessions**
-```powershell
-# Generate completion script
-aimgr completion powershell > aimgr.ps1
-
-# Add to your PowerShell profile
-# Find profile location: $PROFILE
-```
+**Note:** Fish and PowerShell completion generation is available via `aimgr completion fish` and `aimgr completion powershell`, but these shells are not officially tested or supported.
 
 ### Usage Examples
 
