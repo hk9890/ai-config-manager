@@ -470,7 +470,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 			resourceRef := formatResourceReference(issue.Type, issue.Name)
 			table.AddRow(resourceRef, status)
 		}
-		table.Format(output.Table)
+		_ = table.Format(output.Table)
 		fmt.Println()
 	}
 
@@ -491,7 +491,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 			resourceRef := formatResourceReference(issue.Type, issue.Name)
 			table.AddRow(resourceRef, status)
 		}
-		table.Format(output.Table)
+		_ = table.Format(output.Table)
 		fmt.Println()
 	}
 
@@ -508,7 +508,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 			resourceRef := formatResourceReference(issue.Type, issue.Name)
 			table.AddRow(resourceRef, issue.SourcePath)
 		}
-		table.Format(output.Table)
+		_ = table.Format(output.Table)
 		fmt.Println()
 	}
 

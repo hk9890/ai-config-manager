@@ -29,7 +29,7 @@ It helps you organize and share reusable AI configurations.`,
 			os.Exit(0)
 		}
 		// If no version flag and no subcommand, show help
-		cmd.Help()
+		_ = cmd.Help()
 	},
 }
 
@@ -79,5 +79,5 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
-	viper.ReadInConfig() // read in config file if available
+	_ = viper.ReadInConfig() // read in config file if available
 }

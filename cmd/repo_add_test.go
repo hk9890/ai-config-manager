@@ -133,7 +133,7 @@ func TestPrintDiscoveryErrors_OutputFormat(t *testing.T) {
 	_ = w.Close()
 	os.Stdout = oldStdout
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify structure

@@ -15,7 +15,7 @@ func TestLoad_NoConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer _ = os.RemoveAll(tmpDir)
 
 	// Load config from directory without config file
 	_, err = Load(tmpDir)
@@ -427,7 +427,7 @@ func TestLoadGlobal_NoConfig(t *testing.T) {
 	// Override XDG_CONFIG_HOME to use temp directory
 	// This isolates the test from the actual user's config
 	oldXDGConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer func() {
 		os.Setenv("XDG_CONFIG_HOME", oldXDGConfigHome)
 		xdg.Reload() // Restore original paths

@@ -114,7 +114,7 @@ func setupTestManifest(t *testing.T, sources []*repomanifest.Source) (string, fu
 		if originalRepoPath != "" {
 			os.Setenv("AIMGR_REPO_PATH", originalRepoPath)
 		} else {
-			os.Unsetenv("AIMGR_REPO_PATH")
+			_ = os.Unsetenv("AIMGR_REPO_PATH")
 		}
 	}
 
