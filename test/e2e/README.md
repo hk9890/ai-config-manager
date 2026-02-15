@@ -203,7 +203,7 @@ go test -v ./test/e2e -run TestE2EWorkflow -tags=e2e
 Run CLI commands manually with test config:
 ```bash
 ./aimgr --config test/e2e/configs/e2e-test.yaml repo list
-./aimgr --config test/e2e/configs/e2e-test.yaml repo import examples/
+./aimgr --config test/e2e/configs/e2e-test.yaml repo add examples/
 ```
 
 ### Clean Test Artifacts

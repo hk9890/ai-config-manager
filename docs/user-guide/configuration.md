@@ -268,7 +268,7 @@ Override paths without modifying config file:
 ```bash
 # Run tests with temporary repository
 export AIMGR_REPO_PATH=/tmp/test-repo
-aimgr repo import ~/test-resources/
+aimgr repo add ~/test-resources/
 aimgr install skill/test-skill
 
 # Original config unchanged
@@ -385,7 +385,7 @@ Use environment variable for dynamic paths:
 ```bash
 # .gitlab-ci.yml or .github/workflows/main.yml
 export AIMGR_REPO_PATH=/tmp/ci-ai-repo
-aimgr repo import gh:myorg/resources
+aimgr repo add gh:myorg/resources
 aimgr install skill/linter
 ```
 
@@ -408,7 +408,7 @@ repo:
 ```bash
 # Test with temporary repository
 export AIMGR_REPO_PATH=/tmp/test-repo
-aimgr repo import ./test-resources/
+aimgr repo add ./test-resources/
 aimgr install skill/test-skill
 
 # Original repository unchanged

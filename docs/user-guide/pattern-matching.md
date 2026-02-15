@@ -139,13 +139,13 @@ aimgr uninstall skill/*helper
 **Add with filter:**
 ```bash
 # Add only skills from a repository
-aimgr repo import gh:owner/repo --filter "skill/*"
+aimgr repo add gh:owner/repo --filter "skill/*"
 
 # Add only packages
-aimgr repo import ~/resources/ --filter "package/*"
+aimgr repo add ~/resources/ --filter "package/*"
 
 # Add resources matching pattern
-aimgr repo import gh:owner/repo --filter "web-*"
+aimgr repo add gh:owner/repo --filter "web-*"
 ```
 
 **Remove with pattern:**
@@ -266,7 +266,7 @@ aimgr repo remove package/test-*
 
 **Add development packages:**
 ```bash
-aimgr repo import gh:owner/repo --filter "package/dev-*"
+aimgr repo add gh:owner/repo --filter "package/dev-*"
 ```
 
 **Install web development tools:**
@@ -292,7 +292,7 @@ aimgr list package/* --format=json
 
 **Export specific resource types:**
 ```bash
-aimgr repo import ~/backup/ --filter "skill/*"
+aimgr repo add ~/backup/ --filter "skill/*"
 ```
 
 **Clean up deprecated resources:**

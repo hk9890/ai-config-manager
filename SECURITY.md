@@ -50,7 +50,7 @@ AI resources (commands, skills, agents) are markdown files read by LLMs. **These
 1. **Verify Sources Before Adding:**
    ```bash
    # Review repository contents before importing
-   aimgr repo import gh:owner/repo --dry-run
+   aimgr repo add gh:owner/repo --dry-run
    
    # Check resource details before installing
    aimgr repo describe skill resource-name

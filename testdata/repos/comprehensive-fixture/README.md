@@ -59,6 +59,6 @@ repo/
 go test -v -tags=integration ./test -run TestImportLayout
 
 # Manual verification
-aimgr repo import testdata/repos/comprehensive-fixture
+aimgr repo add testdata/repos/comprehensive-fixture
 aimgr repo list --type command
 ```

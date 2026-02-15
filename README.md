@@ -68,10 +68,10 @@ make build
 aimgr config set install.targets claude
 
 # 2. Add resources from GitHub
-aimgr repo import gh:owner/repo
+aimgr repo add gh:owner/repo
 
 # 3. Add resources from local directory
-aimgr repo import ~/.opencode/
+aimgr repo add ~/.opencode/
 
 # 4. List available resources
 aimgr repo list

@@ -34,32 +34,32 @@ Test if aimgr can successfully parse your resources without actually adding them
 
 ```bash
 # Validate a single skill
-aimgr repo import ./my-skill --dry-run
+aimgr repo add ./my-skill --dry-run
 
 # Validate a command
-aimgr repo import ./commands/my-command.md --dry-run
+aimgr repo add ./commands/my-command.md --dry-run
 
 # Validate an agent
-aimgr repo import ./agents/my-agent.md --dry-run
+aimgr repo add ./agents/my-agent.md --dry-run
 
 # Validate a package
-aimgr repo import ./packages/my-package.package.json --dry-run
+aimgr repo add ./packages/my-package.package.json --dry-run
 
 # Validate an entire directory
-aimgr repo import ./my-resources --dry-run
+aimgr repo add ./my-resources --dry-run
 ```
 
 **Output formats:**
 
 ```bash
 # Human-readable table (default)
-aimgr repo import ./my-skill --dry-run
+aimgr repo add ./my-skill --dry-run
 
 # JSON for scripting/CI
-aimgr repo import ./my-skill --dry-run --format=json
+aimgr repo add ./my-skill --dry-run --format=json
 
 # YAML for structured review
-aimgr repo import ./my-skill --dry-run --format=yaml
+aimgr repo add ./my-skill --dry-run --format=yaml
 ```
 
 **Exit codes:**
@@ -72,7 +72,7 @@ Add resources to the repository and then run verification:
 
 ```bash
 # Add resources
-aimgr repo import ./my-resources
+aimgr repo add ./my-resources
 
 # Verify integrity
 aimgr repo verify
@@ -234,7 +234,7 @@ Create a test project to verify resources install correctly:
 
 ```bash
 # 1. Add resource to repository
-aimgr repo import ./my-skill
+aimgr repo add ./my-skill
 
 # 2. Create test project
 mkdir -p /tmp/test-project
@@ -268,7 +268,7 @@ For commands with nested structure:
 #     rollback.md
 
 # Import with nested structure preserved
-aimgr repo import ./commands
+aimgr repo add ./commands
 
 # Verify nested names
 aimgr repo list command/api/*
@@ -297,11 +297,11 @@ cat > my-package.package.json << 'EOF'
 EOF
 
 # 2. Ensure referenced resources exist
-aimgr repo import ./my-skill
-aimgr repo import ./commands/my-command.md
+aimgr repo add ./my-skill
+aimgr repo add ./commands/my-command.md
 
 # 3. Import package
-aimgr repo import my-package.package.json
+aimgr repo add my-package.package.json
 
 # 4. Verify package references
 aimgr repo verify package/my-package
@@ -431,7 +431,7 @@ Before sharing your resources publicly:
 Resources can be shared via GitHub repositories. Users can import with:
 
 ```bash
-aimgr repo import gh:username/my-ai-resources
+aimgr repo add gh:username/my-ai-resources
 ```
 
 ### Validation in CI/CD
@@ -453,12 +453,12 @@ Automate validation in your CI pipeline using dry-run mode and JSON output.
 
 **Validate before adding:**
 ```bash
-aimgr repo import ./my-resource --dry-run
+aimgr repo add ./my-resource --dry-run
 ```
 
 **Add to repository:**
 ```bash
-aimgr repo import ./my-resource
+aimgr repo add ./my-resource
 ```
 
 **Verify repository:**

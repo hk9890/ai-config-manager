@@ -317,17 +317,17 @@ Import all resources from directories using auto-discovery:
 
 ```bash
 # Import from .opencode folder
-aimgr repo import ~/.opencode
-aimgr repo import ~/project/.opencode
+aimgr repo add ~/.opencode
+aimgr repo add ~/project/.opencode
 
 # Import from .claude folder
-aimgr repo import ~/.claude
-aimgr repo import ~/project/.claude
+aimgr repo add ~/.claude
+aimgr repo add ~/project/.claude
 
 # Filter specific resource types
-aimgr repo import ~/.opencode --filter "skill/*"
-aimgr repo import ~/project/.claude --filter "agent/*"
-aimgr repo import gh:owner/repo --filter "package/*"
+aimgr repo add ~/.opencode --filter "skill/*"
+aimgr repo add ~/project/.claude --filter "agent/*"
+aimgr repo add gh:owner/repo --filter "package/*"
 ```
 
 This imports:

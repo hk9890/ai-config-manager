@@ -23,10 +23,10 @@ The fastest way to check if your resource works with aimgr:
 
 ```bash
 # 1. Validate the format (doesn't add to repo)
-aimgr repo import ./my-resource --dry-run
+aimgr repo add ./my-resource --dry-run
 
 # 2. If validation passes, test installation
-aimgr repo import ./my-resource      # Add to repo
+aimgr repo add ./my-resource      # Add to repo
 cd /tmp/test-project                  # Go to test directory
 aimgr install skill/my-resource       # Try installing it
 
@@ -112,13 +112,13 @@ Examples and instructions...
 
 ```bash
 # Validate without adding to repository
-aimgr repo import ./my-skill --dry-run
+aimgr repo add ./my-skill --dry-run
 
 # Expected success output:
 # ✓ skill/my-skill - Successfully validated
 
 # JSON output for scripting
-aimgr repo import ./my-skill --dry-run --format=json
+aimgr repo add ./my-skill --dry-run --format=json
 ```
 
 **Exit codes:**
@@ -129,7 +129,7 @@ aimgr repo import ./my-skill --dry-run --format=json
 
 ```bash
 # Add to repository
-aimgr repo import ./my-skill
+aimgr repo add ./my-skill
 
 # Create test project
 mkdir -p /tmp/test-aimgr
@@ -227,7 +227,7 @@ Agent documentation and guidelines go here.
 
 ```bash
 # Validate the agent file
-aimgr repo import ./my-agent.md --dry-run
+aimgr repo add ./my-agent.md --dry-run
 
 # Expected success output:
 # ✓ agent/my-agent - Successfully validated
@@ -237,7 +237,7 @@ aimgr repo import ./my-agent.md --dry-run
 
 ```bash
 # Add to repository
-aimgr repo import ./my-agent.md
+aimgr repo add ./my-agent.md
 
 # Test installation
 cd /tmp/test-aimgr
@@ -302,10 +302,10 @@ Command documentation and usage instructions.
 
 ```bash
 # Validate command file
-aimgr repo import ./commands/my-command.md --dry-run
+aimgr repo add ./commands/my-command.md --dry-run
 
 # Validate entire commands directory
-aimgr repo import ./commands --dry-run
+aimgr repo add ./commands --dry-run
 
 # Expected success output:
 # ✓ command/my-command - Successfully validated
@@ -316,7 +316,7 @@ aimgr repo import ./commands --dry-run
 
 ```bash
 # Add to repository
-aimgr repo import ./commands
+aimgr repo add ./commands
 
 # Test installation
 cd /tmp/test-aimgr
@@ -388,9 +388,9 @@ Single file: `my-package.package.json`
 
 ```bash
 # Add individual resources first
-aimgr repo import ./my-skill
-aimgr repo import ./commands/my-command.md
-aimgr repo import ./my-agent.md
+aimgr repo add ./my-skill
+aimgr repo add ./commands/my-command.md
+aimgr repo add ./my-agent.md
 
 # Verify they're in the repository
 aimgr repo list skill/my-skill
@@ -402,7 +402,7 @@ aimgr repo list agent/my-agent
 
 ```bash
 # Validate package file
-aimgr repo import ./my-package.package.json --dry-run
+aimgr repo add ./my-package.package.json --dry-run
 
 # Expected success output:
 # ✓ package/my-package - Successfully validated
@@ -414,7 +414,7 @@ After adding the package, verify all references are valid:
 
 ```bash
 # Add package to repository
-aimgr repo import ./my-package.package.json
+aimgr repo add ./my-package.package.json
 
 # Verify package integrity
 aimgr repo verify package/my-package
@@ -458,7 +458,7 @@ Error: package references non-existent resource 'skill/missing-skill'
 ```
 **Fix:** Add the resource to the repository first:
 ```bash
-aimgr repo import ./missing-skill
+aimgr repo add ./missing-skill
 ```
 
 **Error: Invalid package name**
@@ -513,7 +513,7 @@ Error: skill description too long (1500 chars, max 1024)
 
 ### Issue: Import Succeeds but Verify Fails
 
-**Symptom:** `repo import` works but `repo verify` reports errors
+**Symptom:** `repo add` works but `repo verify` reports errors
 
 **Cause:** Package references resources that don't exist
 
@@ -523,7 +523,7 @@ Error: skill description too long (1500 chars, max 1024)
 aimgr repo verify package/my-package
 
 # Add missing resources
-aimgr repo import ./missing-resource
+aimgr repo add ./missing-resource
 
 # Verify again
 aimgr repo verify package/my-package
@@ -570,7 +570,7 @@ jobs:
       - name: Validate all resources
         run: |
           # Validate with dry-run (doesn't modify anything)
-          if aimgr repo import . --dry-run --format=json > validation.json; then
+          if aimgr repo add . --dry-run --format=json > validation.json; then
             echo "✅ All resources valid"
             cat validation.json | jq '.'
             exit 0
@@ -592,7 +592,7 @@ validate-resources:
   script:
     - go install github.com/hk9890/ai-config-manager@latest
     - export PATH="$HOME/go/bin:$PATH"
-    - aimgr repo import . --dry-run --format=json
+    - aimgr repo add . --dry-run --format=json
   artifacts:
     reports:
       junit: validation.json
@@ -616,25 +616,25 @@ COMMANDS=$(find . -path "*/commands/*.md" -not -path "./.git/*")
 
 # Validate each
 for skill in $SKILLS; do
-  if ! aimgr repo import "$skill" --dry-run > /dev/null 2>&1; then
+  if ! aimgr repo add "$skill" --dry-run > /dev/null 2>&1; then
     echo "❌ Validation failed: $skill"
-    aimgr repo import "$skill" --dry-run
+    aimgr repo add "$skill" --dry-run
     exit 1
   fi
 done
 
 for agent in $AGENTS; do
-  if ! aimgr repo import "$agent" --dry-run > /dev/null 2>&1; then
+  if ! aimgr repo add "$agent" --dry-run > /dev/null 2>&1; then
     echo "❌ Validation failed: $agent"
-    aimgr repo import "$agent" --dry-run
+    aimgr repo add "$agent" --dry-run
     exit 1
   fi
 done
 
 for command in $COMMANDS; do
-  if ! aimgr repo import "$command" --dry-run > /dev/null 2>&1; then
+  if ! aimgr repo add "$command" --dry-run > /dev/null 2>&1; then
     echo "❌ Validation failed: $command"
-    aimgr repo import "$command" --dry-run
+    aimgr repo add "$command" --dry-run
     exit 1
   fi
 done
@@ -697,7 +697,7 @@ chmod +x scripts/extract-text.sh
 
 ```bash
 cd ..  # Go to parent directory
-aimgr repo import ./pdf-processing --dry-run
+aimgr repo add ./pdf-processing --dry-run
 
 # Expected output:
 # ✓ skill/pdf-processing - Successfully validated
@@ -706,7 +706,7 @@ aimgr repo import ./pdf-processing --dry-run
 ### 3. Add to repository
 
 ```bash
-aimgr repo import ./pdf-processing
+aimgr repo add ./pdf-processing
 
 # Verify it's in the repo
 aimgr repo list skill/pdf-processing
@@ -747,10 +747,10 @@ cat > pdf-toolkit.package.json << 'EOF'
 EOF
 
 # Validate package
-aimgr repo import ./pdf-toolkit.package.json --dry-run
+aimgr repo add ./pdf-toolkit.package.json --dry-run
 
 # Add package
-aimgr repo import ./pdf-toolkit.package.json
+aimgr repo add ./pdf-toolkit.package.json
 
 # Verify package
 aimgr repo verify package/pdf-toolkit
@@ -778,10 +778,10 @@ ls .claude/skills/pdf-processing/
 
 ```bash
 # Validate without adding
-aimgr repo import <path> --dry-run
+aimgr repo add <path> --dry-run
 
 # Validate and add
-aimgr repo import <path>
+aimgr repo add <path>
 
 # Verify repository integrity
 aimgr repo verify
@@ -790,7 +790,7 @@ aimgr repo verify
 aimgr repo verify <pattern>
 
 # JSON output for scripting
-aimgr repo import <path> --dry-run --format=json
+aimgr repo add <path> --dry-run --format=json
 ```
 
 ### Resource Formats

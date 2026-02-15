@@ -174,7 +174,7 @@ For in-depth information, see the comprehensive guides in `docs/contributor-guid
 → **[Release Process](docs/contributor-guide/release-process.md)**
 - Version management
 - Release workflow
-- See [docs/RELEASING.md](docs/RELEASING.md) for complete guide
+- See [docs/contributor-guide/release-process.md](docs/contributor-guide/release-process.md) for complete guide
 
 ### Documentation Overview
 
