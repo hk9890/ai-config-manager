@@ -6,7 +6,7 @@ Comprehensive testing approach for ai-config-manager.
 
 **Unit Tests** (fast, fixtures-based):
 - Located in `pkg/*/` packages alongside source code
-- Use fixtures in `testdata/repos/`
+- Use fixtures in `pkg/*/testdata/ (e.g., pkg/discovery/testdata/)`
 - No network calls, `//go:build unit`
 - Run with: `make unit-test`
 - Execution: <5 seconds

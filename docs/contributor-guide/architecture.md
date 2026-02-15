@@ -69,16 +69,27 @@ Cobra command tree matching CLI structure. Each command delegates to `pkg/` for 
 
 ### pkg/ - Business Logic
 
+
 | Package | Purpose |
 |---------|---------|
 | `config/` | Configuration file parsing and validation |
 | `discovery/` | Auto-discovery of resources in directories |
+| `errors/` | Error categories and structured error handling |
 | `install/` | Symlink creation and installation logic |
+| `manifest/` | Project manifests (ai.package.yaml) management |
+| `marketplace/` | Marketplace discovery and parsing (marketplace.json) |
+| `metadata/` | Resource metadata tracking (.metadata/ directory) |
+| `output/` | Output formatting (JSON, YAML, tables) |
+| `pattern/` | Glob pattern matching for resource selection |
 | `repo/` | Central repository management (add, list, remove) |
+| `repomanifest/` | Repository manifests (ai.repo.yaml) management |
 | `resource/` | Resource type definitions and loaders |
 | `source/` | Git operations and source parsing |
+| `sourcemetadata/` | Source state tracking (.metadata/sources.json) |
 | `tools/` | Tool-specific information (Claude, OpenCode, Copilot, Windsurf) |
+| `version/` | Version information (build-time injection) |
 | `workspace/` | Git repository caching (10-50x performance) |
+
 
 ### test/ - Integration Tests
 

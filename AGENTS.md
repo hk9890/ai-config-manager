@@ -25,124 +25,54 @@ make fmt        # Format all Go code
 make vet        # Run go vet
 ```
 
-## Repository Structure
+## Use Case Guide
 
-```
-ai-config-manager/
-├── cmd/              # Cobra command definitions (CLI entry points)
-├── pkg/              # Core business logic packages
-│   ├── config/       # Configuration management
-│   ├── discovery/    # Auto-discovery of resources
-│   ├── install/      # Installation/symlink logic
-│   ├── repo/         # Repository management
-│   ├── resource/     # Resource types (command, skill, agent, package)
-│   ├── workspace/    # Git repository caching (10-50x faster)
-│   └── ...
-├── test/             # Integration and E2E tests
-├── docs/             # Documentation
-└── main.go           # Entry point
-```
+Delegate to the right documentation based on what you need to do:
 
-## Code Style Essentials
+### Writing Code / Implementing Features
 
-**Import Organization** - Three groups with blank lines:
-```go
-import (
-    "fmt"           // 1. Standard library
+→ See **[docs/contributor-guide/code-style.md](docs/contributor-guide/code-style.md)** for:
+- Naming conventions (files, packages, types, resources)
+- Import organization (3 groups: stdlib, external, internal)
+- Error handling (always wrap with `%w`)
+- File operations (paths, permissions, defer)
+- Symlink handling (CRITICAL: use `os.Stat()` not `entry.IsDir()`)
+- Best practices summary
 
-    "github.com/spf13/cobra"  // 2. External dependencies
+→ See **[docs/contributor-guide/architecture.md](docs/contributor-guide/architecture.md)** for:
+- System overview and components
+- Package structure (17 packages) and responsibilities
+- Architecture rules (5 critical rules)
+- Data flows (import, install, sync)
+- Key design patterns
 
-    "github.com/hk9890/ai-config-manager/pkg/resource"  // 3. Internal
-)
-```
+### Writing Tests / Analyzing Test Failures
 
-**Naming**:
-- Files: `lowercase_with_underscores.go`
-- Types: `PascalCase`
-- Functions: `PascalCase` (exported), `camelCase` (unexported)
-- Resources: `lowercase-with-hyphens` (1-64 chars, no start/end hyphens)
+→ See **[docs/contributor-guide/testing.md](docs/contributor-guide/testing.md)** for:
+- Test types (unit, integration, E2E)
+- Test isolation with `t.TempDir()`
+- Table-driven test patterns
+- Running specific tests
+- Common test failures and fixes
 
-**Error Handling** - Always wrap:
-```go
-if err != nil {
-    return fmt.Errorf("failed to load command: %w", err)
-}
-```
+### Planning / Adding New Functionality
 
-**Symlink Handling** - CRITICAL for COPY and SYMLINK modes:
-```go
-// ❌ WRONG: Skips symlinked directories
-entries, _ := os.ReadDir(dir)
-for _, entry := range entries {
-    if entry.IsDir() { ... }  // Returns false for symlinks!
-}
+→ See **[docs/contributor-guide/architecture.md](docs/contributor-guide/architecture.md)** for:
+- System overview and components
+- Package responsibilities (`pkg/` structure)
+- Architecture rules you MUST follow
+- Data flows for different operations
 
-// ✅ CORRECT: Follows symlinks
-entries, _ := os.ReadDir(dir)
-for _, entry := range entries {
-    path := filepath.Join(dir, entry.Name())
-    info, err := os.Stat(path)  // os.Stat follows symlinks
-    if err != nil || !info.IsDir() { continue }
-    // Process directory...
-}
-```
+### Releasing New Versions
 
-## Critical Patterns
+→ Use the **github-releases skill** (if available in your environment)
 
-**Git Operations** - Always use workspace cache:
-```go
-import "github.com/hk9890/ai-config-manager/pkg/workspace"
-
-mgr, _ := workspace.NewManager(repoPath)
-clonePath, err := mgr.GetOrClone(gitURL, ref)  // Cached, 10-50x faster
-// Use clonePath - no cleanup needed
-```
-
-**Loading Resources**:
-```go
-// Commands (auto-detects base path)
-res, err := resource.LoadCommand("path/to/commands/test.md")
-
-// Skills (directory with SKILL.md)
-res, err := resource.LoadSkill("path/to/skill-dir")
-
-// Agents (single .md file)
-res, err := resource.LoadAgent("path/to/agent.md")
-```
-
-**Repository Operations**:
-```go
-mgr, err := repo.NewManager()
-mgr.AddCommand(sourcePath)
-resources, err := mgr.List(nil)  // nil = all types
-```
-
-## Testing
-
-Use isolated temporary directories:
-```go
-func TestFeature(t *testing.T) {
-    tmpDir := t.TempDir()  // Auto-cleanup
-    manager := repo.NewManagerWithPath(tmpDir)  // NOT NewManager()
-    // ... test operations ...
-}
-```
-
-**Test Types**:
-- Unit tests: Use fixtures in `testdata/`, no network, `//go:build unit`
-- Integration tests: Real repos, network calls, `//go:build integration`
-
-## Documentation
-
-- **User Guide**: `docs/user-guide/` - Resource formats, patterns, output
-- **Contributor Guide**: `docs/contributor-guide/` - Architecture, testing, development
-- **README.md**: User-facing installation and usage
-- **CONTRIBUTING.md**: Complete development guide
+If not available, see **[docs/contributor-guide/release-process.md](docs/contributor-guide/release-process.md)**
 
 ## Before Committing
 
 1. `make fmt` - Format code
 2. `make test` - All tests pass
-3. Add tests for new functionality
-4. Follow existing patterns
-5. Git operations use `pkg/workspace`
+3. Follow code style guide (see docs/contributor-guide/code-style.md)
+4. Git operations use `pkg/workspace` (see architecture.md)
+5. Tests use `t.TempDir()` and `NewManagerWithPath()` (see testing.md)

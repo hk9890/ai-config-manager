@@ -21,6 +21,7 @@ For detailed setup, see [Development Environment](development-environment.md).
 ### Getting Started
 
 - **[Development Environment](development-environment.md)** - Setup guide (Go, mise, tools)
+- **[Code Style Guide](code-style.md)** - Naming, imports, error handling, symlinks
 - **[Testing Guide](testing.md)** - Testing approach, best practices, troubleshooting
 - **[Release Process](release-process.md)** - Version numbering, creating releases
 
@@ -28,15 +29,12 @@ For detailed setup, see [Development Environment](development-environment.md).
 
 - **[Architecture Guide](architecture.md)** - System overview, design rules, data flows
   - Architecture rules (Git workspace, XDG, error handling, symlinks)
-  - Package structure and responsibilities
+  - Package structure (17 packages)
   - Key concepts and patterns
 
 ### Additional Resources
 
-- **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Complete development guide
-  - Code style guidelines
-  - Development workflow
-  - Submitting changes
+- **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Quick start and workflow guide
 - **[AGENTS.md](../../AGENTS.md)** - Quick reference for AI agents
 
 ## Essential Commands
@@ -84,6 +82,21 @@ if err != nil {
     return fmt.Errorf("failed to load: %w", err)
 }
 ```
+
+### Symlink Handling (CRITICAL)
+
+```go
+// ✅ CORRECT: Use os.Stat() to follow symlinks
+entries, _ := os.ReadDir(dir)
+for _, entry := range entries {
+    path := filepath.Join(dir, entry.Name())
+    info, err := os.Stat(path)  // os.Stat follows symlinks
+    if err != nil || !info.IsDir() { continue }
+    processDirectory(path)
+}
+```
+
+See [Code Style Guide](code-style.md) for complete details.
 
 ## Before Submitting
 

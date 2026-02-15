@@ -14,7 +14,7 @@ const (
 	Command ResourceType = "command"
 	// Skill represents a skill resource (folder with SKILL.md)
 	Skill ResourceType = "skill"
-	// Agent represents an agent resource (folder with AGENT.md)
+	// Agent represents an agent resource (single .md file)
 	Agent ResourceType = "agent"
 	// PackageType represents a package resource (JSON file with resource references)
 	PackageType ResourceType = "package"
