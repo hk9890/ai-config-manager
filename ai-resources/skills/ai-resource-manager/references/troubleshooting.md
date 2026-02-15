@@ -8,7 +8,7 @@ Common issues with `aimgr` (AI Resource Manager) and how to resolve them.
   - [aimgr Not Found](#aimgr-not-found)
   - [Permission Denied](#permission-denied)
   - [Binary Not Executable](#binary-not-executable)
-  - [Installation Script Fails](#installation-script-fails)
+  - [Installation Script Fails](#build-from-source-fails)
 - [Symlink Issues](#symlink-issues)
   - [Broken Symlinks](#broken-symlinks)
   - [Skills Not Detected After Installation](#skills-not-detected-after-installation)
@@ -33,12 +33,14 @@ Common issues with `aimgr` (AI Resource Manager) and how to resolve them.
 
 ### aimgr Not Found
 
-**Symptoms:** 
+**Symptoms:**
+
 - `command not found: aimgr`
 - `bash: aimgr: command not found`
 - Shell can't find the `aimgr` executable
 
 **Diagnosis:**
+
 ```bash
 # Check if aimgr is in PATH
 which aimgr
@@ -54,6 +56,7 @@ ls -la /usr/local/bin/aimgr
 **Solutions:**
 
 1. **Install aimgr** (if not installed):
+
    ```bash
    # Linux/macOS
    ```bash
@@ -67,6 +70,7 @@ ls -la /usr/local/bin/aimgr
    ```
 
 2. **Add to PATH** (if installed but not in PATH):
+
    ```bash
    # For bash
    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
@@ -81,6 +85,7 @@ ls -la /usr/local/bin/aimgr
    ```
 
 3. **Verify installation location**:
+
    ```bash
    # Find where aimgr is installed
    find ~ -name aimgr -type f 2>/dev/null
@@ -94,11 +99,13 @@ ls -la /usr/local/bin/aimgr
 ### Permission Denied
 
 **Symptoms:**
+
 - `Permission denied` when running `aimgr`
 - `zsh: permission denied: aimgr`
 - File exists but can't be executed
 
 **Diagnosis:**
+
 ```bash
 # Check file permissions
 ls -la $(which aimgr)
@@ -110,6 +117,7 @@ ls -la $(which aimgr)
 **Solutions:**
 
 1. **Fix binary permissions**:
+
    ```bash
    chmod +x $(which aimgr)
    
@@ -118,6 +126,7 @@ ls -la $(which aimgr)
    ```
 
 2. **Check ownership**:
+
    ```bash
    # If owned by root, may need sudo or change ownership
    ls -la $(which aimgr)
@@ -127,6 +136,7 @@ ls -la $(which aimgr)
    ```
 
 3. **SELinux/AppArmor issues** (Linux):
+
    ```bash
    # Check SELinux context
    ls -Z $(which aimgr)
@@ -140,10 +150,12 @@ ls -la $(which aimgr)
 ### Binary Not Executable
 
 **Symptoms:**
+
 - `cannot execute binary file: Exec format error`
 - Wrong architecture error
 
 **Diagnosis:**
+
 ```bash
 # Check binary architecture
 file $(which aimgr)
@@ -157,6 +169,7 @@ uname -m
 **Solutions:**
 
 1. **Download correct architecture**:
+
    ```bash
    # Determine your architecture
    uname -m
@@ -168,6 +181,7 @@ uname -m
    ```
 
 2. **Verify download integrity**:
+
    ```bash
    # Check if download completed
    ls -lh $(which aimgr)
@@ -180,11 +194,13 @@ uname -m
 ### Build from Source Fails
 
 **Symptoms:**
+
 - `make install` or `go install` throws errors
 - Build fails with compilation errors
 - Missing dependencies
 
 **Diagnosis:**
+
 ```bash
 # Check Go version (needs 1.21+)
 go version
@@ -202,6 +218,7 @@ ls -la ~/bin/ ~/.local/bin/
 **Solutions:**
 
 1. **Update Go version**:
+
    ```bash
    # Check minimum required version
    go version  # Should be 1.21 or higher
@@ -210,6 +227,7 @@ ls -la ~/bin/ ~/.local/bin/
    ```
 
 2. **Manual build and install**:
+
    ```bash
    # Clone and build
    git clone https://github.com/hk9890/ai-config-manager.git
@@ -226,6 +244,7 @@ ls -la ~/bin/ ~/.local/bin/
    ```
 
 3. **Check prerequisites**:
+
    ```bash
    # Ensure required tools exist
    which go
@@ -240,11 +259,13 @@ ls -la ~/bin/ ~/.local/bin/
 ### Broken Symlinks
 
 **Symptoms:**
+
 - Skills show as installed but don't work
 - AI tool reports "skill not found"
 - `ls` shows red/broken symlinks
 
 **Diagnosis:**
+
 ```bash
 # Check symlinks in Claude Code
 ls -la .claude/skills/
@@ -265,6 +286,7 @@ ls -la $(readlink .claude/skills/some-skill)
 **Solutions:**
 
 1. **Reinstall the resource**:
+
    ```bash
    # Uninstall and reinstall
    aimgr uninstall skill/broken-skill
@@ -272,6 +294,7 @@ ls -la $(readlink .claude/skills/some-skill)
    ```
 
 2. **Manual symlink fix**:
+
    ```bash
    # Remove broken symlink
    rm .claude/skills/broken-skill
@@ -284,6 +307,7 @@ ls -la $(readlink .claude/skills/some-skill)
    ```
 
 3. **Repository verification**:
+
    ```bash
    # Verify resource exists in repository
    ls -la ~/.local/share/ai-config/repo/skills/
@@ -297,11 +321,13 @@ ls -la $(readlink .claude/skills/some-skill)
 ### Skills Not Detected After Installation
 
 **Symptoms:**
+
 - `aimgr list` shows skill installed
 - AI tool doesn't detect/load the skill
 - Skill doesn't appear in tool's skill list
 
 **Diagnosis:**
+
 ```bash
 # Verify installation
 aimgr list --format=json
@@ -325,6 +351,7 @@ ls -la .claude/skills/some-skill/SKILL.md
    - Skills are loaded at startup
 
 2. **Verify correct directory structure**:
+
    ```bash
    # Skill should have SKILL.md in root
    ls -la .claude/skills/some-skill/SKILL.md
@@ -336,6 +363,7 @@ ls -la .claude/skills/some-skill/SKILL.md
    ```
 
 3. **Check tool-specific configuration**:
+
    ```bash
    # For Claude Code, check .claude/ exists
    ls -la .claude/
@@ -349,10 +377,12 @@ ls -la .claude/skills/some-skill/SKILL.md
 ### Symlink Points to Wrong Location
 
 **Symptoms:**
+
 - Symlink exists but points to old/moved location
 - Resource version mismatch
 
 **Diagnosis:**
+
 ```bash
 # Check where symlink points
 readlink -f .claude/skills/some-skill
@@ -368,11 +398,13 @@ cat .claude/skills/some-skill/version.txt
 **Solutions:**
 
 1. **Force reinstall**:
+
    ```bash
    aimgr install skill/some-skill --force
    ```
 
 2. **Clean and reinstall**:
+
    ```bash
    # Remove all symlinks
    aimgr uninstall skill/some-skill
@@ -391,11 +423,13 @@ cat .claude/skills/some-skill/version.txt
 ### Config File Missing
 
 **Symptoms:**
+
 - `config file not found`
 - `failed to read config: no such file or directory`
 - Fresh installation with no config
 
 **Diagnosis:**
+
 ```bash
 # Check if config exists
 ls -la ~/.config/aimgr/aimgr.yaml
@@ -407,11 +441,13 @@ ls -la ~/.config/aimgr/
 **Solutions:**
 
 1. **Create config directory**:
+
    ```bash
    mkdir -p ~/.config/aimgr
    ```
 
 2. **Initialize default config**:
+
    ```bash
    # Set a basic config value to create file
    aimgr config set install.targets claude
@@ -421,6 +457,7 @@ ls -la ~/.config/aimgr/
    ```
 
 3. **Create config manually**:
+
    ```yaml
    # ~/.config/aimgr/aimgr.yaml
    install:
@@ -434,11 +471,13 @@ ls -la ~/.config/aimgr/
 ### Invalid Config YAML
 
 **Symptoms:**
+
 - `failed to parse config: yaml: ...`
 - `invalid YAML syntax`
 - Config loads but values ignored
 
 **Diagnosis:**
+
 ```bash
 # View config file
 cat ~/.config/aimgr/aimgr.yaml
@@ -454,12 +493,14 @@ cat ~/.config/aimgr/aimgr.yaml
 **Solutions:**
 
 1. **Validate YAML syntax**:
+
    ```bash
    # Use online validator or yamllint
    yamllint ~/.config/aimgr/aimgr.yaml
    ```
 
 2. **Fix common YAML issues**:
+
    ```bash
    # Convert tabs to spaces
    expand -t 2 ~/.config/aimgr/aimgr.yaml > /tmp/config.yaml
@@ -469,6 +510,7 @@ cat ~/.config/aimgr/aimgr.yaml
    ```
 
 3. **Reset to defaults**:
+
    ```bash
    # Backup broken config
    mv ~/.config/aimgr/aimgr.yaml ~/.config/aimgr/aimgr.yaml.bak
@@ -478,6 +520,7 @@ cat ~/.config/aimgr/aimgr.yaml
    ```
 
 4. **Example valid config**:
+
    ```yaml
    install:
      targets:
@@ -492,11 +535,13 @@ cat ~/.config/aimgr/aimgr.yaml
 ### Wrong Default Target
 
 **Symptoms:**
+
 - Resources install to unexpected directory
 - Using Claude but resources go to `.opencode/`
 - Need to always specify `--target`
 
 **Diagnosis:**
+
 ```bash
 # Check current config
 aimgr config get install.targets
@@ -508,6 +553,7 @@ ls -d .claude .opencode .github 2>/dev/null
 **Solutions:**
 
 1. **Set preferred default**:
+
    ```bash
    # Set single target
    aimgr config set install.targets claude
@@ -517,12 +563,14 @@ ls -d .claude .opencode .github 2>/dev/null
    ```
 
 2. **Verify setting**:
+
    ```bash
    aimgr config get install.targets
    cat ~/.config/aimgr/aimgr.yaml
    ```
 
 3. **Use explicit target flag**:
+
    ```bash
    # Override default for specific install
    aimgr install skill/utils --target claude
@@ -535,11 +583,13 @@ ls -d .claude .opencode .github 2>/dev/null
 ### Resource Not Found
 
 **Symptoms:**
+
 - `resource not found in repository`
 - `skill/command/agent 'name' does not exist`
 - Can't install a resource you know exists
 
 **Diagnosis:**
+
 ```bash
 # List all resources in repository
 aimgr repo list --format=json
@@ -554,6 +604,7 @@ aimgr repo describe skill resource-name
 **Solutions:**
 
 1. **Update repository**:
+
    ```bash
    # Sync with latest sources
    aimgr repo sync
@@ -563,6 +614,7 @@ aimgr repo describe skill resource-name
    ```
 
 2. **Check exact name** (case-sensitive):
+
    ```bash
    # List all skills
    aimgr repo list skill
@@ -574,13 +626,15 @@ aimgr repo describe skill resource-name
    ```
 
 3. **Add resource source**:
+
    ```bash
    # If resource is in external source
-   aimgr repo import /path/to/resource
-   aimgr repo import https://github.com/user/repo
+   aimgr repo add /path/to/resource
+   aimgr repo add https://github.com/user/repo
    ```
 
 4. **Verify repository path**:
+
    ```bash
    ls -la ~/.local/share/ai-config/repo/
    ls -la ~/.local/share/ai-config/repo/skills/
@@ -591,11 +645,13 @@ aimgr repo describe skill resource-name
 ### Repository Update Fails
 
 **Symptoms:**
+
 - `aimgr repo sync` throws errors
 - Git fetch/pull errors
 - Source unreachable
 
 **Diagnosis:**
+
 ```bash
 # Check repository metadata
 aimgr repo describe skill/resource-name
@@ -604,11 +660,13 @@ aimgr repo describe skill/resource-name
 **Solutions:**
 
 1. **Force update**:
+
    ```bash
    aimgr repo sync --force
    ```
 
 2. **Check source accessibility**:
+
    ```bash
    # If using GitHub, verify you can access it
    curl -I https://github.com
@@ -618,6 +676,7 @@ aimgr repo describe skill/resource-name
    ```
 
 3. **Remove and re-add source**:
+
    ```bash
    # Get current sources
    aimgr config get sync.sources
@@ -626,10 +685,11 @@ aimgr repo describe skill/resource-name
    aimgr repo remove https://github.com/user/repo
    
    # Re-add it
-   aimgr repo import https://github.com/user/repo
+   aimgr repo add https://github.com/user/repo
    ```
 
 4. **Manual git fix**:
+
    ```bash
    cd ~/.local/share/ai-config/repo/
    git fetch --all
@@ -641,11 +701,13 @@ aimgr repo describe skill/resource-name
 ### Duplicate Resources
 
 **Symptoms:**
+
 - Same resource appears multiple times
 - Resources from different sources conflict
 - Ambiguous resource name errors
 
 **Diagnosis:**
+
 ```bash
 # List all resources with full details
 aimgr repo list --format=json | jq '.[] | select(.name=="duplicate-name")'
@@ -657,6 +719,7 @@ aimgr config get sync.sources
 **Solutions:**
 
 1. **Use qualified names**:
+
    ```bash
    # If same resource from multiple sources
    aimgr install source1:skill/utils
@@ -664,6 +727,7 @@ aimgr config get sync.sources
    ```
 
 2. **Remove duplicate source**:
+
    ```bash
    # Remove one source
    aimgr repo remove source-name
@@ -671,6 +735,7 @@ aimgr config get sync.sources
    ```
 
 3. **Prioritize sources** (if supported):
+
    ```bash
    # Check config for source priority
    aimgr config get repository.source_priority
@@ -681,11 +746,13 @@ aimgr config get sync.sources
 ### Repository Corruption
 
 **Symptoms:**
+
 - Strange errors from `aimgr repo` commands
 - Metadata inconsistent
 - Resources partially missing
 
 **Diagnosis:**
+
 ```bash
 # Check repository integrity
 ls -la ~/.local/share/ai-config/repo/
@@ -699,6 +766,7 @@ git fsck
 **Solutions:**
 
 1. **Rebuild repository**:
+
    ```bash
    # Backup current repository
    mv ~/.local/share/ai-config/repo ~/.local/share/ai-config/repo.bak
@@ -707,11 +775,12 @@ git fsck
    mkdir -p ~/.local/share/ai-config/repo
    
    # Re-add sources
-   aimgr repo import <your-sources>
+   aimgr repo add <your-sources>
    aimgr repo sync
    ```
 
 2. **Fix git repository**:
+
    ```bash
    cd ~/.local/share/ai-config/repo/
    
@@ -732,11 +801,13 @@ git fsck
 ### Wrong Tool Directory Selected
 
 **Symptoms:**
+
 - Resources install to unexpected directory
 - Using Claude Code but resources go to `.opencode/`
 - Multiple tool directories exist
 
 **Diagnosis:**
+
 ```bash
 # Check what directories exist
 ls -d .claude .opencode .github/skills 2>/dev/null
@@ -751,6 +822,7 @@ aimgr config get install.targets
 **Solutions:**
 
 1. **Specify target explicitly**:
+
    ```bash
    # Force installation to specific tool
    aimgr install skill/utils --target claude
@@ -758,12 +830,14 @@ aimgr config get install.targets
    ```
 
 2. **Set config default**:
+
    ```bash
    # Set preferred tool
    aimgr config set install.targets claude
    ```
 
 3. **Remove unwanted directories** (if you only use one tool):
+
    ```bash
    # If you only use Claude Code
    rm -rf .opencode/
@@ -777,11 +851,13 @@ aimgr config get install.targets
 ### Multiple Tool Directories Exist
 
 **Symptoms:**
+
 - Resources install to both `.claude/` and `.opencode/`
 - Want to install to specific tool only
 - Confusion about which tool loads which resources
 
 **Diagnosis:**
+
 ```bash
 # Check existing directories
 ls -la .claude/ .opencode/ .github/skills/
@@ -799,6 +875,7 @@ ls -la .opencode/skills/
    - Each tool only loads from its own directory
 
 2. **Install to specific tool**:
+
    ```bash
    # Use --target flag
    aimgr install skill/claude-specific --target claude
@@ -806,6 +883,7 @@ ls -la .opencode/skills/
    ```
 
 3. **Set default behavior**:
+
    ```bash
    # Install to single tool by default
    aimgr config set install.targets claude
@@ -815,6 +893,7 @@ ls -la .opencode/skills/
    ```
 
 4. **Remove from specific tool**:
+
    ```bash
    # Symlinks are safe to remove manually
    rm .opencode/skills/unwanted-skill
@@ -829,11 +908,13 @@ ls -la .opencode/skills/
 ### AI Tool Doesn't Load Resources
 
 **Symptoms:**
+
 - Resources installed correctly (symlinks exist)
 - AI tool doesn't recognize/use them
 - Skill not showing in tool's skill list
 
 **Diagnosis:**
+
 ```bash
 # Verify installation
 aimgr list
@@ -857,6 +938,7 @@ tree -L 2 .claude/skills/some-skill/
    - Resources are indexed at startup
 
 2. **Check resource structure**:
+
    ```bash
    # Skills must have SKILL.md
    ls -la .claude/skills/*/SKILL.md
@@ -872,10 +954,11 @@ tree -L 2 .claude/skills/some-skill/
    - Claude Code looks in `.claude/`
    - OpenCode looks in `.opencode/`
    - GitHub Copilot looks in `.github/skills/`
-   
+
    Make sure resources are in the correct directory.
 
 4. **Check AI tool logs** (if available):
+
    ```bash
    # For Claude Code (example, path may vary)
    tail -f ~/Library/Logs/Claude/main.log
@@ -884,6 +967,7 @@ tree -L 2 .claude/skills/some-skill/
    ```
 
 5. **Reinstall with verification**:
+
    ```bash
    # Clean uninstall
    aimgr uninstall skill/problem-skill
@@ -907,6 +991,7 @@ tree -L 2 .claude/skills/some-skill/
 If none of these solutions work:
 
 1. **Check aimgr version**:
+
    ```bash
    aimgr --version
    
@@ -914,13 +999,14 @@ If none of these solutions work:
    ```
 
 2. **Enable debug mode** (if supported):
-   ```bash
+
 3. **Check system compatibility**:
    - OS: Linux, macOS, Windows WSL
    - Shell: bash, zsh, fish
    - File system: must support symlinks
 
 4. **Gather diagnostic info**:
+
    ```bash
    # System info
    uname -a
@@ -948,7 +1034,7 @@ If none of these solutions work:
 ## Quick Reference
 
 | Issue | First Action | Most Common Fix |
-|-------|-------------|-----------------|
+| ------- | ------------- | ------------------ |
 | `aimgr not found` | `which aimgr` | Add to PATH |
 | Permission denied | `ls -la $(which aimgr)` | `chmod +x` |
 | Broken symlinks | `ls -la .claude/skills/` | Reinstall resource |
@@ -958,4 +1044,6 @@ If none of these solutions work:
 | Wrong directory | `ls -d .claude .opencode` | Use `--target` flag |
 | Update fails | Check network | `aimgr repo sync --force` |
 
-**Remember:** After installing or modifying resources, **always restart your AI tool** (Claude Code, OpenCode, etc.). Resources are loaded at startup, not dynamically.
+**Remember:** After installing or modifying resources, **always restart
+your AI tool** (Claude Code, OpenCode, etc.). Resources are loaded at
+startup, not dynamically.

@@ -1,8 +1,11 @@
 # Validating AI Resources for Developers
 
+<!-- markdownlint-disable MD036 -->
 **For developers creating skills, agents, commands, and packages**
+<!-- markdownlint-enable MD036 -->
 
-This guide shows how to validate that your AI resources work with aimgr before publishing them.
+This guide shows how to validate that your AI resources work with aimgr
+before publishing them.
 
 ---
 
@@ -12,10 +15,10 @@ The fastest way to check if your resource is compatible with aimgr:
 
 ```bash
 # Step 1: Validate format (doesn't modify repository)
-aimgr repo import ./my-skill --dry-run
+aimgr repo add ./my-skill --dry-run
 
 # Step 2: If validation passes, add to repository
-aimgr repo import ./my-skill
+aimgr repo add ./my-skill
 
 # Step 3: Test installation in a project
 cd /tmp/test-project
@@ -31,9 +34,9 @@ If all three steps succeed, your resource is compatible with aimgr!
 
 Skills are directories containing a `SKILL.md` file.
 
-### Expected Structure
+### Skill Structure
 
-```
+```text
 my-skill/
 ├── SKILL.md              # Required: metadata + documentation
 ├── scripts/              # Optional: helper scripts
@@ -41,7 +44,7 @@ my-skill/
 └── assets/              # Optional: images, files
 ```
 
-### Validation Steps
+### Skill Validation Steps
 
 **1. Check SKILL.md format:**
 
@@ -59,25 +62,28 @@ Documentation goes here...
 ```
 
 **Required fields:**
+
 - `description` - Brief explanation (1-1024 characters)
 
 **Important:**
+
 - Directory name MUST match the `name` field
 - Use lowercase, alphanumeric, and hyphens only (e.g., `pdf-processing`)
 
 **2. Validate with dry-run:**
 
 ```bash
-aimgr repo import ./my-skill --dry-run
+aimgr repo add ./my-skill --dry-run
 
 # Success output:
 # ✓ skill/my-skill - Successfully validated
 
 # For scripting/CI:
-aimgr repo import ./my-skill --dry-run --format=json
+aimgr repo add ./my-skill --dry-run --format=json
 ```
 
 **Exit codes:**
+
 - `0` = Valid
 - `1` = Validation failed
 
@@ -85,7 +91,7 @@ aimgr repo import ./my-skill --dry-run --format=json
 
 ```bash
 # Add to repository
-aimgr repo import ./my-skill
+aimgr repo add ./my-skill
 
 # Test in project
 mkdir /tmp/test && cd /tmp/test
@@ -98,21 +104,27 @@ ls .claude/skills/my-skill/SKILL.md
 ### Common Skill Errors
 
 **Name mismatch:**
-```
+
+```text
 Error: skill name 'my-skill' must match directory name 'myskill'
 ```
+
 **Fix:** Rename directory or update frontmatter to match.
 
 **Invalid name:**
-```
+
+```text
 Error: name must be lowercase alphanumeric + hyphens
 ```
+
 **Fix:** Use only lowercase letters, numbers, hyphens (e.g., `my-skill`).
 
 **Missing SKILL.md:**
-```
+
+```text
 Error: directory must contain SKILL.md
 ```
+
 **Fix:** Create `SKILL.md` in the skill directory.
 
 ---
@@ -121,11 +133,11 @@ Error: directory must contain SKILL.md
 
 Agents are single `.md` files with YAML frontmatter.
 
-### Expected Structure
+### Agent Structure
 
 Single file: `my-agent.md`
 
-### Validation Steps
+### Agent Validation Steps
 
 **1. Check format:**
 
@@ -144,13 +156,13 @@ Documentation...
 **2. Validate:**
 
 ```bash
-aimgr repo import ./my-agent.md --dry-run
+aimgr repo add ./my-agent.md --dry-run
 ```
 
 **3. Test:**
 
 ```bash
-aimgr repo import ./my-agent.md
+aimgr repo add ./my-agent.md
 cd /tmp/test
 aimgr install agent/my-agent
 ls .claude/agents/my-agent.md
@@ -162,16 +174,16 @@ ls .claude/agents/my-agent.md
 
 Commands are `.md` files in a `commands/` directory.
 
-### Expected Structure
+### Command Structure
 
-```
+```text
 commands/
 ├── my-command.md
 └── api/                    # Nested commands supported
     └── deploy.md
 ```
 
-### Validation Steps
+### Command Validation Steps
 
 **1. Check format:**
 
@@ -186,6 +198,7 @@ Documentation...
 ```
 
 **Important:**
+
 - File MUST be in a `commands/` directory
 - Nested structure supported (e.g., `commands/api/deploy.md`)
 
@@ -193,16 +206,16 @@ Documentation...
 
 ```bash
 # Validate single command
-aimgr repo import ./commands/my-command.md --dry-run
+aimgr repo add ./commands/my-command.md --dry-run
 
 # Validate entire commands directory
-aimgr repo import ./commands --dry-run
+aimgr repo add ./commands --dry-run
 ```
 
 **3. Test:**
 
 ```bash
-aimgr repo import ./commands
+aimgr repo add ./commands
 cd /tmp/test
 aimgr install command/my-command
 ls .claude/commands/my-command.md
@@ -214,11 +227,11 @@ ls .claude/commands/my-command.md
 
 Packages are JSON files that bundle multiple resources.
 
-### Expected Structure
+### Package Structure
 
 Single file: `my-package.package.json`
 
-### Validation Steps
+### Package Validation Steps
 
 **1. Create package JSON:**
 
@@ -235,6 +248,7 @@ Single file: `my-package.package.json`
 ```
 
 **Required fields:**
+
 - `name` - Package name (lowercase, alphanumeric, hyphens)
 - `description` - Package description
 - `resources` - Array in `type/name` format
@@ -245,9 +259,9 @@ Single file: `my-package.package.json`
 
 ```bash
 # Add individual resources first
-aimgr repo import ./my-skill
-aimgr repo import ./commands/my-command.md
-aimgr repo import ./my-agent.md
+aimgr repo add ./my-skill
+aimgr repo add ./commands/my-command.md
+aimgr repo add ./my-agent.md
 
 # Verify they're in repository
 aimgr repo list skill/my-skill
@@ -258,14 +272,14 @@ aimgr repo list agent/my-agent
 **3. Validate package:**
 
 ```bash
-aimgr repo import ./my-package.package.json --dry-run
+aimgr repo add ./my-package.package.json --dry-run
 ```
 
 **4. Verify package references:**
 
 ```bash
 # Add package
-aimgr repo import ./my-package.package.json
+aimgr repo add ./my-package.package.json
 
 # Verify all references valid
 aimgr repo verify package/my-package
@@ -286,18 +300,23 @@ ls .claude/agents/my-agent.md
 ### Common Package Errors
 
 **Invalid resource format:**
-```
+
+```text
 Error: invalid resource format: "my-skill" (expected type/name)
 ```
+
 **Fix:** Use `type/name` format: `"skill/my-skill"`
 
 **Resource doesn't exist:**
-```
+
+```text
 Error: package references non-existent resource 'skill/missing'
 ```
+
 **Fix:** Add the resource to repository first:
+
 ```bash
-aimgr repo import ./missing-skill
+aimgr repo add ./missing-skill
 ```
 
 ---
@@ -307,13 +326,15 @@ aimgr repo import ./missing-skill
 ### YAML Syntax Errors
 
 **Error:**
-```
+
+```text
 Error: yaml: mapping values are not allowed in this context
 ```
 
 **Cause:** Special characters in description (especially colons)
 
 **Fix:** Quote the description:
+
 ```yaml
 ---
 description: "My tool: a helper"  # ✓ Quoted
@@ -323,29 +344,37 @@ description: "My tool: a helper"  # ✓ Quoted
 ### Name Validation
 
 **Consecutive hyphens:**
-```
+
+```text
 Error: name cannot contain consecutive hyphens
 ```
+
 **Fix:** Use single hyphens: `my-skill` (not `my--skill`)
 
 **Starts/ends with hyphen:**
-```
+
+```text
 Error: name cannot start/end with hyphen
 ```
+
 **Fix:** Remove leading/trailing hyphens
 
 ### Description Errors
 
 **Missing description:**
-```
+
+```text
 Error: description is required
 ```
+
 **Fix:** Add `description` field to frontmatter
 
 **Too long:**
-```
+
+```text
 Error: skill description too long (1500 chars, max 1024)
 ```
+
 **Fix:** Shorten to 1024 characters or less
 
 ---
@@ -374,7 +403,7 @@ jobs:
       
       - name: Validate resources
         run: |
-          if aimgr repo import . --dry-run --format=json; then
+          if aimgr repo add . --dry-run --format=json; then
             echo "✅ All resources valid"
             exit 0
           else
@@ -395,9 +424,9 @@ echo "Validating resources..."
 SKILLS=$(find . -name "SKILL.md" -not -path "./.git/*" | xargs dirname)
 
 for skill in $SKILLS; do
-  if ! aimgr repo import "$skill" --dry-run >/dev/null 2>&1; then
+  if ! aimgr repo add "$skill" --dry-run >/dev/null 2>&1; then
     echo "❌ Validation failed: $skill"
-    aimgr repo import "$skill" --dry-run
+    aimgr repo add "$skill" --dry-run
     exit 1
   fi
 done
@@ -406,6 +435,7 @@ echo "✅ All resources valid"
 ```
 
 Make executable:
+
 ```bash
 chmod +x .git/hooks/pre-commit
 ```
@@ -449,14 +479,14 @@ echo '#!/bin/bash' > scripts/extract.sh
 
 ```bash
 cd ..
-aimgr repo import ./pdf-processing --dry-run
+aimgr repo add ./pdf-processing --dry-run
 # ✓ skill/pdf-processing - Successfully validated
 ```
 
 **3. Add to repository:**
 
 ```bash
-aimgr repo import ./pdf-processing
+aimgr repo add ./pdf-processing
 ```
 
 **4. Test installation:**
@@ -485,8 +515,8 @@ EOF
 **6. Validate and add package:**
 
 ```bash
-aimgr repo import ./pdf-toolkit.package.json --dry-run
-aimgr repo import ./pdf-toolkit.package.json
+aimgr repo add ./pdf-toolkit.package.json --dry-run
+aimgr repo add ./pdf-toolkit.package.json
 aimgr repo verify package/pdf-toolkit
 ```
 
@@ -513,11 +543,13 @@ All resources must follow these naming conventions:
 - For nested commands: each segment validated separately
 
 **Valid names:**
+
 - `my-skill`
 - `pdf-processor`
 - `api-helper`
 
 **Invalid names:**
+
 - `My-Skill` (uppercase)
 - `my_skill` (underscore)
 - `-my-skill` (starts with hyphen)
@@ -529,10 +561,10 @@ All resources must follow these naming conventions:
 
 ```bash
 # Validate without adding
-aimgr repo import <path> --dry-run
+aimgr repo add <path> --dry-run
 
 # Validate and add
-aimgr repo import <path>
+aimgr repo add <path>
 
 # Verify repository
 aimgr repo verify
@@ -541,13 +573,13 @@ aimgr repo verify
 aimgr repo verify <pattern>
 
 # JSON output for CI/CD
-aimgr repo import <path> --dry-run --format=json
+aimgr repo add <path> --dry-run --format=json
 ```
 
 ---
 
 ## Need Help?
 
-- **Full documentation:** https://github.com/hk9890/ai-config-manager/tree/main/docs/user-guide
-- **Resource formats:** https://github.com/hk9890/ai-config-manager/blob/main/docs/user-guide/resource-formats.md
-- **Report issues:** https://github.com/hk9890/ai-config-manager/issues
+- **Full documentation:** <https://github.com/hk9890/ai-config-manager/tree/main/docs/user-guide>
+- **Resource formats:** <https://github.com/hk9890/ai-config-manager/blob/main/docs/user-guide/resource-formats.md>
+- **Report issues:** <https://github.com/hk9890/ai-config-manager/issues>
