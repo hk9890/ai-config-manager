@@ -26,12 +26,12 @@ import (
 //   - Writes JSON formatted log entries (one per line)
 //   - Creates the logs directory if it doesn't exist (permissions: 0755)
 //   - Opens/creates the log file in append mode (permissions: 0644)
-//   - Uses Debug level as minimum logging level
+//   - Uses the specified level as minimum logging level
 //   - Writes to file only (no console output)
 //
 // Returns an error if the log directory cannot be created or the log file
 // cannot be opened for writing.
-func NewRepoLogger(repoPath string) (*slog.Logger, error) {
+func NewRepoLogger(repoPath string, level slog.Level) (*slog.Logger, error) {
 	// Create logs directory if it doesn't exist
 	logsDir := filepath.Join(repoPath, "logs")
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
@@ -45,12 +45,30 @@ func NewRepoLogger(repoPath string) (*slog.Logger, error) {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
 
-	// Create JSON handler with Debug level
+	// Create JSON handler with specified level
 	handler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level: level,
 	})
 
 	// Create and return logger
 	logger := slog.New(handler)
 	return logger, nil
+}
+
+// ParseLogLevel parses a log level string and returns the corresponding slog.Level.
+// Valid levels: "debug", "info", "warn", "error" (case-insensitive).
+// Returns an error if the level string is invalid.
+func ParseLogLevel(levelStr string) (slog.Level, error) {
+	switch levelStr {
+	case "debug", "DEBUG":
+		return slog.LevelDebug, nil
+	case "info", "INFO":
+		return slog.LevelInfo, nil
+	case "warn", "WARN", "warning", "WARNING":
+		return slog.LevelWarn, nil
+	case "error", "ERROR":
+		return slog.LevelError, nil
+	default:
+		return slog.LevelInfo, fmt.Errorf("invalid log level: %q (valid levels: debug, info, warn, error)", levelStr)
+	}
 }

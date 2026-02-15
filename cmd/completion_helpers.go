@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
@@ -53,7 +52,7 @@ type completionOptions struct {
 // Supports completing both the type prefix and resource names after the slash
 func completeResourcesWithOptions(opts completionOptions) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		manager, err := repo.NewManager()
+		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
@@ -135,7 +134,7 @@ func completeCommandNames(cmd *cobra.Command, args []string, toComplete string) 
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	manager, err := repo.NewManager()
+	manager, err := NewManagerWithLogLevel()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
@@ -160,7 +159,7 @@ func completeSkillNames(cmd *cobra.Command, args []string, toComplete string) ([
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	manager, err := repo.NewManager()
+	manager, err := NewManagerWithLogLevel()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
@@ -185,7 +184,7 @@ func completeAgentNames(cmd *cobra.Command, args []string, toComplete string) ([
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	manager, err := repo.NewManager()
+	manager, err := NewManagerWithLogLevel()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
@@ -300,7 +299,7 @@ func completeSourceNames(cmd *cobra.Command, args []string, toComplete string) (
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	manager, err := repo.NewManager()
+	manager, err := NewManagerWithLogLevel()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}

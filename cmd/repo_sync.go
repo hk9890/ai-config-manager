@@ -145,7 +145,7 @@ func syncSource(src *repomanifest.Source, manager *repo.Manager) error {
 // runSync executes the sync command
 func runSync(cmd *cobra.Command, args []string) error {
 	// Create manager
-	manager, err := repo.NewManager()
+	manager, err := NewManagerWithLogLevel()
 	if err != nil {
 		return fmt.Errorf("failed to create repo manager: %w", err)
 	}

@@ -167,7 +167,7 @@ Examples:
 			}
 
 			// Create repo manager
-			manager, err := repo.NewManager()
+			manager, err := NewManagerWithLogLevel()
 			if err != nil {
 				return fmt.Errorf("failed to create repository manager: %w", err)
 			}
@@ -215,7 +215,7 @@ Examples:
 		}
 
 		// Create repo manager
-		manager, err := repo.NewManager()
+		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return fmt.Errorf("failed to create repository manager: %w", err)
 		}
@@ -291,6 +291,12 @@ func installFromManifest(cmd *cobra.Command) error {
 		}
 	}
 
+	// Create repo manager early to initialize logging
+	manager, err := NewManagerWithLogLevel()
+	if err != nil {
+		return fmt.Errorf("failed to create repository manager: %w", err)
+	}
+
 	// Look for ai.package.yaml
 	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
 	if !manifest.Exists(manifestPath) {
@@ -351,12 +357,6 @@ func installFromManifest(cmd *cobra.Command) error {
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create installer: %w", err)
-	}
-
-	// Create repo manager
-	manager, err := repo.NewManager()
-	if err != nil {
-		return fmt.Errorf("failed to create repository manager: %w", err)
 	}
 
 	// Track results

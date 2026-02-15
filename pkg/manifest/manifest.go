@@ -2,12 +2,22 @@ package manifest
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+// Package-level logger for manifest validation logging
+var logger *slog.Logger
+
+// SetLogger sets the logger for the manifest package.
+// This should be called by the application during initialization.
+func SetLogger(l *slog.Logger) {
+	logger = l
+}
 
 const (
 	// ManifestFileName is the default name for project manifest files
@@ -207,17 +217,43 @@ func Exists(path string) bool {
 // Expected format: "type/name" where type is command|skill|agent|package
 // Names can contain slashes for nested resources (e.g., "command/api/deploy")
 func validateResourceReference(ref string) error {
+	if logger != nil {
+		logger.Debug("validating resource reference",
+			"reference", ref,
+			"parser", "manifest.validateResourceReference")
+	}
+
 	if ref == "" {
+		if logger != nil {
+			logger.Debug("validation failed: empty reference")
+		}
 		return fmt.Errorf("resource reference cannot be empty")
 	}
 
 	parts := strings.Split(ref, "/")
+	if logger != nil {
+		logger.Debug("split resource reference",
+			"parts", parts,
+			"count", len(parts))
+	}
+
 	if len(parts) < 2 {
+		if logger != nil {
+			logger.Debug("validation failed: insufficient parts",
+				"count", len(parts),
+				"reason", "expected at least 2 parts (type/name)")
+		}
 		return fmt.Errorf("invalid format (expected type/name): %q", ref)
 	}
 
 	resourceType := parts[0]
 	name := strings.Join(parts[1:], "/")
+
+	if logger != nil {
+		logger.Debug("parsed resource components",
+			"type", resourceType,
+			"name", name)
+	}
 
 	// Validate resource type
 	validTypes := []string{"command", "skill", "agent", "package"}
@@ -229,12 +265,26 @@ func validateResourceReference(ref string) error {
 		}
 	}
 	if !isValidType {
+		if logger != nil {
+			logger.Debug("validation failed: invalid resource type",
+				"type", resourceType,
+				"valid_types", validTypes)
+		}
 		return fmt.Errorf("invalid resource type %q (expected: command, skill, agent, or package)", resourceType)
 	}
 
 	// Validate name is not empty
 	if name == "" {
+		if logger != nil {
+			logger.Debug("validation failed: empty name")
+		}
 		return fmt.Errorf("resource name cannot be empty")
+	}
+
+	if logger != nil {
+		logger.Debug("validation passed",
+			"type", resourceType,
+			"name", name)
 	}
 
 	return nil

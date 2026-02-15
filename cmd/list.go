@@ -74,7 +74,7 @@ See also:
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create manager
-		manager, err := repo.NewManager()
+		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return err
 		}

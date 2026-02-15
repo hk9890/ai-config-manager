@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
-	"github.com/hk9890/ai-config-manager/pkg/repo"
 )
 
 // repoInitCmd represents the init command
@@ -31,9 +29,9 @@ Examples:
   aimgr repo init                    # Initialize with default location
   AIMGR_REPO_PATH=/custom aimgr repo init  # Initialize at custom location`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mgr, err := repo.NewManager()
+		mgr, err := NewManagerWithLogLevel()
 		if err != nil {
-			return fmt.Errorf("failed to create manager: %w", err)
+			return err
 		}
 
 		// Init() handles everything: directories, git init, .gitignore, initial commit

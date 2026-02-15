@@ -85,7 +85,7 @@ Examples:
 			return err
 		}
 
-		manager, err := repo.NewManager()
+		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return err
 		}

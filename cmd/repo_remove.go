@@ -62,7 +62,7 @@ Examples:
 func runRemove(cmd *cobra.Command, args []string) error {
 	nameOrPathOrURL := args[0]
 
-	mgr, err := repo.NewManager()
+	mgr, err := NewManagerWithLogLevel()
 	if err != nil {
 		return err
 	}

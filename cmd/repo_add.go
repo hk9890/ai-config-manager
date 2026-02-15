@@ -96,7 +96,7 @@ Examples:
 		}
 
 		// Create manager
-		manager, err := repo.NewManager()
+		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return err
 		}

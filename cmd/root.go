@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hk9890/ai-config-manager/pkg/logging"
+	"github.com/hk9890/ai-config-manager/pkg/manifest"
+	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -12,6 +15,7 @@ import (
 var (
 	cfgFile     string
 	versionFlag bool
+	logLevel    string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -42,6 +46,36 @@ func Execute() {
 	}
 }
 
+// GetLogLevel returns the log level flag value
+func GetLogLevel() string {
+	return logLevel
+}
+
+// NewManagerWithLogLevel creates a new repo manager and sets the log level from the --log-level flag.
+// Returns an error if the manager cannot be created or if the log level is invalid.
+func NewManagerWithLogLevel() (*repo.Manager, error) {
+	manager, err := repo.NewManager()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create manager: %w", err)
+	}
+
+	// Parse and set log level
+	level, err := logging.ParseLogLevel(logLevel)
+	if err != nil {
+		return nil, err
+	}
+	manager.SetLogLevel(level)
+
+	// Set logger for cmd and manifest packages
+	repoLogger := manager.GetLogger()
+	if repoLogger != nil {
+		SetLogger(repoLogger)
+		manifest.SetLogger(repoLogger)
+	}
+
+	return manager, nil
+}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -50,6 +84,7 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/aimgr/aimgr.yaml)")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "log level (debug, info, warn, error)")
 
 	// Version flag
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Show version information")

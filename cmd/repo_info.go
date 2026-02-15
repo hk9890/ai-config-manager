@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/output"
-	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
@@ -36,7 +35,7 @@ Examples:
   aimgr repo info --format=yaml`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create a new repo manager
-		manager, err := repo.NewManager()
+		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return err
 		}

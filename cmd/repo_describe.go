@@ -73,7 +73,7 @@ Note: 'repo show' is deprecated, use 'repo describe' instead.`,
 			return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", describeFormatFlag)
 		}
 
-		manager, err := repo.NewManager()
+		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return err
 		}

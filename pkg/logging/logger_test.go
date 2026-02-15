@@ -14,7 +14,7 @@ func TestNewRepoLogger_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create logger
-	logger, err := NewRepoLogger(tmpDir)
+	logger, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() error = %v, want nil", err)
 	}
@@ -65,7 +65,7 @@ func TestNewRepoLogger_DirectoryAlreadyExists(t *testing.T) {
 	}
 
 	// Create logger - should use existing directory
-	logger, err := NewRepoLogger(tmpDir)
+	logger, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() error = %v, want nil", err)
 	}
@@ -94,7 +94,7 @@ func TestNewRepoLogger_InvalidPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, err := NewRepoLogger(tt.repoPath)
+			logger, err := NewRepoLogger(tt.repoPath, slog.LevelDebug)
 			if err == nil {
 				t.Errorf("NewRepoLogger(%q) expected error, got nil", tt.repoPath)
 			}
@@ -123,7 +123,7 @@ func TestNewRepoLogger_PermissionDenied(t *testing.T) {
 	defer os.Chmod(readOnlyDir, 0755)
 
 	// Try to create logger in read-only directory
-	_, err := NewRepoLogger(readOnlyDir)
+	_, err := NewRepoLogger(readOnlyDir, slog.LevelDebug)
 	if err == nil {
 		t.Error("NewRepoLogger() expected error for permission denied, got nil")
 	}
@@ -137,7 +137,7 @@ func TestNewRepoLogger_JSONFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create logger
-	logger, err := NewRepoLogger(tmpDir)
+	logger, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() error = %v, want nil", err)
 	}
@@ -207,14 +207,14 @@ func TestNewRepoLogger_AppendMode(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create first logger and write entry
-	logger1, err := NewRepoLogger(tmpDir)
+	logger1, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() first call error = %v", err)
 	}
 	logger1.Info("first entry")
 
 	// Create second logger and write entry
-	logger2, err := NewRepoLogger(tmpDir)
+	logger2, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() second call error = %v", err)
 	}
@@ -255,7 +255,7 @@ func TestNewRepoLogger_DebugLevel(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create logger
-	logger, err := NewRepoLogger(tmpDir)
+	logger, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() error = %v", err)
 	}
@@ -295,7 +295,7 @@ func TestNewRepoLogger_NestedPath(t *testing.T) {
 	nestedPath := filepath.Join(tmpDir, "level1", "level2", "level3")
 
 	// Create logger - should create all parent directories
-	logger, err := NewRepoLogger(nestedPath)
+	logger, err := NewRepoLogger(nestedPath, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() with nested path error = %v", err)
 	}
@@ -323,7 +323,7 @@ func TestNewRepoLogger_MultipleAttributes(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create logger
-	logger, err := NewRepoLogger(tmpDir)
+	logger, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() error = %v", err)
 	}
@@ -376,7 +376,7 @@ func TestNewRepoLogger_WithContext(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create logger
-	logger, err := NewRepoLogger(tmpDir)
+	logger, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() error = %v", err)
 	}
@@ -418,7 +418,7 @@ func TestNewRepoLogger_LoggerType(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create logger
-	logger, err := NewRepoLogger(tmpDir)
+	logger, err := NewRepoLogger(tmpDir, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() error = %v", err)
 	}
@@ -426,5 +426,100 @@ func TestNewRepoLogger_LoggerType(t *testing.T) {
 	// Verify it returns *slog.Logger
 	if _, ok := interface{}(logger).(*slog.Logger); !ok {
 		t.Errorf("NewRepoLogger() returned %T, want *slog.Logger", logger)
+	}
+}
+
+func TestParseLogLevel(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantLevel slog.Level
+		wantErr   bool
+	}{
+		{
+			name:      "debug lowercase",
+			input:     "debug",
+			wantLevel: slog.LevelDebug,
+			wantErr:   false,
+		},
+		{
+			name:      "debug uppercase",
+			input:     "DEBUG",
+			wantLevel: slog.LevelDebug,
+			wantErr:   false,
+		},
+		{
+			name:      "info lowercase",
+			input:     "info",
+			wantLevel: slog.LevelInfo,
+			wantErr:   false,
+		},
+		{
+			name:      "info uppercase",
+			input:     "INFO",
+			wantLevel: slog.LevelInfo,
+			wantErr:   false,
+		},
+		{
+			name:      "warn lowercase",
+			input:     "warn",
+			wantLevel: slog.LevelWarn,
+			wantErr:   false,
+		},
+		{
+			name:      "warn uppercase",
+			input:     "WARN",
+			wantLevel: slog.LevelWarn,
+			wantErr:   false,
+		},
+		{
+			name:      "warning lowercase",
+			input:     "warning",
+			wantLevel: slog.LevelWarn,
+			wantErr:   false,
+		},
+		{
+			name:      "warning uppercase",
+			input:     "WARNING",
+			wantLevel: slog.LevelWarn,
+			wantErr:   false,
+		},
+		{
+			name:      "error lowercase",
+			input:     "error",
+			wantLevel: slog.LevelError,
+			wantErr:   false,
+		},
+		{
+			name:      "error uppercase",
+			input:     "ERROR",
+			wantLevel: slog.LevelError,
+			wantErr:   false,
+		},
+		{
+			name:      "invalid level",
+			input:     "invalid",
+			wantLevel: slog.LevelInfo, // Returns default on error
+			wantErr:   true,
+		},
+		{
+			name:      "empty string",
+			input:     "",
+			wantLevel: slog.LevelInfo, // Returns default on error
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotLevel, err := ParseLogLevel(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseLogLevel(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				return
+			}
+			if gotLevel != tt.wantLevel {
+				t.Errorf("ParseLogLevel(%q) = %v, want %v", tt.input, gotLevel, tt.wantLevel)
+			}
+		})
 	}
 }

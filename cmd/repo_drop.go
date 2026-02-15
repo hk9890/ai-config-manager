@@ -49,7 +49,7 @@ func runDrop(cmd *cobra.Command, args []string) error {
 	fullDelete, _ := cmd.Flags().GetBool("full-delete")
 	force, _ := cmd.Flags().GetBool("force")
 
-	mgr, err := repo.NewManager()
+	mgr, err := NewManagerWithLogLevel()
 	if err != nil {
 		return err
 	}

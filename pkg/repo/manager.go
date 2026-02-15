@@ -23,6 +23,7 @@ import (
 type Manager struct {
 	repoPath string
 	logger   *slog.Logger
+	logLevel slog.Level
 }
 
 // NewManager creates a new repository manager
@@ -38,6 +39,7 @@ func NewManager() (*Manager, error) {
 	if repoPath != "" {
 		m := &Manager{
 			repoPath: repoPath,
+			logLevel: slog.LevelInfo, // Default to Info
 		}
 		m.initLogger()
 		return m, nil
@@ -50,6 +52,7 @@ func NewManager() (*Manager, error) {
 		// Path is already validated and expanded by config.Validate()
 		m := &Manager{
 			repoPath: cfg.Repo.Path,
+			logLevel: slog.LevelInfo, // Default to Info
 		}
 		m.initLogger()
 		return m, nil
@@ -60,6 +63,7 @@ func NewManager() (*Manager, error) {
 	repoPath = filepath.Join(xdg.DataHome, "ai-config", "repo")
 	m := &Manager{
 		repoPath: repoPath,
+		logLevel: slog.LevelInfo, // Default to Info
 	}
 	m.initLogger()
 	return m, nil
@@ -69,16 +73,24 @@ func NewManager() (*Manager, error) {
 func NewManagerWithPath(repoPath string) *Manager {
 	m := &Manager{
 		repoPath: repoPath,
+		logLevel: slog.LevelDebug, // Tests use Debug level
 	}
 	m.initLogger()
 	return m
+}
+
+// SetLogLevel sets the log level and reinitializes the logger.
+// This should be called after creating the manager and before using it.
+func (m *Manager) SetLogLevel(level slog.Level) {
+	m.logLevel = level
+	m.initLogger()
 }
 
 // initLogger initializes the logger for this Manager.
 // If logger creation fails, logs a warning to stderr but continues.
 // Manager can operate without logging (graceful degradation).
 func (m *Manager) initLogger() {
-	logger, err := logging.NewRepoLogger(m.repoPath)
+	logger, err := logging.NewRepoLogger(m.repoPath, m.logLevel)
 	if err != nil {
 		// Log warning to stderr but don't fail
 		fmt.Fprintf(os.Stderr, "Warning: failed to initialize logger: %v\n", err)

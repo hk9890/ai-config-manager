@@ -102,7 +102,7 @@ Examples:
 		}
 
 		// Create repo manager to get repository path
-		manager, err := repo.NewManager()
+		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return fmt.Errorf("failed to create repository manager: %w", err)
 		}
