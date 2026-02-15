@@ -15,7 +15,7 @@ func TestLoad_NoConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer _ = os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Load config from directory without config file
 	_, err = Load(tmpDir)
