@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.2.0] - 2026-02-15
+
+### Added
+- **Go 1.25.6 enforcement** - Using mise to ensure consistent Go version across all environments
+- **E2E test coverage** - Added tests for SyncEmptyConfig and SyncInvalidSource scenarios
+
+### Fixed
+- **E2E test reliability** - Tests now handle lowercase JSON fields for resources vs uppercase for packages
+- **E2E test modernization** - Updated tests to use ai.repo.yaml instead of obsolete config sync.sources
+- **Test isolation** - Tests now properly isolated from user's global config
+- **Configuration handling** - Config is now optional with sensible defaults
+- **CI stability** - Resolved flaky TestCLIRepoVerifyFixFlag test
+- **Error handling** - Comprehensive cleanup of errcheck violations
+- **Nested command support** - Manifest validation now properly handles nested commands
+
+### Changed
+- **Linting approach** - Removed golangci-lint, now using go vet for consistency
+- **CI tooling** - Upgraded to golangci-lint-action v7 for v2 support
+
+### Documentation
+- Added session summaries for CI consistency, config defaults, and test isolation fixes
+
+
 ## [1.23.0] - 2026-02-13
 
 ### Added
