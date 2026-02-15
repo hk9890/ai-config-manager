@@ -182,7 +182,7 @@ func TestListEnhanced_MultipleTargets(t *testing.T) {
 
 	// Change to project directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	if err := os.Chdir(projectPath); err != nil {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestListEnhanced_NotInManifest(t *testing.T) {
 
 	// Change to project directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	if err := os.Chdir(projectPath); err != nil {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
@@ -395,7 +395,7 @@ func TestListEnhanced_NotInstalled(t *testing.T) {
 
 	// Change to project directory
 	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	if err := os.Chdir(projectPath); err != nil {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
@@ -972,7 +972,7 @@ func captureListOutput(t *testing.T, format string, pattern string) string {
 	outChan := make(chan string)
 	go func() {
 		var buf bytes.Buffer
-		buf.ReadFrom(r)
+		_, _ = buf.ReadFrom(r)
 		outChan <- buf.String()
 	}()
 
@@ -980,7 +980,7 @@ func captureListOutput(t *testing.T, format string, pattern string) string {
 	err = listCmd.RunE(listCmd, args)
 
 	// Restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	output := <-outChan

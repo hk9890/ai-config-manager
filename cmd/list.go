@@ -372,7 +372,7 @@ func outputWithPackagesYAML(resources []resource.Resource, packages []repo.Packa
 
 func outputPackagesYAML(packages []repo.PackageInfo) error {
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(packages)
 }
 

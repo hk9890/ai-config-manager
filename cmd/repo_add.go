@@ -142,7 +142,7 @@ func init() {
 	repoAddCmd.Flags().StringVar(&filterFlag, "filter", "", "Filter resources by pattern (e.g., 'skill/*', '*test*')")
 	repoAddCmd.Flags().StringVar(&addFormatFlag, "format", "table", "Output format: table, json, yaml")
 	repoAddCmd.Flags().StringVar(&nameFlag, "name", "", "Override auto-generated source name")
-	repoAddCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	_ = repoAddCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }
 
 // Helper functions for bulk add integration
