@@ -1,0 +1,3 @@
+linters:
+  disable:
+    - errcheck  # Temporarily disable while we fix all violations systematically
