@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hk9890/ai-config-manager/pkg/repo"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/spf13/cobra"
+
+	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
 // parseResourceArg parses a resource argument in the format "type/name"
@@ -290,4 +292,32 @@ func completeToolNames(cmd *cobra.Command, args []string, toComplete string) ([]
 // completeFormatFlag provides completion for --format flag values
 func completeFormatFlag(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return []string{"table", "json", "yaml"}, cobra.ShellCompDirectiveNoFileComp
+}
+
+// completeSourceNames provides completion for source names from ai.repo.yaml
+func completeSourceNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	manager, err := repo.NewManager()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	// Load manifest
+	manifest, err := repomanifest.Load(manager.GetRepoPath())
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+
+	// Extract source names
+	var names []string
+	for _, source := range manifest.Sources {
+		if strings.HasPrefix(source.Name, toComplete) {
+			names = append(names, source.Name)
+		}
+	}
+
+	return names, cobra.ShellCompDirectiveNoFileComp
 }

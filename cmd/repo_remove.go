@@ -54,8 +54,9 @@ Examples:
 
   # Remove source but keep resources
   aimgr repo remove my-source --keep-resources`,
-	Args: cobra.ExactArgs(1),
-	RunE: runRemove,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeSourceNames,
+	RunE:              runRemove,
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
