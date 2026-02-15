@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
@@ -682,4 +684,73 @@ func TestRunSync_PreservesManifest(t *testing.T) {
 // Filters are per-source at add time, not at sync time
 func TestRunSync_WithFilter(t *testing.T) {
 	t.Skip("Sync does not support filtering - filters are applied at 'repo add' time, not sync time")
+}
+
+// TestRunSync_MetadataCommitted verifies that metadata changes are committed to git
+// This is a regression test for bug ai-config-manager-x7k
+func TestRunSync_MetadataCommitted(t *testing.T) {
+	source1 := createTestSource(t)
+
+	// Create manifest with one source
+	sources := []*repomanifest.Source{
+		{
+			Name: "test-source-1",
+			Path: source1,
+		},
+	}
+	repoPath, cleanup := setupTestManifest(t, sources)
+	defer cleanup()
+
+	// Initialize as git repository
+	manager, err := repo.NewManager()
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	if err := manager.Init(); err != nil {
+		t.Fatalf("failed to initialize git repo: %v", err)
+	}
+
+	// Run sync command
+	err = runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("sync command failed: %v", err)
+	}
+
+	// Verify git status is clean (bug fix verification)
+	cmd := exec.Command("git", "-C", repoPath, "status", "--porcelain")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get git status: %v", err)
+	}
+
+	status := string(output)
+	if status != "" {
+		t.Errorf("Expected clean working tree after repo sync, but got uncommitted changes:\n%s", status)
+		t.Error("This indicates metadata changes were not committed (bug ai-config-manager-x7k)")
+	}
+
+	// Verify we have a commit for metadata update
+	cmd = exec.Command("git", "-C", repoPath, "log", "--oneline")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get git log: %v", err)
+	}
+
+	logOutput := string(output)
+	expectedCommitMsg := "aimgr: update sync timestamps"
+	if !contains(logOutput, expectedCommitMsg) {
+		t.Errorf("Expected commit message %q not found in git log:\n%s", expectedCommitMsg, logOutput)
+	}
+
+	// Verify the commit contains .metadata/sources.json
+	cmd = exec.Command("git", "-C", repoPath, "show", "--stat", "--oneline", "HEAD")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to show latest commit: %v", err)
+	}
+
+	commitShow := string(output)
+	if !contains(commitShow, ".metadata/sources.json") {
+		t.Error("Metadata commit should include .metadata/sources.json")
+	}
 }

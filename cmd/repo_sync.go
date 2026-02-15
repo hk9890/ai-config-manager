@@ -247,6 +247,12 @@ func runSync(cmd *cobra.Command, args []string) error {
 		if err := metadata.Save(manager.GetRepoPath()); err != nil {
 			// Don't fail, just warn
 			fmt.Printf("⚠ Warning: Failed to save metadata: %v\n", err)
+		} else {
+			// Commit metadata changes to git
+			if err := manager.CommitChanges("aimgr: update sync timestamps"); err != nil {
+				// Don't fail if commit fails (e.g., not a git repo)
+				fmt.Printf("⚠ Warning: Failed to commit metadata: %v\n", err)
+			}
 		}
 	}
 
