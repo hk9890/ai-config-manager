@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/install"
+	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -17,6 +18,7 @@ import (
 var (
 	uninstallProjectPathFlag string
 	uninstallForceFlag       bool
+	uninstallNoSaveFlag      bool
 )
 
 // uninstallResult tracks the result of uninstalling a single resource
@@ -31,66 +33,40 @@ type uninstallResult struct {
 
 // uninstallCmd represents the uninstall command
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall [resource]...",
-	Short: "Uninstall resources from a project",
-	Long: `Uninstall one or more resources (commands, skills, or agents) from a project.
+	Use:   "uninstall <resource> [<resource>...]",
+	Short: "Uninstall a resource from the current project",
+	Long: `Uninstall commands, skills, or agents from the current project.
 
-If no resources are specified, uninstalls all resources that are currently installed
-(all symlinks pointing to the aimgr repository).
+This command removes symlinks for the specified resources and updates
+ai.package.yaml to remove the resource entries (unless --no-save is used).
 
-Resources are specified using the format 'type/name':
-  - command/name (or commands/name)
-  - skill/name (or skills/name)
-  - agent/name (or agents/name)
-
-
-Pattern matching:
-  - Use * to match any sequence of characters
-  - Use ? to match any single character
-  - Use [abc] to match any character in the set
-  - Use {a,b} to match alternatives
-  - Patterns are expanded by scanning installed resources in the project
-
-Safety:
-  - Only removes symlinks that point to the aimgr repository
-  - Skips non-symlinks with a warning
-  - Skips symlinks pointing to other locations with a warning
-
-Multi-tool behavior:
-  - Automatically detects all tool directories (.claude, .opencode, .github/skills)
-  - Removes resource from ALL detected tool directories
-  - Shows summary of what was removed from where
+You must specify at least one resource to uninstall. To remove all installed
+resources, use 'aimgr clean' instead.
 
 Examples:
-  # Uninstall all installed resources
-  aimgr uninstall
-
-  # Uninstall a single skill
-  aimgr uninstall skill/pdf-processing
-
-  # Uninstall multiple resources at once
-  aimgr uninstall skill/foo skill/bar command/test agent/my-agent
-
-  # Uninstall all skills
-  aimgr uninstall "skill/*"
-
-  # Uninstall all test resources (any type)
-  aimgr uninstall "*test*"
-
-  # Uninstall skills starting with "pdf"
-  aimgr uninstall "skill/pdf*"
-
-  # Uninstall multiple patterns
-  aimgr uninstall "skill/pdf*" "command/test*"
-
-  # Uninstall from a specific project
-  aimgr uninstall skill/foo --project-path ~/my-project
-
-  # Force uninstall (placeholder for future confirmation prompts)
-  aimgr uninstall command/review --force`,
+  aimgr uninstall skill/pdf-processing       # Remove skill and update manifest
+  aimgr uninstall command/test               # Remove command and update manifest
+  aimgr uninstall skill/foo --no-save        # Remove symlinks but keep in manifest
+  aimgr uninstall "skill/*"                  # Remove all skills using pattern
+  aimgr clean                                # Remove ALL resources (see 'aimgr clean --help')
+`,
 	Args:              cobra.ArbitraryArgs, // Allow 0 or more args
 	ValidArgsFunction: completeResourceArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Require at least one resource argument
+		if len(args) == 0 {
+			fmt.Fprintln(os.Stderr, "Error: at least one resource must be specified")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "To remove all installed resources, use:")
+			fmt.Fprintln(os.Stderr, "  aimgr clean")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "Examples:")
+			fmt.Fprintln(os.Stderr, "  aimgr uninstall skill/pdf-processing")
+			fmt.Fprintln(os.Stderr, "  aimgr uninstall command/test")
+			fmt.Fprintln(os.Stderr, "  aimgr uninstall \"skill/*\"")
+			return fmt.Errorf("resource argument required")
+		}
+
 		// Get project path (current directory or flag)
 		projectPath := uninstallProjectPathFlag
 		if projectPath == "" {
@@ -114,10 +90,8 @@ Examples:
 			return fmt.Errorf("failed to create installer: %w", err)
 		}
 
-		// Handle zero-arg uninstall (uninstall all)
-		if len(args) == 0 {
-			return uninstallAll(projectPath, repoPath, installer.GetTargetTools())
-		}
+		// Track resources to remove from manifest
+		var resourcesToRemove []string
 
 		// Check if uninstalling a package
 		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
@@ -158,6 +132,11 @@ Examples:
 		for _, arg := range expandedArgs {
 			result := processUninstall(arg, projectPath, repoPath, installer.GetTargetTools(), manager)
 			results = append(results, result)
+			// Collect successfully uninstalled resources
+			if result.success {
+				resourceID := fmt.Sprintf("%s/%s", result.resourceType, result.name)
+				resourcesToRemove = append(resourcesToRemove, resourceID)
+			}
 		}
 		// Print results
 		printUninstallSummary(results)
@@ -169,16 +148,38 @@ Examples:
 			}
 		}
 
+		// Update manifest if --no-save is not set (default: update manifest)
+		if !uninstallNoSaveFlag && len(resourcesToRemove) > 0 {
+			manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
+			mf, err := manifest.Load(manifestPath)
+			if err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "Warning: failed to load manifest: %v\n", err)
+			} else if mf != nil {
+				for _, res := range resourcesToRemove {
+					if err := mf.Remove(res); err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: failed to remove %s from manifest: %v\n", res, err)
+					} else {
+						fmt.Printf("Removed %s from %s\n", res, manifest.ManifestFileName)
+					}
+				}
+				if err := mf.Save(manifestPath); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to save manifest: %v\n", err)
+				}
+			}
+		}
+
 		return nil
 	},
 }
 
 // uninstallAll uninstalls all resources currently installed in the project
-func uninstallAll(projectPath string, repoPath string, targetTools []tools.Tool) error {
+// Returns a list of successfully uninstalled resource IDs (type/name format)
+func uninstallAll(projectPath string, repoPath string, targetTools []tools.Tool) ([]string, error) {
 	fmt.Println("Uninstalling all resources from project...")
 	fmt.Println()
 
 	var results []uninstallResult
+	var uninstalled []string
 
 	// Scan each tool directory
 	for _, tool := range targetTools {
@@ -203,17 +204,29 @@ func uninstallAll(projectPath string, repoPath string, targetTools []tools.Tool)
 		}
 	}
 
+	// Collect successfully uninstalled resources
+	seen := make(map[string]bool)
+	for _, result := range results {
+		if result.success {
+			resourceID := fmt.Sprintf("%s/%s", result.resourceType, result.name)
+			if !seen[resourceID] {
+				seen[resourceID] = true
+				uninstalled = append(uninstalled, resourceID)
+			}
+		}
+	}
+
 	// Print results
 	printUninstallSummary(results)
 
 	// Return error if any resource failed
 	for _, result := range results {
 		if !result.success && !result.skipped {
-			return fmt.Errorf("some resources failed to uninstall")
+			return uninstalled, fmt.Errorf("some resources failed to uninstall")
 		}
 	}
 
-	return nil
+	return uninstalled, nil
 }
 
 // uninstallAllFromDir scans a tool directory and uninstalls all symlinks pointing to the repo
@@ -302,6 +315,7 @@ func uninstallAllFromDir(projectPath, repoPath, toolDir string, resourceType res
 }
 
 // processUninstall processes uninstalling a single resource
+// Returns the uninstallResult which includes the resource type and name
 func processUninstall(arg string, projectPath string, repoPath string, targetTools []tools.Tool, manager *repo.Manager) uninstallResult {
 	// Parse resource argument
 	resourceType, name, err := parseResourceArg(arg)
@@ -480,6 +494,7 @@ func init() {
 
 	uninstallCmd.Flags().StringVar(&uninstallProjectPathFlag, "project-path", "", "Project directory path (default: current directory)")
 	uninstallCmd.Flags().BoolVarP(&uninstallForceFlag, "force", "f", false, "Force uninstall (placeholder for future use)")
+	uninstallCmd.Flags().BoolVar(&uninstallNoSaveFlag, "no-save", false, "Don't remove from ai.package.yaml")
 }
 
 // expandUninstallPattern finds installed resources matching a pattern

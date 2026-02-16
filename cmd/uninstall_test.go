@@ -593,7 +593,7 @@ func TestUninstallAll(t *testing.T) {
 	installSymlink(t, projectPath, repoPath, resource.Agent, "code-reviewer")
 
 	// Run uninstallAll
-	err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
+	_, err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("uninstallAll() failed: %v", err)
 	}
@@ -652,7 +652,7 @@ func TestUninstallAll_OnlyRemovesManagedSymlinks(t *testing.T) {
 	}
 
 	// Run uninstallAll
-	err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
+	_, err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("uninstallAll() failed: %v", err)
 	}
@@ -678,7 +678,7 @@ func TestUninstallAll_EmptyDirectory(t *testing.T) {
 	defer cleanup()
 
 	// Run uninstallAll on empty directories
-	err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
+	_, err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("uninstallAll() failed on empty directories: %v", err)
 	}
