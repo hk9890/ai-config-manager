@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
@@ -95,6 +96,70 @@ func DetectInstallTargets(projectPath string, defaultTools []tools.Tool) ([]tool
 	return defaultTools, nil
 }
 
+// ensureValidSymlink checks if a symlink exists and is valid.
+// If the symlink exists but points to a broken target or wrong repository, it removes the symlink.
+// Returns true if installation should proceed, false if valid symlink already exists.
+func ensureValidSymlink(symlinkPath string, expectedTarget string, repoPath string) (bool, error) {
+	// Check if symlink exists
+	linkInfo, err := os.Lstat(symlinkPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Doesn't exist, proceed with installation
+			return true, nil
+		}
+		return false, fmt.Errorf("failed to check symlink: %w", err)
+	}
+
+	// Verify it's a symlink
+	if linkInfo.Mode()&os.ModeSymlink == 0 {
+		// Not a symlink, but something exists at this path - skip to avoid overwriting
+		return false, nil
+	}
+
+	// Check if target exists
+	if _, err := os.Stat(symlinkPath); err != nil {
+		// Broken symlink - remove it so we can recreate
+		if err := os.Remove(symlinkPath); err != nil {
+			return false, fmt.Errorf("failed to remove broken symlink: %w", err)
+		}
+		return true, nil // Proceed with installation
+	}
+
+	// Symlink exists and target is valid - verify it points to correct repo
+	actualTarget, err := os.Readlink(symlinkPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read symlink target: %w", err)
+	}
+
+	// Resolve to absolute path for comparison
+	absActualTarget := actualTarget
+	if !filepath.IsAbs(actualTarget) {
+		absActualTarget = filepath.Join(filepath.Dir(symlinkPath), actualTarget)
+	}
+
+	// Check if target is within the expected repository
+	absRepoPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve repo path: %w", err)
+	}
+
+	// Compare the actual target with expected - if they don't match or wrong repo, recreate
+	if absActualTarget != expectedTarget {
+		// Check if it's just pointing to a different repo location
+		relPath, err := filepath.Rel(absRepoPath, absActualTarget)
+		if err != nil || strings.HasPrefix(relPath, "..") {
+			// Points to outside repo or different location - remove and recreate
+			if err := os.Remove(symlinkPath); err != nil {
+				return false, fmt.Errorf("failed to remove symlink pointing to wrong location: %w", err)
+			}
+			return true, nil // Proceed with installation
+		}
+	}
+
+	// Valid symlink pointing to correct location - skip installation
+	return false, nil
+}
+
 // InstallCommand installs a command resource by creating symlinks to target tools
 func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error {
 	// Get command from repo
@@ -127,9 +192,13 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 			return fmt.Errorf("failed to create directory for %s: %w", tool, err)
 		}
 
-		// Check if already installed
-		if _, err := os.Lstat(symlinkPath); err == nil {
-			// Already exists, skip this tool
+		// Check if valid symlink already exists (removes broken symlinks)
+		shouldInstall, err := ensureValidSymlink(symlinkPath, res.Path, repoManager.GetRepoPath())
+		if err != nil {
+			return fmt.Errorf("failed to check existing installation for %s: %w", tool, err)
+		}
+		if !shouldInstall {
+			// Valid symlink exists, skip this tool
 			continue
 		}
 
@@ -179,9 +248,13 @@ func (i *Installer) InstallSkill(name string, repoManager *repo.Manager) error {
 		// Symlink path
 		symlinkPath := filepath.Join(skillsDir, name)
 
-		// Check if already installed
-		if _, err := os.Lstat(symlinkPath); err == nil {
-			// Already exists, skip this tool
+		// Check if valid symlink already exists (removes broken symlinks)
+		shouldInstall, err := ensureValidSymlink(symlinkPath, res.Path, repoManager.GetRepoPath())
+		if err != nil {
+			return fmt.Errorf("failed to check existing installation for %s: %w", tool, err)
+		}
+		if !shouldInstall {
+			// Valid symlink exists, skip this tool
 			continue
 		}
 
@@ -231,9 +304,13 @@ func (i *Installer) InstallAgent(name string, repoManager *repo.Manager) error {
 		// Symlink path
 		symlinkPath := filepath.Join(agentsDir, filepath.Base(res.Path))
 
-		// Check if already installed
-		if _, err := os.Lstat(symlinkPath); err == nil {
-			// Already exists, skip this tool
+		// Check if valid symlink already exists (removes broken symlinks)
+		shouldInstall, err := ensureValidSymlink(symlinkPath, res.Path, repoManager.GetRepoPath())
+		if err != nil {
+			return fmt.Errorf("failed to check existing installation for %s: %w", tool, err)
+		}
+		if !shouldInstall {
+			// Valid symlink exists, skip this tool
 			continue
 		}
 
@@ -513,9 +590,13 @@ func (i *Installer) IsInstalled(name string, resourceType resource.ResourceType)
 			continue
 		}
 
-		// Verify it's a symlink
+		// Verify it's a symlink and check if target is valid
 		if info.Mode()&os.ModeSymlink != 0 {
-			return true
+			// Check if target exists (os.Stat follows symlinks)
+			if _, err := os.Stat(symlinkPath); err == nil {
+				return true // Valid symlink exists
+			}
+			// Broken symlink - not considered installed
 		}
 	}
 
