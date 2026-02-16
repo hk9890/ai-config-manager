@@ -109,6 +109,12 @@ func (m *Manager) GetLogger() *slog.Logger {
 // This is idempotent - safe to call multiple times.
 func (m *Manager) Init() error {
 	// Create main repo directory
+	if m.logger != nil {
+		m.logger.Debug("creating repo directory",
+			"path", m.repoPath,
+			"permissions", "0755",
+		)
+	}
 	if err := os.MkdirAll(m.repoPath, 0755); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to create repo directory",
@@ -121,6 +127,12 @@ func (m *Manager) Init() error {
 
 	// Create commands subdirectory
 	commandsPath := filepath.Join(m.repoPath, "commands")
+	if m.logger != nil {
+		m.logger.Debug("creating commands directory",
+			"path", commandsPath,
+			"permissions", "0755",
+		)
+	}
 	if err := os.MkdirAll(commandsPath, 0755); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to create commands directory",
@@ -133,6 +145,12 @@ func (m *Manager) Init() error {
 
 	// Create skills subdirectory
 	skillsPath := filepath.Join(m.repoPath, "skills")
+	if m.logger != nil {
+		m.logger.Debug("creating skills directory",
+			"path", skillsPath,
+			"permissions", "0755",
+		)
+	}
 	if err := os.MkdirAll(skillsPath, 0755); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to create skills directory",
@@ -145,6 +163,12 @@ func (m *Manager) Init() error {
 
 	// Create agents subdirectory
 	agentsPath := filepath.Join(m.repoPath, "agents")
+	if m.logger != nil {
+		m.logger.Debug("creating agents directory",
+			"path", agentsPath,
+			"permissions", "0755",
+		)
+	}
 	if err := os.MkdirAll(agentsPath, 0755); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to create agents directory",
@@ -157,6 +181,12 @@ func (m *Manager) Init() error {
 
 	// Create packages subdirectory
 	packagesPath := filepath.Join(m.repoPath, "packages")
+	if m.logger != nil {
+		m.logger.Debug("creating packages directory",
+			"path", packagesPath,
+			"permissions", "0755",
+		)
+	}
 	if err := os.MkdirAll(packagesPath, 0755); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to create packages directory",
@@ -403,10 +433,18 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 	destPath := m.GetPathForResource(res)
 
 	// Create parent directories if needed (for nested structure)
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+	parentDir := filepath.Dir(destPath)
+	if m.logger != nil {
+		m.logger.Debug("creating parent directories",
+			"path", parentDir,
+			"resource", res.Name,
+			"permissions", "0755",
+		)
+	}
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to create parent directories",
-				"path", filepath.Dir(destPath),
+				"path", parentDir,
 				"resource", res.Name,
 				"error", err.Error(),
 			)
@@ -438,6 +476,14 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 		}
 
 		// Create symlink
+		if m.logger != nil {
+			m.logger.Debug("creating symlink",
+				"resource", res.Name,
+				"type", "command",
+				"source", absSource,
+				"dest", destPath,
+			)
+		}
 		if err := os.Symlink(absSource, destPath); err != nil {
 			if m.logger != nil {
 				m.logger.Error("failed to create symlink",
@@ -452,7 +498,15 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 		}
 	} else {
 		// Copy the file (default)
-		if err := copyFile(sourcePath, destPath); err != nil {
+		if m.logger != nil {
+			m.logger.Debug("copying file",
+				"resource", res.Name,
+				"type", "command",
+				"source", sourcePath,
+				"dest", destPath,
+			)
+		}
+		if err := m.copyFile(sourcePath, destPath); err != nil {
 			if m.logger != nil {
 				m.logger.Error("failed to copy command",
 					"resource", res.Name,
@@ -481,6 +535,18 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 	if sourceName == "" {
 		sourceName = metadata.DeriveSourceName(sourceURL)
 	}
+
+	// DEBUG: Log metadata creation with source name
+	if m.logger != nil {
+		m.logger.Debug("creating command metadata",
+			"resource", res.Name,
+			"type", "command",
+			"source_name", sourceName,
+			"source_url", sourceURL,
+			"source_type", sourceType,
+		)
+	}
+
 	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to save metadata",
@@ -554,6 +620,14 @@ func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref str
 		}
 
 		// Create symlink to the entire directory
+		if m.logger != nil {
+			m.logger.Debug("creating symlink",
+				"resource", res.Name,
+				"type", "skill",
+				"source", absSource,
+				"dest", destPath,
+			)
+		}
 		if err := os.Symlink(absSource, destPath); err != nil {
 			if m.logger != nil {
 				m.logger.Error("failed to create symlink",
@@ -568,7 +642,15 @@ func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref str
 		}
 	} else {
 		// Copy the directory (default)
-		if err := copyDir(sourcePath, destPath); err != nil {
+		if m.logger != nil {
+			m.logger.Debug("copying directory",
+				"resource", res.Name,
+				"type", "skill",
+				"source", sourcePath,
+				"dest", destPath,
+			)
+		}
+		if err := m.copyDir(sourcePath, destPath); err != nil {
 			if m.logger != nil {
 				m.logger.Error("failed to copy skill",
 					"resource", res.Name,
@@ -597,6 +679,18 @@ func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref str
 	if sourceName == "" {
 		sourceName = metadata.DeriveSourceName(sourceURL)
 	}
+
+	// DEBUG: Log metadata creation with source name
+	if m.logger != nil {
+		m.logger.Debug("creating skill metadata",
+			"resource", res.Name,
+			"type", "skill",
+			"source_name", sourceName,
+			"source_url", sourceURL,
+			"source_type", sourceType,
+		)
+	}
+
 	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to save metadata",
@@ -654,16 +748,55 @@ func (m *Manager) addAgentWithOptions(sourcePath, sourceURL, sourceType, ref str
 		// Ensure source is absolute path
 		absSource, err := filepath.Abs(sourcePath)
 		if err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to get absolute path",
+					"source", sourcePath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to get absolute path: %w", err)
 		}
 
 		// Create symlink
+		if m.logger != nil {
+			m.logger.Debug("creating symlink",
+				"resource", res.Name,
+				"type", "agent",
+				"source", absSource,
+				"dest", destPath,
+			)
+		}
 		if err := os.Symlink(absSource, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create symlink",
+					"resource", res.Name,
+					"type", "agent",
+					"source", absSource,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to create symlink: %w", err)
 		}
 	} else {
 		// Copy the file (default)
-		if err := copyFile(sourcePath, destPath); err != nil {
+		if m.logger != nil {
+			m.logger.Debug("copying file",
+				"resource", res.Name,
+				"type", "agent",
+				"source", sourcePath,
+				"dest", destPath,
+			)
+		}
+		if err := m.copyFile(sourcePath, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to copy agent",
+					"resource", res.Name,
+					"source", sourcePath,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
 			return fmt.Errorf("failed to copy agent: %w", err)
 		}
 	}
@@ -684,6 +817,18 @@ func (m *Manager) addAgentWithOptions(sourcePath, sourceURL, sourceType, ref str
 	if sourceName == "" {
 		sourceName = metadata.DeriveSourceName(sourceURL)
 	}
+
+	// DEBUG: Log metadata creation with source name
+	if m.logger != nil {
+		m.logger.Debug("creating agent metadata",
+			"resource", res.Name,
+			"type", "agent",
+			"source_name", sourceName,
+			"source_url", sourceURL,
+			"source_type", sourceType,
+		)
+	}
+
 	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
 		return fmt.Errorf("failed to save metadata: %w", err)
 	}
@@ -710,6 +855,15 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 		return err
 	}
 
+	// DEBUG: Log package loading
+	if m.logger != nil {
+		m.logger.Debug("loading package",
+			"source", sourcePath,
+			"source_url", sourceURL,
+			"source_type", sourceType,
+		)
+	}
+
 	// Validate and load the package
 	pkg, err := resource.LoadPackage(sourcePath)
 	if err != nil {
@@ -720,6 +874,16 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 			)
 		}
 		return fmt.Errorf("failed to load package: %w", err)
+	}
+
+	// DEBUG: Log package metadata
+	if m.logger != nil {
+		m.logger.Debug("package loaded",
+			"name", pkg.Name,
+			"description", pkg.Description,
+			"resource_count", len(pkg.Resources),
+			"resources", pkg.Resources,
+		)
 	}
 
 	// Get destination path
@@ -749,6 +913,13 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 		}
 
 		// Create symlink
+		if m.logger != nil {
+			m.logger.Debug("creating symlink",
+				"package", pkg.Name,
+				"source", absSource,
+				"dest", destPath,
+			)
+		}
 		if err := os.Symlink(absSource, destPath); err != nil {
 			if m.logger != nil {
 				m.logger.Error("failed to create symlink",
@@ -762,7 +933,14 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 		}
 	} else {
 		// Copy the file (default)
-		if err := copyFile(sourcePath, destPath); err != nil {
+		if m.logger != nil {
+			m.logger.Debug("copying file",
+				"package", pkg.Name,
+				"source", sourcePath,
+				"dest", destPath,
+			)
+		}
+		if err := m.copyFile(sourcePath, destPath); err != nil {
 			if m.logger != nil {
 				m.logger.Error("failed to copy package",
 					"package", pkg.Name,
@@ -782,6 +960,18 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 	if sourceName == "" {
 		sourceName = metadata.DeriveSourceName(sourceURL)
 	}
+
+	// DEBUG: Log metadata creation with source name
+	if m.logger != nil {
+		m.logger.Debug("creating package metadata",
+			"resource", pkg.Name,
+			"type", "package",
+			"source_name", sourceName,
+			"source_url", sourceURL,
+			"source_type", sourceType,
+		)
+	}
+
 	pkgMeta := &metadata.PackageMetadata{
 		Name:          pkg.Name,
 		SourceType:    sourceType,
@@ -811,11 +1001,26 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 func (m *Manager) validatePackageResources(pkg *resource.Package) []string {
 	var missing []string
 
+	// DEBUG: Log package validation start
+	if m.logger != nil {
+		m.logger.Debug("validating package resources",
+			"package", pkg.Name,
+			"resource_count", len(pkg.Resources),
+		)
+	}
+
 	for _, ref := range pkg.Resources {
 		// Parse the resource reference
 		resType, resName, err := resource.ParseResourceReference(ref)
 		if err != nil {
 			// Invalid reference format
+			if m.logger != nil {
+				m.logger.Error("invalid resource reference format",
+					"package", pkg.Name,
+					"reference", ref,
+					"error", err.Error(),
+				)
+			}
 			missing = append(missing, ref)
 			continue
 		}
@@ -823,8 +1028,39 @@ func (m *Manager) validatePackageResources(pkg *resource.Package) []string {
 		// Check if resource exists
 		resPath := m.GetPath(resName, resType)
 		if _, err := os.Stat(resPath); os.IsNotExist(err) {
+			// DEBUG: Log missing resource
+			if m.logger != nil {
+				m.logger.Debug("package resource not found",
+					"package", pkg.Name,
+					"reference", ref,
+					"type", string(resType),
+					"name", resName,
+					"expected_path", resPath,
+				)
+			}
 			missing = append(missing, ref)
+		} else {
+			// DEBUG: Log resource found
+			if m.logger != nil {
+				m.logger.Debug("package resource found",
+					"package", pkg.Name,
+					"reference", ref,
+					"type", string(resType),
+					"name", resName,
+					"path", resPath,
+				)
+			}
 		}
+	}
+
+	// DEBUG: Log validation summary
+	if m.logger != nil {
+		m.logger.Debug("package validation complete",
+			"package", pkg.Name,
+			"total", len(pkg.Resources),
+			"missing", len(missing),
+			"missing_list", missing,
+		)
 	}
 
 	return missing
@@ -1106,6 +1342,13 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 	}
 
 	// Remove the resource
+	if m.logger != nil {
+		m.logger.Debug("removing resource file/directory",
+			"resource", name,
+			"type", string(resourceType),
+			"path", path,
+		)
+	}
 	if err := os.RemoveAll(path); err != nil {
 		if m.logger != nil {
 			m.logger.Error("failed to remove resource",
@@ -1121,6 +1364,13 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 	// Remove metadata file
 	metadataPath := metadata.GetMetadataPath(name, resourceType, m.repoPath)
 	if _, err := os.Stat(metadataPath); err == nil {
+		if m.logger != nil {
+			m.logger.Debug("removing metadata file",
+				"resource", name,
+				"type", string(resourceType),
+				"path", metadataPath,
+			)
+		}
 		if err := os.Remove(metadataPath); err != nil {
 			if m.logger != nil {
 				m.logger.Error("failed to remove metadata",
@@ -1142,6 +1392,68 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 	}
 
 	return nil
+}
+
+// HasSource checks if a resource belongs to the specified source name.
+// This method wraps metadata.HasSource with DEBUG logging to help diagnose
+// source name mismatches during orphan detection.
+func (m *Manager) HasSource(name string, resourceType resource.ResourceType, sourceName string) bool {
+	// Load metadata to check source
+	meta, err := metadata.Load(name, resourceType, m.repoPath)
+
+	// DEBUG: Log each metadata check
+	if m.logger != nil {
+		if err != nil {
+			m.logger.Debug("checking metadata - load failed",
+				"resource", name,
+				"type", string(resourceType),
+				"expected_source", sourceName,
+				"error", err.Error(),
+			)
+			return false
+		}
+
+		match := meta.SourceName != "" && meta.SourceName == sourceName
+
+		m.logger.Debug("checking metadata",
+			"resource", name,
+			"type", string(resourceType),
+			"metadata_source", meta.SourceName,
+			"expected_source", sourceName,
+			"match", match,
+		)
+
+		// Log mismatch explanation
+		if !match {
+			if meta.SourceName == "" {
+				m.logger.Debug("resource not removed - no source name in metadata",
+					"resource", name,
+					"type", string(resourceType),
+					"expected_source", sourceName,
+					"reason", "legacy resource without source tracking",
+				)
+			} else {
+				m.logger.Debug("resource not removed - source mismatch",
+					"resource", name,
+					"type", string(resourceType),
+					"expected_source", sourceName,
+					"actual_source", meta.SourceName,
+					"reason", "source names do not match",
+				)
+			}
+		} else {
+			m.logger.Debug("resource will be removed",
+				"resource", name,
+				"type", string(resourceType),
+				"source_name", sourceName,
+			)
+		}
+
+		return match
+	}
+
+	// Fallback to simple check without logging
+	return meta.SourceName != "" && meta.SourceName == sourceName
 }
 
 // GetPath returns the full path to a resource in the repository
@@ -1264,42 +1576,129 @@ func (m *Manager) CommitChanges(message string) error {
 }
 
 // copyFile copies a single file from src to dst
-func copyFile(src, dst string) error {
+func (m *Manager) copyFile(src, dst string) error {
+	// Get source file info for logging
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to stat source file",
+				"source", src,
+				"error", err.Error(),
+			)
+		}
+		return err
+	}
+
+	if m.logger != nil {
+		m.logger.Debug("copying file",
+			"source", src,
+			"dest", dst,
+			"size", srcInfo.Size(),
+			"permissions", srcInfo.Mode(),
+		)
+	}
+
 	sourceFile, err := os.Open(src)
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to open source file",
+				"source", src,
+				"error", err.Error(),
+			)
+		}
 		return err
 	}
 	defer sourceFile.Close()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to create destination file",
+				"dest", dst,
+				"error", err.Error(),
+			)
+		}
 		return err
 	}
 	defer destFile.Close()
 
-	if _, err := io.Copy(destFile, sourceFile); err != nil {
+	bytesWritten, err := io.Copy(destFile, sourceFile)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to copy file contents",
+				"source", src,
+				"dest", dst,
+				"bytes_written", bytesWritten,
+				"error", err.Error(),
+			)
+		}
 		return err
 	}
 
-	return destFile.Sync()
+	if err := destFile.Sync(); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to sync destination file",
+				"dest", dst,
+				"error", err.Error(),
+			)
+		}
+		return err
+	}
+
+	if m.logger != nil {
+		m.logger.Debug("file copied successfully",
+			"source", src,
+			"dest", dst,
+			"bytes", bytesWritten,
+		)
+	}
+
+	return nil
 }
 
 // copyDir recursively copies a directory from src to dst
-func copyDir(src, dst string) error {
+func (m *Manager) copyDir(src, dst string) error {
 	// Get source directory info
 	srcInfo, err := os.Stat(src)
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to stat source directory",
+				"source", src,
+				"error", err.Error(),
+			)
+		}
 		return err
+	}
+
+	if m.logger != nil {
+		m.logger.Debug("copying directory",
+			"source", src,
+			"dest", dst,
+			"permissions", srcInfo.Mode(),
+		)
 	}
 
 	// Create destination directory
 	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to create destination directory",
+				"dest", dst,
+				"permissions", srcInfo.Mode(),
+				"error", err.Error(),
+			)
+		}
 		return err
 	}
 
 	// Read source directory
 	entries, err := os.ReadDir(src)
 	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to read source directory",
+				"source", src,
+				"error", err.Error(),
+			)
+		}
 		return err
 	}
 
@@ -1312,20 +1711,34 @@ func copyDir(src, dst string) error {
 		info, err := os.Stat(srcPath)
 		if err != nil {
 			// Skip entries we can't stat
+			if m.logger != nil {
+				m.logger.Debug("skipping entry that cannot be stat'd",
+					"path", srcPath,
+					"error", err.Error(),
+				)
+			}
 			continue
 		}
 
 		if info.IsDir() {
 			// Recursively copy subdirectory
-			if err := copyDir(srcPath, dstPath); err != nil {
+			if err := m.copyDir(srcPath, dstPath); err != nil {
 				return err
 			}
 		} else {
 			// Copy file
-			if err := copyFile(srcPath, dstPath); err != nil {
+			if err := m.copyFile(srcPath, dstPath); err != nil {
 				return err
 			}
 		}
+	}
+
+	if m.logger != nil {
+		m.logger.Debug("directory copied successfully",
+			"source", src,
+			"dest", dst,
+			"entries", len(entries),
+		)
 	}
 
 	return nil
@@ -1709,7 +2122,7 @@ func (m *Manager) ValidatePackageResources(pkg *resource.Package) []string {
 
 // GetPackage loads a package by name from the repository
 func (m *Manager) GetPackage(name string) (*resource.Package, error) {
-	// Log the get package operation
+	// DEBUG: Log get package operation
 	if m.logger != nil {
 		m.logger.Debug("repo get package",
 			"package", name,
@@ -1717,7 +2130,29 @@ func (m *Manager) GetPackage(name string) (*resource.Package, error) {
 	}
 
 	pkgPath := resource.GetPackagePath(name, m.repoPath)
-	return resource.LoadPackage(pkgPath)
+	pkg, err := resource.LoadPackage(pkgPath)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load package",
+				"package", name,
+				"path", pkgPath,
+				"error", err.Error(),
+			)
+		}
+		return nil, err
+	}
+
+	// DEBUG: Log package details after successful load
+	if m.logger != nil {
+		m.logger.Debug("package retrieved",
+			"name", pkg.Name,
+			"description", pkg.Description,
+			"resource_count", len(pkg.Resources),
+			"resources", pkg.Resources,
+		)
+	}
+
+	return pkg, nil
 }
 
 // Drop removes the entire repository directory and recreates the empty structure.
@@ -1727,7 +2162,18 @@ func (m *Manager) GetPackage(name string) (*resource.Package, error) {
 // is ready to accept new sources via 'repo add' or 'repo sync'.
 func (m *Manager) Drop() error {
 	// Remove entire repo directory
+	if m.logger != nil {
+		m.logger.Debug("removing entire repository directory",
+			"path", m.repoPath,
+		)
+	}
 	if err := os.RemoveAll(m.repoPath); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to remove repository",
+				"path", m.repoPath,
+				"error", err.Error(),
+			)
+		}
 		return fmt.Errorf("failed to remove repository: %w", err)
 	}
 

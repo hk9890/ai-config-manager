@@ -140,12 +140,22 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+// Package-level logger for workspace operations
+var logger *slog.Logger
+
+// SetLogger sets the logger for the workspace package.
+// This should be called by the application during initialization.
+func SetLogger(l *slog.Logger) {
+	logger = l
+}
 
 // Manager manages the workspace cache for Git repositories.
 // The workspace cache stores cloned Git repositories to avoid redundant clones
@@ -225,8 +235,21 @@ func (m *Manager) GetOrClone(url string, ref string) (string, error) {
 	// Get cache path
 	cachePath := m.getCachePath(url)
 
+	// Log cache lookup
+	if logger != nil {
+		logger.Debug("cache lookup",
+			"url", url,
+			"ref", ref,
+			"cache_path", cachePath,
+		)
+	}
+
 	// Check if cache exists and is valid
 	if m.isValidCache(cachePath) {
+		// Log cache hit
+		if logger != nil {
+			logger.Debug("cache hit", "cache_path", cachePath)
+		}
 		// Cache exists - ensure correct ref is checked out (only if ref is specified)
 		if ref != "" {
 			if err := m.checkoutRef(cachePath, ref); err != nil {
@@ -265,6 +288,11 @@ func (m *Manager) GetOrClone(url string, ref string) (string, error) {
 			}
 			return cachePath, nil
 		}
+	}
+
+	// Log cache miss
+	if logger != nil {
+		logger.Debug("cache miss", "cache_path", cachePath)
 	}
 
 	// Cache doesn't exist or was removed due to corruption - clone it
@@ -309,6 +337,15 @@ func (m *Manager) Update(url string, ref string) error {
 
 	// Get cache path
 	cachePath := m.getCachePath(url)
+
+	// Log update operation
+	if logger != nil {
+		logger.Debug("updating cached repository",
+			"url", url,
+			"ref", ref,
+			"cache_path", cachePath,
+		)
+	}
 
 	// Verify cache exists
 	if !m.isValidCache(cachePath) {
@@ -546,14 +583,58 @@ func (m *Manager) Remove(url string) error {
 	return nil
 }
 
+// runGitCommand executes a git command with comprehensive logging.
+// Logs command execution, output, and failures at appropriate levels.
+func runGitCommand(workDir string, args ...string) (string, error) {
+	// Log command execution at DEBUG level
+	if logger != nil {
+		logger.Debug("executing git command",
+			"command", fmt.Sprintf("git %s", strings.Join(args, " ")),
+			"working_dir", workDir,
+		)
+	}
+
+	// Build command
+	cmd := exec.Command("git", args...)
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
+
+	// Execute command and capture combined output
+	output, err := cmd.CombinedOutput()
+	outputStr := strings.TrimSpace(string(output))
+
+	if err != nil {
+		// Log failure at ERROR level with full context
+		if logger != nil {
+			logger.Error("git command failed",
+				"command", fmt.Sprintf("git %s", strings.Join(args, " ")),
+				"working_dir", workDir,
+				"error", err.Error(),
+				"output", outputStr,
+			)
+		}
+		return outputStr, fmt.Errorf("git command failed: %w\nOutput: %s", err, outputStr)
+	}
+
+	// Log success output at DEBUG level
+	if logger != nil && outputStr != "" {
+		logger.Debug("git command output",
+			"command", fmt.Sprintf("git %s", strings.Join(args, " ")),
+			"output", outputStr,
+		)
+	}
+
+	return outputStr, nil
+}
+
 // getRemoteURL retrieves the remote URL from a Git repository.
 func (m *Manager) getRemoteURL(cachePath string) (string, error) {
-	cmd := exec.Command("git", "-C", cachePath, "config", "--get", "remote.origin.url")
-	output, err := cmd.Output()
+	output, err := runGitCommand(cachePath, "config", "--get", "remote.origin.url")
 	if err != nil {
 		return "", fmt.Errorf("failed to get remote URL: %w", err)
 	}
-	return strings.TrimSpace(string(output)), nil
+	return output, nil
 }
 
 // normalizeURL normalizes a Git URL for consistent hashing.
@@ -697,6 +778,15 @@ func (m *Manager) updateMetadataEntry(url string, ref string, updateType string)
 // cloneRepo clones a Git repository to the specified cache path.
 // This does a full clone (not shallow) to support ref switching.
 func (m *Manager) cloneRepo(url string, cachePath string, ref string) error {
+	// Log clone operation
+	if logger != nil {
+		logger.Debug("cloning repository",
+			"url", url,
+			"ref", ref,
+			"cache_path", cachePath,
+		)
+	}
+
 	// Build git clone command (full clone for ref switching)
 	args := []string{"clone"}
 
@@ -707,13 +797,43 @@ func (m *Manager) cloneRepo(url string, cachePath string, ref string) error {
 
 	args = append(args, url, cachePath)
 
-	// Execute git clone
+	// Execute git clone (using parent directory as workdir since target doesn't exist yet)
 	cmd := exec.Command("git", args...)
 	output, err := cmd.CombinedOutput()
+
+	// Manual logging since we can't use runGitCommand (cachePath doesn't exist yet)
+	if logger != nil {
+		logger.Debug("executing git command",
+			"command", fmt.Sprintf("git %s", strings.Join(args, " ")),
+			"working_dir", "",
+		)
+	}
+
 	if err != nil {
+		// Log failure
+		if logger != nil {
+			logger.Error("git clone failed",
+				"command", fmt.Sprintf("git %s", strings.Join(args, " ")),
+				"url", url,
+				"cache_path", cachePath,
+				"error", err.Error(),
+				"output", strings.TrimSpace(string(output)),
+			)
+		}
 		// Clean up partial clone on failure
 		_ = os.RemoveAll(cachePath)
 		return fmt.Errorf("git clone failed: %w\nOutput: %s", err, string(output))
+	}
+
+	// Log success output
+	if logger != nil {
+		outputStr := strings.TrimSpace(string(output))
+		if outputStr != "" {
+			logger.Debug("git command output",
+				"command", "clone",
+				"output", outputStr,
+			)
+		}
 	}
 
 	return nil
@@ -721,51 +841,90 @@ func (m *Manager) cloneRepo(url string, cachePath string, ref string) error {
 
 // checkoutRef checks out the specified ref in a Git repository.
 func (m *Manager) checkoutRef(cachePath string, ref string) error {
-	cmd := exec.Command("git", "-C", cachePath, "checkout", ref)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git checkout failed: %w\nOutput: %s", err, string(output))
+	// Get current ref for logging
+	var currentRef string
+	if output, err := runGitCommand(cachePath, "rev-parse", "--abbrev-ref", "HEAD"); err == nil {
+		currentRef = output
 	}
+
+	// Check if ref is a branch
+	isBranch := false
+	if _, err := runGitCommand(cachePath, "show-ref", "--verify", "--quiet", fmt.Sprintf("refs/heads/%s", ref)); err == nil {
+		isBranch = true
+	} else if _, err := runGitCommand(cachePath, "show-ref", "--verify", "--quiet", fmt.Sprintf("refs/remotes/origin/%s", ref)); err == nil {
+		isBranch = true
+	}
+
+	// Log checkout operation
+	if logger != nil {
+		logger.Debug("checking out ref",
+			"cache_path", cachePath,
+			"current_ref", currentRef,
+			"target_ref", ref,
+			"is_branch", isBranch,
+		)
+	}
+
+	// Execute checkout
+	_, err := runGitCommand(cachePath, "checkout", ref)
+	if err != nil {
+		return fmt.Errorf("git checkout failed: %w", err)
+	}
+
 	return nil
 }
 
 // fetchRepo fetches the latest refs from the remote repository.
 func (m *Manager) fetchRepo(cachePath string) error {
-	cmd := exec.Command("git", "-C", cachePath, "fetch", "--all")
-	output, err := cmd.CombinedOutput()
+	if logger != nil {
+		logger.Debug("fetching from remote", "cache_path", cachePath)
+	}
+
+	_, err := runGitCommand(cachePath, "fetch", "--all")
 	if err != nil {
-		return fmt.Errorf("git fetch failed: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("git fetch failed: %w", err)
 	}
 	return nil
 }
 
 // hasUncommittedChanges checks if the repository has uncommitted changes.
 func (m *Manager) hasUncommittedChanges(cachePath string) (bool, error) {
-	cmd := exec.Command("git", "-C", cachePath, "status", "--porcelain")
-	output, err := cmd.CombinedOutput()
+	output, err := runGitCommand(cachePath, "status", "--porcelain")
 	if err != nil {
-		return false, fmt.Errorf("git status failed: %w\nOutput: %s", err, string(output))
+		return false, fmt.Errorf("git status failed: %w", err)
 	}
 	// If output is non-empty, there are uncommitted changes
-	return len(strings.TrimSpace(string(output))) > 0, nil
+	hasChanges := len(output) > 0
+
+	if logger != nil && hasChanges {
+		logger.Debug("uncommitted changes detected", "cache_path", cachePath)
+	}
+
+	return hasChanges, nil
 }
 
 // stashChanges stashes uncommitted changes in the repository.
 func (m *Manager) stashChanges(cachePath string) error {
-	cmd := exec.Command("git", "-C", cachePath, "stash", "push", "-m", "workspace cache auto-stash")
-	output, err := cmd.CombinedOutput()
+	if logger != nil {
+		logger.Debug("stashing uncommitted changes", "cache_path", cachePath)
+	}
+
+	_, err := runGitCommand(cachePath, "stash", "push", "-m", "workspace cache auto-stash")
 	if err != nil {
-		return fmt.Errorf("git stash failed: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("git stash failed: %w", err)
 	}
 	return nil
 }
 
 // popStash restores stashed changes in the repository.
 func (m *Manager) popStash(cachePath string) error {
-	cmd := exec.Command("git", "-C", cachePath, "stash", "pop")
-	output, err := cmd.CombinedOutput()
+	if logger != nil {
+		logger.Debug("restoring stashed changes", "cache_path", cachePath)
+	}
+
+	_, err := runGitCommand(cachePath, "stash", "pop")
 	if err != nil {
-		return fmt.Errorf("git stash pop failed: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("git stash pop failed: %w", err)
 	}
 	return nil
 }
@@ -777,15 +936,24 @@ func (m *Manager) resetToOrigin(cachePath string, ref string) error {
 	checkBranchCmd := exec.Command("git", "-C", cachePath, "show-ref", "--verify", "--quiet", fmt.Sprintf("refs/remotes/origin/%s", ref))
 	isBranch := checkBranchCmd.Run() == nil
 
+	if logger != nil {
+		logger.Debug("resetting to origin",
+			"cache_path", cachePath,
+			"ref", ref,
+			"is_branch", isBranch,
+		)
+	}
+
 	if isBranch {
 		// For branches, checkout and reset to origin
 		if err := m.checkoutRef(cachePath, ref); err != nil {
 			return err
 		}
-		cmd := exec.Command("git", "-C", cachePath, "reset", "--hard", fmt.Sprintf("origin/%s", ref))
-		output, err := cmd.CombinedOutput()
+
+		// Use runGitCommand for consistent logging
+		_, err := runGitCommand(cachePath, "reset", "--hard", fmt.Sprintf("origin/%s", ref))
 		if err != nil {
-			return fmt.Errorf("git reset failed: %w\nOutput: %s", err, string(output))
+			return fmt.Errorf("git reset failed: %w", err)
 		}
 	} else {
 		// For tags/commits, just checkout
@@ -799,10 +967,14 @@ func (m *Manager) resetToOrigin(cachePath string, ref string) error {
 
 // pullCurrentBranch pulls the latest changes for the currently checked out branch.
 func (m *Manager) pullCurrentBranch(cachePath string) error {
-	cmd := exec.Command("git", "-C", cachePath, "pull")
-	output, err := cmd.CombinedOutput()
+	if logger != nil {
+		logger.Debug("pulling current branch", "cache_path", cachePath)
+	}
+
+	// Use runGitCommand for consistent logging
+	_, err := runGitCommand(cachePath, "pull")
 	if err != nil {
-		return fmt.Errorf("git pull failed: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("git pull failed: %w", err)
 	}
 	return nil
 }

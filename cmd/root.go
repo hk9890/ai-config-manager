@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hk9890/ai-config-manager/pkg/discovery"
 	"github.com/hk9890/ai-config-manager/pkg/logging"
 	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/version"
+	"github.com/hk9890/ai-config-manager/pkg/workspace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -66,11 +68,13 @@ func NewManagerWithLogLevel() (*repo.Manager, error) {
 	}
 	manager.SetLogLevel(level)
 
-	// Set logger for cmd and manifest packages
+	// Set logger for cmd, manifest, workspace, and discovery packages
 	repoLogger := manager.GetLogger()
 	if repoLogger != nil {
 		SetLogger(repoLogger)
 		manifest.SetLogger(repoLogger)
+		workspace.SetLogger(repoLogger)
+		discovery.SetLogger(repoLogger)
 	}
 
 	return manager, nil

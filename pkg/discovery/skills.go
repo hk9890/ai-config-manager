@@ -45,20 +45,42 @@ func DiscoverSkillsWithErrors(basePath string, subpath string) ([]*resource.Reso
 		searchRoot = filepath.Join(basePath, subpath)
 	}
 
+	// Log discovery start
+	if logger != nil {
+		logger.Debug("starting skill discovery",
+			"base_path", basePath,
+			"subpath", subpath,
+			"search_root", searchRoot)
+	}
+
 	// Check if searchRoot exists and is accessible
 	searchRootInfo, searchRootErr := os.Stat(searchRoot)
 
 	// If searchRoot exists, check if it's a skill directory
 	if searchRootErr == nil && searchRootInfo.IsDir() {
 		if isSkillDir(searchRoot) {
+			if logger != nil {
+				logger.Debug("search root is a skill directory",
+					"path", searchRoot)
+			}
 			skill, err := resource.LoadSkill(searchRoot)
 			if err != nil {
 				// Collect error instead of silently failing
+				if logger != nil {
+					logger.Debug("failed to load skill from search root",
+						"path", searchRoot,
+						"error", err)
+				}
 				allErrors = append(allErrors, DiscoveryError{
 					Path:  searchRoot,
 					Error: err,
 				})
 			} else if skill.Name != "" && skill.Description != "" {
+				if logger != nil {
+					logger.Debug("skill discovery completed",
+						"skills_found", 1,
+						"skill_name", skill.Name)
+				}
 				return []*resource.Resource{skill}, allErrors, nil
 			}
 		}
@@ -104,9 +126,18 @@ func DiscoverSkillsWithErrors(basePath string, subpath string) ([]*resource.Reso
 	candidates := make(map[string]*resource.Resource) // Map by name for deduplication
 	for _, location := range priorityLocations {
 		locationPath := filepath.Join(searchRoot, location)
+		if logger != nil {
+			logger.Debug("searching priority location for skills",
+				"location", locationPath)
+		}
 		skills, errs := searchSkillsInDir(locationPath)
 		allErrors = append(allErrors, errs...)
 		if len(skills) > 0 {
+			if logger != nil {
+				logger.Debug("found skills in priority location",
+					"location", locationPath,
+					"count", len(skills))
+			}
 			for _, skill := range skills {
 				// First found wins (deduplication by name)
 				if _, exists := candidates[skill.Name]; !exists {
@@ -118,15 +149,33 @@ func DiscoverSkillsWithErrors(basePath string, subpath string) ([]*resource.Reso
 
 	// If we found skills, return them
 	if len(candidates) > 0 {
+		if logger != nil {
+			logger.Debug("skill discovery completed from priority locations",
+				"skills_found", len(candidates),
+				"errors", len(allErrors))
+		}
 		return mapToSlice(candidates), allErrors, nil
 	}
 
 	// Fall back to recursive search (max depth 5)
+	if logger != nil {
+		logger.Debug("no skills found in priority locations, falling back to recursive search",
+			"search_root", searchRoot)
+	}
 	recursiveSkills, recursiveErrs, err := recursiveSearchSkills(searchRoot, 0)
 	allErrors = append(allErrors, recursiveErrs...)
 	if err != nil {
 		// If recursive search fails, just return what we have
+		if logger != nil {
+			logger.Debug("recursive search failed",
+				"error", err)
+		}
 		return mapToSlice(candidates), allErrors, nil
+	}
+
+	if logger != nil {
+		logger.Debug("recursive search completed",
+			"skills_found", len(recursiveSkills))
 	}
 
 	for _, skill := range recursiveSkills {
@@ -135,7 +184,14 @@ func DiscoverSkillsWithErrors(basePath string, subpath string) ([]*resource.Reso
 		}
 	}
 
-	return mapToSlice(candidates), allErrors, nil
+	result := mapToSlice(candidates)
+	if logger != nil {
+		logger.Debug("skill discovery completed",
+			"total_skills", len(result),
+			"total_errors", len(allErrors))
+	}
+
+	return result, allErrors, nil
 }
 
 // isSkillDir checks if a directory contains a SKILL.md file
@@ -181,6 +237,11 @@ func searchSkillsInDir(dirPath string) ([]*resource.Resource, []DiscoveryError) 
 		skill, err := resource.LoadSkill(entryPath)
 		if err != nil {
 			// Collect error instead of silently skipping
+			if logger != nil {
+				logger.Debug("failed to load skill",
+					"path", entryPath,
+					"error", err)
+			}
 			errors = append(errors, DiscoveryError{
 				Path:  entryPath,
 				Error: err,
@@ -190,9 +251,18 @@ func searchSkillsInDir(dirPath string) ([]*resource.Resource, []DiscoveryError) 
 
 		// Skip if name or description is missing
 		if skill.Name == "" || skill.Description == "" {
+			if logger != nil {
+				logger.Debug("skipping skill with missing name or description",
+					"path", entryPath)
+			}
 			continue
 		}
 
+		if logger != nil {
+			logger.Debug("found skill",
+				"name", skill.Name,
+				"path", entryPath)
+		}
 		skills = append(skills, skill)
 	}
 
@@ -212,9 +282,20 @@ func recursiveSearchSkills(rootPath string, currentDepth int) ([]*resource.Resou
 		return skills, errors, nil
 	}
 
+	if logger != nil {
+		logger.Debug("recursive skill search",
+			"path", rootPath,
+			"depth", currentDepth)
+	}
+
 	// Read directory entries
 	entries, err := os.ReadDir(rootPath)
 	if err != nil {
+		if logger != nil {
+			logger.Error("failed to read directory during recursive search",
+				"path", rootPath,
+				"error", err)
+		}
 		return nil, errors, fmt.Errorf("failed to read directory: %w", err)
 	}
 

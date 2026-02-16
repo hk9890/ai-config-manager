@@ -19,9 +19,22 @@ func DiscoverPackages(basePath string, subpath string) ([]*resource.Package, err
 		searchPath = filepath.Join(basePath, subpath)
 	}
 
+	// Log discovery start
+	if logger != nil {
+		logger.Debug("starting package discovery",
+			"base_path", basePath,
+			"subpath", subpath,
+			"search_path", searchPath)
+	}
+
 	// Verify search path exists
 	searchPathInfo, err := os.Stat(searchPath)
 	if err != nil {
+		if logger != nil {
+			logger.Error("search path does not exist",
+				"path", searchPath,
+				"error", err)
+		}
 		return nil, fmt.Errorf("path does not exist: %w", err)
 	}
 
@@ -32,16 +45,34 @@ func DiscoverPackages(basePath string, subpath string) ([]*resource.Package, err
 	// Try priority locations first
 	packages, err := searchPriorityPackageLocations(searchPath)
 	if err == nil && len(packages) > 0 {
+		if logger != nil {
+			logger.Debug("package discovery completed from priority locations",
+				"packages_found", len(packages))
+		}
 		return deduplicatePackages(packages), nil
 	}
 
 	// Fall back to recursive search (max depth 5)
+	if logger != nil {
+		logger.Debug("no packages found in priority locations, falling back to recursive search",
+			"search_path", searchPath)
+	}
 	packages, err = recursiveSearchPackages(searchPath, 0)
 	if err != nil {
+		if logger != nil {
+			logger.Error("recursive search failed",
+				"error", err)
+		}
 		return nil, fmt.Errorf("failed to search for packages: %w", err)
 	}
 
-	return deduplicatePackages(packages), nil
+	dedupedPackages := deduplicatePackages(packages)
+	if logger != nil {
+		logger.Debug("package discovery completed",
+			"total_packages", len(dedupedPackages))
+	}
+
+	return dedupedPackages, nil
 }
 
 // searchPriorityPackageLocations searches standard package directories
@@ -59,10 +90,26 @@ func searchPriorityPackageLocations(basePath string) ([]*resource.Package, error
 			continue // Directory doesn't exist, skip
 		}
 
+		if logger != nil {
+			logger.Debug("searching priority location for packages",
+				"location", dir)
+		}
+
 		packages, err := searchPackagesDirectory(dir)
 		if err != nil {
 			// Continue searching other directories even if one fails
+			if logger != nil {
+				logger.Debug("failed to search directory",
+					"directory", dir,
+					"error", err)
+			}
 			continue
+		}
+
+		if len(packages) > 0 && logger != nil {
+			logger.Debug("found packages in priority location",
+				"location", dir,
+				"count", len(packages))
 		}
 
 		allPackages = append(allPackages, packages...)
@@ -77,6 +124,12 @@ func recursiveSearchPackages(basePath string, depth int) ([]*resource.Package, e
 		return nil, nil
 	}
 
+	if logger != nil {
+		logger.Debug("recursive package search",
+			"path", basePath,
+			"depth", depth)
+	}
+
 	var allPackages []*resource.Package
 
 	// Search current directory for *.package.json files
@@ -88,6 +141,11 @@ func recursiveSearchPackages(basePath string, depth int) ([]*resource.Package, e
 	// Recursively search subdirectories
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
+		if logger != nil {
+			logger.Error("failed to read directory during recursive search",
+				"path", basePath,
+				"error", err)
+		}
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
@@ -123,6 +181,11 @@ func recursiveSearchPackages(basePath string, depth int) ([]*resource.Package, e
 func searchPackagesDirectory(dir string) ([]*resource.Package, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		if logger != nil {
+			logger.Error("failed to read directory",
+				"directory", dir,
+				"error", err)
+		}
 		return nil, fmt.Errorf("failed to read directory: %w", err)
 	}
 
@@ -144,9 +207,19 @@ func searchPackagesDirectory(dir string) ([]*resource.Package, error) {
 		pkg, err := resource.LoadPackage(filePath)
 		if err != nil {
 			// Invalid package file, skip it
+			if logger != nil {
+				logger.Debug("failed to load package",
+					"path", filePath,
+					"error", err)
+			}
 			continue
 		}
 
+		if logger != nil {
+			logger.Debug("found package",
+				"name", pkg.Name,
+				"path", filePath)
+		}
 		packages = append(packages, pkg)
 	}
 

@@ -48,6 +48,14 @@ func DiscoverAgentsWithErrors(basePath string, subpath string) ([]*resource.Reso
 		searchPath = filepath.Join(basePath, subpath)
 	}
 
+	// Log discovery start
+	if logger != nil {
+		logger.Debug("starting agent discovery",
+			"base_path", basePath,
+			"subpath", subpath,
+			"search_path", searchPath)
+	}
+
 	// Check if search path exists, but be lenient with subpaths
 	searchPathInfo, searchPathErr := os.Stat(searchPath)
 
@@ -89,23 +97,50 @@ func DiscoverAgentsWithErrors(basePath string, subpath string) ([]*resource.Reso
 	// Try priority locations first (with recursive search within them)
 	agents := make([]*resource.Resource, 0)
 	for _, location := range priorityLocations {
+		if logger != nil {
+			logger.Debug("searching priority location for agents",
+				"location", location)
+		}
 		found, errors := searchAgentsInDirectory(location, 0)
 		agents = append(agents, found...)
 		allErrors = append(allErrors, errors...)
+		if len(found) > 0 && logger != nil {
+			logger.Debug("found agents in priority location",
+				"location", location,
+				"count", len(found))
+		}
 	}
 
 	// If no agents found in priority locations, do recursive search
 	if len(agents) == 0 {
+		if logger != nil {
+			logger.Debug("no agents found in priority locations, falling back to recursive search",
+				"search_path", searchPath)
+		}
 		found, errors, err := discoverAgentsRecursive(searchPath, 0)
 		if err != nil {
+			if logger != nil {
+				logger.Error("recursive search failed",
+					"error", err)
+			}
 			return nil, allErrors, fmt.Errorf("recursive search failed: %w", err)
 		}
 		agents = append(agents, found...)
 		allErrors = append(allErrors, errors...)
+		if logger != nil {
+			logger.Debug("recursive search completed",
+				"agents_found", len(found))
+		}
 	}
 
 	// Deduplicate by agent name (keep first occurrence)
 	agents = deduplicateAgents(agents)
+
+	if logger != nil {
+		logger.Debug("agent discovery completed",
+			"total_agents", len(agents),
+			"total_errors", len(allErrors))
+	}
 
 	return agents, allErrors, nil
 }
@@ -118,11 +153,22 @@ func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, []Dis
 		return nil, nil
 	}
 
+	if logger != nil {
+		logger.Debug("scanning directory for agents",
+			"directory", dir,
+			"depth", depth)
+	}
+
 	// Check if directory exists
 	info, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil // Directory doesn't exist, not an error
+		}
+		if logger != nil {
+			logger.Error("failed to stat directory",
+				"directory", dir,
+				"error", err)
 		}
 		return nil, []DiscoveryError{{
 			Path:  dir,
@@ -171,11 +217,21 @@ func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, []Dis
 			agent, err := resource.LoadAgent(entryPath)
 			if err != nil {
 				// Collect error instead of silently skipping
+				if logger != nil {
+					logger.Debug("failed to load agent",
+						"path", entryPath,
+						"error", err)
+				}
 				errors = append(errors, DiscoveryError{
 					Path:  entryPath,
 					Error: err,
 				})
 				continue
+			}
+			if logger != nil {
+				logger.Debug("found agent",
+					"name", agent.Name,
+					"path", entryPath)
 			}
 			agents = append(agents, agent)
 		}
@@ -265,11 +321,22 @@ func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Reso
 		return nil, nil, nil
 	}
 
+	if logger != nil {
+		logger.Debug("recursive agent search",
+			"path", dirPath,
+			"depth", currentDepth)
+	}
+
 	// Check if directory exists
 	info, err := os.Stat(dirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil, nil
+		}
+		if logger != nil {
+			logger.Error("failed to stat directory during recursive search",
+				"path", dirPath,
+				"error", err)
 		}
 		return nil, nil, fmt.Errorf("failed to stat directory: %w", err)
 	}

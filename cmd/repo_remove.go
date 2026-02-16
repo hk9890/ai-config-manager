@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -96,8 +95,8 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 		}
 
 		for _, res := range resources {
-			// Check if resource came from this source
-			if metadata.HasSource(res.Name, res.Type, source.Name, repoPath) {
+			// Check if resource came from this source (uses Manager.HasSource for DEBUG logging)
+			if mgr.HasSource(res.Name, res.Type, source.Name) {
 				orphanedResources = append(orphanedResources, res)
 			}
 		}

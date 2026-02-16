@@ -30,6 +30,14 @@ func DiscoverCommandsWithErrors(basePath string, subpath string) ([]*resource.Re
 		searchPath = filepath.Join(basePath, subpath)
 	}
 
+	// Log discovery start
+	if logger != nil {
+		logger.Debug("starting command discovery",
+			"base_path", basePath,
+			"subpath", subpath,
+			"search_path", searchPath)
+	}
+
 	// Verify search path exists, but be lenient with subpaths
 	searchPathInfo, searchPathErr := os.Stat(searchPath)
 
@@ -65,9 +73,19 @@ func DiscoverCommandsWithErrors(basePath string, subpath string) ([]*resource.Re
 
 	// If searchPath itself is a commands directory, search it directly
 	if isCommandsDirectory(searchPath) {
+		if logger != nil {
+			logger.Debug("search path is a commands directory, searching directly",
+				"path", searchPath)
+		}
 		commands, errors := searchCommandsInDirectory(searchPath, 0, searchPath)
 		allCommands = append(allCommands, commands...)
 		allErrors = append(allErrors, errors...)
+
+		if logger != nil {
+			logger.Debug("command discovery completed",
+				"commands_found", len(allCommands),
+				"errors", len(allErrors))
+		}
 		return deduplicateCommands(allCommands), allErrors, nil
 	}
 
@@ -76,14 +94,34 @@ func DiscoverCommandsWithErrors(basePath string, subpath string) ([]*resource.Re
 	allErrors = append(allErrors, priorityErrors...)
 	allCommands = append(allCommands, priorityCommands...)
 
+	if logger != nil {
+		logger.Debug("priority locations search completed",
+			"commands_found", len(priorityCommands),
+			"errors", len(priorityErrors))
+	}
+
 	// Also do recursive search to find commands outside priority directories
 	// (e.g., in nested/ or other top-level directories)
 	recursiveCommands, recursiveErrors := recursiveSearchCommands(searchPath, 0, searchPath)
 	allErrors = append(allErrors, recursiveErrors...)
 	allCommands = append(allCommands, recursiveCommands...)
 
+	if logger != nil {
+		logger.Debug("recursive search completed",
+			"commands_found", len(recursiveCommands),
+			"errors", len(recursiveErrors))
+	}
+
 	// Return deduplicated results (may be empty)
-	return deduplicateCommands(allCommands), allErrors, nil
+	dedupedCommands := deduplicateCommands(allCommands)
+
+	if logger != nil {
+		logger.Debug("command discovery completed",
+			"total_commands", len(dedupedCommands),
+			"total_errors", len(allErrors))
+	}
+
+	return dedupedCommands, allErrors, nil
 }
 
 // searchPriorityLocations searches standard command directories RECURSIVELY
@@ -120,11 +158,22 @@ func searchCommandsInDirectory(dir string, depth int, basePath string) ([]*resou
 		return nil, nil
 	}
 
+	if logger != nil {
+		logger.Debug("scanning directory for commands",
+			"directory", dir,
+			"depth", depth)
+	}
+
 	var commands []*resource.Resource
 	var errors []DiscoveryError
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		if logger != nil {
+			logger.Error("failed to read directory",
+				"directory", dir,
+				"error", err)
+		}
 		errors = append(errors, DiscoveryError{
 			Path:  dir,
 			Error: fmt.Errorf("failed to read directory: %w", err),
@@ -163,6 +212,11 @@ func searchCommandsInDirectory(dir string, depth int, basePath string) ([]*resou
 		cmd, err := resource.LoadCommandWithBase(entryPath, basePath)
 		if err != nil {
 			// Collect error instead of silently skipping
+			if logger != nil {
+				logger.Debug("failed to load command",
+					"path", entryPath,
+					"error", err)
+			}
 			errors = append(errors, DiscoveryError{
 				Path:  entryPath,
 				Error: err,
@@ -170,6 +224,11 @@ func searchCommandsInDirectory(dir string, depth int, basePath string) ([]*resou
 			continue
 		}
 
+		if logger != nil {
+			logger.Debug("found command",
+				"name", cmd.Name,
+				"path", entryPath)
+		}
 		commands = append(commands, cmd)
 	}
 
