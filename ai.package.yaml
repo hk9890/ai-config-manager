@@ -6,3 +6,4 @@ resources:
     - skill/fix-documentation
     - skill/task-sync
     - skill/github-task-sync
+    - package/skill-development
