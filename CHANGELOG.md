@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.3.0] - 2026-02-16
+
+### Added
+- **DEBUG logging system** - Comprehensive logging across all operations
+  - New `--log-level` flag (DEBUG, INFO, WARN, ERROR)
+  - DEBUG logging for validation, discovery, install, sync, and repo operations
+  - ERROR logging for critical failures in repo operations
+  - Orphan detection logging for better troubleshooting
+- **JSON standardization** - All JSON output now uses camelCase field names for consistency
+- **E2E sync tests** - Added end-to-end integration tests for sync operations
+
+### Fixed
+- **Broken symlink detection** - Install now detects and replaces broken symlinks instead of failing
+- **Git auto-commit issues** - Fixed metadata and manifest changes not being committed to git
+  - `repo add` now commits manifest changes
+  - `repo remove` now commits both manifest and metadata changes
+  - `repo sync` now commits metadata changes
+- **Repo remove bugs** - Fixed packages not being removed and name mismatch issues
+- **Autocomplete** - Added source name completion for `repo remove` command
+- **CI stability** - Configured git identity for integration tests
+
+### Changed
+- Enhanced error reporting with structured logging levels
+- Improved debugging experience with comprehensive DEBUG output
+
+
 ## [2.2.1] - 2026-02-15
 
 ### Documentation
