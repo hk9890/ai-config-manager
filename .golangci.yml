@@ -1,0 +1,56 @@
+# golangci-lint configuration
+# See: https://golangci-lint.run/usage/configuration/
+
+linters:
+  enable:
+    - govet         # Standard Go vet checks
+    - staticcheck   # Advanced static analysis
+    - errcheck      # Check for unchecked errors
+    - gosec         # Security-focused checks
+    - gocritic      # Comprehensive Go source code linter
+    - dupl          # Code duplication detection
+    - gocyclo       # Cyclomatic complexity
+    - goconst       # Repeated strings that could be constants
+    - misspell      # Spelling mistakes
+    - unconvert     # Unnecessary type conversions
+
+linters-settings:
+  dupl:
+    threshold: 100
+  gocyclo:
+    min-complexity: 15
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  gosec:
+    # G304: File path provided as taint input (expected in file management tool)
+    # G301: Directory permissions (0755 is standard for tool directories)
+    # G306: File permissions (0644 is standard for tool files)
+    excludes:
+      - G304
+      - G301
+      - G306
+  errcheck:
+    # Exclude checking errors for specific functions where it's safe
+    exclude-functions:
+      - (io.Closer).Close
+      - (*os.File).Close
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # Allow duplication in test files for table-driven test patterns
+    - path: _test\.go
+      linters:
+        - dupl
+    # Allow duplication in test helper files
+    - path: test/
+      linters:
+        - dupl
+    # Ignore certain gosec issues in tests
+    - path: _test\.go
+      text: "G204:"  # Subprocess with variable
+      linters:
+        - gosec
