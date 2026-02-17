@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.4.0] - 2026-02-17
+
+### Added
+- **`aimgr verify` command** - Verify repository integrity by checking for broken symlinks, orphaned metadata, and missing resources
+- **`aimgr clean` command** - Clean broken symlinks and orphaned metadata files with optional dry-run mode
+
+### Changed
+- **BREAKING**: `aimgr uninstall` now requires explicit resource arguments (safety improvement to prevent accidental bulk uninstalls)
+- **BREAKING**: `aimgr uninstall` now modifies `ai.package.yaml` by default when uninstalling (use `--no-save` to opt-out)
+- Enhanced `aimgr uninstall` to automatically clean up orphaned metadata files after uninstallation
+
+
 ## [2.3.0] - 2026-02-16
 
 ### Added
