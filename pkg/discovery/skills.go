@@ -273,72 +273,20 @@ func searchSkillsInDir(dirPath string) ([]*resource.Resource, []DiscoveryError) 
 // Limited to maxDepth (5) to prevent excessive searching
 // Returns both discovered skills and any errors encountered
 func recursiveSearchSkills(rootPath string, currentDepth int) ([]*resource.Resource, []DiscoveryError, error) {
-	var skills []*resource.Resource
-	var errors []DiscoveryError
 	const maxDepth = 5
 
-	// Stop if we've reached max depth
-	if currentDepth >= maxDepth {
-		return skills, errors, nil
+	config := &DirectoryTraversalConfig{
+		MaxDepth:           maxDepth,
+		DirectoryValidator: isSkillDir,
+		DirectoryLoader:    resource.LoadSkill,
+		DirectoryFilter: func(name string, depth int) bool {
+			// Skip hidden directories (except those in our priority list)
+			return shouldSkipHiddenDirectory(name)
+		},
+		SkipResourceSubdirs: true, // Don't recurse into skill directories
 	}
 
-	if logger != nil {
-		logger.Debug("recursive skill search",
-			"path", rootPath,
-			"depth", currentDepth)
-	}
-
-	// Read directory entries
-	entries, err := os.ReadDir(rootPath)
-	if err != nil {
-		if logger != nil {
-			logger.Error("failed to read directory during recursive search",
-				"path", rootPath,
-				"error", err)
-		}
-		return nil, errors, fmt.Errorf("failed to read directory: %w", err)
-	}
-
-	// Check each entry
-	for _, entry := range entries {
-		entryPath := filepath.Join(rootPath, entry.Name())
-
-		// Follow symlinks with os.Stat
-		entryInfo, err := os.Stat(entryPath)
-		if err != nil || !entryInfo.IsDir() {
-			continue
-		}
-
-		// Skip hidden directories (except those in our priority list)
-		if len(entry.Name()) > 0 && entry.Name()[0] == '.' {
-			continue
-		}
-
-		// Check if this directory is a skill
-		if isSkillDir(entryPath) {
-			skill, err := resource.LoadSkill(entryPath)
-			if err != nil {
-				// Collect error instead of silently skipping
-				errors = append(errors, DiscoveryError{
-					Path:  entryPath,
-					Error: err,
-				})
-			} else if skill.Name != "" && skill.Description != "" {
-				skills = append(skills, skill)
-			}
-			// Don't recurse into skill directories
-			continue
-		}
-
-		// Recurse into subdirectory
-		subSkills, subErrs, err := recursiveSearchSkills(entryPath, currentDepth+1)
-		errors = append(errors, subErrs...)
-		if err == nil {
-			skills = append(skills, subSkills...)
-		}
-	}
-
-	return skills, errors, nil
+	return traverseDirectoriesForResources(rootPath, currentDepth, config)
 }
 
 // mapToSlice converts a map of resources to a slice

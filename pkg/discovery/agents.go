@@ -134,7 +134,7 @@ func DiscoverAgentsWithErrors(basePath string, subpath string) ([]*resource.Reso
 	}
 
 	// Deduplicate by agent name (keep first occurrence)
-	agents = deduplicateAgents(agents)
+	agents = deduplicateResources(agents)
 
 	if logger != nil {
 		logger.Debug("agent discovery completed",
@@ -149,95 +149,20 @@ func DiscoverAgentsWithErrors(basePath string, subpath string) ([]*resource.Reso
 // This is used for priority locations to find agents at any depth within that location
 // Returns both successfully loaded agents and any errors encountered
 func searchAgentsInDirectory(dir string, depth int) ([]*resource.Resource, []DiscoveryError) {
-	if depth > MaxRecursiveDepth {
-		return nil, nil
+	config := &TraversalConfig{
+		MaxDepth: MaxRecursiveDepth,
+		Validator: func(path string, info os.FileInfo) bool {
+			// Only process .md files
+			return isMarkdownFile(path)
+		},
+		Loader: func(path string, base string) (*resource.Resource, error) {
+			return resource.LoadAgent(path)
+		},
+		DirectoryFilter: nil, // No directory filtering for agents in priority locations
+		BasePath:        dir,
 	}
 
-	if logger != nil {
-		logger.Debug("scanning directory for agents",
-			"directory", dir,
-			"depth", depth)
-	}
-
-	// Check if directory exists
-	info, err := os.Stat(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil // Directory doesn't exist, not an error
-		}
-		if logger != nil {
-			logger.Error("failed to stat directory",
-				"directory", dir,
-				"error", err)
-		}
-		return nil, []DiscoveryError{{
-			Path:  dir,
-			Error: fmt.Errorf("failed to stat directory: %w", err),
-		}}
-	}
-
-	if !info.IsDir() {
-		return nil, []DiscoveryError{{
-			Path:  dir,
-			Error: fmt.Errorf("path is not a directory: %s", dir),
-		}}
-	}
-
-	agents := make([]*resource.Resource, 0)
-	var errors []DiscoveryError
-
-	// Read directory entries
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, []DiscoveryError{{
-			Path:  dir,
-			Error: fmt.Errorf("failed to read directory: %w", err),
-		}}
-	}
-
-	for _, entry := range entries {
-		entryPath := filepath.Join(dir, entry.Name())
-
-		// Follow symlinks with os.Stat
-		entryInfo, err := os.Stat(entryPath)
-		if err != nil {
-			continue
-		}
-
-		if entryInfo.IsDir() {
-			// Recursively search subdirectories
-			subAgents, subErrors := searchAgentsInDirectory(entryPath, depth+1)
-			agents = append(agents, subAgents...)
-			errors = append(errors, subErrors...)
-			continue
-		}
-
-		// If it's a .md file, try to load as agent
-		if filepath.Ext(entry.Name()) == ".md" {
-			agent, err := resource.LoadAgent(entryPath)
-			if err != nil {
-				// Collect error instead of silently skipping
-				if logger != nil {
-					logger.Debug("failed to load agent",
-						"path", entryPath,
-						"error", err)
-				}
-				errors = append(errors, DiscoveryError{
-					Path:  entryPath,
-					Error: err,
-				})
-				continue
-			}
-			if logger != nil {
-				logger.Debug("found agent",
-					"name", agent.Name,
-					"path", entryPath)
-			}
-			agents = append(agents, agent)
-		}
-	}
-
-	return agents, errors
+	return traverseDirectory(dir, depth, config)
 }
 
 // discoverAgentsInDirectory finds agent .md files in a specific directory
@@ -369,7 +294,8 @@ func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Reso
 		}
 
 		// Skip common directories that typically don't contain agents
-		if shouldSkipDirectory(entry.Name()) {
+		// Also skip "commands" and "skills" directories (handled by their own discovery)
+		if entry.Name() == "commands" || entry.Name() == "skills" || shouldSkipCommonDirectory(entry.Name()) {
 			continue
 		}
 
@@ -386,38 +312,14 @@ func discoverAgentsRecursive(dirPath string, currentDepth int) ([]*resource.Reso
 }
 
 // shouldSkipDirectory returns true if the directory should be skipped during recursive search
+// This is a wrapper function for backward compatibility with tests
 func shouldSkipDirectory(name string) bool {
-	skipDirs := []string{
-		"commands", // Commands are handled by command discovery
-		"skills",   // Skills are handled by skill discovery
-		"documentation",
-		"docs",
-		"node_modules",
-		".git",
-		".svn",
-		".hg",
-		"vendor",
-		"build",
-		"dist",
-		"target",
-		"bin",
-		"obj",
-		"__pycache__",
-		".pytest_cache",
-		".venv",
-		"venv",
-		"test",
-		"tests",
-		"examples",
+	// Skip resource-specific directories
+	if name == "commands" || name == "skills" {
+		return true
 	}
-
-	for _, skip := range skipDirs {
-		if name == skip {
-			return true
-		}
-	}
-
-	return false
+	// Skip common non-resource directories
+	return shouldSkipCommonDirectory(name)
 }
 
 // isInAgentsSubtree checks if a file path is within an agents/ directory subtree
@@ -436,17 +338,7 @@ func isInAgentsSubtree(path string) bool {
 }
 
 // deduplicateAgents removes duplicate agents, keeping the first occurrence
-// Deduplication is by agent name
+// This is a wrapper around deduplicateResources for backward compatibility with tests
 func deduplicateAgents(agents []*resource.Resource) []*resource.Resource {
-	seen := make(map[string]bool)
-	result := make([]*resource.Resource, 0, len(agents))
-
-	for _, agent := range agents {
-		if !seen[agent.Name] {
-			seen[agent.Name] = true
-			result = append(result, agent)
-		}
-	}
-
-	return result
+	return deduplicateResources(agents)
 }

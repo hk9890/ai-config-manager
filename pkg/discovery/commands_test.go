@@ -161,7 +161,7 @@ func TestIsExcludedFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
-			result := isExcludedFile(tt.filename)
+			result := isExcludedMarkdownFile(tt.filename)
 			if result != tt.excluded {
 				t.Errorf("isExcludedFile(%q) = %v, want %v", tt.filename, result, tt.excluded)
 			}

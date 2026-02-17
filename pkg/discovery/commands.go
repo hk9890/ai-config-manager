@@ -86,7 +86,7 @@ func DiscoverCommandsWithErrors(basePath string, subpath string) ([]*resource.Re
 				"commands_found", len(allCommands),
 				"errors", len(allErrors))
 		}
-		return deduplicateCommands(allCommands), allErrors, nil
+		return deduplicateResources(allCommands), allErrors, nil
 	}
 
 	// Search priority locations
@@ -113,7 +113,7 @@ func DiscoverCommandsWithErrors(basePath string, subpath string) ([]*resource.Re
 	}
 
 	// Return deduplicated results (may be empty)
-	dedupedCommands := deduplicateCommands(allCommands)
+	dedupedCommands := deduplicateResources(allCommands)
 
 	if logger != nil {
 		logger.Debug("command discovery completed",
@@ -154,85 +154,24 @@ func searchPriorityLocations(basePath string) ([]*resource.Resource, []Discovery
 // This is used for priority locations to find commands at any depth within that location
 // basePath is used to calculate relative paths for commands
 func searchCommandsInDirectory(dir string, depth int, basePath string) ([]*resource.Resource, []DiscoveryError) {
-	if depth > maxDepth {
-		return nil, nil
-	}
-
-	if logger != nil {
-		logger.Debug("scanning directory for commands",
-			"directory", dir,
-			"depth", depth)
-	}
-
-	var commands []*resource.Resource
-	var errors []DiscoveryError
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if logger != nil {
-			logger.Error("failed to read directory",
-				"directory", dir,
-				"error", err)
-		}
-		errors = append(errors, DiscoveryError{
-			Path:  dir,
-			Error: fmt.Errorf("failed to read directory: %w", err),
-		})
-		return nil, errors
-	}
-
-	for _, entry := range entries {
-		entryPath := filepath.Join(dir, entry.Name())
-
-		// Follow symlinks with os.Stat
-		entryInfo, err := os.Stat(entryPath)
-		if err != nil {
-			continue
-		}
-
-		if entryInfo.IsDir() {
-			// Recursively search subdirectories
-			subCommands, subErrors := searchCommandsInDirectory(entryPath, depth+1, basePath)
-			commands = append(commands, subCommands...)
-			errors = append(errors, subErrors...)
-			continue
-		}
-
-		// Check if it's a .md file
-		if filepath.Ext(entry.Name()) != ".md" {
-			continue
-		}
-
-		// Exclude special files
-		if isExcludedFile(entry.Name()) {
-			continue
-		}
-
-		// Try to load as command with relative path calculation
-		cmd, err := resource.LoadCommandWithBase(entryPath, basePath)
-		if err != nil {
-			// Collect error instead of silently skipping
-			if logger != nil {
-				logger.Debug("failed to load command",
-					"path", entryPath,
-					"error", err)
+	config := &TraversalConfig{
+		MaxDepth: maxDepth,
+		Validator: func(path string, info os.FileInfo) bool {
+			// Check if it's a .md file
+			if !isMarkdownFile(path) {
+				return false
 			}
-			errors = append(errors, DiscoveryError{
-				Path:  entryPath,
-				Error: err,
-			})
-			continue
-		}
-
-		if logger != nil {
-			logger.Debug("found command",
-				"name", cmd.Name,
-				"path", entryPath)
-		}
-		commands = append(commands, cmd)
+			// Exclude special files
+			return !isExcludedMarkdownFile(filepath.Base(path))
+		},
+		Loader: func(path string, base string) (*resource.Resource, error) {
+			return resource.LoadCommandWithBase(path, base)
+		},
+		DirectoryFilter: nil, // No directory filtering for commands
+		BasePath:        basePath,
 	}
 
-	return commands, errors
+	return traverseDirectory(dir, depth, config)
 }
 
 // recursiveSearchCommands performs a recursive search for command files
@@ -277,7 +216,7 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 		}
 
 		// Skip common non-resource directories
-		if shouldSkipNonResourceDirectory(entry.Name()) {
+		if shouldSkipCommonDirectory(entry.Name()) {
 			continue
 		}
 
@@ -333,7 +272,7 @@ func searchDirectory(dir string, basePath string) ([]*resource.Resource, []Disco
 		}
 
 		// Exclude special files
-		if isExcludedFile(entry.Name()) {
+		if isExcludedMarkdownFile(entry.Name()) {
 			continue
 		}
 
@@ -354,27 +293,6 @@ func searchDirectory(dir string, basePath string) ([]*resource.Resource, []Disco
 	}
 
 	return commands, errors
-}
-
-// isExcludedFile checks if a filename should be excluded from command discovery
-func isExcludedFile(filename string) bool {
-	excluded := []string{
-		"SKILL.md",
-		"README.md",
-		"readme.md",
-		"Readme.md",
-		"REFERENCE.md",
-		"reference.md",
-		"Reference.md",
-	}
-
-	for _, excl := range excluded {
-		if filename == excl {
-			return true
-		}
-	}
-
-	return false
 }
 
 // isCommandsDirectory checks if a directory path IS a commands directory
@@ -405,51 +323,8 @@ func isInCommandsSubtree(path string) bool {
 		isCommandsDirectory(path)
 }
 
-// shouldSkipNonResourceDirectory returns true if the directory should be skipped during recursive search
-// These are common directories that typically don't contain resources
-func shouldSkipNonResourceDirectory(name string) bool {
-	skipDirs := []string{
-		"documentation",
-		"docs",
-		"node_modules",
-		".git",
-		".svn",
-		".hg",
-		"vendor",
-		"build",
-		"dist",
-		"target",
-		"bin",
-		"obj",
-		"__pycache__",
-		".pytest_cache",
-		".venv",
-		"venv",
-		"test",
-		"tests",
-		"examples",
-	}
-
-	for _, skip := range skipDirs {
-		if name == skip {
-			return true
-		}
-	}
-
-	return false
-}
-
 // deduplicateCommands removes duplicate commands by name, keeping the first occurrence
+// This is a wrapper around deduplicateResources for backward compatibility with tests
 func deduplicateCommands(commands []*resource.Resource) []*resource.Resource {
-	seen := make(map[string]bool)
-	var unique []*resource.Resource
-
-	for _, cmd := range commands {
-		if !seen[cmd.Name] {
-			seen[cmd.Name] = true
-			unique = append(unique, cmd)
-		}
-	}
-
-	return unique
+	return deduplicateResources(commands)
 }
