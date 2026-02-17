@@ -357,15 +357,199 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 	return m.addCommandWithOptions(sourcePath, sourceURL, sourceType, ref, ImportOptions{ImportMode: "copy"})
 }
 
-// addCommandWithOptions is an internal method that adds a command with import options
-func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
+// resourceLoader is a strategy function type for loading different resource types
+type resourceLoader func(sourcePath string) (*resource.Resource, error)
+
+// addResource is the generic internal method that adds any resource type using the strategy pattern
+// The loader parameter is a strategy function that knows how to load the specific resource type
+// The isDirectory parameter indicates whether to copy/symlink a directory (true) or file (false)
+func (m *Manager) addResource(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions,
+	resType resource.ResourceType, loader resourceLoader, isDirectory bool) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
 		return err
 	}
 
-	// Validate and load the command with base path for relative path calculation
-	// Strategy: Look for "commands" directory ancestor, or use source's parent dir
+	// Load the resource using the provided loader strategy
+	res, err := loader(sourcePath)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to load resource",
+				"source", sourcePath,
+				"type", string(resType),
+				"error", err.Error(),
+			)
+		}
+		return fmt.Errorf("failed to load %s: %w", resType, err)
+	}
+
+	// Get destination path
+	var destPath string
+	if resType == resource.Command {
+		// Commands may have nested structure, use GetPathForResource
+		destPath = m.GetPathForResource(res)
+
+		// Create parent directories if needed (for nested structure)
+		parentDir := filepath.Dir(destPath)
+		if m.logger != nil {
+			m.logger.Debug("creating parent directories",
+				"path", parentDir,
+				"resource", res.Name,
+				"permissions", "0755",
+			)
+		}
+		if err := os.MkdirAll(parentDir, 0755); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create parent directories",
+					"path", parentDir,
+					"resource", res.Name,
+					"error", err.Error(),
+				)
+			}
+			return fmt.Errorf("failed to create parent directories: %w", err)
+		}
+	} else {
+		destPath = m.GetPath(res.Name, resType)
+	}
+
+	// Log before copying/symlinking
+	if m.logger != nil {
+		m.logger.Info("repo add",
+			"resource", res.Name,
+			"type", string(resType),
+			"source", sourcePath,
+		)
+	}
+
+	// Copy or symlink based on mode
+	if opts.ImportMode == "symlink" {
+		// Ensure source is absolute path
+		absSource, err := filepath.Abs(sourcePath)
+		if err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to get absolute path",
+					"source", sourcePath,
+					"error", err.Error(),
+				)
+			}
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		// Create symlink
+		if m.logger != nil {
+			m.logger.Debug("creating symlink",
+				"resource", res.Name,
+				"type", string(resType),
+				"source", absSource,
+				"dest", destPath,
+			)
+		}
+		if err := os.Symlink(absSource, destPath); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create symlink",
+					"resource", res.Name,
+					"type", string(resType),
+					"source", absSource,
+					"dest", destPath,
+					"error", err.Error(),
+				)
+			}
+			return fmt.Errorf("failed to create symlink: %w", err)
+		}
+	} else {
+		// Copy the file or directory (default)
+		if isDirectory {
+			// Copy directory (for skills)
+			if m.logger != nil {
+				m.logger.Debug("copying directory",
+					"resource", res.Name,
+					"type", string(resType),
+					"source", sourcePath,
+					"dest", destPath,
+				)
+			}
+			if err := m.copyDir(sourcePath, destPath); err != nil {
+				if m.logger != nil {
+					m.logger.Error("failed to copy directory",
+						"resource", res.Name,
+						"source", sourcePath,
+						"dest", destPath,
+						"error", err.Error(),
+					)
+				}
+				return fmt.Errorf("failed to copy %s: %w", resType, err)
+			}
+		} else {
+			// Copy file (for commands and agents)
+			if m.logger != nil {
+				m.logger.Debug("copying file",
+					"resource", res.Name,
+					"type", string(resType),
+					"source", sourcePath,
+					"dest", destPath,
+				)
+			}
+			if err := m.copyFile(sourcePath, destPath); err != nil {
+				if m.logger != nil {
+					m.logger.Error("failed to copy file",
+						"resource", res.Name,
+						"source", sourcePath,
+						"dest", destPath,
+						"error", err.Error(),
+					)
+				}
+				return fmt.Errorf("failed to copy %s: %w", resType, err)
+			}
+		}
+	}
+
+	// Create and save metadata
+	now := time.Now()
+	meta := &metadata.ResourceMetadata{
+		Name:           res.Name,
+		Type:           resType,
+		SourceType:     sourceType,
+		SourceURL:      sourceURL,
+		Ref:            ref,
+		FirstInstalled: now,
+		LastUpdated:    now,
+	}
+
+	// Use explicit sourceName from opts if provided, otherwise derive
+	sourceName := opts.SourceName
+	if sourceName == "" {
+		sourceName = metadata.DeriveSourceName(sourceURL)
+	}
+
+	// DEBUG: Log metadata creation with source name
+	if m.logger != nil {
+		m.logger.Debug("creating resource metadata",
+			"resource", res.Name,
+			"type", string(resType),
+			"source_name", sourceName,
+			"source_url", sourceURL,
+			"source_type", sourceType,
+		)
+	}
+
+	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
+		if m.logger != nil {
+			m.logger.Error("failed to save metadata",
+				"resource", res.Name,
+				"type", string(resType),
+				"path", metadata.GetMetadataPath(res.Name, resType, m.repoPath),
+				"error", err.Error(),
+			)
+		}
+		return fmt.Errorf("failed to save metadata: %w", err)
+	}
+
+	return nil
+}
+
+// addCommandWithOptions is an internal method that adds a command with import options
+func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
+	// Special base path calculation for commands (supports nested structure)
 	basePath := ""
 	cleanPath := filepath.Clean(sourcePath)
 
@@ -418,148 +602,12 @@ func (m *Manager) addCommandWithOptions(sourcePath, sourceURL, sourceType, ref s
 		}
 	}
 
-	res, err := resource.LoadCommandWithBase(sourcePath, basePath)
-	if err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to load command",
-				"source", sourcePath,
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to load command: %w", err)
+	// Use the command loader with base path
+	loader := func(path string) (*resource.Resource, error) {
+		return resource.LoadCommandWithBase(path, basePath)
 	}
 
-	// Get destination path
-	destPath := m.GetPathForResource(res)
-
-	// Create parent directories if needed (for nested structure)
-	parentDir := filepath.Dir(destPath)
-	if m.logger != nil {
-		m.logger.Debug("creating parent directories",
-			"path", parentDir,
-			"resource", res.Name,
-			"permissions", "0755",
-		)
-	}
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to create parent directories",
-				"path", parentDir,
-				"resource", res.Name,
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to create parent directories: %w", err)
-	}
-
-	// Log before copying/symlinking
-	if m.logger != nil {
-		m.logger.Info("repo add",
-			"resource", res.Name,
-			"type", "command",
-			"source", sourcePath,
-		)
-	}
-
-	// Copy or symlink based on mode
-	if opts.ImportMode == "symlink" {
-		// Ensure source is absolute path
-		absSource, err := filepath.Abs(sourcePath)
-		if err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to get absolute path",
-					"source", sourcePath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to get absolute path: %w", err)
-		}
-
-		// Create symlink
-		if m.logger != nil {
-			m.logger.Debug("creating symlink",
-				"resource", res.Name,
-				"type", "command",
-				"source", absSource,
-				"dest", destPath,
-			)
-		}
-		if err := os.Symlink(absSource, destPath); err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to create symlink",
-					"resource", res.Name,
-					"type", "command",
-					"source", absSource,
-					"dest", destPath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to create symlink: %w", err)
-		}
-	} else {
-		// Copy the file (default)
-		if m.logger != nil {
-			m.logger.Debug("copying file",
-				"resource", res.Name,
-				"type", "command",
-				"source", sourcePath,
-				"dest", destPath,
-			)
-		}
-		if err := m.copyFile(sourcePath, destPath); err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to copy command",
-					"resource", res.Name,
-					"source", sourcePath,
-					"dest", destPath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to copy command: %w", err)
-		}
-	}
-
-	// Create and save metadata
-	now := time.Now()
-	meta := &metadata.ResourceMetadata{
-		Name:           res.Name,
-		Type:           resource.Command,
-		SourceType:     sourceType,
-		SourceURL:      sourceURL,
-		Ref:            ref,
-		FirstInstalled: now,
-		LastUpdated:    now,
-	}
-	// Use explicit sourceName from opts if provided, otherwise derive
-	sourceName := opts.SourceName
-	if sourceName == "" {
-		sourceName = metadata.DeriveSourceName(sourceURL)
-	}
-
-	// DEBUG: Log metadata creation with source name
-	if m.logger != nil {
-		m.logger.Debug("creating command metadata",
-			"resource", res.Name,
-			"type", "command",
-			"source_name", sourceName,
-			"source_url", sourceURL,
-			"source_type", sourceType,
-		)
-	}
-
-	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to save metadata",
-				"resource", res.Name,
-				"type", "command",
-				"path", metadata.GetMetadataPath(res.Name, resource.Command, m.repoPath),
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to save metadata: %w", err)
-	}
-
-	return nil
+	return m.addResource(sourcePath, sourceURL, sourceType, ref, opts, resource.Command, loader, false)
 }
 
 // AddSkill adds a skill resource to the repository.
@@ -576,134 +624,7 @@ func (m *Manager) AddSkillWithRef(sourcePath, sourceURL, sourceType, ref string)
 
 // addSkillWithOptions is an internal method that adds a skill with import options
 func (m *Manager) addSkillWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
-	// Ensure repo is initialized
-	if err := m.Init(); err != nil {
-		return err
-	}
-
-	// Validate and load the skill
-	res, err := resource.LoadSkill(sourcePath)
-	if err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to load skill",
-				"source", sourcePath,
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to load skill: %w", err)
-	}
-
-	// Get destination path
-	destPath := m.GetPath(res.Name, resource.Skill)
-
-	// Log before copying/symlinking
-	if m.logger != nil {
-		m.logger.Info("repo add",
-			"resource", res.Name,
-			"type", "skill",
-			"source", sourcePath,
-		)
-	}
-
-	// Copy or symlink based on mode
-	if opts.ImportMode == "symlink" {
-		// Ensure source is absolute path
-		absSource, err := filepath.Abs(sourcePath)
-		if err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to get absolute path",
-					"source", sourcePath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to get absolute path: %w", err)
-		}
-
-		// Create symlink to the entire directory
-		if m.logger != nil {
-			m.logger.Debug("creating symlink",
-				"resource", res.Name,
-				"type", "skill",
-				"source", absSource,
-				"dest", destPath,
-			)
-		}
-		if err := os.Symlink(absSource, destPath); err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to create symlink",
-					"resource", res.Name,
-					"type", "skill",
-					"source", absSource,
-					"dest", destPath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to create symlink: %w", err)
-		}
-	} else {
-		// Copy the directory (default)
-		if m.logger != nil {
-			m.logger.Debug("copying directory",
-				"resource", res.Name,
-				"type", "skill",
-				"source", sourcePath,
-				"dest", destPath,
-			)
-		}
-		if err := m.copyDir(sourcePath, destPath); err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to copy skill",
-					"resource", res.Name,
-					"source", sourcePath,
-					"dest", destPath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to copy skill: %w", err)
-		}
-	}
-
-	// Create and save metadata
-	now := time.Now()
-	meta := &metadata.ResourceMetadata{
-		Name:           res.Name,
-		Type:           resource.Skill,
-		SourceType:     sourceType,
-		SourceURL:      sourceURL,
-		Ref:            ref,
-		FirstInstalled: now,
-		LastUpdated:    now,
-	}
-	// Use explicit sourceName from opts if provided, otherwise derive
-	sourceName := opts.SourceName
-	if sourceName == "" {
-		sourceName = metadata.DeriveSourceName(sourceURL)
-	}
-
-	// DEBUG: Log metadata creation with source name
-	if m.logger != nil {
-		m.logger.Debug("creating skill metadata",
-			"resource", res.Name,
-			"type", "skill",
-			"source_name", sourceName,
-			"source_url", sourceURL,
-			"source_type", sourceType,
-		)
-	}
-
-	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to save metadata",
-				"resource", res.Name,
-				"type", "skill",
-				"path", metadata.GetMetadataPath(res.Name, resource.Skill, m.repoPath),
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to save metadata: %w", err)
-	}
-
-	return nil
+	return m.addResource(sourcePath, sourceURL, sourceType, ref, opts, resource.Skill, resource.LoadSkill, true)
 }
 
 // AddAgent adds an agent resource to the repository.
@@ -720,120 +641,7 @@ func (m *Manager) AddAgentWithRef(sourcePath, sourceURL, sourceType, ref string)
 
 // addAgentWithOptions is an internal method that adds an agent with import options
 func (m *Manager) addAgentWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
-	// Ensure repo is initialized
-	if err := m.Init(); err != nil {
-		return err
-	}
-
-	// Validate and load the agent
-	res, err := resource.LoadAgent(sourcePath)
-	if err != nil {
-		return fmt.Errorf("failed to load agent: %w", err)
-	}
-
-	// Get destination path
-	destPath := m.GetPath(res.Name, resource.Agent)
-
-	// Log before copying/symlinking
-	if m.logger != nil {
-		m.logger.Info("repo add",
-			"resource", res.Name,
-			"type", "agent",
-			"source", sourcePath,
-		)
-	}
-
-	// Copy or symlink based on mode
-	if opts.ImportMode == "symlink" {
-		// Ensure source is absolute path
-		absSource, err := filepath.Abs(sourcePath)
-		if err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to get absolute path",
-					"source", sourcePath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to get absolute path: %w", err)
-		}
-
-		// Create symlink
-		if m.logger != nil {
-			m.logger.Debug("creating symlink",
-				"resource", res.Name,
-				"type", "agent",
-				"source", absSource,
-				"dest", destPath,
-			)
-		}
-		if err := os.Symlink(absSource, destPath); err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to create symlink",
-					"resource", res.Name,
-					"type", "agent",
-					"source", absSource,
-					"dest", destPath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to create symlink: %w", err)
-		}
-	} else {
-		// Copy the file (default)
-		if m.logger != nil {
-			m.logger.Debug("copying file",
-				"resource", res.Name,
-				"type", "agent",
-				"source", sourcePath,
-				"dest", destPath,
-			)
-		}
-		if err := m.copyFile(sourcePath, destPath); err != nil {
-			if m.logger != nil {
-				m.logger.Error("failed to copy agent",
-					"resource", res.Name,
-					"source", sourcePath,
-					"dest", destPath,
-					"error", err.Error(),
-				)
-			}
-			return fmt.Errorf("failed to copy agent: %w", err)
-		}
-	}
-
-	// Create and save metadata
-	now := time.Now()
-	meta := &metadata.ResourceMetadata{
-		Name:           res.Name,
-		Type:           resource.Agent,
-		SourceType:     sourceType,
-		SourceURL:      sourceURL,
-		Ref:            ref,
-		FirstInstalled: now,
-		LastUpdated:    now,
-	}
-	// Use explicit sourceName from opts if provided, otherwise derive
-	sourceName := opts.SourceName
-	if sourceName == "" {
-		sourceName = metadata.DeriveSourceName(sourceURL)
-	}
-
-	// DEBUG: Log metadata creation with source name
-	if m.logger != nil {
-		m.logger.Debug("creating agent metadata",
-			"resource", res.Name,
-			"type", "agent",
-			"source_name", sourceName,
-			"source_url", sourceURL,
-			"source_type", sourceType,
-		)
-	}
-
-	if err := metadata.Save(meta, m.repoPath, sourceName); err != nil {
-		return fmt.Errorf("failed to save metadata: %w", err)
-	}
-
-	return nil
+	return m.addResource(sourcePath, sourceURL, sourceType, ref, opts, resource.Agent, resource.LoadAgent, false)
 }
 
 // AddPackage adds a package resource to the repository.
@@ -849,6 +657,7 @@ func (m *Manager) AddPackageWithRef(sourcePath, sourceURL, sourceType, ref strin
 }
 
 // addPackageWithOptions is an internal method that adds a package with import options
+// Note: Packages use a different metadata structure, so we handle them separately
 func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
 	// Ensure repo is initialized
 	if err := m.Init(); err != nil {
