@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.5.0] - 2026-02-17
+
+### Added
+- **Codecov integration** - Comprehensive code coverage tracking with Codecov service
+- **golangci-lint in CI** - Automated linting checks in GitHub Actions workflow
+- **Comprehensive test coverage** - Added 1000+ lines of tests covering:
+  - 8 previously untested cmd files (clean, completion, project verify, repo init/verify, root)
+  - Package metadata functionality
+  - Agent integration tests
+
+### Changed
+- **Code organization** - Refactored `pkg/repo/manager.go` (1800+ lines) into focused, maintainable files:
+  - `add.go` - Resource addition operations
+  - `remove.go` - Resource removal operations  
+  - `bulk.go` - Bulk import operations
+  - `list.go` - Resource listing
+  - `package.go` - Package management
+  - `fileops.go` - File operations
+  - `git.go` - Git operations
+- **Discovery logic** - Consolidated duplicate traversal logic across discovery functions
+- **Strategy pattern** - Unified Add* methods using strategy pattern for cleaner code
+
 ## [2.4.0] - 2026-02-17
 
 ### Added
