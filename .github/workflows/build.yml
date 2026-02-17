@@ -27,14 +27,24 @@ jobs:
       - name: Run vet
         run: make vet
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m
+
       - name: Build binary
         run: make build
 
-      - name: Run unit tests
-        run: make unit-test
+      - name: Run tests with coverage
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-      - name: Run integration tests
-        run: make integration-test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          fail_ci_if_error: false
 
   e2e-test:
     name: E2E Tests

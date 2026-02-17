@@ -1,6 +1,7 @@
 # aimgr - AI Resources Manager
 
 [![Build Status](https://github.com/hk9890/ai-config-manager/actions/workflows/build.yml/badge.svg)](https://github.com/hk9890/ai-config-manager/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/hk9890/ai-config-manager/branch/main/graph/badge.svg)](https://codecov.io/gh/hk9890/ai-config-manager)
 [![Release](https://img.shields.io/github/v/release/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/releases)
 [![License](https://img.shields.io/github/license/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/blob/main/LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/blob/main/go.mod)
