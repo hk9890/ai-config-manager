@@ -225,18 +225,3 @@ func searchPackagesDirectory(dir string) ([]*resource.Package, error) {
 
 	return packages, nil
 }
-
-// deduplicatePackages removes duplicate packages by name, keeping the first occurrence
-func deduplicatePackages(packages []*resource.Package) []*resource.Package {
-	seen := make(map[string]bool)
-	var unique []*resource.Package
-
-	for _, pkg := range packages {
-		if !seen[pkg.Name] {
-			seen[pkg.Name] = true
-			unique = append(unique, pkg)
-		}
-	}
-
-	return unique
-}
