@@ -112,6 +112,11 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 		}
 	}
 
+	// Warn about breaking project symlinks when orphaned resources will be removed
+	if len(orphanedResources) > 0 {
+		warnProjectSymlinks(orphanedResources)
+	}
+
 	// Dry run mode: show what would be removed
 	if dryRun {
 		fmt.Printf("Would remove source: %s\n", source.Name)
@@ -227,6 +232,20 @@ func formatSourcesList(manifest *repomanifest.Manifest) string {
 		lines = append(lines, fmt.Sprintf("  - %s (%s)", source.Name, location))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// warnProjectSymlinks prints a warning when removing resources that may be
+// installed in project directories. Since there is no central registry of
+// project installations, this emits a generic warning directing users to
+// run 'aimgr project verify' in affected projects.
+func warnProjectSymlinks(resources []resource.Resource) {
+	var names []string
+	for _, res := range resources {
+		names = append(names, fmt.Sprintf("%s/%s", res.Type, res.Name))
+	}
+	fmt.Fprintf(os.Stderr, "⚠ Warning: removing %d resource(s) (%s) may break symlinks in projects that have them installed.\n",
+		len(resources), strings.Join(names, ", "))
+	fmt.Fprintf(os.Stderr, "  Run 'aimgr project verify --fix' in affected projects to clean up broken symlinks.\n\n")
 }
 
 func init() {

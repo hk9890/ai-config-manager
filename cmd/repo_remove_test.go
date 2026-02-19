@@ -967,3 +967,228 @@ description: Legacy command
 		t.Error("Legacy resource should be removed as orphan (matched by source name)")
 	}
 }
+
+// TestRepoRemove_WarnsAboutProjectSymlinks tests that removing orphaned resources
+// emits a warning about potentially breaking project symlinks.
+func TestRepoRemove_WarnsAboutProjectSymlinks(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := repo.NewManagerWithPath(tempDir)
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	manifest, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	source := &repomanifest.Source{
+		Name: "warn-source",
+		Path: "/home/user/resources",
+		ID:   "src-warn",
+	}
+	if err := manifest.AddSource(source); err != nil {
+		t.Fatalf("Failed to add source: %v", err)
+	}
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Add a test resource with metadata pointing to this source
+	commandPath := filepath.Join(tempDir, "commands", "warn-cmd.md")
+	commandContent := "---\nname: warn-cmd\ndescription: Warning test command\n---\n# Warning Test Cmd\n"
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
+		t.Fatalf("Failed to create command: %v", err)
+	}
+	meta := &metadata.ResourceMetadata{
+		Name:           "warn-cmd",
+		Type:           resource.Command,
+		SourceType:     "local",
+		SourceURL:      "/home/user/resources",
+		SourceName:     "warn-source",
+		SourceID:       "src-warn",
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(meta, tempDir, "warn-source"); err != nil {
+		t.Fatalf("Failed to save metadata: %v", err)
+	}
+
+	// Capture stderr to check for warning
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	err = performRemove(mgr, "warn-source", false, false)
+
+	// Restore stderr and read captured output
+	w.Close()
+	os.Stderr = oldStderr
+	captured := make([]byte, 4096)
+	n, _ := r.Read(captured)
+	stderrOutput := string(captured[:n])
+
+	if err != nil {
+		t.Fatalf("performRemove failed: %v", err)
+	}
+
+	// Verify warning was emitted
+	if !strings.Contains(stderrOutput, "may break symlinks") {
+		t.Errorf("Expected warning about breaking symlinks, got stderr: %q", stderrOutput)
+	}
+	if !strings.Contains(stderrOutput, "command/warn-cmd") {
+		t.Errorf("Expected warning to mention resource name, got stderr: %q", stderrOutput)
+	}
+	if !strings.Contains(stderrOutput, "project verify") {
+		t.Errorf("Expected warning to suggest 'project verify', got stderr: %q", stderrOutput)
+	}
+}
+
+// TestRepoRemove_WarnsAboutProjectSymlinks_DryRun tests that the warning
+// is also shown in dry-run mode.
+func TestRepoRemove_WarnsAboutProjectSymlinks_DryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := repo.NewManagerWithPath(tempDir)
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	manifest, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	source := &repomanifest.Source{
+		Name: "dryrun-warn-source",
+		Path: "/home/user/resources",
+		ID:   "src-dryrun-warn",
+	}
+	if err := manifest.AddSource(source); err != nil {
+		t.Fatalf("Failed to add source: %v", err)
+	}
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Add a test resource
+	commandPath := filepath.Join(tempDir, "commands", "dryrun-cmd.md")
+	commandContent := "---\nname: dryrun-cmd\ndescription: Dry run test command\n---\n# Dry Run Cmd\n"
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
+		t.Fatalf("Failed to create command: %v", err)
+	}
+	meta := &metadata.ResourceMetadata{
+		Name:           "dryrun-cmd",
+		Type:           resource.Command,
+		SourceType:     "local",
+		SourceURL:      "/home/user/resources",
+		SourceName:     "dryrun-warn-source",
+		SourceID:       "src-dryrun-warn",
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(meta, tempDir, "dryrun-warn-source"); err != nil {
+		t.Fatalf("Failed to save metadata: %v", err)
+	}
+
+	// Capture stderr to check for warning
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	err = performRemove(mgr, "dryrun-warn-source", true, false) // dry-run = true
+
+	// Restore stderr and read captured output
+	w.Close()
+	os.Stderr = oldStderr
+	captured := make([]byte, 4096)
+	n, _ := r.Read(captured)
+	stderrOutput := string(captured[:n])
+
+	if err != nil {
+		t.Fatalf("performRemove failed: %v", err)
+	}
+
+	// Verify warning was emitted even in dry-run mode
+	if !strings.Contains(stderrOutput, "may break symlinks") {
+		t.Errorf("Expected warning about breaking symlinks in dry-run mode, got stderr: %q", stderrOutput)
+	}
+
+	// In dry-run mode, the resource should NOT actually be removed
+	if _, err := os.Stat(commandPath); err != nil {
+		t.Error("Resource should still exist in dry-run mode")
+	}
+}
+
+// TestRepoRemove_NoWarningWhenKeepResources tests that no symlink warning
+// is emitted when --keep-resources is used (since resources won't break).
+func TestRepoRemove_NoWarningWhenKeepResources(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := repo.NewManagerWithPath(tempDir)
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	manifest, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	source := &repomanifest.Source{
+		Name: "keep-source",
+		Path: "/home/user/resources",
+		ID:   "src-keep",
+	}
+	if err := manifest.AddSource(source); err != nil {
+		t.Fatalf("Failed to add source: %v", err)
+	}
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Add a test resource
+	commandPath := filepath.Join(tempDir, "commands", "keep-cmd.md")
+	commandContent := "---\nname: keep-cmd\ndescription: Keep test command\n---\n# Keep Cmd\n"
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
+		t.Fatalf("Failed to create command: %v", err)
+	}
+	meta := &metadata.ResourceMetadata{
+		Name:           "keep-cmd",
+		Type:           resource.Command,
+		SourceType:     "local",
+		SourceURL:      "/home/user/resources",
+		SourceName:     "keep-source",
+		SourceID:       "src-keep",
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(meta, tempDir, "keep-source"); err != nil {
+		t.Fatalf("Failed to save metadata: %v", err)
+	}
+
+	// Capture stderr
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	err = performRemove(mgr, "keep-source", false, true) // keepResources = true
+
+	w.Close()
+	os.Stderr = oldStderr
+	captured := make([]byte, 4096)
+	n, _ := r.Read(captured)
+	stderrOutput := string(captured[:n])
+
+	if err != nil {
+		t.Fatalf("performRemove failed: %v", err)
+	}
+
+	// No symlink warning should be emitted when keeping resources
+	if strings.Contains(stderrOutput, "may break symlinks") {
+		t.Errorf("Should NOT warn about symlinks when --keep-resources is used, got stderr: %q", stderrOutput)
+	}
+
+	// Resource should still exist
+	if _, err := os.Stat(commandPath); err != nil {
+		t.Error("Resource should still exist with --keep-resources")
+	}
+}
