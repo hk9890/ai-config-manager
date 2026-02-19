@@ -319,3 +319,136 @@ func TestListInstalled_OutputFormats(t *testing.T) {
 
 	_ = bytes.Buffer{} // Avoid unused import error
 }
+
+// TestBuildResourceInfo_BrokenHealthStatus tests that buildResourceInfo correctly
+// propagates the health status for broken resources.
+func TestBuildResourceInfo_BrokenHealthStatus(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create .opencode/skills directory with a broken symlink
+	skillsDir := filepath.Join(tmpDir, ".opencode", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("failed to create skills dir: %v", err)
+	}
+	brokenSymlink := filepath.Join(skillsDir, "broken-skill")
+	if err := os.Symlink("/nonexistent/target", brokenSymlink); err != nil {
+		t.Fatalf("failed to create broken symlink: %v", err)
+	}
+
+	// Create a resource with HealthBroken
+	resources := []resource.Resource{
+		{
+			Type:   resource.Skill,
+			Name:   "broken-skill",
+			Health: resource.HealthBroken,
+		},
+	}
+
+	detectedTools := []tools.Tool{tools.OpenCode}
+	infos := buildResourceInfo(resources, tmpDir, detectedTools)
+
+	if len(infos) != 1 {
+		t.Fatalf("expected 1 resource info, got %d", len(infos))
+	}
+
+	info := infos[0]
+	if info.Health != "broken" {
+		t.Errorf("expected health 'broken', got '%s'", info.Health)
+	}
+	if info.Name != "broken-skill" {
+		t.Errorf("expected name 'broken-skill', got '%s'", info.Name)
+	}
+}
+
+// TestBuildResourceInfo_HealthyStatus tests that buildResourceInfo shows "ok" for
+// healthy resources.
+func TestBuildResourceInfo_HealthyStatus(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a resource with HealthOK
+	resources := []resource.Resource{
+		{
+			Type:        resource.Skill,
+			Name:        "healthy-skill",
+			Description: "A healthy skill",
+			Health:      resource.HealthOK,
+		},
+	}
+
+	detectedTools := []tools.Tool{tools.OpenCode}
+	infos := buildResourceInfo(resources, tmpDir, detectedTools)
+
+	if len(infos) != 1 {
+		t.Fatalf("expected 1 resource info, got %d", len(infos))
+	}
+
+	info := infos[0]
+	if info.Health != "ok" {
+		t.Errorf("expected health 'ok', got '%s'", info.Health)
+	}
+}
+
+// TestBuildResourceInfo_MixedHealthStatus tests buildResourceInfo with a mix of
+// healthy and broken resources.
+func TestBuildResourceInfo_MixedHealthStatus(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	resources := []resource.Resource{
+		{
+			Type:   resource.Skill,
+			Name:   "good-skill",
+			Health: resource.HealthOK,
+		},
+		{
+			Type:   resource.Skill,
+			Name:   "bad-skill",
+			Health: resource.HealthBroken,
+		},
+		{
+			Type:   resource.Command,
+			Name:   "good-cmd",
+			Health: resource.HealthOK,
+		},
+	}
+
+	detectedTools := []tools.Tool{tools.OpenCode}
+	infos := buildResourceInfo(resources, tmpDir, detectedTools)
+
+	if len(infos) != 3 {
+		t.Fatalf("expected 3 resource infos, got %d", len(infos))
+	}
+
+	// Count health statuses
+	healthCounts := make(map[string]int)
+	for _, info := range infos {
+		healthCounts[info.Health]++
+	}
+
+	if healthCounts["ok"] != 2 {
+		t.Errorf("expected 2 'ok' resources, got %d", healthCounts["ok"])
+	}
+	if healthCounts["broken"] != 1 {
+		t.Errorf("expected 1 'broken' resource, got %d", healthCounts["broken"])
+	}
+}
+
+// TestIsInstalledInTool_BrokenSymlinkDetected tests that isInstalledInTool()
+// detects broken symlinks (returns true because the symlink exists via Lstat).
+func TestIsInstalledInTool_BrokenSymlinkDetected(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a broken skill symlink
+	skillsDir := filepath.Join(tmpDir, ".opencode", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("failed to create skills dir: %v", err)
+	}
+	brokenSymlink := filepath.Join(skillsDir, "broken-skill")
+	if err := os.Symlink("/nonexistent/target", brokenSymlink); err != nil {
+		t.Fatalf("failed to create broken symlink: %v", err)
+	}
+
+	// isInstalledInTool uses Lstat, so broken symlinks are still detected as "installed"
+	if !isInstalledInTool(tmpDir, "broken-skill", resource.Skill, tools.OpenCode) {
+		t.Error("expected broken symlink to be detected as installed (Lstat detects it)")
+	}
+}

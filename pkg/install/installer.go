@@ -447,12 +447,26 @@ func (i *Installer) List() ([]resource.Resource, error) {
 						continue
 					}
 
+					// Check if target exists
+					if _, err := os.Stat(target); err != nil {
+						// Broken symlink — create a minimal resource entry
+						name := strings.TrimSuffix(entry.Name(), ".md")
+						resourceMap[name] = resource.Resource{
+							Name:   name,
+							Type:   resource.Command,
+							Path:   target,
+							Health: resource.HealthBroken,
+						}
+						continue
+					}
+
 					// Load the resource
 					res, err := resource.LoadCommand(target)
 					if err != nil {
 						continue
 					}
 
+					res.Health = resource.HealthOK
 					// Deduplicate by name
 					resourceMap[res.Name] = *res
 				}
@@ -489,6 +503,13 @@ func (i *Installer) List() ([]resource.Resource, error) {
 					// Verify target is a directory (skill)
 					targetInfo, err := os.Stat(target)
 					if err != nil || !targetInfo.IsDir() {
+						// Broken symlink or not a directory
+						resourceMap[entry.Name()] = resource.Resource{
+							Name:   entry.Name(),
+							Type:   resource.Skill,
+							Path:   target,
+							Health: resource.HealthBroken,
+						}
 						continue
 					}
 
@@ -498,6 +519,7 @@ func (i *Installer) List() ([]resource.Resource, error) {
 						continue
 					}
 
+					res.Health = resource.HealthOK
 					// Deduplicate by name
 					resourceMap[res.Name] = *res
 				}
@@ -535,12 +557,26 @@ func (i *Installer) List() ([]resource.Resource, error) {
 						continue
 					}
 
+					// Check if target exists
+					if _, err := os.Stat(target); err != nil {
+						// Broken symlink — create a minimal resource entry
+						name := strings.TrimSuffix(entry.Name(), ".md")
+						resourceMap[name] = resource.Resource{
+							Name:   name,
+							Type:   resource.Agent,
+							Path:   target,
+							Health: resource.HealthBroken,
+						}
+						continue
+					}
+
 					// Load the resource
 					res, err := resource.LoadAgent(target)
 					if err != nil {
 						continue
 					}
 
+					res.Health = resource.HealthOK
 					// Deduplicate by name
 					resourceMap[res.Name] = *res
 				}

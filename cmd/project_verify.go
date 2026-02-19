@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hk9890/ai-config-manager/pkg/install"
 	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/output"
+	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"github.com/spf13/cobra"
@@ -446,14 +448,13 @@ func displayVerifyIssues(issues []VerifyIssue, format output.Format) error {
 	}
 }
 
-func fixVerifyIssues(projectPath string, issues []VerifyIssue, manager interface{}) error {
+func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo.Manager) error {
 	fixed := 0
 	failed := 0
 
 	for _, issue := range issues {
 		switch issue.IssueType {
 		case "broken", "wrong-repo":
-			// Remove and reinstall
 			fmt.Printf("  Fixing %s...\n", issue.Resource)
 
 			// Remove broken symlink
@@ -463,16 +464,106 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, manager interface
 				continue
 			}
 
-			// TODO: Reinstall using installer
-			// For now, just suggest manual reinstall
-			fmt.Printf("    Removed broken symlink. Run 'aimgr install' to reinstall.\n")
+			// Determine resource type and name from the issue
+			resType, resName := parseResourceFromIssue(issue)
+
+			// Check if resource still exists in repo
+			_, err := repoManager.Get(resName, resType)
+			if err != nil {
+				// Resource no longer in repo — can't reinstall
+				fmt.Printf("    ✗ Removed broken symlink. Resource '%s' no longer exists in repository.\n", resName)
+				fmt.Printf("      Consider removing from %s: aimgr uninstall %s/%s\n", manifest.ManifestFileName, resType, resName)
+				fixed++
+				continue
+			}
+
+			// Reinstall using the installer
+			detectedTools, err := tools.DetectExistingTools(projectPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "    Failed to detect tools: %v\n", err)
+				failed++
+				continue
+			}
+
+			installer, err := install.NewInstallerWithTargets(projectPath, detectedTools)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "    Failed to create installer: %v\n", err)
+				failed++
+				continue
+			}
+
+			var installErr error
+			switch resType {
+			case resource.Command:
+				installErr = installer.InstallCommand(resName, repoManager)
+			case resource.Skill:
+				installErr = installer.InstallSkill(resName, repoManager)
+			case resource.Agent:
+				installErr = installer.InstallAgent(resName, repoManager)
+			}
+
+			if installErr != nil {
+				fmt.Fprintf(os.Stderr, "    Failed to reinstall: %v\n", installErr)
+				failed++
+				continue
+			}
+
+			fmt.Printf("    ✓ Reinstalled %s/%s\n", resType, resName)
 			fixed++
 
 		case "not-installed":
-			// Resource in manifest but not installed
 			fmt.Printf("  Installing %s...\n", issue.Resource)
-			// TODO: Call installer to install this resource
-			fmt.Printf("    Run 'aimgr install' to install missing resources.\n")
+
+			// Parse "type/name" from the resource reference
+			resType, resName, err := resource.ParseResourceReference(issue.Resource)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "    Cannot parse resource reference: %s\n", issue.Resource)
+				failed++
+				continue
+			}
+
+			// Check if resource exists in repo
+			_, err = repoManager.Get(resName, resType)
+			if err != nil {
+				fmt.Printf("    ✗ Resource '%s' not found in repository. Remove from %s or run 'aimgr repo add' to add it.\n",
+					issue.Resource, manifest.ManifestFileName)
+				failed++
+				continue
+			}
+
+			// Install it
+			detectedTools, err := tools.DetectExistingTools(projectPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "    Failed to detect tools: %v\n", err)
+				failed++
+				continue
+			}
+
+			installer, err := install.NewInstallerWithTargets(projectPath, detectedTools)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "    Failed to create installer: %v\n", err)
+				failed++
+				continue
+			}
+
+			var installErr error
+			switch resType {
+			case resource.Command:
+				installErr = installer.InstallCommand(resName, repoManager)
+			case resource.Skill:
+				installErr = installer.InstallSkill(resName, repoManager)
+			case resource.Agent:
+				installErr = installer.InstallAgent(resName, repoManager)
+			}
+
+			if installErr != nil {
+				fmt.Fprintf(os.Stderr, "    Failed to install: %v\n", installErr)
+				failed++
+				continue
+			}
+
+			fmt.Printf("    ✓ Installed %s\n", issue.Resource)
+			fixed++
 
 		case "orphaned":
 			// Installed but not in manifest
@@ -485,13 +576,35 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, manager interface
 	fmt.Println()
 	if fixed > 0 {
 		fmt.Printf("✓ Fixed %d issue(s)\n", fixed)
-		fmt.Println("Run 'aimgr install' to complete repairs")
 	}
 	if failed > 0 {
 		fmt.Printf("✗ Failed to fix %d issue(s)\n", failed)
 	}
 
 	return nil
+}
+
+// parseResourceFromIssue extracts the resource type and name from a VerifyIssue.
+// It uses the directory path to determine the resource type (commands/, skills/, agents/)
+// and strips file extensions like .md from the resource name.
+func parseResourceFromIssue(issue VerifyIssue) (resource.ResourceType, string) {
+	name := issue.Resource
+
+	// Determine type from the directory path
+	pathLower := strings.ToLower(issue.Path)
+	switch {
+	case strings.Contains(pathLower, "/commands/"):
+		name = strings.TrimSuffix(name, ".md")
+		return resource.Command, name
+	case strings.Contains(pathLower, "/skills/"):
+		return resource.Skill, name
+	case strings.Contains(pathLower, "/agents/"):
+		name = strings.TrimSuffix(name, ".md")
+		return resource.Agent, name
+	default:
+		// Fallback — try to infer from name
+		return resource.Skill, name
+	}
 }
 
 var (

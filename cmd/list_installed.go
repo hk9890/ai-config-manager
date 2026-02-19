@@ -177,6 +177,7 @@ type ResourceInfo struct {
 	Version     string                `json:"version,omitempty" yaml:"version,omitempty"`
 	Targets     []string              `json:"targets" yaml:"targets"`
 	SyncStatus  string                `json:"sync_status" yaml:"sync_status"`
+	Health      string                `json:"health" yaml:"health"`
 }
 
 // getSyncStatus determines the sync status of a resource relative to ai.package.yaml
@@ -235,15 +236,22 @@ func buildResourceInfo(resources []resource.Resource, projectPath string, detect
 	infos := make([]ResourceInfo, 0, len(resources))
 
 	for _, res := range resources {
+		health := "ok"
+		if res.Health == resource.HealthBroken {
+			health = "broken"
+		}
+
 		info := ResourceInfo{
 			Type:        res.Type,
 			Name:        res.Name,
 			Description: res.Description,
 			Version:     res.Version,
 			Targets:     []string{},
+			Health:      health,
 		}
 
 		// Check which tools have this resource installed
+		// For broken resources, isInstalledInTool uses os.Lstat which detects broken symlinks
 		for _, tool := range detectedTools {
 			if isInstalledInTool(projectPath, res.Name, res.Type, tool) {
 				info.Targets = append(info.Targets, tool.String())
@@ -317,18 +325,22 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		}
 	}
 
-	// Create table with NAME, TARGETS, SYNC, DESCRIPTION using shared infrastructure
-	table := output.NewTable("Name", "Targets", "Sync", "Description")
+	// Create table with NAME, TARGETS, SYNC, STATUS, DESCRIPTION using shared infrastructure
+	table := output.NewTable("Name", "Targets", "Sync", "Status", "Description")
 	table.WithResponsive().
-		WithDynamicColumn(3).              // Description stretches
-		WithMinColumnWidths(40, 12, 4, 30) // Name min=40, Targets min=12, Sync min=4, Description min=30
+		WithDynamicColumn(4).                 // Description stretches
+		WithMinColumnWidths(40, 12, 4, 8, 30) // Name min=40, Targets min=12, Sync min=4, Status min=8, Description min=30
 
 	// Add commands
 	for _, cmd := range commands {
 		targets := strings.Join(cmd.Targets, ", ")
 		resourceRef := fmt.Sprintf("command/%s", cmd.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0)
-		table.AddRow(resourceRef, targets, syncSymbol, cmd.Description)
+		status := "✓"
+		if cmd.Health == "broken" {
+			status = "✗ broken"
+		}
+		table.AddRow(resourceRef, targets, syncSymbol, status, cmd.Description)
 	}
 
 	// Add empty row between types if commands exist and skills or agents exist
@@ -341,7 +353,11 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		targets := strings.Join(skill.Targets, ", ")
 		resourceRef := fmt.Sprintf("skill/%s", skill.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0)
-		table.AddRow(resourceRef, targets, syncSymbol, skill.Description)
+		status := "✓"
+		if skill.Health == "broken" {
+			status = "✗ broken"
+		}
+		table.AddRow(resourceRef, targets, syncSymbol, status, skill.Description)
 	}
 
 	// Add empty row between types if skills exist and agents exist
@@ -354,7 +370,11 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		targets := strings.Join(agent.Targets, ", ")
 		resourceRef := fmt.Sprintf("agent/%s", agent.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0)
-		table.AddRow(resourceRef, targets, syncSymbol, agent.Description)
+		status := "✓"
+		if agent.Health == "broken" {
+			status = "✗ broken"
+		}
+		table.AddRow(resourceRef, targets, syncSymbol, status, agent.Description)
 	}
 
 	// Render the table
@@ -365,6 +385,17 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 	// Print legend
 	fmt.Println("\nLegend:")
 	fmt.Println("  ✓ = In sync  * = Not in manifest  ⚠ = Not installed  - = No manifest")
+
+	// Count broken resources and print warning to stderr
+	brokenCount := 0
+	for _, info := range infos {
+		if info.Health == "broken" {
+			brokenCount++
+		}
+	}
+	if brokenCount > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠ %d broken resource(s) found. Run 'aimgr verify --fix' to repair.\n", brokenCount)
+	}
 
 	return nil
 }

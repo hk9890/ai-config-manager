@@ -20,6 +20,16 @@ const (
 	PackageType ResourceType = "package"
 )
 
+// ResourceHealth represents the health status of an installed resource
+type ResourceHealth string
+
+const (
+	// HealthOK indicates the resource symlink is valid and target exists
+	HealthOK ResourceHealth = "ok"
+	// HealthBroken indicates the resource symlink target doesn't exist
+	HealthBroken ResourceHealth = "broken"
+)
+
 // Resource represents an AI resource (command, skill, or agent)
 type Resource struct {
 	Name        string            `json:"name" yaml:"name"` // For nested commands, contains full path (e.g., "api/deploy")
@@ -30,6 +40,7 @@ type Resource struct {
 	License     string            `json:"license,omitempty" yaml:"license,omitempty"`
 	Path        string            `json:"path" yaml:"path"`
 	Metadata    map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Health      ResourceHealth    `json:"health,omitempty" yaml:"health,omitempty"`
 }
 
 var (
