@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.6.0] - 2026-02-19
+
+### Added
+- **Hash-based source IDs** — Deterministic, collision-resistant source identity for reliable tracking across renames (`pkg/repomanifest/sourceid.go`)
+- **Source ID threading** — Source IDs flow through `repo add` and `repo sync` pipelines for consistent tracking
+- **Sync orphan cleanup** — `repo sync` now detects and removes resources that were deleted from their source
+- **Cross-source collision detection** — Sync warns when resources from different sources would collide
+- **Remove by source** — `repo remove --source` removes all resources from a specific source
+- **Broken symlink warnings** — `repo remove` warns before removing resources with active project symlinks
+- **Broken symlink detection** — `list` shows resource health indicator (ok/broken)
+- **Broken symlink recovery** — `verify --fix` reinstalls recoverable broken resources
+- **E2E tests** — Add/remove cycles, sync lifecycle, source rename scenarios
+- **Comprehensive broken symlink tests** — Unit tests for broken symlink detection across all resource types
+
+### Changed
+- Manifest now stores source ID alongside source name for reliable identity
+- `repo sync` tracks resource-to-source mapping and cleans up orphans
+- `repo remove` checks for active project symlinks before removing
+
+
 ## [2.5.0] - 2026-02-17
 
 ### Added
