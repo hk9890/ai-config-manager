@@ -12,8 +12,8 @@ import (
 func (m *Manager) Remove(name string, resourceType resource.ResourceType) error {
 	path := m.GetPath(name, resourceType)
 
-	// Check if resource exists
-	if _, err := os.Stat(path); err != nil {
+	// Check if resource exists (Lstat so dangling symlinks are found too)
+	if _, err := os.Lstat(path); err != nil {
 		return fmt.Errorf("resource '%s' not found", name)
 	}
 

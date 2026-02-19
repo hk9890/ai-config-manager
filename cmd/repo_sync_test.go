@@ -875,8 +875,8 @@ func TestScanSourceResources_PartialTypes(t *testing.T) {
 	}
 }
 
-// TestRunSync_DetectsRemovedResources tests that sync detects resources
-// deleted from a source between syncs
+// TestRunSync_DetectsRemovedResources tests that sync detects and removes resources
+// deleted from a source between syncs (bmz1.2 detection + bmz1.3 removal)
 func TestRunSync_DetectsRemovedResources(t *testing.T) {
 	sourceDir := createTestSource(t)
 
@@ -911,9 +911,7 @@ func TestRunSync_DetectsRemovedResources(t *testing.T) {
 		t.Fatalf("failed to remove skill from source: %v", err)
 	}
 
-	// Second sync: should detect the removals
-	// Note: bmz1.2 only detects — it does NOT remove. The resources should still exist
-	// in the repo after sync, but the removals should be detected.
+	// Second sync: should detect AND remove the orphans (bmz1.3)
 	err = runSync(syncCmd, []string{})
 	if err != nil {
 		t.Fatalf("second sync failed: %v", err)
@@ -924,18 +922,9 @@ func TestRunSync_DetectsRemovedResources(t *testing.T) {
 	verifyResourcesInRepo(t, repoPath, resource.Skill, "sync-test-skill", "pdf-processing")
 	verifyResourcesInRepo(t, repoPath, resource.Agent, "sync-test-agent", "code-reviewer")
 
-	// The removed resources: since import mode is symlink, the symlink entries
-	// may still exist as dangling symlinks. Verify with Lstat (checks symlink itself,
-	// not target). bmz1.2 only detects removals, doesn't remove from repo.
-	danglingCmd := filepath.Join(repoPath, "commands", "pdf-command.md")
-	if _, err := os.Lstat(danglingCmd); err != nil {
-		// Symlink was cleaned up by the system or force re-import — either way, detection worked
-		t.Logf("Note: dangling symlink for pdf-command was removed (expected with force mode)")
-	}
-	danglingSkill := filepath.Join(repoPath, "skills", "image-processing")
-	if _, err := os.Lstat(danglingSkill); err != nil {
-		t.Logf("Note: dangling symlink for image-processing was removed (expected with force mode)")
-	}
+	// The removed resources should now be gone from the repo (bmz1.3 removes them)
+	verifyResourcesNotInRepo(t, repoPath, resource.Command, "pdf-command")
+	verifyResourcesNotInRepo(t, repoPath, resource.Skill, "image-processing")
 }
 
 // TestRunSync_FailedSourceExcludedFromRemovalDetection tests that
@@ -980,16 +969,11 @@ func TestRunSync_FailedSourceExcludedFromRemovalDetection(t *testing.T) {
 		t.Fatalf("second sync failed (should succeed with partial): %v", err)
 	}
 
-	// Resources from valid source should still be in repo
+	// Resources from valid source that still exist should be present
 	verifyResourcesInRepo(t, repoPath, resource.Command, "sync-test-cmd", "test-command")
-	// pdf-command: source file was removed, so the symlink is dangling.
-	// bmz1.2 only detects removals — it doesn't remove from repo.
-	// Use Lstat to verify the symlink entry itself still exists (os.Stat follows
-	// symlinks and would fail on a dangling one).
-	danglingCmd := filepath.Join(repoPath, "commands", "pdf-command.md")
-	if _, err := os.Lstat(danglingCmd); err != nil {
-		t.Logf("Note: dangling symlink for pdf-command was removed (expected with force mode)")
-	}
+
+	// pdf-command was removed from source, so sync should have removed it (bmz1.3)
+	verifyResourcesNotInRepo(t, repoPath, resource.Command, "pdf-command")
 }
 
 // TestRunSync_NoRemovalsWhenSourceUnchanged tests that no removals are
@@ -1062,4 +1046,280 @@ func TestSyncSource_ReturnsSourcePath(t *testing.T) {
 	if returnedPath != absSourceDir {
 		t.Errorf("syncSource returned path %q, expected %q", returnedPath, absSourceDir)
 	}
+}
+
+// TestRunSync_DryRunDoesNotRemoveOrphans tests that --dry-run mode detects
+// orphaned resources but does NOT actually remove them from the repo
+func TestRunSync_DryRunDoesNotRemoveOrphans(t *testing.T) {
+	sourceDir := createTestSource(t)
+
+	sourceID := "src-dryrun-rm"
+	sources := []*repomanifest.Source{
+		{
+			Name: "dryrun-source",
+			Path: sourceDir,
+			ID:   sourceID,
+		},
+	}
+	repoPath, cleanup := setupTestManifest(t, sources)
+	defer cleanup()
+
+	// First sync: import all resources (non-dry-run)
+	err := runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("first sync failed: %v", err)
+	}
+
+	// Verify all resources imported
+	verifyResourcesInRepo(t, repoPath, resource.Command, "sync-test-cmd", "test-command", "pdf-command")
+
+	// Remove a command from the source
+	if err := os.Remove(filepath.Join(sourceDir, "commands", "pdf-command.md")); err != nil {
+		t.Fatalf("failed to remove command from source: %v", err)
+	}
+
+	// Second sync with --dry-run: should NOT remove the orphan
+	syncDryRunFlag = true
+	defer func() { syncDryRunFlag = false }()
+	err = runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("dry-run sync failed: %v", err)
+	}
+
+	// pdf-command should still exist as a dangling symlink in the repo
+	// (dry-run should not remove it). Use Lstat to check the symlink entry itself.
+	danglingCmd := filepath.Join(repoPath, "commands", "pdf-command.md")
+	if _, err := os.Lstat(danglingCmd); err != nil {
+		t.Errorf("dry-run should NOT have removed pdf-command, but it's gone: %v", err)
+	}
+}
+
+// TestRunSync_RemovesOrphansWithGitCommit tests that orphan removals are
+// committed to git during sync
+func TestRunSync_RemovesOrphansWithGitCommit(t *testing.T) {
+	sourceDir := createTestSource(t)
+
+	sourceID := "src-git-rm"
+	sources := []*repomanifest.Source{
+		{
+			Name: "git-rm-source",
+			Path: sourceDir,
+			ID:   sourceID,
+		},
+	}
+	repoPath, cleanup := setupTestManifest(t, sources)
+	defer cleanup()
+
+	// Initialize as git repo
+	manager, err := repo.NewManager()
+	if err != nil {
+		t.Fatalf("failed to create manager: %v", err)
+	}
+	if err := manager.Init(); err != nil {
+		t.Fatalf("failed to init git repo: %v", err)
+	}
+
+	// First sync: import all resources
+	err = runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("first sync failed: %v", err)
+	}
+
+	// Remove resources from source
+	if err := os.Remove(filepath.Join(sourceDir, "commands", "pdf-command.md")); err != nil {
+		t.Fatalf("failed to remove command: %v", err)
+	}
+	if err := os.RemoveAll(filepath.Join(sourceDir, "skills", "image-processing")); err != nil {
+		t.Fatalf("failed to remove skill: %v", err)
+	}
+
+	// Second sync: should remove orphans and commit
+	err = runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("second sync failed: %v", err)
+	}
+
+	// Verify resources were removed
+	verifyResourcesNotInRepo(t, repoPath, resource.Command, "pdf-command")
+	verifyResourcesNotInRepo(t, repoPath, resource.Skill, "image-processing")
+
+	// Verify git status is clean
+	gitCmd := exec.Command("git", "-C", repoPath, "status", "--porcelain")
+	output, err := gitCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get git status: %v", err)
+	}
+	status := string(output)
+	if status != "" {
+		t.Errorf("expected clean git status after sync with removals, got:\n%s", status)
+	}
+
+	// Verify git log contains removal commits (Manager.Remove commits each individually)
+	gitCmd = exec.Command("git", "-C", repoPath, "log", "--oneline")
+	output, err = gitCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get git log: %v", err)
+	}
+	logOutput := string(output)
+	if !contains(logOutput, "aimgr: remove command: pdf-command") {
+		t.Errorf("expected removal commit for pdf-command in git log, got:\n%s", logOutput)
+	}
+	if !contains(logOutput, "aimgr: remove skill: image-processing") {
+		t.Errorf("expected removal commit for image-processing in git log, got:\n%s", logOutput)
+	}
+}
+
+// TestRunSync_RemovalOnlyForSuccessfulSources verifies that resources from
+// failed sources are NOT removed even if they appear orphaned
+func TestRunSync_RemovalOnlyForSuccessfulSources(t *testing.T) {
+	// Create two separate source directories
+	sourceA := createTestSource(t)
+	sourceB := t.TempDir()
+
+	// Source B has a unique command
+	cmdDir := filepath.Join(sourceB, "commands")
+	if err := os.MkdirAll(cmdDir, 0755); err != nil {
+		t.Fatalf("failed to create commands dir: %v", err)
+	}
+	content := "---\ndescription: Source B only command\n---\n# source-b-cmd"
+	if err := os.WriteFile(filepath.Join(cmdDir, "source-b-cmd.md"), []byte(content), 0644); err != nil {
+		t.Fatalf("failed to create command: %v", err)
+	}
+
+	sources := []*repomanifest.Source{
+		{
+			Name: "source-a",
+			Path: sourceA,
+			ID:   "src-a",
+		},
+		{
+			Name: "source-b",
+			Path: sourceB,
+			ID:   "src-b",
+		},
+	}
+	repoPath, cleanup := setupTestManifest(t, sources)
+	defer cleanup()
+
+	// First sync: both sources succeed
+	err := runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("first sync failed: %v", err)
+	}
+
+	// Verify source B's resource is imported
+	verifyResourcesInRepo(t, repoPath, resource.Command, "source-b-cmd")
+
+	// Now make source B's path invalid (simulating a failed source)
+	sources[1].Path = "/nonexistent/source-b-path"
+	manifest := &repomanifest.Manifest{Version: 1, Sources: sources}
+	if err := manifest.Save(repoPath); err != nil {
+		t.Fatalf("failed to save updated manifest: %v", err)
+	}
+
+	// Second sync: source A succeeds, source B fails
+	// Source B's resources should NOT be removed because source B failed
+	err = runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("second sync failed (should succeed with partial): %v", err)
+	}
+
+	// Source B's resource should still exist (not removed because source failed)
+	// Note: since it was symlinked from the original source B path, the symlink
+	// target still exists. Use Lstat to be safe.
+	sourceBCmd := filepath.Join(repoPath, "commands", "source-b-cmd.md")
+	if _, err := os.Lstat(sourceBCmd); err != nil {
+		t.Errorf("source B's resource should NOT have been removed (source B failed to sync): %v", err)
+	}
+}
+
+// TestRunSync_CrossSourceNameCollision tests that when two sources provide a
+// resource with the same name, orphan cleanup does not incorrectly remove the
+// resource that was overwritten by the other source (bmz1.7).
+//
+// Scenario:
+//  1. Source A has "shared-cmd" and "cmd-a"
+//  2. Source B has "shared-cmd" and "cmd-b"
+//  3. After first sync, "shared-cmd" metadata points to Source B (last-write-wins)
+//  4. "shared-cmd" is then removed from Source A
+//  5. On second sync, orphan detection for Source A sees "shared-cmd" in pre-sync
+//     inventory but not in the source. Without bmz1.7, it would remove it.
+//  6. With bmz1.7: metadata re-check sees "shared-cmd" now belongs to Source B,
+//     so it skips removal. The resource survives.
+func TestRunSync_CrossSourceNameCollision(t *testing.T) {
+	// Source A: has "shared-cmd" and "cmd-a"
+	sourceA := t.TempDir()
+	cmdDirA := filepath.Join(sourceA, "commands")
+	if err := os.MkdirAll(cmdDirA, 0755); err != nil {
+		t.Fatalf("failed to create commands dir for source A: %v", err)
+	}
+	sharedContent := "---\ndescription: Shared command from A\n---\n# shared-cmd (A)"
+	if err := os.WriteFile(filepath.Join(cmdDirA, "shared-cmd.md"), []byte(sharedContent), 0644); err != nil {
+		t.Fatalf("failed to create shared-cmd in source A: %v", err)
+	}
+	cmdAContent := "---\ndescription: Source A only\n---\n# cmd-a"
+	if err := os.WriteFile(filepath.Join(cmdDirA, "cmd-a.md"), []byte(cmdAContent), 0644); err != nil {
+		t.Fatalf("failed to create cmd-a: %v", err)
+	}
+
+	// Source B: has "shared-cmd" and "cmd-b"
+	sourceB := t.TempDir()
+	cmdDirB := filepath.Join(sourceB, "commands")
+	if err := os.MkdirAll(cmdDirB, 0755); err != nil {
+		t.Fatalf("failed to create commands dir for source B: %v", err)
+	}
+	sharedContentB := "---\ndescription: Shared command from B\n---\n# shared-cmd (B)"
+	if err := os.WriteFile(filepath.Join(cmdDirB, "shared-cmd.md"), []byte(sharedContentB), 0644); err != nil {
+		t.Fatalf("failed to create shared-cmd in source B: %v", err)
+	}
+	cmdBContent := "---\ndescription: Source B only\n---\n# cmd-b"
+	if err := os.WriteFile(filepath.Join(cmdDirB, "cmd-b.md"), []byte(cmdBContent), 0644); err != nil {
+		t.Fatalf("failed to create cmd-b: %v", err)
+	}
+
+	// Sources: A is synced first, then B overwrites "shared-cmd"
+	sources := []*repomanifest.Source{
+		{
+			Name: "source-a",
+			Path: sourceA,
+			ID:   "src-collision-a",
+		},
+		{
+			Name: "source-b",
+			Path: sourceB,
+			ID:   "src-collision-b",
+		},
+	}
+	repoPath, cleanup := setupTestManifest(t, sources)
+	defer cleanup()
+
+	// First sync: both sources succeed. Source B syncs after A,
+	// so "shared-cmd" metadata ends up pointing to Source B.
+	err := runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("first sync failed: %v", err)
+	}
+
+	// Verify all resources exist
+	verifyResourcesInRepo(t, repoPath, resource.Command, "shared-cmd", "cmd-a", "cmd-b")
+
+	// Now remove "shared-cmd" from Source A (simulating the resource being deleted
+	// from source A between syncs). Source B still has it.
+	if err := os.Remove(filepath.Join(cmdDirA, "shared-cmd.md")); err != nil {
+		t.Fatalf("failed to remove shared-cmd from source A: %v", err)
+	}
+
+	// Second sync: Source A no longer has "shared-cmd" but Source B still does.
+	// Orphan detection for Source A should NOT remove "shared-cmd" because
+	// its metadata now points to Source B.
+	err = runSync(syncCmd, []string{})
+	if err != nil {
+		t.Fatalf("second sync failed: %v", err)
+	}
+
+	// "shared-cmd" should still exist (not incorrectly removed)
+	verifyResourcesInRepo(t, repoPath, resource.Command, "shared-cmd", "cmd-b")
+
+	// "cmd-a" should still exist (it wasn't removed from source A)
+	verifyResourcesInRepo(t, repoPath, resource.Command, "cmd-a")
 }

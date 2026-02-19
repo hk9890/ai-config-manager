@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/discovery"
-	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	resmeta "github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -28,44 +28,83 @@ type resourceInfo struct {
 // for all resources in the repo that have a source assigned.
 // This is used before sync to build a pre-sync inventory, enabling orphan detection
 // by comparing the "before" set with the "after" set.
+//
+// Instead of using manager.List() (which skips dangling symlinks), this function
+// scans the .metadata/ directories directly. Metadata files are real files that
+// persist even when the resource symlink is dangling, ensuring complete inventory.
 func collectResourcesBySource(manager *repo.Manager, repoPath string) (map[string][]resourceInfo, error) {
-	// List all resources in the repo (commands, skills, agents, packages)
-	resources, err := manager.List(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list resources: %w", err)
+	bySource := make(map[string][]resourceInfo)
+
+	// Resource types to scan with their metadata subdirectory names
+	types := []struct {
+		resType resource.ResourceType
+		metaDir string
+	}{
+		{resource.Command, "commands"},
+		{resource.Skill, "skills"},
+		{resource.Agent, "agents"},
 	}
 
-	bySource := make(map[string][]resourceInfo)
-	for _, res := range resources {
-		var key string
+	for _, rt := range types {
+		metaDirPath := filepath.Join(repoPath, ".metadata", rt.metaDir)
+		entries, err := os.ReadDir(metaDirPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("failed to read metadata dir %s: %w", rt.metaDir, err)
+		}
 
-		if res.Type == resource.PackageType {
-			// Load package-specific metadata
-			pkgMeta, err := metadata.LoadPackageMetadata(res.Name, repoPath)
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), "-metadata.json") {
+				continue
+			}
+
+			// Extract resource name from filename: <name>-metadata.json
+			name := strings.TrimSuffix(entry.Name(), "-metadata.json")
+
+			meta, err := resmeta.Load(name, rt.resType, repoPath)
 			if err != nil {
-				continue // Skip packages without metadata
+				continue // Skip unreadable metadata
 			}
-			key = pkgMeta.SourceID
-			if key == "" {
-				key = pkgMeta.SourceName
-			}
-		} else {
-			// Load resource metadata (commands, skills, agents)
-			meta, err := metadata.Load(res.Name, res.Type, repoPath)
-			if err != nil {
-				continue // Skip resources without metadata
-			}
-			key = meta.SourceID
+
+			key := meta.SourceID
 			if key == "" {
 				key = meta.SourceName
 			}
-		}
+			if key == "" {
+				continue // Skip resources without source info
+			}
 
-		if key == "" {
-			continue // Skip resources without source info
+			bySource[key] = append(bySource[key], resourceInfo{Name: name, Type: rt.resType})
 		}
+	}
 
-		bySource[key] = append(bySource[key], resourceInfo{Name: res.Name, Type: res.Type})
+	// Handle packages separately (different metadata structure)
+	pkgMetaDir := filepath.Join(repoPath, ".metadata", "packages")
+	pkgEntries, err := os.ReadDir(pkgMetaDir)
+	if err == nil {
+		for _, entry := range pkgEntries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), "-metadata.json") {
+				continue
+			}
+
+			name := strings.TrimSuffix(entry.Name(), "-metadata.json")
+			pkgMeta, err := resmeta.LoadPackageMetadata(name, repoPath)
+			if err != nil {
+				continue
+			}
+
+			key := pkgMeta.SourceID
+			if key == "" {
+				key = pkgMeta.SourceName
+			}
+			if key == "" {
+				continue
+			}
+
+			bySource[key] = append(bySource[key], resourceInfo{Name: name, Type: resource.PackageType})
+		}
 	}
 
 	return bySource, nil
@@ -385,6 +424,17 @@ func runSync(cmd *cobra.Command, args []string) error {
 							continue // Still in source, keep it
 						}
 					}
+
+					// Before marking for removal, re-check metadata to handle
+					// cross-source name collisions (bmz1.7). If another source
+					// overwrote this resource during sync, its metadata now
+					// points to the other source — skip removal in that case.
+					if !resmeta.HasSource(res.Name, res.Type, sourceKey, repoPath) {
+						fmt.Fprintf(os.Stderr, "  ⚠ Skipping removal of %s/%s: metadata now points to a different source (name collision)\n",
+							res.Type, res.Name)
+						continue
+					}
+
 					// Resource was in repo but not in source -> removed
 					removedResources[sourceKey] = append(removedResources[sourceKey], res)
 				}
@@ -427,34 +477,52 @@ func runSync(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Report detected removals (actual removal is handled by bmz1.3)
-	totalRemoved := 0
+	// Count total resources to be removed
+	totalToRemove := 0
 	for _, resources := range removedResources {
-		totalRemoved += len(resources)
+		totalToRemove += len(resources)
 	}
-	if totalRemoved > 0 {
-		fmt.Printf("Detected %d resource(s) removed from source(s):\n", totalRemoved)
+
+	// Warn about breaking project symlinks before removing (bmz1.3)
+	if totalToRemove > 0 {
+		fmt.Fprintf(os.Stderr, "\n⚠ Removed resources may have active project installations.\n")
+		fmt.Fprintf(os.Stderr, "  Run 'aimgr project verify --fix' in affected projects to clean up broken symlinks.\n\n")
+	}
+
+	// Remove orphaned resources or show dry-run preview (bmz1.3)
+	removeCount := 0
+	if !syncDryRunFlag && totalToRemove > 0 {
+		fmt.Printf("Removing %d resource(s) no longer in sources:\n", totalToRemove)
 		for sourceKey, resources := range removedResources {
-			var names []string
 			for _, res := range resources {
-				names = append(names, fmt.Sprintf("%s/%s", res.Type, res.Name))
+				fmt.Printf("  - %s/%s (from %s)\n", res.Type, res.Name, sourceKey)
+				if err := manager.Remove(res.Name, res.Type); err != nil {
+					fmt.Fprintf(os.Stderr, "  ⚠ Warning: failed to remove %s/%s: %v\n",
+						res.Type, res.Name, err)
+				} else {
+					removeCount++
+				}
 			}
-			fmt.Printf("  %s: %s\n", sourceKey, strings.Join(names, ", "))
 		}
-		fmt.Println()
+		fmt.Printf("✓ Removed %d resource(s)\n", removeCount)
+	} else if syncDryRunFlag && totalToRemove > 0 {
+		fmt.Printf("\nWould remove %d resource(s) no longer in sources:\n", totalToRemove)
+		for sourceKey, resources := range removedResources {
+			for _, res := range resources {
+				fmt.Printf("  - %s/%s (from %s)\n", res.Type, res.Name, sourceKey)
+			}
+		}
 	}
 
 	// Print overall summary
 	fmt.Println("═══════════════════════════════════════════════════════════")
-	fmt.Printf("Sync Complete: %d/%d sources synced successfully\n", sourcesProcessed, len(manifest.Sources))
+	fmt.Printf("Sync Complete: %d/%d sources synced, %d resource(s) removed\n",
+		sourcesProcessed, len(manifest.Sources), removeCount)
 	if sourcesFailed > 0 {
 		fmt.Printf("  %d source(s) failed or skipped:\n", sourcesFailed)
 		for _, name := range failedSources {
 			fmt.Printf("    - %s\n", name)
 		}
-	}
-	if totalRemoved > 0 {
-		fmt.Printf("  %d resource(s) detected as removed from source(s)\n", totalRemoved)
 	}
 	fmt.Println()
 
