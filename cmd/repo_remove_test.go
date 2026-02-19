@@ -12,6 +12,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 )
 
 func TestRepoRemove_ByName(t *testing.T) {
@@ -650,5 +651,319 @@ description: Command from source 2
 	}
 	if _, err := os.Stat(command2Path); os.IsNotExist(err) {
 		t.Error("command2 should still exist (from source-2)")
+	}
+}
+
+func TestRepoRemove_CleansUpSourceMetadata(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := repo.NewManagerWithPath(tempDir)
+
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Add a source to the manifest
+	manifest, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	source := &repomanifest.Source{
+		Name: "test-source",
+		Path: "/home/user/resources",
+	}
+	if err := manifest.AddSource(source); err != nil {
+		t.Fatalf("Failed to add source: %v", err)
+	}
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create source metadata entry
+	srcMeta, err := sourcemetadata.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load source metadata: %v", err)
+	}
+	srcMeta.SetAdded("test-source", time.Now())
+	srcMeta.SetLastSynced("test-source", time.Now())
+	if err := srcMeta.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save source metadata: %v", err)
+	}
+
+	// Verify source metadata exists before removal
+	srcMeta, _ = sourcemetadata.Load(tempDir)
+	if srcMeta.Get("test-source") == nil {
+		t.Fatal("Source metadata should exist before removal")
+	}
+
+	// Remove the source
+	if err := performRemove(mgr, "test-source", false, false); err != nil {
+		t.Fatalf("Failed to remove source: %v", err)
+	}
+
+	// Verify source metadata is cleaned up
+	srcMeta, err = sourcemetadata.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load source metadata after removal: %v", err)
+	}
+	if srcMeta.Get("test-source") != nil {
+		t.Error("Source metadata should be cleaned up after removal")
+	}
+}
+
+func TestRepoRemove_CleansUpSourceMetadata_KeepResources(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := repo.NewManagerWithPath(tempDir)
+
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Add a source to the manifest
+	manifest, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	source := &repomanifest.Source{
+		Name: "test-source",
+		Path: "/home/user/resources",
+	}
+	if err := manifest.AddSource(source); err != nil {
+		t.Fatalf("Failed to add source: %v", err)
+	}
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Add a test resource so we can verify it's kept
+	commandPath := filepath.Join(tempDir, "commands", "test-command.md")
+	commandContent := `---
+name: test-command
+description: Test command
+---
+# Test Command`
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	// Create resource metadata
+	meta := &metadata.ResourceMetadata{
+		Name:           "test-command",
+		Type:           resource.Command,
+		SourceType:     "local",
+		SourceURL:      "/home/user/resources",
+		SourceName:     "test-source",
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(meta, tempDir, "test-source"); err != nil {
+		t.Fatalf("Failed to save metadata: %v", err)
+	}
+
+	// Create source metadata entry
+	srcMeta, err := sourcemetadata.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load source metadata: %v", err)
+	}
+	srcMeta.SetAdded("test-source", time.Now())
+	srcMeta.SetLastSynced("test-source", time.Now())
+	if err := srcMeta.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save source metadata: %v", err)
+	}
+
+	// Remove with --keep-resources
+	if err := performRemove(mgr, "test-source", false, true); err != nil {
+		t.Fatalf("Failed to remove source with keep-resources: %v", err)
+	}
+
+	// Verify source metadata is STILL cleaned up (regardless of --keep-resources)
+	srcMeta, err = sourcemetadata.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load source metadata after removal: %v", err)
+	}
+	if srcMeta.Get("test-source") != nil {
+		t.Error("Source metadata should be cleaned up even with --keep-resources")
+	}
+
+	// Verify resources are kept
+	if _, err := os.Stat(commandPath); os.IsNotExist(err) {
+		t.Error("Resource should still exist with --keep-resources")
+	}
+}
+
+func TestRepoRemove_RenamedSourceMatchesByID(t *testing.T) {
+	// Test that resources are found as orphans even after a source is renamed,
+	// because the source ID stays the same (it's based on path/URL, not name).
+	tempDir := t.TempDir()
+
+	mgr := repo.NewManagerWithPath(tempDir)
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Step 1: Add source with original name
+	manifest, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	source := &repomanifest.Source{
+		Name: "original-name",
+		Path: "/home/user/my-resources",
+	}
+
+	if err := manifest.AddSource(source); err != nil {
+		t.Fatalf("Failed to add source: %v", err)
+	}
+
+	// AddSource auto-generates ID; capture it
+	sourceID := source.ID
+	if sourceID == "" {
+		t.Fatal("Expected source to have an auto-generated ID")
+	}
+
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Step 2: Add a resource with metadata that has both source_name and source_id
+	commandPath := filepath.Join(tempDir, "commands", "my-command.md")
+	commandContent := `---
+name: my-command
+description: A test command
+---
+# My Command`
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	meta := &metadata.ResourceMetadata{
+		Name:           "my-command",
+		Type:           resource.Command,
+		SourceType:     "local",
+		SourceURL:      "/home/user/my-resources",
+		SourceName:     "original-name",
+		SourceID:       sourceID,
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(meta, tempDir, "original-name"); err != nil {
+		t.Fatalf("Failed to save metadata: %v", err)
+	}
+
+	// Step 3: Rename source in manifest (simulating manual edit of ai.repo.yaml).
+	// The path stays the same, so the ID stays the same.
+	manifest, err = repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to reload manifest: %v", err)
+	}
+
+	// Remove old and add new with same path (same ID) but different name
+	_, err = manifest.RemoveSource("original-name")
+	if err != nil {
+		t.Fatalf("Failed to remove original source: %v", err)
+	}
+
+	renamedSource := &repomanifest.Source{
+		ID:   sourceID, // Keep the same ID
+		Name: "new-name",
+		Path: "/home/user/my-resources",
+	}
+	if err := manifest.AddSource(renamedSource); err != nil {
+		t.Fatalf("Failed to add renamed source: %v", err)
+	}
+
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest after rename: %v", err)
+	}
+
+	// Verify resource still exists before remove
+	if _, err := os.Stat(commandPath); os.IsNotExist(err) {
+		t.Fatal("Resource should exist before removal")
+	}
+
+	// Step 4: Remove using the new name — orphan detection should match by source ID
+	if err := performRemove(mgr, "new-name", false, false); err != nil {
+		t.Fatalf("Failed to remove renamed source: %v", err)
+	}
+
+	// Step 5: Verify source is removed from manifest
+	manifest, _ = repomanifest.Load(tempDir)
+	if manifest.HasSource("new-name") {
+		t.Error("Source should not exist after removal")
+	}
+
+	// Verify resource was found as orphan and removed (matched by source_id)
+	if _, err := os.Stat(commandPath); !os.IsNotExist(err) {
+		t.Error("Resource should be removed as orphan (matched by source ID)")
+	}
+
+	// Verify metadata was also removed
+	metadataPath := metadata.GetMetadataPath("my-command", resource.Command, tempDir)
+	if _, err := os.Stat(metadataPath); !os.IsNotExist(err) {
+		t.Error("Resource metadata should be removed")
+	}
+}
+
+func TestRepoRemove_LegacyResourceWithoutSourceID(t *testing.T) {
+	// Test backward compatibility: resources without source_id should still be
+	// matched by source_name.
+	tempDir := t.TempDir()
+
+	mgr := repo.NewManagerWithPath(tempDir)
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	manifest, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load manifest: %v", err)
+	}
+
+	source := &repomanifest.Source{
+		Name: "legacy-source",
+		Path: "/home/user/legacy",
+	}
+	if err := manifest.AddSource(source); err != nil {
+		t.Fatalf("Failed to add source: %v", err)
+	}
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Add a resource with metadata that has source_name but NO source_id (legacy)
+	commandPath := filepath.Join(tempDir, "commands", "legacy-cmd.md")
+	commandContent := `---
+name: legacy-cmd
+description: Legacy command
+---
+# Legacy Command`
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
+		t.Fatalf("Failed to create test command: %v", err)
+	}
+
+	meta := &metadata.ResourceMetadata{
+		Name:       "legacy-cmd",
+		Type:       resource.Command,
+		SourceType: "local",
+		SourceURL:  "/home/user/legacy",
+		SourceName: "legacy-source",
+		// SourceID intentionally empty — legacy resource
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(meta, tempDir, "legacy-source"); err != nil {
+		t.Fatalf("Failed to save metadata: %v", err)
+	}
+
+	// Remove the source — should still find the resource by name fallback
+	if err := performRemove(mgr, "legacy-source", false, false); err != nil {
+		t.Fatalf("Failed to remove source: %v", err)
+	}
+
+	// Verify resource was found as orphan and removed
+	if _, err := os.Stat(commandPath); !os.IsNotExist(err) {
+		t.Error("Legacy resource should be removed as orphan (matched by source name)")
 	}
 }

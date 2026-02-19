@@ -1,16 +1,17 @@
 package repomanifest
 
 import (
-	"time"
-
 	"fmt"
-	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 )
 
 const (
@@ -26,6 +27,7 @@ type Manifest struct {
 
 // Source represents a single synced source in the repository
 type Source struct {
+	ID      string `yaml:"id,omitempty"`
 	Name    string `yaml:"name"`
 	Path    string `yaml:"path,omitempty"`
 	URL     string `yaml:"url,omitempty"`
@@ -72,6 +74,14 @@ func Load(repoPath string) (*Manifest, error) {
 	// This migrates from the old format where state was mixed with config
 	if err := migrateIfNeeded(repoPath, &m); err != nil {
 		return nil, fmt.Errorf("failed to migrate manifest: %w", err)
+	}
+
+	// Migrate sources without IDs (auto-generate from URL/path)
+	if m.migrateSourceIDs() {
+		if err := m.Save(repoPath); err != nil {
+			// Read-only manifest: log warning but continue without persisting IDs
+			slog.Warn("could not persist migrated source IDs", "path", repoPath, "error", err)
+		}
 	}
 
 	// Validate the manifest
@@ -123,8 +133,9 @@ func (m *Manifest) Validate() error {
 		return fmt.Errorf("invalid version: %d (expected 1)", m.Version)
 	}
 
-	// Check for duplicate names
+	// Check for duplicate names and IDs
 	names := make(map[string]bool)
+	ids := make(map[string]bool)
 	for _, source := range m.Sources {
 		if err := validateSource(source); err != nil {
 			return fmt.Errorf("invalid source '%s': %w", source.Name, err)
@@ -134,6 +145,13 @@ func (m *Manifest) Validate() error {
 			return fmt.Errorf("duplicate source name: %s", source.Name)
 		}
 		names[source.Name] = true
+
+		if source.ID != "" {
+			if ids[source.ID] {
+				return fmt.Errorf("duplicate source ID: %s", source.ID)
+			}
+			ids[source.ID] = true
+		}
 	}
 
 	return nil
@@ -156,9 +174,23 @@ func (m *Manifest) AddSource(source *Source) error {
 		source.Name = generateSourceName(source)
 	}
 
+	// Auto-generate ID if not provided
+	if source.ID == "" {
+		source.ID = GenerateSourceID(source)
+	}
+
 	// Validate source
 	if err := validateSource(source); err != nil {
 		return fmt.Errorf("invalid source: %w", err)
+	}
+
+	// Check for duplicate source ID (same canonical location, different name)
+	if source.ID != "" {
+		for _, existing := range m.Sources {
+			if existing.ID == source.ID && existing.Name != source.Name {
+				return fmt.Errorf("source with same location already exists as '%s' (ID: %s)", existing.Name, existing.ID)
+			}
+		}
 	}
 
 	// Check for duplicate name
@@ -170,40 +202,56 @@ func (m *Manifest) AddSource(source *Source) error {
 	return nil
 }
 
-// RemoveSource removes a source by name, path, or URL
-// Returns the removed source and nil error if found
-// Returns nil and error if not found
-func (m *Manifest) RemoveSource(nameOrPath string) (*Source, error) {
+// RemoveSource removes a source by ID, name, path, or URL.
+// ID matching has highest priority, followed by name, then path/URL.
+// Returns the removed source and nil error if found.
+// Returns nil and error if not found.
+func (m *Manifest) RemoveSource(identifier string) (*Source, error) {
 	if m == nil {
 		return nil, fmt.Errorf("cannot remove from nil manifest")
 	}
 
-	if nameOrPath == "" {
+	if identifier == "" {
 		return nil, fmt.Errorf("nameOrPath cannot be empty")
 	}
 
-	// Find source by name first, then by path/URL
+	// First pass: match by ID (highest priority)
 	for i, source := range m.Sources {
-		if source.Name == nameOrPath || source.Path == nameOrPath || source.URL == nameOrPath {
-			// Remove from slice
+		if source.ID != "" && source.ID == identifier {
 			m.Sources = append(m.Sources[:i], m.Sources[i+1:]...)
 			return source, nil
 		}
 	}
 
-	return nil, fmt.Errorf("source not found: %s", nameOrPath)
+	// Second pass: match by name, path, or URL
+	for i, source := range m.Sources {
+		if source.Name == identifier || source.Path == identifier || source.URL == identifier {
+			m.Sources = append(m.Sources[:i], m.Sources[i+1:]...)
+			return source, nil
+		}
+	}
+
+	return nil, fmt.Errorf("source not found: %s", identifier)
 }
 
-// GetSource finds a source by name, path, or URL
-// Returns the source and true if found, nil and false otherwise
-func (m *Manifest) GetSource(nameOrPath string) (*Source, bool) {
-	if m == nil || nameOrPath == "" {
+// GetSource finds a source by ID, name, path, or URL.
+// ID matching has highest priority, followed by name, then path/URL.
+// Returns the source and true if found, nil and false otherwise.
+func (m *Manifest) GetSource(identifier string) (*Source, bool) {
+	if m == nil || identifier == "" {
 		return nil, false
 	}
 
-	// Match by name first, then by path/URL
+	// First pass: match by ID (highest priority)
 	for _, source := range m.Sources {
-		if source.Name == nameOrPath || source.Path == nameOrPath || source.URL == nameOrPath {
+		if source.ID != "" && source.ID == identifier {
+			return source, true
+		}
+	}
+
+	// Second pass: match by name, path, or URL
+	for _, source := range m.Sources {
+		if source.Name == identifier || source.Path == identifier || source.URL == identifier {
 			return source, true
 		}
 	}
@@ -327,6 +375,21 @@ func generateSourceName(source *Source) string {
 	}
 
 	return name
+}
+
+// migrateSourceIDs generates IDs for any sources that lack them.
+// Returns true if any IDs were generated (indicating the manifest should be saved).
+func (m *Manifest) migrateSourceIDs() bool {
+	migrated := false
+	for i := range m.Sources {
+		if m.Sources[i].ID == "" {
+			m.Sources[i].ID = GenerateSourceID(m.Sources[i])
+			if m.Sources[i].ID != "" {
+				migrated = true
+			}
+		}
+	}
+	return migrated
 }
 
 // migrateIfNeeded migrates old manifest format to new format

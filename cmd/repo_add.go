@@ -114,7 +114,16 @@ Examples:
 		} else {
 			// Local source: always use symlink mode
 			importMode = "symlink"
-			addErr = addBulkFromLocalWithMode(parsed.LocalPath, manager, filterFlag, importMode)
+
+			// Compute source ID from absolute path before import
+			absPath, pathErr := filepath.Abs(parsed.LocalPath)
+			if pathErr != nil {
+				return fmt.Errorf("failed to get absolute path: %w", pathErr)
+			}
+			tempSource := repomanifest.Source{Path: absPath}
+			sourceID := repomanifest.GenerateSourceID(&tempSource)
+
+			addErr = addBulkFromLocalWithMode(parsed.LocalPath, manager, filterFlag, sourceID, importMode, "")
 		}
 
 		// If add operation failed or in dry-run mode, return early
@@ -380,7 +389,7 @@ func importFromLocalPath(
 	sourceType string, // "local", "github", "git-url", "test"
 	ref string, // Git ref (empty for local/test)
 ) error {
-	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, ref, "copy", "")
+	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, ref, "copy", "", "")
 }
 
 // importFromLocalPathWithMode is the same as importFromLocalPath but allows specifying import mode.
@@ -393,6 +402,7 @@ func importFromLocalPathWithMode(
 	ref string, // Git ref (empty for local/test)
 	importMode string, // "copy" or "symlink"
 	sourceName string, // Explicit source name from manifest (empty = derive from URL)
+	sourceID string, // Source ID for metadata tracking (empty = none)
 ) error {
 	// Discover all resources (with error collection)
 	commands, commandErrors, err := discovery.DiscoverCommandsWithErrors(localPath, "")
@@ -554,6 +564,7 @@ func importFromLocalPathWithMode(
 	// Import using bulk add
 	opts := repo.BulkImportOptions{
 		SourceName:   sourceName,
+		SourceID:     sourceID,
 		ImportMode:   importMode,
 		Force:        forceFlag,
 		SkipExisting: skipExistingFlag,
@@ -605,11 +616,12 @@ func addBulkFromLocal(localPath string, manager *repo.Manager) error {
 
 // addBulkFromLocalWithFilter handles bulk add from a local folder or single file with a custom filter
 func addBulkFromLocalWithFilter(localPath string, manager *repo.Manager, filter string) error {
-	return addBulkFromLocalWithMode(localPath, manager, filter, "copy")
+	return addBulkFromLocalWithMode(localPath, manager, filter, "", "copy", "")
 }
 
-// addBulkFromLocalWithMode handles bulk add from a local folder or single file with custom filter and import mode
-func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter string, importMode string) error {
+// addBulkFromLocalWithMode handles bulk add from a local folder or single file with custom filter and import mode.
+// If sourceName is non-empty it is used as-is; otherwise the name is derived from --name flag or filepath.Base.
+func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter string, sourceID string, importMode string, sourceName string) error {
 	// Validate path exists
 	if _, err := os.Stat(localPath); err != nil {
 		return fmt.Errorf("path does not exist: %s", localPath)
@@ -649,24 +661,30 @@ func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter st
 	sourceURL := "file://" + absPath
 	sourceType := "local"
 
-	// Determine source name (use --name flag if provided)
-	sourceName := nameFlag
+	// Determine source name: prefer explicit parameter, then --name flag, then filepath.Base
+	if sourceName == "" {
+		sourceName = nameFlag
+	}
 	if sourceName == "" {
 		// Derive from path (same logic as manifest generation)
 		sourceName = filepath.Base(absPath)
 	}
 
 	// Call common import function with import mode
-	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, "", importMode, sourceName)
+	return importFromLocalPathWithMode(localPath, manager, filter, sourceURL, sourceType, "", importMode, sourceName, sourceID)
 }
 
 // addBulkFromGitHub handles bulk add from a GitHub repository
 func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error {
-	return addBulkFromGitHubWithFilter(parsed, manager, filterFlag)
+	// Compute source ID from URL before import
+	tempSource := repomanifest.Source{URL: parsed.URL}
+	sourceID := repomanifest.GenerateSourceID(&tempSource)
+
+	return addBulkFromGitHubWithFilter(parsed, manager, filterFlag, sourceID)
 }
 
 // addBulkFromGitHubWithFilter handles bulk add from a GitHub repository with a custom filter
-func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Manager, filter string) error {
+func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Manager, filter string, sourceID string) error {
 	// Clone repository to workspace
 	cloneURL, err := source.GetCloneURL(parsed)
 	if err != nil {
@@ -739,7 +757,7 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 	}
 
 	// Call common import function with workspace path
-	return importFromLocalPathWithMode(searchPath, manager, filter, parsed.URL, sourceType, parsed.Ref, "copy", sourceName)
+	return importFromLocalPathWithMode(searchPath, manager, filter, parsed.URL, sourceType, parsed.Ref, "copy", sourceName, sourceID)
 }
 
 // selectResource handles resource selection when multiple resources are found

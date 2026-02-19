@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,8 +9,10 @@ import (
 
 	"github.com/hk9890/ai-config-manager/pkg/manifest"
 	"github.com/hk9890/ai-config-manager/pkg/output"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var projectVerifyCmd = &cobra.Command{
@@ -74,23 +77,37 @@ Examples:
 			issues = append(issues, manifestIssues...)
 		}
 
+		// Parse format flag
+		parsedFormat, err := output.ParseFormat(verifyFormatFlag2)
+		if err != nil {
+			return err
+		}
+
 		// Report results
 		if len(issues) == 0 {
-			fmt.Println("✓ All installed resources are valid")
-			return nil
+			return displayNoIssues(parsedFormat)
 		}
 
 		// Display issues
-		fmt.Printf("Found %d issue(s):\n\n", len(issues))
-		displayVerifyIssues(issues)
+		if parsedFormat == output.Table {
+			fmt.Printf("Found %d issue(s):\n\n", len(issues))
+		}
+		if err := displayVerifyIssues(issues, parsedFormat); err != nil {
+			return err
+		}
 
 		// Auto-fix if requested
 		if verifyFixFlag {
-			fmt.Println("\nAttempting to fix issues...")
+			if parsedFormat == output.Table {
+				fmt.Println("\nAttempting to fix issues...")
+			}
 			return fixVerifyIssues(projectPath, issues, manager)
 		}
 
-		fmt.Println("\nRun 'aimgr verify --fix' to automatically fix these issues")
+		// Show fix suggestion only for table format
+		if parsedFormat == output.Table {
+			fmt.Println("\nRun 'aimgr verify --fix' to automatically fix these issues")
+		}
 		return nil
 	},
 }
@@ -233,10 +250,102 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 		if len(parts) != 2 {
 			continue
 		}
-		resType := parts[0] // "skill", "command", "agent"
+		resType := parts[0] // "skill", "command", "agent", "package"
 		resName := parts[1]
 
-		// Check if installed in any tool
+		// Special handling for packages - check if all constituent resources are installed
+		if resType == "package" {
+			// Load package definition
+			packagePath := resource.GetPackagePath(resName, repoPath)
+			pkg, err := resource.LoadPackage(packagePath)
+			if err != nil {
+				// Package definition doesn't exist or is invalid
+				issues = append(issues, VerifyIssue{
+					Resource:    resourceRef,
+					Tool:        "any",
+					IssueType:   "not-installed",
+					Description: fmt.Sprintf("Package definition not found in repository: %v", err),
+					Path:        manifestPath,
+					Severity:    "warning",
+				})
+				continue
+			}
+
+			// Check if all resources in the package are installed
+			allInstalled := true
+			for _, pkgRes := range pkg.Resources {
+				resInstalled := false
+				resParts := strings.SplitN(pkgRes, "/", 2)
+				if len(resParts) != 2 {
+					continue
+				}
+
+				// Check if this resource is installed
+				for _, tool := range detectedTools {
+					toolInfo := tools.GetToolInfo(tool)
+					var checkPaths []string
+
+					switch resParts[0] {
+					case "skill":
+						if !toolInfo.SupportsSkills {
+							continue
+						}
+						// Skills are directories
+						checkPaths = []string{filepath.Join(projectPath, toolInfo.SkillsDir, resParts[1])}
+					case "command":
+						if !toolInfo.SupportsCommands {
+							continue
+						}
+						// Commands can be files or nested: check both directory and .md file
+						basePath := filepath.Join(projectPath, toolInfo.CommandsDir, resParts[1])
+						checkPaths = []string{
+							basePath,         // Directory (for nested commands)
+							basePath + ".md", // File
+						}
+					case "agent":
+						if !toolInfo.SupportsAgents {
+							continue
+						}
+						// Agents are files
+						basePath := filepath.Join(projectPath, toolInfo.AgentsDir, resParts[1])
+						checkPaths = []string{basePath + ".md"}
+					default:
+						continue
+					}
+
+					// Check if any of the paths exist
+					for _, path := range checkPaths {
+						if _, err := os.Lstat(path); err == nil {
+							resInstalled = true
+							break
+						}
+					}
+
+					if resInstalled {
+						break
+					}
+				}
+
+				if !resInstalled {
+					allInstalled = false
+					break
+				}
+			}
+
+			if !allInstalled {
+				issues = append(issues, VerifyIssue{
+					Resource:    resourceRef,
+					Tool:        "any",
+					IssueType:   "not-installed",
+					Description: fmt.Sprintf("Listed in %s but not all package resources are installed", manifest.ManifestFileName),
+					Path:        manifestPath,
+					Severity:    "warning",
+				})
+			}
+			continue
+		}
+
+		// Check if regular resource is installed in any tool
 		installed := false
 		for _, tool := range detectedTools {
 			toolInfo := tools.GetToolInfo(tool)
@@ -283,21 +392,58 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 	return issues, nil
 }
 
-func displayVerifyIssues(issues []VerifyIssue) {
-	table := output.NewTable("Resource", "Tool", "Issue", "Details")
-	table.WithResponsive().
-		WithDynamicColumn(3).
-		WithMinColumnWidths(20, 12, 15, 40)
+func displayNoIssues(format output.Format) error {
+	switch format {
+	case output.JSON:
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(map[string][]VerifyIssue{"issues": {}})
 
-	for _, issue := range issues {
-		symbol := "⚠"
-		if issue.Severity == "error" {
-			symbol = "✗"
-		}
-		table.AddRow(issue.Resource, issue.Tool, symbol+" "+issue.IssueType, issue.Description)
+	case output.YAML:
+		encoder := yaml.NewEncoder(os.Stdout)
+		defer func() { _ = encoder.Close() }()
+		return encoder.Encode(map[string][]VerifyIssue{"issues": {}})
+
+	case output.Table:
+		fmt.Println("✓ All installed resources are valid")
+		return nil
+
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
 	}
+}
 
-	_ = table.Format(output.Table)
+func displayVerifyIssues(issues []VerifyIssue, format output.Format) error {
+	switch format {
+	case output.JSON:
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(issues)
+
+	case output.YAML:
+		encoder := yaml.NewEncoder(os.Stdout)
+		defer func() { _ = encoder.Close() }()
+		return encoder.Encode(issues)
+
+	case output.Table:
+		table := output.NewTable("Name", "Tool", "Issue", "Details")
+		table.WithResponsive().
+			WithDynamicColumn(3).
+			WithMinColumnWidths(40, 12, 15, 40)
+
+		for _, issue := range issues {
+			symbol := "⚠"
+			if issue.Severity == "error" {
+				symbol = "✗"
+			}
+			table.AddRow(issue.Resource, issue.Tool, symbol+" "+issue.IssueType, issue.Description)
+		}
+
+		return table.Format(output.Table)
+
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
 }
 
 func fixVerifyIssues(projectPath string, issues []VerifyIssue, manager interface{}) error {
@@ -359,4 +505,7 @@ func init() {
 	projectVerifyCmd.Flags().StringVar(&verifyProjectPath, "project-path", "", "Project directory path (default: current directory)")
 	projectVerifyCmd.Flags().BoolVar(&verifyFixFlag, "fix", false, "Automatically fix issues by reinstalling resources")
 	projectVerifyCmd.Flags().StringVar(&verifyFormatFlag2, "format", "table", "Output format (table|json|yaml)")
+
+	// Register completion functions
+	_ = projectVerifyCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }

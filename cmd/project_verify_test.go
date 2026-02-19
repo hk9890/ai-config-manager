@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hk9890/ai-config-manager/pkg/manifest"
+	"github.com/hk9890/ai-config-manager/pkg/output"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
@@ -342,8 +343,11 @@ func TestDisplayVerifyIssues(t *testing.T) {
 		},
 	}
 
-	// Just verify it doesn't panic
-	displayVerifyIssues(issues)
+	// Just verify it doesn't panic and returns no error
+	err := displayVerifyIssues(issues, output.Table)
+	if err != nil {
+		t.Errorf("displayVerifyIssues failed: %v", err)
+	}
 }
 
 func TestVerifyIssueTypes(t *testing.T) {

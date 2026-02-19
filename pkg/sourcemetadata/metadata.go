@@ -10,6 +10,7 @@ import (
 
 // SourceState tracks runtime state for a single source
 type SourceState struct {
+	SourceID   string    `json:"source_id,omitempty"`
 	Added      time.Time `json:"added"`
 	LastSynced time.Time `json:"last_synced,omitempty"`
 }

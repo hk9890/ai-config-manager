@@ -177,6 +177,7 @@ func (m *Manager) addResource(sourcePath, sourceURL, sourceType, ref string, opt
 		Type:           resType,
 		SourceType:     sourceType,
 		SourceURL:      sourceURL,
+		SourceID:       opts.SourceID,
 		Ref:            ref,
 		FirstInstalled: now,
 		LastUpdated:    now,
@@ -310,6 +311,7 @@ func (m *Manager) AddAgentWithRef(sourcePath, sourceURL, sourceType, ref string)
 func (m *Manager) addAgentWithOptions(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions) error {
 	return m.addResource(sourcePath, sourceURL, sourceType, ref, opts, resource.Agent, resource.LoadAgent, false)
 }
+
 // AddPackage adds a package resource to the repository.
 // Metadata is automatically saved to .metadata/packages/<name>-metadata.json
 func (m *Manager) AddPackage(sourcePath, sourceURL, sourceType string) error {
@@ -452,6 +454,7 @@ func (m *Manager) addPackageWithOptions(sourcePath, sourceURL, sourceType, ref s
 		SourceType:    sourceType,
 		SourceURL:     sourceURL,
 		SourceName:    sourceName,
+		SourceID:      opts.SourceID,
 		SourceRef:     ref,
 		FirstAdded:    now,
 		LastUpdated:   now,

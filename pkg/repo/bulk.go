@@ -14,6 +14,7 @@ import (
 // BulkImportOptions contains options for bulk import operations
 type BulkImportOptions struct {
 	SourceName   string // Explicit source name from manifest (overrides derived name)
+	SourceID     string // Source ID from manifest (hash-based)
 	ImportMode   string // "copy" or "symlink"
 	Force        bool   // Overwrite existing resources
 	SkipExisting bool   // Skip conflicts silently
@@ -26,6 +27,7 @@ type BulkImportOptions struct {
 // ImportOptions contains options for single resource import operations
 type ImportOptions struct {
 	SourceName string // Explicit source name from manifest (overrides derived name)
+	SourceID   string // Source ID from manifest (hash-based)
 	ImportMode string // "copy" or "symlink"
 	Force      bool   // Overwrite existing resources
 }
@@ -214,6 +216,7 @@ func (m *Manager) importResource(sourcePath string, opts BulkImportOptions, resu
 		// Create import options from bulk options
 		importOpts := ImportOptions{
 			SourceName: opts.SourceName,
+			SourceID:   opts.SourceID,
 			ImportMode: opts.ImportMode,
 			Force:      opts.Force,
 		}
@@ -348,6 +351,7 @@ func (m *Manager) importPackage(sourcePath string, opts BulkImportOptions, resul
 		// Create import options from bulk options
 		importOpts := ImportOptions{
 			SourceName: opts.SourceName,
+			SourceID:   opts.SourceID,
 			ImportMode: opts.ImportMode,
 			Force:      opts.Force,
 		}

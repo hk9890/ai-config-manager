@@ -24,6 +24,7 @@ type ResourceMetadata struct {
 	SourceType     string                `json:"source_type"`           // Source type: "github", "local", "file"
 	SourceURL      string                `json:"source_url"`            // Source URL or file path
 	SourceName     string                `json:"source_name,omitempty"` // Source name from ai.repo.yaml or derived from URL/path
+	SourceID       string                `json:"source_id,omitempty"`   // Source ID from ai.repo.yaml (hash-based)
 	Ref            string                `json:"ref,omitempty"`         // Git ref (branch/tag/commit), defaults to "main" if empty
 	FirstInstalled time.Time             `json:"first_installed"`       // When resource was first added
 	LastUpdated    time.Time             `json:"last_updated"`          // When resource was last updated
@@ -88,15 +89,22 @@ func Load(name string, resourceType resource.ResourceType, repoPath string) (*Re
 	return &metadata, nil
 }
 
-// HasSource checks if a resource has the specified source name.
-// Returns false if the metadata doesn't exist or if the source name doesn't match.
-// Legacy resources without source_name are treated as having an unknown source (returns false).
-func HasSource(name string, resourceType resource.ResourceType, sourceName, repoPath string) bool {
+// HasSource checks if a resource has the specified source identifier.
+// The sourceIdentifier is matched against SourceID first (if present), then falls back
+// to matching against SourceName for backward compatibility with resources that
+// don't yet have a SourceID set.
+// Returns false if the metadata doesn't exist or if neither field matches.
+func HasSource(name string, resourceType resource.ResourceType, sourceIdentifier, repoPath string) bool {
 	metadata, err := Load(name, resourceType, repoPath)
 	if err != nil {
 		return false
 	}
-	return metadata.SourceName != "" && metadata.SourceName == sourceName
+	// Check SourceID first
+	if metadata.SourceID != "" && metadata.SourceID == sourceIdentifier {
+		return true
+	}
+	// Fall back to SourceName matching
+	return metadata.SourceName != "" && metadata.SourceName == sourceIdentifier
 }
 
 // DeriveSourceName derives a human-readable source name from a sourceURL.
@@ -254,6 +262,7 @@ type PackageMetadata struct {
 	SourceType     string    `json:"source_type"`
 	SourceURL      string    `json:"source_url,omitempty"`
 	SourceName     string    `json:"source_name,omitempty"`
+	SourceID       string    `json:"source_id,omitempty"`
 	SourceRef      string    `json:"source_ref,omitempty"`
 	FirstAdded     time.Time `json:"first_added"`
 	LastUpdated    time.Time `json:"last_updated"`

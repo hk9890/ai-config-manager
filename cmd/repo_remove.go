@@ -10,6 +10,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
 )
 
 var (
@@ -95,8 +96,17 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 		}
 
 		for _, res := range resources {
-			// Check if resource came from this source (uses Manager.HasSource for DEBUG logging)
-			if mgr.HasSource(res.Name, res.Type, source.Name) {
+			// Check if resource came from this source (uses Manager.HasSource for DEBUG logging).
+			// Try source ID first for precise matching (handles renamed sources),
+			// then fall back to source name for backward compatibility.
+			matched := false
+			if source.ID != "" {
+				matched = mgr.HasSource(res.Name, res.Type, source.ID)
+			}
+			if !matched {
+				matched = mgr.HasSource(res.Name, res.Type, source.Name)
+			}
+			if matched {
 				orphanedResources = append(orphanedResources, res)
 			}
 		}
@@ -131,6 +141,24 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 	// Save manifest
 	if err := manifest.Save(repoPath); err != nil {
 		return fmt.Errorf("failed to save manifest: %w", err)
+	}
+
+	// Clean up source metadata (regardless of --keep-resources)
+	sourceMetadata, err := sourcemetadata.Load(repoPath)
+	if err == nil {
+		removed := false
+		if source.ID != "" {
+			if _, exists := sourceMetadata.Sources[source.ID]; exists {
+				sourceMetadata.Delete(source.ID)
+				removed = true
+			}
+		}
+		if !removed {
+			sourceMetadata.Delete(source.Name)
+		}
+		if err := sourceMetadata.Save(repoPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to update source metadata: %v\n", err)
+		}
 	}
 
 	// Commit manifest changes to git

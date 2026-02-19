@@ -3,6 +3,7 @@ package repomanifest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -427,6 +428,175 @@ func TestAddSource_AutoGenerateName(t *testing.T) {
 	t.Logf("Auto-generated name: %s", source.Name)
 }
 
+func TestAddSource_DuplicateIDDetection(t *testing.T) {
+	t.Run("same path same name is duplicate by name", func(t *testing.T) {
+		m := &Manifest{
+			Version: 1,
+			Sources: []*Source{},
+		}
+
+		// Add first source
+		s1 := &Source{
+			Name: "tools",
+			Path: "/tmp/foo/tools",
+		}
+		if err := m.AddSource(s1); err != nil {
+			t.Fatalf("AddSource() first add error = %v", err)
+		}
+
+		// Add same source again with same name → caught by existing name check
+		s2 := &Source{
+			Name: "tools",
+			Path: "/tmp/foo/tools",
+		}
+		err := m.AddSource(s2)
+		if err == nil {
+			t.Fatal("AddSource() expected error for duplicate name, got nil")
+		}
+		if !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("expected 'already exists' in error, got: %s", err)
+		}
+	})
+
+	t.Run("same absolute path different name detected by ID", func(t *testing.T) {
+		m := &Manifest{
+			Version: 1,
+			Sources: []*Source{},
+		}
+
+		// Use a temp dir so we can create paths that resolve to the same absolute path
+		tmpDir := t.TempDir()
+		toolsDir := filepath.Join(tmpDir, "foo", "tools")
+		if err := os.MkdirAll(toolsDir, 0755); err != nil {
+			t.Fatalf("failed to create tools dir: %v", err)
+		}
+
+		// Add first source with canonical path
+		s1 := &Source{
+			Name: "tools",
+			Path: toolsDir,
+		}
+		if err := m.AddSource(s1); err != nil {
+			t.Fatalf("AddSource() first add error = %v", err)
+		}
+
+		// Add same path via "../foo/tools" with a different name
+		altPath := filepath.Join(tmpDir, "foo", "..", "foo", "tools")
+		s2 := &Source{
+			Name: "my-tools",
+			Path: altPath,
+		}
+		err := m.AddSource(s2)
+		if err == nil {
+			t.Fatal("AddSource() expected error for duplicate ID (same path, different name), got nil")
+		}
+		if !strings.Contains(err.Error(), "same location already exists") {
+			t.Errorf("expected 'same location already exists' in error, got: %s", err)
+		}
+		if !strings.Contains(err.Error(), "tools") {
+			t.Errorf("expected existing source name 'tools' in error, got: %s", err)
+		}
+		if !strings.Contains(err.Error(), "src-") {
+			t.Errorf("expected source ID in error, got: %s", err)
+		}
+	})
+
+	t.Run("same URL with and without git suffix detected by ID", func(t *testing.T) {
+		m := &Manifest{
+			Version: 1,
+			Sources: []*Source{},
+		}
+
+		// Add first source with URL without .git
+		s1 := &Source{
+			Name: "my-repo",
+			URL:  "https://github.com/org/repo",
+		}
+		if err := m.AddSource(s1); err != nil {
+			t.Fatalf("AddSource() first add error = %v", err)
+		}
+
+		// Add same URL with .git suffix and different name → same ID
+		s2 := &Source{
+			Name: "repo-copy",
+			URL:  "https://github.com/org/repo.git",
+		}
+		err := m.AddSource(s2)
+		if err == nil {
+			t.Fatal("AddSource() expected error for duplicate ID (URL with .git), got nil")
+		}
+		if !strings.Contains(err.Error(), "same location already exists") {
+			t.Errorf("expected 'same location already exists' in error, got: %s", err)
+		}
+		if !strings.Contains(err.Error(), "my-repo") {
+			t.Errorf("expected existing source name 'my-repo' in error, got: %s", err)
+		}
+	})
+
+	t.Run("different sources succeed with different IDs", func(t *testing.T) {
+		m := &Manifest{
+			Version: 1,
+			Sources: []*Source{},
+		}
+
+		// Add first source
+		s1 := &Source{
+			Name: "source-a",
+			Path: "/path/to/source-a",
+		}
+		if err := m.AddSource(s1); err != nil {
+			t.Fatalf("AddSource() source-a error = %v", err)
+		}
+
+		// Add second, genuinely different source
+		s2 := &Source{
+			Name: "source-b",
+			URL:  "https://github.com/org/different-repo",
+		}
+		if err := m.AddSource(s2); err != nil {
+			t.Fatalf("AddSource() source-b error = %v", err)
+		}
+
+		if len(m.Sources) != 2 {
+			t.Errorf("expected 2 sources, got %d", len(m.Sources))
+		}
+
+		// Verify they have different IDs
+		if m.Sources[0].ID == m.Sources[1].ID {
+			t.Errorf("expected different IDs, both got: %s", m.Sources[0].ID)
+		}
+	})
+
+	t.Run("same name same ID is caught by name check not ID check", func(t *testing.T) {
+		m := &Manifest{
+			Version: 1,
+			Sources: []*Source{},
+		}
+
+		s1 := &Source{
+			Name: "my-repo",
+			URL:  "https://github.com/org/repo",
+		}
+		if err := m.AddSource(s1); err != nil {
+			t.Fatalf("AddSource() first add error = %v", err)
+		}
+
+		// Same name, same URL → same ID, but should be caught by name check
+		s2 := &Source{
+			Name: "my-repo",
+			URL:  "https://github.com/org/repo",
+		}
+		err := m.AddSource(s2)
+		if err == nil {
+			t.Fatal("AddSource() expected error for duplicate, got nil")
+		}
+		// Should be the name-based error, not the ID-based error
+		if !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("expected 'already exists' in error, got: %s", err)
+		}
+	})
+}
+
 // TestAddSource_SetsAddedTimestamp removed - timestamp handling moved to sourcemetadata package
 
 func TestAddSource_NilManifest(t *testing.T) {
@@ -520,6 +690,77 @@ func TestRemoveSource_ByPath(t *testing.T) {
 	}
 	if removed.Name != "test" {
 		t.Errorf("RemoveSource() returned wrong source: %s", removed.Name)
+	}
+}
+
+func TestRemoveSource_ByID(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{
+			{
+				ID:   "src-abc123def456",
+				Name: "source-a",
+				Path: "/path/a",
+			},
+			{
+				ID:   "src-789012345678",
+				Name: "source-b",
+				URL:  "https://github.com/user/repo",
+			},
+		},
+	}
+
+	// Remove by ID (highest priority)
+	removed, err := m.RemoveSource("src-abc123def456")
+	if err != nil {
+		t.Fatalf("RemoveSource() by ID error = %v", err)
+	}
+	if removed.Name != "source-a" {
+		t.Errorf("RemoveSource() returned wrong source: %s", removed.Name)
+	}
+	if len(m.Sources) != 1 {
+		t.Errorf("expected 1 source after removal, got %d", len(m.Sources))
+	}
+
+	// Verify the remaining source is source-b
+	if m.Sources[0].Name != "source-b" {
+		t.Errorf("expected remaining source to be source-b, got %s", m.Sources[0].Name)
+	}
+}
+
+func TestRemoveSource_IDTakesPrecedenceOverName(t *testing.T) {
+	// Edge case: one source's ID happens to match another source's name.
+	// ID matching should take priority.
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{
+			{
+				ID:   "src-aaa111222333",
+				Name: "src-bbb444555666",
+				Path: "/path/first",
+			},
+			{
+				ID:   "src-bbb444555666",
+				Name: "second-source",
+				Path: "/path/second",
+			},
+		},
+	}
+
+	// "src-bbb444555666" matches source-1 by name AND source-2 by ID.
+	// ID should win → removes source-2.
+	removed, err := m.RemoveSource("src-bbb444555666")
+	if err != nil {
+		t.Fatalf("RemoveSource() error = %v", err)
+	}
+	if removed.Name != "second-source" {
+		t.Errorf("expected RemoveSource to match by ID (second-source), got: %s", removed.Name)
+	}
+	if len(m.Sources) != 1 {
+		t.Errorf("expected 1 source remaining, got %d", len(m.Sources))
+	}
+	if m.Sources[0].Name != "src-bbb444555666" {
+		t.Errorf("expected remaining source to be 'src-bbb444555666', got %s", m.Sources[0].Name)
 	}
 }
 

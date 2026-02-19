@@ -78,9 +78,11 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 	return nil
 }
 
-// HasSource checks if a resource belongs to the specified source name.
-// This method wraps metadata.HasSource with DEBUG logging to help diagnose
-// source name mismatches during orphan detection.
+// HasSource checks if a resource belongs to the specified source.
+// This method checks SourceID first for precise matching, then falls back to
+// SourceName matching for backward compatibility with resources that don't yet
+// have a SourceID set.
+// DEBUG logging helps diagnose source name/ID mismatches during orphan detection.
 func (m *Manager) HasSource(name string, resourceType resource.ResourceType, sourceName string) bool {
 	// Load metadata to check source
 	meta, err := metadata.Load(name, resourceType, m.repoPath)
@@ -97,20 +99,26 @@ func (m *Manager) HasSource(name string, resourceType resource.ResourceType, sou
 			return false
 		}
 
-		match := meta.SourceName != "" && meta.SourceName == sourceName
+		// Check SourceID first, then fall back to SourceName
+		matchByID := meta.SourceID != "" && meta.SourceID == sourceName
+		matchByName := meta.SourceName != "" && meta.SourceName == sourceName
+		match := matchByID || matchByName
 
 		m.logger.Debug("checking metadata",
 			"resource", name,
 			"type", string(resourceType),
-			"metadata_source", meta.SourceName,
+			"metadata_source_id", meta.SourceID,
+			"metadata_source_name", meta.SourceName,
 			"expected_source", sourceName,
+			"match_by_id", matchByID,
+			"match_by_name", matchByName,
 			"match", match,
 		)
 
 		// Log mismatch explanation
 		if !match {
-			if meta.SourceName == "" {
-				m.logger.Debug("resource not removed - no source name in metadata",
+			if meta.SourceName == "" && meta.SourceID == "" {
+				m.logger.Debug("resource not removed - no source identity in metadata",
 					"resource", name,
 					"type", string(resourceType),
 					"expected_source", sourceName,
@@ -121,8 +129,9 @@ func (m *Manager) HasSource(name string, resourceType resource.ResourceType, sou
 					"resource", name,
 					"type", string(resourceType),
 					"expected_source", sourceName,
-					"actual_source", meta.SourceName,
-					"reason", "source names do not match",
+					"actual_source_id", meta.SourceID,
+					"actual_source_name", meta.SourceName,
+					"reason", "source identity does not match",
 				)
 			}
 		} else {
@@ -130,6 +139,12 @@ func (m *Manager) HasSource(name string, resourceType resource.ResourceType, sou
 				"resource", name,
 				"type", string(resourceType),
 				"source_name", sourceName,
+				"matched_by", func() string {
+					if matchByID {
+						return "source_id"
+					}
+					return "source_name"
+				}(),
 			)
 		}
 
@@ -137,6 +152,9 @@ func (m *Manager) HasSource(name string, resourceType resource.ResourceType, sou
 	}
 
 	// Fallback to simple check without logging
+	if meta.SourceID != "" && meta.SourceID == sourceName {
+		return true
+	}
 	return meta.SourceName != "" && meta.SourceName == sourceName
 }
 
