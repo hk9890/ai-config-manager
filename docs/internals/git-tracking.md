@@ -428,7 +428,7 @@ jobs:
 
 ## See Also
 
-- [Repository Management](sync-sources.md) - Configuring sync sources
+- [Sources](../user-guide/sources.md) - Configuring sync sources
 - [Workspace Caching](workspace-caching.md) - Understanding `.workspace/`
-- [Pattern Matching](pattern-matching.md) - Selecting resources
-- [Output Formats](output-formats.md) - Scripting with aimgr
+- [Repository Layout](repository-layout.md) - Internal folder structure
+- [Pattern Matching](../reference/pattern-matching.md) - Selecting resources

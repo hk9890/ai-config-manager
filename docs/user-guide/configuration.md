@@ -7,7 +7,6 @@ This guide covers all configuration options for `aimgr`, including repository pa
 `aimgr` uses XDG Base Directory standards for configuration:
 
 - **Default location**: `~/.config/aimgr/aimgr.yaml`
-- **Legacy location**: `~/.ai-repo.yaml` (automatically migrated)
 - **Custom location**: Use `--config` flag (not implemented yet)
 
 The config file is automatically created when you first run commands that need configuration.
@@ -26,7 +25,7 @@ repo:
   path: ~/.local/share/ai-config/repo
 ```
 
-**Note:** Source management for automatic syncing is configured separately via `ai.repo.yaml` files. See [sync-sources.md](./sync-sources.md) for details.
+**Note:** Source management for automatic syncing is configured separately via `ai.repo.yaml` files. See [sources.md](./sources.md) for details.
 
 ---
 
@@ -326,7 +325,117 @@ aimgr config set install.targets claude,opencode
 aimgr config get install.targets
 ```
 
+---
 
+## Field Mappings
+
+Different AI tools often require different values for the same resource fields. For example, OpenCode might use model names in `provider/model` format (e.g., `langdock/claude-sonnet-4-5`) while Claude uses just the model name (e.g., `claude-sonnet-4`). Field mappings let you define logical values in your resources that get transformed to tool-specific values.
+
+### Quick Start Example
+
+The most common use case is mapping model names. Here's a minimal configuration:
+
+```yaml
+# ~/.config/aimgr/aimgr.yaml
+install:
+  targets:
+    - claude
+    - opencode
+
+mappings:
+  skill:
+    model:
+      sonnet-4.5:
+        opencode: "langdock/claude-sonnet-4-5"
+        claude: "claude-sonnet-4"
+```
+
+With this configuration, a skill with `model: sonnet-4.5` in its frontmatter will be transformed to use the appropriate model name for each tool during installation.
+
+### Config Schema
+
+```yaml
+# ~/.config/aimgr/aimgr.yaml
+mappings:
+  skill:
+    model:
+      sonnet-4.5:
+        opencode: "langdock/claude-sonnet-4-5"
+        claude: "claude-sonnet-4"
+      opus-4:
+        opencode: "langdock/claude-opus-4"
+        claude: "claude-opus-4"
+      null:  # Maps missing/empty field to tool-specific value
+        opencode: "langdock/default-model"
+  agent:
+    model:
+      # Same structure as skill
+  command:
+    model:
+      # Same structure as skill
+```
+
+### Key Concepts
+
+**Per-Type Mappings**
+
+Each resource type (`skill`, `agent`, `command`) has its own mapping section. This allows different transformation rules per type if needed.
+
+**Field Transformations**
+
+Structure: `mappings.<type>.<field>.<logical_value>.<tool>: <actual_value>`
+
+- `<type>`: Resource type (skill, agent, command)
+- `<field>`: Frontmatter field name (e.g., model)
+- `<logical_value>`: The value used in your resource files
+- `<tool>`: Target tool name (claude, opencode, copilot, windsurf)
+- `<actual_value>`: The tool-specific value to use
+
+**The `null` Key**
+
+Use the special `null` key to handle resources with missing or empty field values:
+
+```yaml
+mappings:
+  skill:
+    model:
+      null:
+        opencode: "langdock/default-model"
+        claude: "claude-sonnet-4"
+```
+
+This maps any skill without a `model` field (or with an empty value) to tool-specific defaults.
+
+### How It Works
+
+1. **During `repo add` and `repo sync`**: aimgr parses frontmatter in your resources and generates tool-specific variants in a `.modifications/` folder within the repository:
+
+   ```
+   repo/
+     skills/my-skill/SKILL.md          # Original (untouched)
+     agents/reviewer.md                # Original (untouched)
+     .modifications/                   # Generated variants
+       opencode/
+         skills/my-skill/SKILL.md      # Transformed for opencode
+         agents/reviewer.md
+       claude/
+         skills/my-skill/SKILL.md      # Transformed for claude
+         agents/reviewer.md
+   ```
+
+2. **During `install`**: aimgr checks for a modification file. If one exists for the target tool, it symlinks to the modified version. Otherwise, it symlinks to the original file.
+
+3. **During `repo remove`**: aimgr cleans up the corresponding modification files.
+
+### Backwards Compatibility
+
+If no `mappings` section is configured, aimgr behaves exactly as before—no `.modifications/` folder is created, and install always symlinks to the original files.
+
+### File Scope by Type
+
+- **skill**: Only `SKILL.md` is processed for transformations
+- **agent**: All `.md` files in the agent are processed
+- **command**: All `.md` files in the command are processed
 
 ---
 
@@ -347,6 +456,21 @@ install:
 # If not specified, uses: ~/.local/share/ai-config/repo
 repo:
   path: ~/ai-resources
+
+# Field mappings for tool-specific values (optional)
+mappings:
+  skill:
+    model:
+      sonnet-4.5:
+        opencode: "langdock/claude-sonnet-4-5"
+        claude: "claude-sonnet-4"
+      null:
+        opencode: "langdock/default-model"
+  agent:
+    model:
+      sonnet-4.5:
+        opencode: "langdock/claude-sonnet-4-5"
+        claude: "claude-sonnet-4"
 ```
 
 ---
@@ -596,7 +720,7 @@ rm ~/.ai-repo.yaml
 ## See Also
 
 - [README.md](../../README.md) - Quick start and overview
-- [sync-sources.md](./sync-sources.md) - Source management via ai.repo.yaml files
-- [workspace-caching.md](./workspace-caching.md) - Git repository caching
-- [output-formats.md](./output-formats.md) - CLI output formats
-- [pattern-matching.md](./pattern-matching.md) - Pattern syntax for filtering
+- [Sources](./sources.md) - Source management via ai.repo.yaml files
+- [Supported Tools](../reference/supported-tools.md) - Tool support and resource formats
+- [Pattern Matching](../reference/pattern-matching.md) - Pattern syntax for filtering
+- [Output Formats](../reference/output-formats.md) - CLI output formats

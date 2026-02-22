@@ -55,7 +55,7 @@ This optimization significantly improves performance for bulk operations.
 └── agents/                       # Agent resources
 ```
 
-**Note:** The repository path is configurable. See [configuration.md](./configuration.md) for details on customizing the repository location via `repo.path` config or `AIMGR_REPO_PATH` environment variable.
+**Note:** The repository path is configurable. See [configuration.md](../user-guide/configuration.md) for details on customizing the repository location via `repo.path` config or `AIMGR_REPO_PATH` environment variable.
 
 ### Hash-Based Storage
 
@@ -240,6 +240,6 @@ rm -rf ~/.local/share/ai-config/repo/.workspace/
 
 ## Related Documentation
 
-- [Resource Formats](resource-formats.md) - Resource format specifications
-- [Output Formats](output-formats.md) - CLI output formats
-- [Pattern Matching](pattern-matching.md) - Pattern matching for resources
+- [Repository Layout](./repository-layout.md) - Repository folder structure
+- [Git Tracking](./git-tracking.md) - How aimgr uses Git
+- [Supported Tools](../reference/supported-tools.md) - Tool support and resource format documentation

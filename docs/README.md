@@ -4,84 +4,61 @@ Welcome to the **aimgr** (ai-config-manager) documentation! This page serves as 
 
 ## Documentation Structure
 
-The documentation is organized into the following sections:
+The documentation is organized into four sections:
 
-### 📘 [User Guide](user-guide/)
+### [User Guide](user-guide/)
 
-User-facing documentation covering all aspects of using **aimgr** effectively.
+User-facing documentation for using aimgr day-to-day.
 
-**What's inside:**
-- [Getting Started Guide](user-guide/README.md) - Quick start and overview
-- [Pattern Matching](user-guide/pattern-matching.md) - Filter resources with patterns (`skill/*`, `command/test`)
-- [Resource Formats](user-guide/resource-formats.md) - Complete specifications for commands, skills, agents, and packages
-- [Output Formats](user-guide/output-formats.md) - Control CLI output (JSON, YAML, table) for scripting and automation
-- [GitHub Sources](user-guide/github-sources.md) - Import resources from GitHub repositories (`gh:owner/repo`)
-- [Workspace Caching](user-guide/workspace-caching.md) - Understand Git repository caching for 10-50x performance improvements
+**Contents:**
+- [Getting Started](user-guide/getting-started.md) - Installation, first steps, and common operations
+- [Configuration](user-guide/configuration.md) - Repository path, installation targets, and field mappings
+- [Sources](user-guide/sources.md) - Managing remote and local resource sources
 
-**Use this section for:** Learning how to use aimgr, understanding resource formats, scripting with CLI output, and optimizing performance.
+**Use this section for:** Learning how to use aimgr, configuring your setup, and managing resources.
 
 ---
 
-### 🛠️ [Contributor Guide](contributor-guide/)
+### [Reference](reference/)
 
-Documentation for developers contributing to the **aimgr** project.
+Technical reference documentation for syntax and specifications.
 
-**What's inside:**
-- [Contributor Overview](contributor-guide/README.md) - Getting started with development
-- [Release Process](contributor-guide/release-process.md) - Step-by-step guide for creating and publishing releases
+**Contents:**
+- [Supported Tools](reference/supported-tools.md) - AI tools supported by aimgr and their capabilities
+- [Pattern Matching](reference/pattern-matching.md) - Glob patterns for filtering and matching resources
+- [Output Formats](reference/output-formats.md) - CLI output formats (table, JSON, YAML) and scripting
 
-**See also:**
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - Main contributor guide (setup, workflow, code style)
-- [Architecture Documentation](#-architecture) - Technical design and system architecture
-
-**Use this section for:** Setting up a development environment, understanding the contribution workflow, and managing releases.
+**Use this section for:** Looking up exact syntax, understanding tool support, and scripting with aimgr.
 
 ---
 
-### 🏗️ [Architecture](architecture/)
+### [Contributor Guide](contributor-guide/)
 
-Technical design documentation covering architectural decisions, design rules, and system design principles.
+Documentation for developers contributing to aimgr.
 
-**What's inside:**
-- [Architecture Overview](architecture/README.md) - System design, core principles, and component layout
-- [Architecture Rules](contributor-guide/architecture.md) - System overview, design rules, and patterns
-  - Git operations with workspace cache
-  - XDG Base Directory compliance
-  - Build tags for test categories
-  - Error wrapping requirements
+**Contents:**
+- [Overview](contributor-guide/README.md) - Getting started with development
+- [Code Style](contributor-guide/code-style.md) - Naming, imports, error handling, and best practices
+- [Architecture](contributor-guide/architecture.md) - System design, package structure, and design rules
+- [Testing](contributor-guide/testing.md) - Test types, patterns, and troubleshooting
+- [Release Process](contributor-guide/release-process.md) - How to create releases
 
-**Use this section for:** Understanding design decisions, following architectural patterns, and maintaining consistency across the codebase.
+**See also:** [CONTRIBUTING.md](../CONTRIBUTING.md) for setup and workflow.
 
----
-
-### 📦 [Planning Archive](planning/)
-
-Historical planning and analysis documents from the development of **aimgr**.
-
-**What's inside:**
-- Technical investigations and evaluations
-- Implementation strategies and refactoring plans
-- Historical decision-making context
-
-**Note:** These documents are for reference and historical context. They are **not required for general use** of aimgr. See the [User Guide](#-user-guide) for current documentation.
-
-**Use this section for:** Understanding past architectural decisions, finding context for refactoring needs, and learning from historical development processes.
+**Use this section for:** Setting up a development environment and contributing code.
 
 ---
 
-### 📜 [Release Notes Archive](archive/release-notes/)
+### [Internals](internals/)
 
-Archived release notes from previous versions of **aimgr**.
+Implementation details for curious users and contributors.
 
-**What's inside:**
-- Historical release announcements (v0.3.0 through v1.4.0)
-- Feature additions and bug fixes from past releases
+**Contents:**
+- [Repository Layout](internals/repository-layout.md) - Internal folder structure of an aimgr repository
+- [Workspace Caching](internals/workspace-caching.md) - How the workspace cache optimizes Git operations
+- [Git Tracking](internals/git-tracking.md) - How aimgr tracks repository changes with Git
 
-**For current releases, see:**
-- [CHANGELOG.md](../CHANGELOG.md) - Active changelog in the root directory
-- [GitHub Releases](https://github.com/hk9890/ai-config-manager/releases) - Official releases with binaries
-
-**Use this section for:** Historical reference and understanding the evolution of the project.
+**Use this section for:** Understanding how aimgr works internally, debugging, and advanced troubleshooting.
 
 ---
 
@@ -92,9 +69,6 @@ If you're an AI coding agent working on this repository, see **[AGENTS.md](../AG
 - Code style guidelines
 - Common patterns and resource loading
 - Testing best practices
-- Essential development workflows
-
-This guide is specifically designed to help AI agents work effectively in the ai-config-manager codebase.
 
 ---
 
@@ -103,11 +77,12 @@ This guide is specifically designed to help AI agents work effectively in the ai
 ### Project Information
 - **[README.md](../README.md)** - Project overview, installation, and command reference
 - **[CONTRIBUTING.md](../CONTRIBUTING.md)** - How to contribute to aimgr
-- **[CHANGELOG.md](../CHANGELOG.md)** - Current changelog
+- **[CHANGELOG.md](../CHANGELOG.md)** - Version history
 
 ### External Resources
 - **[GitHub Repository](https://github.com/hk9890/ai-config-manager)** - Source code and issue tracker
-- **[GitHub Releases](https://github.com/hk9890/ai-config-manager/releases)** - Download releases and view release notes
+- **[GitHub Releases](https://github.com/hk9890/ai-config-manager/releases)** - Download releases and binaries
+- **[AgentSkills.io](https://agentskills.io/home)** - Community skill format specification
 
 ---
 
@@ -116,9 +91,3 @@ This guide is specifically designed to help AI agents work effectively in the ai
 - **Questions**: [GitHub Discussions](https://github.com/hk9890/ai-config-manager/discussions)
 - **Bug Reports**: [GitHub Issues](https://github.com/hk9890/ai-config-manager/issues)
 - **Feature Requests**: [GitHub Issues](https://github.com/hk9890/ai-config-manager/issues)
-
----
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](../CONTRIBUTING.md) and the [Contributor Guide](contributor-guide/) to get started.

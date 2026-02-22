@@ -453,6 +453,5 @@ If your pattern matches too many resources:
 
 ## Related Documentation
 
-- [Resource Formats](resource-formats.md) - Resource format specifications
-- [Output Formats](output-formats.md) - CLI output formats
-- [Workspace Caching](workspace-caching.md) - Git repository caching
+- [Supported Tools](./supported-tools.md) - Tool support and resource format documentation
+- [Output Formats](./output-formats.md) - CLI output formats
