@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.6.1] - 2026-02-22
+
+### Fixed
+- **Multi-resource package install** — `aimgr install skill/x package/y` now works correctly. Previously packages only worked when passed as a single argument.
+- **Multi-resource package uninstall** — Same fix applied to uninstall command
+
+### Added  
+- **Tool-specific field mappings** — Frontmatter fields are now mapped to tool-specific equivalents during installation
+
+### Changed
+- **Documentation restructured** — Contributor guide reorganized into clear sections (architecture, code style, testing, release process)
+- **Fixed broken documentation links** — README links to contributor guide corrected
+
+
 ## [2.6.0] - 2026-02-19
 
 ### Added
