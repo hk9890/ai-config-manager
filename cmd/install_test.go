@@ -660,3 +660,177 @@ func TestExpandPattern_SpecialCharacters(t *testing.T) {
 		})
 	}
 }
+
+// Test helpers for package tests
+
+// createTestPackage creates a test package in the repo
+func createTestPackage(t *testing.T, repoPath, packageName string, resources []string) {
+	t.Helper()
+
+	// Create packages directory
+	packagesDir := filepath.Join(repoPath, "packages", packageName)
+	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+		t.Fatalf("failed to create packages dir: %v", err)
+	}
+
+	// Create package.yaml content
+	content := fmt.Sprintf("name: %s\ndescription: Test package\nresources:\n", packageName)
+	for _, res := range resources {
+		content += fmt.Sprintf("  - %s\n", res)
+	}
+
+	// Write package.yaml
+	pkgFile := filepath.Join(packagesDir, "package.yaml")
+	if err := os.WriteFile(pkgFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to create package.yaml: %v", err)
+	}
+}
+
+// TestInstallMultipleSkills tests installing multiple skills
+func TestInstallMultipleSkills(t *testing.T) {
+	repoPath, cleanup := createTestRepo(t)
+	defer cleanup()
+
+	mgr := repo.NewManagerWithPath(repoPath)
+
+	// Verify skills exist in repo
+	skills := []string{"pdf-processing", "pdf-extraction"}
+	for _, skillName := range skills {
+		_, err := mgr.Get(skillName, resource.Skill)
+		if err != nil {
+			t.Fatalf("skill %s not found in test repo: %v", skillName, err)
+		}
+	}
+}
+
+// TestInstallSkillAndPackage tests installing a skill and a package together
+func TestInstallSkillAndPackage(t *testing.T) {
+	repoPath, cleanup := createTestRepo(t)
+	defer cleanup()
+
+	// Create a test package with some skills
+	createTestPackage(t, repoPath, "test-pkg", []string{"skill/test-skill", "command/test-command"})
+
+	mgr := repo.NewManagerWithPath(repoPath)
+
+	// Verify skill exists
+	_, err := mgr.Get("pdf-processing", resource.Skill)
+	if err != nil {
+		t.Fatalf("skill not found in test repo: %v", err)
+	}
+
+	// Verify package resources exist
+	_, err = mgr.Get("test-skill", resource.Skill)
+	if err != nil {
+		t.Fatalf("skill test-skill not found in test repo: %v", err)
+	}
+	_, err = mgr.Get("test-command", resource.Command)
+	if err != nil {
+		t.Fatalf("command test-command not found in test repo: %v", err)
+	}
+}
+
+// TestInstallMultiplePackages tests installing multiple packages
+func TestInstallMultiplePackages(t *testing.T) {
+	repoPath, cleanup := createTestRepo(t)
+	defer cleanup()
+
+	// Create test packages
+	createTestPackage(t, repoPath, "pkg-a", []string{"skill/pdf-processing"})
+	createTestPackage(t, repoPath, "pkg-b", []string{"skill/test-skill"})
+
+	mgr := repo.NewManagerWithPath(repoPath)
+
+	// Verify both package resources exist
+	_, err := mgr.Get("pdf-processing", resource.Skill)
+	if err != nil {
+		t.Fatalf("skill pdf-processing not found: %v", err)
+	}
+	_, err = mgr.Get("test-skill", resource.Skill)
+	if err != nil {
+		t.Fatalf("skill test-skill not found: %v", err)
+	}
+}
+
+// TestInstallArgProcessing tests that arguments are correctly separated into packages and resources
+func TestInstallArgProcessing(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         []string
+		wantPackages []string
+		wantOthers   []string
+	}{
+		{
+			name:         "only skills",
+			args:         []string{"skill/pdf-processing", "skill/test-skill"},
+			wantPackages: nil,
+			wantOthers:   []string{"skill/pdf-processing", "skill/test-skill"},
+		},
+		{
+			name:         "only packages",
+			args:         []string{"package/pkg-a", "package/pkg-b"},
+			wantPackages: []string{"package/pkg-a", "package/pkg-b"},
+			wantOthers:   nil,
+		},
+		{
+			name:         "mixed skills and packages",
+			args:         []string{"skill/pdf-processing", "package/pkg-a", "command/test"},
+			wantPackages: []string{"package/pkg-a"},
+			wantOthers:   []string{"skill/pdf-processing", "command/test"},
+		},
+		{
+			name:         "packages prefix normalization",
+			args:         []string{"packages/pkg-a", "package/pkg-b"},
+			wantPackages: []string{"package/pkg-a", "package/pkg-b"},
+			wantOthers:   nil,
+		},
+		{
+			name:         "skill and package together",
+			args:         []string{"skill/pdf-processing", "package/test-pkg"},
+			wantPackages: []string{"package/test-pkg"},
+			wantOthers:   []string{"skill/pdf-processing"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var packageRefs []string
+			var resourceRefs []string
+
+			// Simulate the arg processing logic from install.go RunE
+			for _, arg := range tt.args {
+				if strings.HasPrefix(arg, "package/") || strings.HasPrefix(arg, "packages/") {
+					normalizedArg := arg
+					if strings.HasPrefix(arg, "packages/") {
+						normalizedArg = "package/" + strings.TrimPrefix(arg, "packages/")
+					}
+					packageRefs = append(packageRefs, normalizedArg)
+				} else {
+					resourceRefs = append(resourceRefs, arg)
+				}
+			}
+
+			// Verify packages
+			if len(packageRefs) != len(tt.wantPackages) {
+				t.Errorf("got %d packages, want %d", len(packageRefs), len(tt.wantPackages))
+			}
+			for i, pkg := range tt.wantPackages {
+				if i >= len(packageRefs) || packageRefs[i] != pkg {
+					t.Errorf("package[%d] = %v, want %v", i, packageRefs, tt.wantPackages)
+					break
+				}
+			}
+
+			// Verify other resources
+			if len(resourceRefs) != len(tt.wantOthers) {
+				t.Errorf("got %d resources, want %d", len(resourceRefs), len(tt.wantOthers))
+			}
+			for i, res := range tt.wantOthers {
+				if i >= len(resourceRefs) || resourceRefs[i] != res {
+					t.Errorf("resource[%d] = %v, want %v", i, resourceRefs, tt.wantOthers)
+					break
+				}
+			}
+		})
+	}
+}

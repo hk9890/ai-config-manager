@@ -127,55 +127,6 @@ Examples:
 			return installFromManifest(cmd)
 		}
 
-		// Check if installing a package
-		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
-			packageName := strings.TrimPrefix(args[0], "package/")
-
-			// Get project path
-			projectPath := projectPathFlag
-			if projectPath == "" {
-				var err error
-				projectPath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
-			}
-
-			// Parse target flag
-			explicitTargets, err := parseTargetFlag(installTargetFlag)
-			if err != nil {
-				return err
-			}
-
-			// Create installer
-			var installer *install.Installer
-			if explicitTargets != nil {
-				installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
-			} else {
-				cfg, err := config.LoadGlobal()
-				if err != nil {
-					return fmt.Errorf("failed to load config: %w", err)
-				}
-				defaultTargets, err := cfg.GetDefaultTargets()
-				if err != nil {
-					return fmt.Errorf("invalid default targets in config: %w", err)
-				}
-				installer, err = install.NewInstaller(projectPath, defaultTargets)
-			}
-			if err != nil {
-				return fmt.Errorf("failed to create installer: %w", err)
-			}
-
-			// Create repo manager
-			manager, err := NewManagerWithLogLevel()
-			if err != nil {
-				return fmt.Errorf("failed to create repository manager: %w", err)
-			}
-
-			// Install package
-			return installPackage(packageName, projectPath, installer, manager)
-		}
-
 		// Get project path (current directory or flag)
 		projectPath := projectPathFlag
 		if projectPath == "" {
@@ -220,9 +171,20 @@ Examples:
 			return fmt.Errorf("failed to create repository manager: %w", err)
 		}
 
-		// Expand patterns in arguments
-		var expandedArgs []string
+		// Separate packages from other resources BEFORE pattern expansion
+		var packageRefs []string
+		var resourceRefs []string
 		for _, arg := range args {
+			if strings.HasPrefix(arg, "package/") || strings.HasPrefix(arg, "packages/") {
+				normalizedArg := arg
+				if strings.HasPrefix(arg, "packages/") {
+					normalizedArg = "package/" + strings.TrimPrefix(arg, "packages/")
+				}
+				packageRefs = append(packageRefs, normalizedArg)
+				continue
+			}
+
+			// Expand patterns for non-package resources
 			matches, err := ExpandPattern(manager, arg)
 			if err != nil {
 				return fmt.Errorf("failed to expand pattern '%s': %w", arg, err)
@@ -240,14 +202,33 @@ Examples:
 				fmt.Printf("Installing %d resources matching '%s'...\n", len(matches), arg)
 			}
 
-			expandedArgs = append(expandedArgs, matches...)
+			resourceRefs = append(resourceRefs, matches...)
 		}
 
 		// Track results
 		var results []installResult
 
-		// Process each expanded resource
-		for _, arg := range expandedArgs {
+		// Process packages via installPackage()
+		for _, pkgRef := range packageRefs {
+			packageName := strings.TrimPrefix(pkgRef, "package/")
+			err := installPackage(packageName, projectPath, installer, manager)
+			if err != nil {
+				results = append(results, installResult{
+					name:    pkgRef,
+					success: false,
+					message: err.Error(),
+				})
+			} else {
+				results = append(results, installResult{
+					name:    pkgRef,
+					success: true,
+					message: "",
+				})
+			}
+		}
+
+		// Process non-package resources via processInstall()
+		for _, arg := range resourceRefs {
 			result := processInstall(arg, installer, manager)
 			results = append(results, result)
 		}

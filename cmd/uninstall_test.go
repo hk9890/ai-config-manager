@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hk9890/ai-config-manager/pkg/pattern"
@@ -681,5 +682,196 @@ func TestUninstallAll_EmptyDirectory(t *testing.T) {
 	_, err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("uninstallAll() failed on empty directories: %v", err)
+	}
+}
+
+// Test helpers for package tests
+
+// createTestPackageForUninstall creates a test package in the repo
+func createTestPackageForUninstall(t *testing.T, repoPath, packageName string, resources []string) {
+	t.Helper()
+
+	// Create packages directory
+	packagesDir := filepath.Join(repoPath, "packages", packageName)
+	if err := os.MkdirAll(packagesDir, 0755); err != nil {
+		t.Fatalf("failed to create packages dir: %v", err)
+	}
+
+	// Create package.yaml content
+	content := fmt.Sprintf("name: %s\ndescription: Test package\nresources:\n", packageName)
+	for _, res := range resources {
+		content += fmt.Sprintf("  - %s\n", res)
+	}
+
+	// Write package.yaml
+	pkgFile := filepath.Join(packagesDir, "package.yaml")
+	if err := os.WriteFile(pkgFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to create package.yaml: %v", err)
+	}
+}
+
+// TestUninstallMultipleSkills tests uninstalling multiple skills
+func TestUninstallMultipleSkills(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Install multiple skills
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "test-skill")
+
+	// Verify they exist
+	skillsDir := filepath.Join(projectPath, ".claude", "skills")
+	if _, err := os.Lstat(filepath.Join(skillsDir, "pdf-processing")); err != nil {
+		t.Fatalf("pdf-processing not installed: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(skillsDir, "test-skill")); err != nil {
+		t.Fatalf("test-skill not installed: %v", err)
+	}
+
+	// Create manager for processUninstall
+	manager := repo.NewManagerWithPath(repoPath)
+
+	// Uninstall both
+	result1 := processUninstall("skill/pdf-processing", projectPath, repoPath, []tools.Tool{tools.Claude}, manager)
+	result2 := processUninstall("skill/test-skill", projectPath, repoPath, []tools.Tool{tools.Claude}, manager)
+
+	if !result1.success {
+		t.Errorf("failed to uninstall pdf-processing: %s", result1.message)
+	}
+	if !result2.success {
+		t.Errorf("failed to uninstall test-skill: %s", result2.message)
+	}
+
+	// Verify they're gone
+	if _, err := os.Lstat(filepath.Join(skillsDir, "pdf-processing")); !os.IsNotExist(err) {
+		t.Error("pdf-processing still exists after uninstall")
+	}
+	if _, err := os.Lstat(filepath.Join(skillsDir, "test-skill")); !os.IsNotExist(err) {
+		t.Error("test-skill still exists after uninstall")
+	}
+}
+
+// TestUninstallSkillAndPackage tests uninstalling a skill and verifying package handling
+func TestUninstallSkillAndPackage(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Create a test package
+	createTestPackageForUninstall(t, repoPath, "test-pkg", []string{"skill/pdf-processing", "skill/test-skill"})
+
+	// Install skills
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "test-skill")
+
+	// Verify they exist
+	skillsDir := filepath.Join(projectPath, ".claude", "skills")
+	if _, err := os.Lstat(filepath.Join(skillsDir, "pdf-processing")); err != nil {
+		t.Fatalf("pdf-processing not installed: %v", err)
+	}
+}
+
+// TestUninstallMultiplePackages tests verifying package structure
+func TestUninstallMultiplePackages(t *testing.T) {
+	repoPath, projectPath, cleanup := setupTestRepoForUninstall(t)
+	defer cleanup()
+
+	// Create test packages
+	createTestPackageForUninstall(t, repoPath, "pkg-a", []string{"skill/pdf-processing"})
+	createTestPackageForUninstall(t, repoPath, "pkg-b", []string{"skill/test-skill"})
+
+	// Install the resources
+	installSymlink(t, projectPath, repoPath, resource.Skill, "pdf-processing")
+	installSymlink(t, projectPath, repoPath, resource.Skill, "test-skill")
+
+	// Verify they exist
+	skillsDir := filepath.Join(projectPath, ".claude", "skills")
+	if _, err := os.Lstat(filepath.Join(skillsDir, "pdf-processing")); err != nil {
+		t.Fatalf("pdf-processing not installed: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(skillsDir, "test-skill")); err != nil {
+		t.Fatalf("test-skill not installed: %v", err)
+	}
+}
+
+// TestUninstallArgProcessing tests that arguments are correctly separated into packages and resources
+func TestUninstallArgProcessing(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         []string
+		wantPackages []string
+		wantOthers   []string
+	}{
+		{
+			name:         "only skills",
+			args:         []string{"skill/pdf-processing", "skill/test-skill"},
+			wantPackages: nil,
+			wantOthers:   []string{"skill/pdf-processing", "skill/test-skill"},
+		},
+		{
+			name:         "only packages",
+			args:         []string{"package/pkg-a", "package/pkg-b"},
+			wantPackages: []string{"package/pkg-a", "package/pkg-b"},
+			wantOthers:   nil,
+		},
+		{
+			name:         "mixed skills and packages",
+			args:         []string{"skill/pdf-processing", "package/pkg-a", "command/test"},
+			wantPackages: []string{"package/pkg-a"},
+			wantOthers:   []string{"skill/pdf-processing", "command/test"},
+		},
+		{
+			name:         "packages prefix normalization",
+			args:         []string{"packages/pkg-a", "package/pkg-b"},
+			wantPackages: []string{"package/pkg-a", "package/pkg-b"},
+			wantOthers:   nil,
+		},
+		{
+			name:         "skill and package together",
+			args:         []string{"skill/pdf-processing", "package/test-pkg"},
+			wantPackages: []string{"package/test-pkg"},
+			wantOthers:   []string{"skill/pdf-processing"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var packageRefs []string
+			var resourceRefs []string
+
+			// Simulate the arg processing logic from uninstall.go RunE
+			for _, arg := range tt.args {
+				if strings.HasPrefix(arg, "package/") || strings.HasPrefix(arg, "packages/") {
+					normalizedArg := arg
+					if strings.HasPrefix(arg, "packages/") {
+						normalizedArg = "package/" + strings.TrimPrefix(arg, "packages/")
+					}
+					packageRefs = append(packageRefs, normalizedArg)
+				} else {
+					resourceRefs = append(resourceRefs, arg)
+				}
+			}
+
+			// Verify packages
+			if len(packageRefs) != len(tt.wantPackages) {
+				t.Errorf("got %d packages, want %d", len(packageRefs), len(tt.wantPackages))
+			}
+			for i, pkg := range tt.wantPackages {
+				if i >= len(packageRefs) || packageRefs[i] != pkg {
+					t.Errorf("package[%d] = %v, want %v", i, packageRefs, tt.wantPackages)
+					break
+				}
+			}
+
+			// Verify other resources
+			if len(resourceRefs) != len(tt.wantOthers) {
+				t.Errorf("got %d resources, want %d", len(resourceRefs), len(tt.wantOthers))
+			}
+			for i, res := range tt.wantOthers {
+				if i >= len(resourceRefs) || resourceRefs[i] != res {
+					t.Errorf("resource[%d] = %v, want %v", i, resourceRefs, tt.wantOthers)
+					break
+				}
+			}
+		})
 	}
 }

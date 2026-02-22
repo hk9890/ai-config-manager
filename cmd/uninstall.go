@@ -93,16 +93,19 @@ Examples:
 		// Track resources to remove from manifest
 		var resourcesToRemove []string
 
-		// Check if uninstalling a package
-		if len(args) == 1 && strings.HasPrefix(args[0], "package/") {
-			packageName := strings.TrimPrefix(args[0], "package/")
-			// Uninstall package
-			return uninstallPackage(packageName, installer, manager)
-		}
-
-		// Expand patterns in arguments
-		var expandedArgs []string
+		// Separate packages from other resources BEFORE pattern expansion
+		var packageRefs []string
+		var resourceRefs []string
 		for _, arg := range args {
+			if strings.HasPrefix(arg, "package/") || strings.HasPrefix(arg, "packages/") {
+				normalizedArg := arg
+				if strings.HasPrefix(arg, "packages/") {
+					normalizedArg = "package/" + strings.TrimPrefix(arg, "packages/")
+				}
+				packageRefs = append(packageRefs, normalizedArg)
+				continue
+			}
+
 			// Check if this is a pattern or exact name
 			_, _, isPattern := pattern.ParsePattern(arg)
 
@@ -115,21 +118,41 @@ Examples:
 				if len(expanded) == 0 {
 					fmt.Printf("Warning: pattern '%s' matches no installed resources\n", arg)
 				}
-				expandedArgs = append(expandedArgs, expanded...)
+				resourceRefs = append(resourceRefs, expanded...)
 			} else {
 				// Not a pattern, add as-is (will be validated by processUninstall)
-				expandedArgs = append(expandedArgs, arg)
+				resourceRefs = append(resourceRefs, arg)
 			}
 		}
 
 		// Deduplicate the expanded list
-		expandedArgs = deduplicateStrings(expandedArgs)
+		resourceRefs = deduplicateStrings(resourceRefs)
 
 		// Track results
 		var results []uninstallResult
 
+		// Process packages via uninstallPackage()
+		for _, pkgRef := range packageRefs {
+			packageName := strings.TrimPrefix(pkgRef, "package/")
+			err := uninstallPackage(packageName, installer, manager)
+			if err != nil {
+				results = append(results, uninstallResult{
+					name:    pkgRef,
+					success: false,
+					message: err.Error(),
+				})
+			} else {
+				results = append(results, uninstallResult{
+					name:    pkgRef,
+					success: true,
+					message: "",
+				})
+				resourcesToRemove = append(resourcesToRemove, pkgRef)
+			}
+		}
+
 		// Process each resource argument
-		for _, arg := range expandedArgs {
+		for _, arg := range resourceRefs {
 			result := processUninstall(arg, projectPath, repoPath, installer.GetTargetTools(), manager)
 			results = append(results, result)
 			// Collect successfully uninstalled resources
