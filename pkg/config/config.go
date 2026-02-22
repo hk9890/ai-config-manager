@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/adrg/xdg"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -66,6 +68,18 @@ func expandEnvVars(s string) string {
 	})
 }
 
+// FieldMappings maps logical values to tool-specific values
+// Structure: field_name -> logical_value -> tool_name -> actual_value
+// Special key "null" maps missing/empty values
+type FieldMappings map[string]map[string]map[string]string
+
+// TypeMappings holds field mappings for each resource type
+type TypeMappings struct {
+	Skill   FieldMappings `yaml:"skill,omitempty"`
+	Agent   FieldMappings `yaml:"agent,omitempty"`
+	Command FieldMappings `yaml:"command,omitempty"`
+}
+
 // Config represents the application configuration
 type Config struct {
 	// Install configuration for default installation targets
@@ -73,6 +87,9 @@ type Config struct {
 
 	// Repo configuration for repository settings
 	Repo RepoConfig `yaml:"repo"`
+
+	// Mappings holds tool-specific field transformations for each resource type
+	Mappings TypeMappings `yaml:"mappings,omitempty"`
 }
 
 // InstallConfig holds installation-related configuration
@@ -288,7 +305,40 @@ func (c *Config) Validate() error {
 		c.Repo.Path = filepath.Clean(c.Repo.Path)
 	}
 
+	// Validate mappings - warn about unknown tool names but don't error
+	if c.Mappings.HasAny() {
+		c.validateMappingsToolNames()
+	}
+
 	return nil
+}
+
+// validateMappingsToolNames checks if tool names in mappings are known
+// and logs warnings for unknown tools (allows future tools)
+func (c *Config) validateMappingsToolNames() {
+	unknownTools := make(map[string]struct{})
+
+	// Check each field mappings for unknown tools
+	checkFieldMappings := func(fm FieldMappings) {
+		for _, valueMappings := range fm {
+			for _, toolMappings := range valueMappings {
+				for toolName := range toolMappings {
+					if _, err := tools.ParseTool(toolName); err != nil {
+						unknownTools[toolName] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+
+	checkFieldMappings(c.Mappings.Skill)
+	checkFieldMappings(c.Mappings.Agent)
+	checkFieldMappings(c.Mappings.Command)
+
+	// Log warnings for unknown tools
+	for toolName := range unknownTools {
+		fmt.Fprintf(os.Stderr, "⚠️  Warning: mappings contains unknown tool '%s' (known: claude, opencode, copilot, windsurf)\n", toolName)
+	}
 }
 
 // GetDefaultTargets returns the configured default installation targets
@@ -308,4 +358,94 @@ func (c *Config) GetDefaultTargets() ([]tools.Tool, error) {
 	}
 
 	return targets, nil
+}
+
+// GetMapping returns the tool-specific value for a field
+// Returns (mappedValue, true) if mapping exists
+// Returns ("", false) if no mapping exists
+func (tm *TypeMappings) GetMapping(resourceType resource.ResourceType, fieldName string, logicalValue string, toolName string) (string, bool) {
+	var fieldMappings FieldMappings
+	switch resourceType {
+	case resource.Skill:
+		fieldMappings = tm.Skill
+	case resource.Agent:
+		fieldMappings = tm.Agent
+	case resource.Command:
+		fieldMappings = tm.Command
+	default:
+		return "", false
+	}
+
+	if fieldMappings == nil {
+		return "", false
+	}
+
+	valueMappings, ok := fieldMappings[fieldName]
+	if !ok {
+		return "", false
+	}
+
+	toolMappings, ok := valueMappings[logicalValue]
+	if !ok {
+		return "", false
+	}
+
+	actualValue, ok := toolMappings[toolName]
+	if !ok {
+		return "", false
+	}
+
+	return actualValue, true
+}
+
+// GetMappingWithNull handles null mapping for missing values
+// If logicalValue is empty, checks for "null" key mapping
+func (tm *TypeMappings) GetMappingWithNull(resourceType resource.ResourceType, fieldName string, logicalValue string, toolName string) (string, bool) {
+	// First try the actual value
+	if logicalValue != "" {
+		if val, ok := tm.GetMapping(resourceType, fieldName, logicalValue, toolName); ok {
+			return val, true
+		}
+	}
+
+	// If empty or not found, try null mapping
+	if logicalValue == "" {
+		return tm.GetMapping(resourceType, fieldName, "null", toolName)
+	}
+
+	return "", false
+}
+
+// GetToolsWithMappings returns list of tools that have any mappings defined
+func (tm *TypeMappings) GetToolsWithMappings() []string {
+	toolSet := make(map[string]struct{})
+
+	// Collect tools from all field mappings
+	collectTools := func(fm FieldMappings) {
+		for _, valueMappings := range fm {
+			for _, toolMappings := range valueMappings {
+				for toolName := range toolMappings {
+					toolSet[toolName] = struct{}{}
+				}
+			}
+		}
+	}
+
+	collectTools(tm.Skill)
+	collectTools(tm.Agent)
+	collectTools(tm.Command)
+
+	// Convert set to sorted slice
+	result := make([]string, 0, len(toolSet))
+	for toolName := range toolSet {
+		result = append(result, toolName)
+	}
+	sort.Strings(result)
+
+	return result
+}
+
+// HasAny returns true if any mappings are defined
+func (tm *TypeMappings) HasAny() bool {
+	return len(tm.Skill) > 0 || len(tm.Agent) > 0 || len(tm.Command) > 0
 }

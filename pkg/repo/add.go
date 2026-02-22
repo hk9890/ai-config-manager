@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hk9890/ai-config-manager/pkg/config"
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/modifications"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
@@ -210,6 +212,22 @@ func (m *Manager) addResource(sourcePath, sourceURL, sourceType, ref string, opt
 			)
 		}
 		return fmt.Errorf("failed to save metadata: %w", err)
+	}
+
+	// Generate modifications if mappings exist in config
+	cfg, err := config.LoadGlobal()
+	if err == nil && cfg.Mappings.HasAny() {
+		gen := modifications.NewGenerator(m.repoPath, cfg.Mappings, m.logger)
+		tools, genErr := gen.GenerateForResource(res)
+		if genErr != nil {
+			if m.logger != nil {
+				m.logger.Warn("failed to generate modifications", "error", genErr)
+			}
+		} else if len(tools) > 0 {
+			if m.logger != nil {
+				m.logger.Info("generated modifications", "resource", res.Name, "tools", tools)
+			}
+		}
 	}
 
 	return nil

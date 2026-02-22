@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/hk9890/ai-config-manager/pkg/config"
 	"github.com/hk9890/ai-config-manager/pkg/manifest"
+	"github.com/hk9890/ai-config-manager/pkg/modifications"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
@@ -160,6 +162,23 @@ func ensureValidSymlink(symlinkPath string, expectedTarget string, repoPath stri
 	return false, nil
 }
 
+// getSymlinkSource returns the path to symlink to for a resource and tool.
+// Returns modification path if it exists for the target tool, otherwise returns the original path.
+func (i *Installer) getSymlinkSource(res *resource.Resource, tool tools.Tool, repoPath string) string {
+	cfg, err := config.LoadGlobal()
+	if err != nil {
+		return res.Path // Fall back to original on config error
+	}
+
+	gen := modifications.NewGenerator(repoPath, cfg.Mappings, nil) // logger can be nil for read-only ops
+	toolName := tool.String()                                      // e.g., "opencode", "claude"
+
+	if modPath := gen.GetModificationPath(res, toolName); modPath != "" {
+		return modPath
+	}
+	return res.Path
+}
+
 // InstallCommand installs a command resource by creating symlinks to target tools
 func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error {
 	// Get command from repo
@@ -192,8 +211,11 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 			return fmt.Errorf("failed to create directory for %s: %w", tool, err)
 		}
 
+		// Determine source path (modification if exists, otherwise original)
+		sourcePath := i.getSymlinkSource(res, tool, repoManager.GetRepoPath())
+
 		// Check if valid symlink already exists (removes broken symlinks)
-		shouldInstall, err := ensureValidSymlink(symlinkPath, res.Path, repoManager.GetRepoPath())
+		shouldInstall, err := ensureValidSymlink(symlinkPath, sourcePath, repoManager.GetRepoPath())
 		if err != nil {
 			return fmt.Errorf("failed to check existing installation for %s: %w", tool, err)
 		}
@@ -203,7 +225,7 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 		}
 
 		// Create symlink
-		if err := os.Symlink(res.Path, symlinkPath); err != nil {
+		if err := os.Symlink(sourcePath, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink for %s: %w", tool, err)
 		}
 
@@ -215,6 +237,7 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 				"resource_name", res.Name,
 				"tool", tool.String(),
 				"dest_path", symlinkPath,
+				"source_path", sourcePath,
 			)
 		}
 	}
@@ -248,8 +271,11 @@ func (i *Installer) InstallSkill(name string, repoManager *repo.Manager) error {
 		// Symlink path
 		symlinkPath := filepath.Join(skillsDir, name)
 
+		// Determine source path (modification if exists, otherwise original)
+		sourcePath := i.getSymlinkSource(res, tool, repoManager.GetRepoPath())
+
 		// Check if valid symlink already exists (removes broken symlinks)
-		shouldInstall, err := ensureValidSymlink(symlinkPath, res.Path, repoManager.GetRepoPath())
+		shouldInstall, err := ensureValidSymlink(symlinkPath, sourcePath, repoManager.GetRepoPath())
 		if err != nil {
 			return fmt.Errorf("failed to check existing installation for %s: %w", tool, err)
 		}
@@ -259,7 +285,7 @@ func (i *Installer) InstallSkill(name string, repoManager *repo.Manager) error {
 		}
 
 		// Create symlink
-		if err := os.Symlink(res.Path, symlinkPath); err != nil {
+		if err := os.Symlink(sourcePath, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink for %s: %w", tool, err)
 		}
 
@@ -271,6 +297,7 @@ func (i *Installer) InstallSkill(name string, repoManager *repo.Manager) error {
 				"resource_name", res.Name,
 				"tool", tool.String(),
 				"dest_path", symlinkPath,
+				"source_path", sourcePath,
 			)
 		}
 	}
@@ -304,8 +331,11 @@ func (i *Installer) InstallAgent(name string, repoManager *repo.Manager) error {
 		// Symlink path
 		symlinkPath := filepath.Join(agentsDir, filepath.Base(res.Path))
 
+		// Determine source path (modification if exists, otherwise original)
+		sourcePath := i.getSymlinkSource(res, tool, repoManager.GetRepoPath())
+
 		// Check if valid symlink already exists (removes broken symlinks)
-		shouldInstall, err := ensureValidSymlink(symlinkPath, res.Path, repoManager.GetRepoPath())
+		shouldInstall, err := ensureValidSymlink(symlinkPath, sourcePath, repoManager.GetRepoPath())
 		if err != nil {
 			return fmt.Errorf("failed to check existing installation for %s: %w", tool, err)
 		}
@@ -315,7 +345,7 @@ func (i *Installer) InstallAgent(name string, repoManager *repo.Manager) error {
 		}
 
 		// Create symlink
-		if err := os.Symlink(res.Path, symlinkPath); err != nil {
+		if err := os.Symlink(sourcePath, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink for %s: %w", tool, err)
 		}
 
@@ -327,6 +357,7 @@ func (i *Installer) InstallAgent(name string, repoManager *repo.Manager) error {
 				"resource_name", res.Name,
 				"tool", tool.String(),
 				"dest_path", symlinkPath,
+				"source_path", sourcePath,
 			)
 		}
 	}

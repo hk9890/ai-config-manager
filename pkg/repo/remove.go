@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hk9890/ai-config-manager/pkg/config"
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/modifications"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
@@ -15,6 +17,22 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 	// Check if resource exists (Lstat so dangling symlinks are found too)
 	if _, err := os.Lstat(path); err != nil {
 		return fmt.Errorf("resource '%s' not found", name)
+	}
+
+	// Get resource info before removal (needed for modifications cleanup)
+	res, _ := m.Get(name, resourceType) // Ignore error - resource might be partially broken
+
+	// Cleanup modifications if they exist
+	if res != nil {
+		cfg, err := config.LoadGlobal()
+		if err == nil {
+			gen := modifications.NewGenerator(m.repoPath, cfg.Mappings, m.logger)
+			if err := gen.CleanupForResource(res); err != nil {
+				if m.logger != nil {
+					m.logger.Warn("failed to cleanup modifications", "resource", name, "error", err)
+				}
+			}
+		}
 	}
 
 	// Log before removing

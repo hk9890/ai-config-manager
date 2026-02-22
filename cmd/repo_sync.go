@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hk9890/ai-config-manager/pkg/config"
 	"github.com/hk9890/ai-config-manager/pkg/discovery"
 	resmeta "github.com/hk9890/ai-config-manager/pkg/metadata"
+	"github.com/hk9890/ai-config-manager/pkg/modifications"
 	"github.com/hk9890/ai-config-manager/pkg/repo"
 	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
 	"github.com/hk9890/ai-config-manager/pkg/resource"
@@ -525,6 +527,42 @@ func runSync(cmd *cobra.Command, args []string) error {
 		}
 	}
 	fmt.Println()
+
+	// Regenerate all modifications based on current config (skip in dry-run mode)
+	if !syncDryRunFlag {
+		logger := manager.GetLogger()
+		cfg, err := config.LoadGlobal()
+		if err == nil && cfg.Mappings.HasAny() {
+			gen := modifications.NewGenerator(repoPath, cfg.Mappings, logger)
+
+			// Clean existing modifications first
+			if err := gen.CleanupAll(); err != nil {
+				if logger != nil {
+					logger.Warn("failed to cleanup old modifications", "error", err.Error())
+				}
+			}
+
+			// Regenerate all
+			if err := gen.GenerateAll(); err != nil {
+				if logger != nil {
+					logger.Warn("failed to generate modifications", "error", err.Error())
+				}
+			} else {
+				if logger != nil {
+					logger.Info("regenerated modifications for all resources")
+				}
+			}
+		} else if err == nil {
+			// No mappings - clean up any existing modifications
+			gen := modifications.NewGenerator(repoPath, cfg.Mappings, logger)
+			if err := gen.CleanupAll(); err != nil {
+				if logger != nil {
+					logger.Warn("failed to cleanup modifications", "error", err.Error())
+				}
+			}
+		}
+		// If config load fails, skip modifications silently (not critical)
+	}
 
 	// Return error if all sources failed
 	if sourcesFailed == len(manifest.Sources) {

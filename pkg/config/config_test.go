@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/adrg/xdg"
+	"github.com/hk9890/ai-config-manager/pkg/resource"
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
 
@@ -932,4 +933,463 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// Test TypeMappings methods
+func TestTypeMappings_GetMapping(t *testing.T) {
+	tm := TypeMappings{
+		Skill: FieldMappings{
+			"model": {
+				"sonnet-4.5": {
+					"opencode": "langdock/claude-sonnet-4-5",
+					"claude":   "claude-sonnet-4",
+				},
+			},
+		},
+		Agent: FieldMappings{
+			"model": {
+				"gpt-4": {
+					"opencode": "langdock/gpt-4",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		resourceType resource.ResourceType
+		fieldName    string
+		logicalValue string
+		toolName     string
+		wantValue    string
+		wantFound    bool
+	}{
+		{
+			name:         "skill model opencode mapping exists",
+			resourceType: resource.Skill,
+			fieldName:    "model",
+			logicalValue: "sonnet-4.5",
+			toolName:     "opencode",
+			wantValue:    "langdock/claude-sonnet-4-5",
+			wantFound:    true,
+		},
+		{
+			name:         "skill model claude mapping exists",
+			resourceType: resource.Skill,
+			fieldName:    "model",
+			logicalValue: "sonnet-4.5",
+			toolName:     "claude",
+			wantValue:    "claude-sonnet-4",
+			wantFound:    true,
+		},
+		{
+			name:         "skill model windsurf mapping not found",
+			resourceType: resource.Skill,
+			fieldName:    "model",
+			logicalValue: "sonnet-4.5",
+			toolName:     "windsurf",
+			wantValue:    "",
+			wantFound:    false,
+		},
+		{
+			name:         "agent model mapping exists",
+			resourceType: resource.Agent,
+			fieldName:    "model",
+			logicalValue: "gpt-4",
+			toolName:     "opencode",
+			wantValue:    "langdock/gpt-4",
+			wantFound:    true,
+		},
+		{
+			name:         "command has no mappings",
+			resourceType: resource.Command,
+			fieldName:    "model",
+			logicalValue: "sonnet-4.5",
+			toolName:     "opencode",
+			wantValue:    "",
+			wantFound:    false,
+		},
+		{
+			name:         "unknown resource type",
+			resourceType: resource.PackageType,
+			fieldName:    "model",
+			logicalValue: "sonnet-4.5",
+			toolName:     "opencode",
+			wantValue:    "",
+			wantFound:    false,
+		},
+		{
+			name:         "unknown field name",
+			resourceType: resource.Skill,
+			fieldName:    "unknown",
+			logicalValue: "sonnet-4.5",
+			toolName:     "opencode",
+			wantValue:    "",
+			wantFound:    false,
+		},
+		{
+			name:         "unknown logical value",
+			resourceType: resource.Skill,
+			fieldName:    "model",
+			logicalValue: "unknown-model",
+			toolName:     "opencode",
+			wantValue:    "",
+			wantFound:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotValue, gotFound := tm.GetMapping(tt.resourceType, tt.fieldName, tt.logicalValue, tt.toolName)
+			if gotValue != tt.wantValue {
+				t.Errorf("GetMapping() value = %q, want %q", gotValue, tt.wantValue)
+			}
+			if gotFound != tt.wantFound {
+				t.Errorf("GetMapping() found = %v, want %v", gotFound, tt.wantFound)
+			}
+		})
+	}
+}
+
+func TestTypeMappings_GetMappingWithNull(t *testing.T) {
+	tm := TypeMappings{
+		Skill: FieldMappings{
+			"model": {
+				"sonnet-4.5": {
+					"opencode": "langdock/claude-sonnet-4-5",
+				},
+				"null": {
+					"opencode": "langdock/default-model",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		resourceType resource.ResourceType
+		fieldName    string
+		logicalValue string
+		toolName     string
+		wantValue    string
+		wantFound    bool
+	}{
+		{
+			name:         "non-empty value uses direct mapping",
+			resourceType: resource.Skill,
+			fieldName:    "model",
+			logicalValue: "sonnet-4.5",
+			toolName:     "opencode",
+			wantValue:    "langdock/claude-sonnet-4-5",
+			wantFound:    true,
+		},
+		{
+			name:         "empty value uses null mapping",
+			resourceType: resource.Skill,
+			fieldName:    "model",
+			logicalValue: "",
+			toolName:     "opencode",
+			wantValue:    "langdock/default-model",
+			wantFound:    true,
+		},
+		{
+			name:         "empty value with no null mapping",
+			resourceType: resource.Skill,
+			fieldName:    "model",
+			logicalValue: "",
+			toolName:     "claude",
+			wantValue:    "",
+			wantFound:    false,
+		},
+		{
+			name:         "non-empty unknown value not found",
+			resourceType: resource.Skill,
+			fieldName:    "model",
+			logicalValue: "unknown-model",
+			toolName:     "opencode",
+			wantValue:    "",
+			wantFound:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotValue, gotFound := tm.GetMappingWithNull(tt.resourceType, tt.fieldName, tt.logicalValue, tt.toolName)
+			if gotValue != tt.wantValue {
+				t.Errorf("GetMappingWithNull() value = %q, want %q", gotValue, tt.wantValue)
+			}
+			if gotFound != tt.wantFound {
+				t.Errorf("GetMappingWithNull() found = %v, want %v", gotFound, tt.wantFound)
+			}
+		})
+	}
+}
+
+func TestTypeMappings_GetToolsWithMappings(t *testing.T) {
+	tests := []struct {
+		name      string
+		mappings  TypeMappings
+		wantTools []string
+	}{
+		{
+			name:      "empty mappings",
+			mappings:  TypeMappings{},
+			wantTools: []string{},
+		},
+		{
+			name: "single tool in skill",
+			mappings: TypeMappings{
+				Skill: FieldMappings{
+					"model": {
+						"sonnet-4.5": {
+							"opencode": "value",
+						},
+					},
+				},
+			},
+			wantTools: []string{"opencode"},
+		},
+		{
+			name: "multiple tools across types",
+			mappings: TypeMappings{
+				Skill: FieldMappings{
+					"model": {
+						"sonnet-4.5": {
+							"opencode": "value1",
+							"claude":   "value2",
+						},
+					},
+				},
+				Agent: FieldMappings{
+					"model": {
+						"gpt-4": {
+							"windsurf": "value3",
+						},
+					},
+				},
+			},
+			wantTools: []string{"claude", "opencode", "windsurf"},
+		},
+		{
+			name: "deduplicates tools",
+			mappings: TypeMappings{
+				Skill: FieldMappings{
+					"field1": {
+						"value1": {"opencode": "mapped1"},
+					},
+					"field2": {
+						"value2": {"opencode": "mapped2"},
+					},
+				},
+			},
+			wantTools: []string{"opencode"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotTools := tt.mappings.GetToolsWithMappings()
+			if len(gotTools) != len(tt.wantTools) {
+				t.Errorf("GetToolsWithMappings() = %v, want %v", gotTools, tt.wantTools)
+				return
+			}
+			for i, want := range tt.wantTools {
+				if gotTools[i] != want {
+					t.Errorf("GetToolsWithMappings()[%d] = %q, want %q", i, gotTools[i], want)
+				}
+			}
+		})
+	}
+}
+
+func TestTypeMappings_HasAny(t *testing.T) {
+	tests := []struct {
+		name     string
+		mappings TypeMappings
+		want     bool
+	}{
+		{
+			name:     "empty mappings",
+			mappings: TypeMappings{},
+			want:     false,
+		},
+		{
+			name: "skill has mappings",
+			mappings: TypeMappings{
+				Skill: FieldMappings{"model": {"value": {"tool": "mapped"}}},
+			},
+			want: true,
+		},
+		{
+			name: "agent has mappings",
+			mappings: TypeMappings{
+				Agent: FieldMappings{"model": {"value": {"tool": "mapped"}}},
+			},
+			want: true,
+		},
+		{
+			name: "command has mappings",
+			mappings: TypeMappings{
+				Command: FieldMappings{"model": {"value": {"tool": "mapped"}}},
+			},
+			want: true,
+		},
+		{
+			name: "nil field mappings",
+			mappings: TypeMappings{
+				Skill:   nil,
+				Agent:   nil,
+				Command: nil,
+			},
+			want: false,
+		},
+		{
+			name: "empty field mappings",
+			mappings: TypeMappings{
+				Skill:   FieldMappings{},
+				Agent:   FieldMappings{},
+				Command: FieldMappings{},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.mappings.HasAny(); got != tt.want {
+				t.Errorf("HasAny() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoad_WithMappings(t *testing.T) {
+	tests := []struct {
+		name          string
+		configYAML    string
+		wantSkillMap  bool
+		wantAgentMap  bool
+		wantHasAny    bool
+		checkMappings func(t *testing.T, cfg *Config)
+	}{
+		{
+			name: "config with mappings section",
+			configYAML: `install:
+  targets: [claude]
+mappings:
+  skill:
+    model:
+      sonnet-4.5:
+        opencode: "langdock/claude-sonnet-4-5"
+        claude: "claude-sonnet-4"
+`,
+			wantSkillMap: true,
+			wantAgentMap: false,
+			wantHasAny:   true,
+			checkMappings: func(t *testing.T, cfg *Config) {
+				val, found := cfg.Mappings.GetMapping(resource.Skill, "model", "sonnet-4.5", "opencode")
+				if !found || val != "langdock/claude-sonnet-4-5" {
+					t.Errorf("expected opencode mapping, got value=%q found=%v", val, found)
+				}
+			},
+		},
+		{
+			name: "config without mappings section (backwards compatible)",
+			configYAML: `install:
+  targets: [claude]
+`,
+			wantSkillMap: false,
+			wantAgentMap: false,
+			wantHasAny:   false,
+		},
+		{
+			name: "config with empty mappings section",
+			configYAML: `install:
+  targets: [claude]
+mappings: {}
+`,
+			wantSkillMap: false,
+			wantAgentMap: false,
+			wantHasAny:   false,
+		},
+		{
+			name: "config with null mapping",
+			configYAML: `install:
+  targets: [claude]
+mappings:
+  skill:
+    model:
+      "null":
+        opencode: "langdock/default-model"
+`,
+			wantSkillMap: true,
+			wantHasAny:   true,
+			checkMappings: func(t *testing.T, cfg *Config) {
+				val, found := cfg.Mappings.GetMappingWithNull(resource.Skill, "model", "", "opencode")
+				if !found || val != "langdock/default-model" {
+					t.Errorf("expected null mapping, got value=%q found=%v", val, found)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			configPath := filepath.Join(tmpDir, DefaultConfigFileName)
+			if err := os.WriteFile(configPath, []byte(tt.configYAML), 0644); err != nil {
+				t.Fatalf("failed to write config: %v", err)
+			}
+
+			cfg, err := Load(tmpDir)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+
+			// Check HasAny
+			if got := cfg.Mappings.HasAny(); got != tt.wantHasAny {
+				t.Errorf("HasAny() = %v, want %v", got, tt.wantHasAny)
+			}
+
+			// Check specific mapping presence
+			hasSkillMap := len(cfg.Mappings.Skill) > 0
+			if hasSkillMap != tt.wantSkillMap {
+				t.Errorf("Skill mappings present = %v, want %v", hasSkillMap, tt.wantSkillMap)
+			}
+
+			hasAgentMap := len(cfg.Mappings.Agent) > 0
+			if hasAgentMap != tt.wantAgentMap {
+				t.Errorf("Agent mappings present = %v, want %v", hasAgentMap, tt.wantAgentMap)
+			}
+
+			// Run custom mapping checks
+			if tt.checkMappings != nil {
+				tt.checkMappings(t, cfg)
+			}
+		})
+	}
+}
+
+func TestValidate_MappingsWarnsUnknownTools(t *testing.T) {
+	// This test verifies that unknown tool names produce a warning but don't error
+	cfg := &Config{
+		Install: InstallConfig{Targets: []string{"claude"}},
+		Mappings: TypeMappings{
+			Skill: FieldMappings{
+				"model": {
+					"value": {
+						"unknowntool": "mapped-value",
+						"opencode":    "known-value",
+					},
+				},
+			},
+		},
+	}
+
+	// Validate should succeed (warning only, no error)
+	err := cfg.Validate()
+	if err != nil {
+		t.Errorf("Validate() should not error for unknown tools, got: %v", err)
+	}
 }
