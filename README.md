@@ -90,19 +90,24 @@ aimgr install "skill/pdf*"
 
 Complete documentation is available in the `docs/` directory:
 
-### User Guides
+### User Guide
 
-- **[Getting Started](docs/user-guide/getting-started.md)** - Complete setup, first steps, and common workflows
-- **[Configuration](docs/user-guide/configuration.md)** - Config file, environment variables, repository path
-- **[Sync Sources](docs/user-guide/sync-sources.md)** - Automated syncing from configured sources (`ai.repo.yaml`)
-- **[GitHub Sources](docs/user-guide/github-sources.md)** - Import from GitHub repositories
-- **[Pattern Matching](docs/user-guide/pattern-matching.md)** - Glob patterns for batch operations
-- **[Resource Formats](docs/user-guide/resource-formats.md)** - Commands, skills, agents, packages format specifications
-- **[Output Formats](docs/user-guide/output-formats.md)** - JSON, YAML, table output for scripting
-- **[Validating Resources](docs/user-guide/validating-resources.md)** - Test resources before publishing
-- **[Workspace Caching](docs/user-guide/workspace-caching.md)** - Git repository caching for performance
-- **[Git Tracking](docs/user-guide/git-tracking.md)** - Git-backed repository with change history
-- **[Developer Guide](docs/user-guide/developer-guide.md)** - Creating and testing resources
+- **[Getting Started](docs/user-guide/getting-started.md)** - Installation, setup, and common workflows
+- **[Configuration](docs/user-guide/configuration.md)** - Config file, environment variables, field mappings
+- **[Sources](docs/user-guide/sources.md)** - Managing local and GitHub sources (`ai.repo.yaml`)
+
+### Reference
+
+- **[Pattern Matching](docs/reference/pattern-matching.md)** - Glob patterns for batch operations
+- **[Output Formats](docs/reference/output-formats.md)** - JSON, YAML, table output for scripting
+- **[Supported Tools](docs/reference/supported-tools.md)** - Tool compatibility and external documentation links
+- **[Troubleshooting](docs/reference/troubleshooting.md)** - Common issues and solutions
+
+### Internals
+
+- **[Repository Layout](docs/internals/repository-layout.md)** - Internal folder structure
+- **[Workspace Caching](docs/internals/workspace-caching.md)** - Git repository caching for performance
+- **[Git Tracking](docs/internals/git-tracking.md)** - Git-backed repository with change history
 
 ### For Contributors
 
