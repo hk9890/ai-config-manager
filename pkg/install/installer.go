@@ -450,11 +450,58 @@ func scanFileSymlinks(dir string, resType resource.ResourceType, loader func(str
 	}
 
 	for _, entry := range entries {
+		symlinkPath := filepath.Join(dir, entry.Name())
+
 		if entry.IsDir() {
+			// Recurse into subdirectory for namespaced resources (one level only)
+			subEntries, err := os.ReadDir(symlinkPath)
+			if err != nil {
+				continue
+			}
+			for _, subEntry := range subEntries {
+				if subEntry.IsDir() {
+					continue // Only one level of nesting
+				}
+				subPath := filepath.Join(symlinkPath, subEntry.Name())
+				subInfo, err := os.Lstat(subPath)
+				if err != nil {
+					continue
+				}
+				// Only list symlinks
+				if subInfo.Mode()&os.ModeSymlink == 0 {
+					continue
+				}
+				// Read the symlink target
+				target, err := os.Readlink(subPath)
+				if err != nil {
+					continue
+				}
+				// Build namespaced name: "dirname/filename-without-ext"
+				name := entry.Name() + "/" + strings.TrimSuffix(subEntry.Name(), ".md")
+				// Check if target exists
+				if _, err := os.Stat(target); err != nil {
+					// Broken symlink
+					resourceMap[name] = resource.Resource{
+						Name:   name,
+						Type:   resType,
+						Path:   target,
+						Health: resource.HealthBroken,
+					}
+					continue
+				}
+				// Load the resource
+				res, err := loader(target)
+				if err != nil {
+					continue
+				}
+				res.Health = resource.HealthOK
+				// Override name with namespaced version
+				res.Name = name
+				resourceMap[res.Name] = *res
+			}
 			continue
 		}
 
-		symlinkPath := filepath.Join(dir, entry.Name())
 		info, err := os.Lstat(symlinkPath)
 		if err != nil {
 			continue

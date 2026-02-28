@@ -55,6 +55,11 @@ type completionOptions struct {
 // Supports completing both the type prefix and resource names after the slash
 func completeResourcesWithOptions(opts completionOptions) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// For single-arg commands, stop suggesting after first argument
+		if !opts.multiArg && len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
 		manager, err := NewManagerWithLogLevel()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError

@@ -180,24 +180,61 @@ type ResourceInfo struct {
 	Health      string                `json:"health" yaml:"health"`
 }
 
-// getSyncStatus determines the sync status of a resource relative to ai.package.yaml
-// It compares the resource's installation state with its presence in the manifest file
-func getSyncStatus(projectPath string, resourceRef string, isInstalled bool) SyncStatus {
-	// Load the manifest file from the project directory
+// expandManifestResources returns a set of all resource references in the manifest,
+// including individual resources that are members of declared packages.
+// Returns nil if no manifest exists or cannot be loaded (signals "no manifest").
+func expandManifestResources(projectPath string) map[string]bool {
 	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
 	m, err := manifest.Load(manifestPath)
 	if err != nil {
-		// If manifest file doesn't exist, return no-manifest status
-		if os.IsNotExist(err) {
-			return SyncStatusNoManifest
+		return nil // No manifest or error — return nil to signal "no manifest"
+	}
+
+	expanded := make(map[string]bool)
+
+	// Try to get the repo manager for package expansion
+	manager, managerErr := NewManagerWithLogLevel()
+
+	for _, ref := range m.Resources {
+		expanded[ref] = true
+
+		// If this is a package reference, expand its members
+		if strings.HasPrefix(ref, "package/") && managerErr == nil {
+			packageName := strings.TrimPrefix(ref, "package/")
+			repoPath := manager.GetRepoPath()
+			pkgPath := resource.GetPackagePath(packageName, repoPath)
+			pkg, err := resource.LoadPackage(pkgPath)
+			if err != nil {
+				continue // Package not found in repo, skip expansion
+			}
+			for _, memberRef := range pkg.Resources {
+				expanded[memberRef] = true
+			}
 		}
-		// For other errors (e.g., invalid YAML), also treat as no manifest
-		// This is graceful - we can't determine sync status without a valid manifest
+	}
+
+	return expanded
+}
+
+// getSyncStatus determines the sync status of a resource relative to ai.package.yaml.
+// expandedManifest is a pre-computed set of all resource refs (including package members).
+// Pass nil to indicate no manifest exists.
+func getSyncStatus(projectPath string, resourceRef string, isInstalled bool, expandedManifest ...map[string]bool) SyncStatus {
+	// If an expanded manifest was provided, use it directly
+	var manifestSet map[string]bool
+	if len(expandedManifest) > 0 {
+		manifestSet = expandedManifest[0]
+	} else {
+		// Fallback: compute expanded manifest on the fly (for backward compatibility with tests)
+		manifestSet = expandManifestResources(projectPath)
+	}
+
+	if manifestSet == nil {
 		return SyncStatusNoManifest
 	}
 
-	// Check if the resource reference exists in the manifest
-	inManifest := m.Has(resourceRef)
+	// Check if the resource reference exists in the expanded manifest
+	inManifest := manifestSet[resourceRef]
 
 	// Determine sync status based on both installation and manifest presence
 	if inManifest && isInstalled {
@@ -214,8 +251,8 @@ func getSyncStatus(projectPath string, resourceRef string, isInstalled bool) Syn
 }
 
 // formatSyncStatus gets the sync status and returns the appropriate symbol
-func formatSyncStatus(projectPath string, resourceRef string, isInstalled bool) string {
-	status := getSyncStatus(projectPath, resourceRef, isInstalled)
+func formatSyncStatus(projectPath string, resourceRef string, isInstalled bool, expandedManifest map[string]bool) string {
+	status := getSyncStatus(projectPath, resourceRef, isInstalled, expandedManifest)
 
 	switch status {
 	case SyncStatusInSync:
@@ -233,6 +270,9 @@ func formatSyncStatus(projectPath string, resourceRef string, isInstalled bool) 
 
 // buildResourceInfo creates ResourceInfo entries with target tool information and sync status
 func buildResourceInfo(resources []resource.Resource, projectPath string, detectedTools []tools.Tool) []ResourceInfo {
+	// Pre-compute expanded manifest (includes package member resources)
+	expandedManifest := expandManifestResources(projectPath)
+
 	infos := make([]ResourceInfo, 0, len(resources))
 
 	for _, res := range resources {
@@ -265,7 +305,7 @@ func buildResourceInfo(resources []resource.Resource, projectPath string, detect
 		resourceRef := fmt.Sprintf("%s/%s", res.Type, res.Name)
 
 		// Get sync status
-		syncStatus := getSyncStatus(projectPath, resourceRef, isInstalled)
+		syncStatus := getSyncStatus(projectPath, resourceRef, isInstalled, expandedManifest)
 		info.SyncStatus = string(syncStatus)
 
 		infos = append(infos, info)
@@ -326,6 +366,9 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		}
 	}
 
+	// Pre-compute expanded manifest for sync status display
+	expandedManifest := expandManifestResources(projectPath)
+
 	// Create table with NAME, TARGETS, SYNC, STATUS, DESCRIPTION using shared infrastructure
 	table := output.NewTable("Name", "Targets", "Sync", "Status", "Description")
 	table.WithResponsive().
@@ -336,7 +379,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 	for _, cmd := range commands {
 		targets := strings.Join(cmd.Targets, ", ")
 		resourceRef := fmt.Sprintf("command/%s", cmd.Name)
-		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0)
+		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if cmd.Health == string(resource.HealthBroken) {
 			status = "✗ broken"
@@ -353,7 +396,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 	for _, skill := range skills {
 		targets := strings.Join(skill.Targets, ", ")
 		resourceRef := fmt.Sprintf("skill/%s", skill.Name)
-		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0)
+		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if skill.Health == string(resource.HealthBroken) {
 			status = "✗ broken"
@@ -370,7 +413,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 	for _, agent := range agents {
 		targets := strings.Join(agent.Targets, ", ")
 		resourceRef := fmt.Sprintf("agent/%s", agent.Name)
-		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0)
+		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if agent.Health == string(resource.HealthBroken) {
 			status = "✗ broken"

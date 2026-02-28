@@ -44,10 +44,13 @@ type DescribeResourceOutput struct {
 
 // repoDescribeCmd represents the repo describe command
 var repoDescribeCmd = &cobra.Command{
-	Use:               "describe <pattern>",
-	Aliases:           []string{"show"}, // Deprecated: use 'describe' instead
-	ValidArgsFunction: completeResourceArgs,
-	Short:             "Display detailed resource information",
+	Use:     "describe <pattern> [pattern...]",
+	Aliases: []string{"show"}, // Deprecated: use 'describe' instead
+	ValidArgsFunction: completeResourcesWithOptions(completionOptions{
+		includePackages: true,
+		multiArg:        true,
+	}),
+	Short: "Display detailed resource information",
 	Long: `Display detailed information about resources in the repository.
 
 Examples:
@@ -55,19 +58,18 @@ Examples:
   aimgr repo describe command/test            # Describe specific command
   aimgr repo describe agent/code-reviewer     # Describe specific agent
   aimgr repo describe package/dynatrace-core  # Describe specific package
-  aimgr repo describe skill/*                 # Describe all skills (summary)
+  aimgr repo describe skill/* command/*       # Describe multiple patterns
   aimgr repo describe *pdf*                   # Describe all resources with "pdf"
 
 Supports glob patterns: *, ?, [abc], {a,b}
+Accepts multiple arguments to describe several resources at once.
 
 When multiple resources match, shows a summary list.
 When a single resource matches, shows detailed information.
 
 Note: 'repo show' is deprecated, use 'repo describe' instead.`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		pattern := args[0]
-
 		// Validate format flag
 		if describeFormatFlag != "table" && describeFormatFlag != "json" && describeFormatFlag != "yaml" {
 			return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", describeFormatFlag)
@@ -78,23 +80,32 @@ Note: 'repo show' is deprecated, use 'repo describe' instead.`,
 			return err
 		}
 
-		// Expand pattern to matching resources
-		matches, err := ExpandPattern(manager, pattern)
-		if err != nil {
-			return err
+		// Collect all matches from all arguments
+		var allMatches []string
+		seen := make(map[string]bool)
+		for _, pat := range args {
+			matches, err := ExpandPattern(manager, pat)
+			if err != nil {
+				return err
+			}
+			if len(matches) == 0 {
+				return fmt.Errorf("no resources found matching '%s'", pat)
+			}
+			for _, m := range matches {
+				if !seen[m] {
+					seen[m] = true
+					allMatches = append(allMatches, m)
+				}
+			}
 		}
 
-		if len(matches) == 0 {
-			return fmt.Errorf("no resources found matching '%s'", pattern)
-		}
-
-		if len(matches) == 1 {
+		if len(allMatches) == 1 {
 			// Single match - show detailed view
-			return describeDetailedResource(manager, matches[0], describeFormatFlag)
+			return describeDetailedResource(manager, allMatches[0], describeFormatFlag)
 		}
 
 		// Multiple matches - show summary
-		return describeResourceSummary(manager, matches, describeFormatFlag)
+		return describeResourceSummary(manager, allMatches, describeFormatFlag)
 	},
 }
 

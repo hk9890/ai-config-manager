@@ -214,15 +214,17 @@ Examples:
 			err := installPackage(packageName, projectPath, installer, manager)
 			if err != nil {
 				results = append(results, installResult{
-					name:    pkgRef,
-					success: false,
-					message: err.Error(),
+					resourceType: resource.PackageType,
+					name:         packageName,
+					success:      false,
+					message:      err.Error(),
 				})
 			} else {
 				results = append(results, installResult{
-					name:    pkgRef,
-					success: true,
-					message: "",
+					resourceType: resource.PackageType,
+					name:         packageName,
+					success:      true,
+					message:      "",
 				})
 			}
 		}
@@ -632,13 +634,6 @@ func installPackage(packageName string, projectPath string, installer *install.I
 		return fmt.Errorf("package installation completed with errors")
 	}
 
-	// Update manifest with package reference if successful installations
-	if installed > 0 {
-		packageRef := fmt.Sprintf("package/%s", pkg.Name)
-		if err := updateManifest(projectPath, packageRef); err != nil {
-			fmt.Printf("⚠ Warning: failed to update manifest: %v\n", err)
-		}
-	}
 	return nil
 
 }
