@@ -147,6 +147,67 @@ func TestVerifyDirectory(t *testing.T) {
 			},
 			expectedCount: 0,
 		},
+		{
+			name: "detects broken symlink in nested directory",
+			setupFunc: func(dir, repoPath string) error {
+				nsDir := filepath.Join(dir, "test-ns")
+				if err := os.MkdirAll(nsDir, 0755); err != nil {
+					return err
+				}
+				target := filepath.Join(repoPath, "commands", "test-ns", "broken-cmd.md")
+				return os.Symlink(target, filepath.Join(nsDir, "broken-cmd.md"))
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "detects wrong-repo symlink in nested directory",
+			setupFunc: func(dir, repoPath string) error {
+				nsDir := filepath.Join(dir, "test-ns")
+				if err := os.MkdirAll(nsDir, 0755); err != nil {
+					return err
+				}
+				// Create a valid target outside the repo
+				wrongDir := filepath.Join(dir, ".wrong-repo", "commands", "test-ns")
+				if err := os.MkdirAll(wrongDir, 0755); err != nil {
+					return err
+				}
+				wrongTarget := filepath.Join(wrongDir, "cmd.md")
+				if err := os.WriteFile(wrongTarget, []byte("test"), 0644); err != nil {
+					return err
+				}
+				return os.Symlink(wrongTarget, filepath.Join(nsDir, "cmd.md"))
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "valid symlink in nested directory has no issues",
+			setupFunc: func(dir, repoPath string) error {
+				nsDir := filepath.Join(dir, "test-ns")
+				if err := os.MkdirAll(nsDir, 0755); err != nil {
+					return err
+				}
+				target := filepath.Join(repoPath, "commands", "test-ns", "good-cmd.md")
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
+					return err
+				}
+				return os.Symlink(target, filepath.Join(nsDir, "good-cmd.md"))
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "ignores regular files in nested directory",
+			setupFunc: func(dir, repoPath string) error {
+				nsDir := filepath.Join(dir, "test-ns")
+				if err := os.MkdirAll(nsDir, 0755); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(nsDir, "regular-file.md"), []byte("test"), 0644)
+			},
+			expectedCount: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -172,6 +233,165 @@ func TestVerifyDirectory(t *testing.T) {
 
 			if len(issues) != tt.expectedCount {
 				t.Errorf("Expected %d issues, got %d", tt.expectedCount, len(issues))
+			}
+		})
+	}
+}
+
+// TestVerifyDirectory_NestedCommands tests that verifyDirectory correctly
+// recurses into subdirectories to find broken/valid nested command symlinks.
+func TestVerifyDirectory_NestedCommands(t *testing.T) {
+	tests := []struct {
+		name             string
+		setupFunc        func(string, string) error
+		expectedCount    int
+		expectedType     string
+		expectedResource string
+	}{
+		{
+			name: "detects broken nested symlink",
+			setupFunc: func(dir, repoPath string) error {
+				subDir := filepath.Join(dir, "api")
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					return err
+				}
+				target := filepath.Join(repoPath, "commands", "api", "deploy.md")
+				return os.Symlink(target, filepath.Join(subDir, "deploy.md"))
+			},
+			expectedCount:    1,
+			expectedType:     "broken",
+			expectedResource: "api/deploy",
+		},
+		{
+			name: "valid nested symlink has no issues",
+			setupFunc: func(dir, repoPath string) error {
+				subDir := filepath.Join(dir, "api")
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					return err
+				}
+				target := filepath.Join(repoPath, "commands", "api", "deploy.md")
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
+					return err
+				}
+				return os.Symlink(target, filepath.Join(subDir, "deploy.md"))
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "detects wrong-repo nested symlink",
+			setupFunc: func(dir, repoPath string) error {
+				subDir := filepath.Join(dir, "api")
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					return err
+				}
+				// Create a target outside the repo
+				wrongTarget := filepath.Join(dir, "wrong-repo", "commands", "api", "deploy.md")
+				if err := os.MkdirAll(filepath.Dir(wrongTarget), 0755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(wrongTarget, []byte("test"), 0644); err != nil {
+					return err
+				}
+				return os.Symlink(wrongTarget, filepath.Join(subDir, "deploy.md"))
+			},
+			expectedCount:    1,
+			expectedType:     "wrong-repo",
+			expectedResource: "api/deploy",
+		},
+		{
+			name: "ignores regular files in subdirectory",
+			setupFunc: func(dir, repoPath string) error {
+				subDir := filepath.Join(dir, "api")
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(subDir, "not-a-symlink.md"), []byte("test"), 0644)
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "does not recurse deeper than one level",
+			setupFunc: func(dir, repoPath string) error {
+				deepDir := filepath.Join(dir, "level1", "level2")
+				if err := os.MkdirAll(deepDir, 0755); err != nil {
+					return err
+				}
+				target := filepath.Join(repoPath, "commands", "missing.md")
+				return os.Symlink(target, filepath.Join(deepDir, "deep.md"))
+			},
+			expectedCount: 0, // Should NOT find the deeply nested symlink
+		},
+		{
+			name: "detects multiple broken nested symlinks",
+			setupFunc: func(dir, repoPath string) error {
+				subDir := filepath.Join(dir, "api")
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					return err
+				}
+				target1 := filepath.Join(repoPath, "commands", "api", "deploy.md")
+				if err := os.Symlink(target1, filepath.Join(subDir, "deploy.md")); err != nil {
+					return err
+				}
+				target2 := filepath.Join(repoPath, "commands", "api", "status.md")
+				return os.Symlink(target2, filepath.Join(subDir, "status.md"))
+			},
+			expectedCount: 2,
+			expectedType:  "broken",
+		},
+		{
+			name: "mixes top-level and nested symlinks",
+			setupFunc: func(dir, repoPath string) error {
+				// Top-level broken symlink
+				topTarget := filepath.Join(repoPath, "commands", "top-cmd")
+				if err := os.Symlink(topTarget, filepath.Join(dir, "top-cmd")); err != nil {
+					return err
+				}
+				// Nested broken symlink
+				subDir := filepath.Join(dir, "api")
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					return err
+				}
+				nestedTarget := filepath.Join(repoPath, "commands", "api", "deploy.md")
+				return os.Symlink(nestedTarget, filepath.Join(subDir, "deploy.md"))
+			},
+			expectedCount: 2,
+			expectedType:  "broken",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			repoDir := t.TempDir()
+
+			testDir := filepath.Join(dir, "commands")
+			if err := os.MkdirAll(testDir, 0755); err != nil {
+				t.Fatalf("Failed to create test directory: %v", err)
+			}
+
+			if err := tt.setupFunc(testDir, repoDir); err != nil {
+				t.Fatalf("Setup failed: %v", err)
+			}
+
+			issues, err := verifyDirectory(testDir, "claude", repoDir)
+			if err != nil {
+				t.Fatalf("verifyDirectory failed: %v", err)
+			}
+
+			if len(issues) != tt.expectedCount {
+				t.Errorf("Expected %d issues, got %d: %+v", tt.expectedCount, len(issues), issues)
+			}
+
+			if tt.expectedCount > 0 && len(issues) > 0 {
+				if tt.expectedType != "" && issues[0].IssueType != tt.expectedType {
+					t.Errorf("Issue type = %v, want %v", issues[0].IssueType, tt.expectedType)
+				}
+				if tt.expectedResource != "" && issues[0].Resource != tt.expectedResource {
+					t.Errorf("Resource = %v, want %v", issues[0].Resource, tt.expectedResource)
+				}
 			}
 		})
 	}
@@ -374,6 +594,45 @@ func TestVerifyIssueTypes(t *testing.T) {
 	}
 }
 
+// TestScanProjectIssues_NestedCommands verifies that scanProjectIssues
+// detects broken symlinks inside subdirectories of the commands directory.
+func TestScanProjectIssues_NestedCommands(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create commands directory with a nested broken symlink
+	claudeDir := filepath.Join(projectDir, ".claude", "commands", "api")
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		t.Fatalf("Failed to create nested commands directory: %v", err)
+	}
+	target := filepath.Join(repoDir, "commands", "api", "deploy.md")
+	if err := os.Symlink(target, filepath.Join(claudeDir, "deploy.md")); err != nil {
+		t.Fatalf("Failed to create broken symlink: %v", err)
+	}
+
+	// Detect tools
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	// Scan for issues
+	issues, err := scanProjectIssues(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("scanProjectIssues failed: %v", err)
+	}
+
+	if len(issues) != 1 {
+		t.Fatalf("Expected 1 issue, got %d: %+v", len(issues), issues)
+	}
+	if issues[0].IssueType != "broken" {
+		t.Errorf("Issue type = %v, want broken", issues[0].IssueType)
+	}
+	if issues[0].Resource != "api/deploy" {
+		t.Errorf("Resource = %v, want api/deploy", issues[0].Resource)
+	}
+}
+
 // TestParseResourceFromIssue tests the helper that extracts resource type and name
 // from a VerifyIssue based on its path.
 func TestParseResourceFromIssue(t *testing.T) {
@@ -445,6 +704,15 @@ func TestParseResourceFromIssue(t *testing.T) {
 			},
 			expectedType: resource.Skill,
 			expectedName: "unknown-resource",
+		},
+		{
+			name: "nested command strips .md from namespaced name",
+			issue: VerifyIssue{
+				Resource: "api/deploy",
+				Path:     "/project/.claude/commands/api/deploy.md",
+			},
+			expectedType: resource.Command,
+			expectedName: "api/deploy",
 		},
 	}
 
@@ -727,7 +995,6 @@ func TestFixVerifyIssues_WrongRepoReinstalls(t *testing.T) {
 	}
 }
 
-
 // TestCheckManifestSync_PackageListsMissingResources verifies that when a
 // package has missing resources, the issue description names each one.
 func TestCheckManifestSync_PackageListsMissingResources(t *testing.T) {
@@ -877,6 +1144,7 @@ func TestCheckManifestSync_PackageAllInstalledNoIssue(t *testing.T) {
 		t.Errorf("Expected 0 issues for fully installed package, got %d: %+v", len(issues), issues)
 	}
 }
+
 // TestCheckManifestSync_DetectsBrokenSymlinkAsNotInstalled verifies that
 // checkManifestSync treats a broken symlink as "not installed" since os.Stat
 // correctly follows the symlink and fails when the target doesn't exist.
@@ -1045,5 +1313,513 @@ func TestBrokenSymlinkNoDuplicatesBetweenPhases(t *testing.T) {
 	}
 	if allIssues[0].Resource != "test-skill" {
 		t.Errorf("Expected resource 'test-skill', got %q", allIssues[0].Resource)
+	}
+}
+
+// TestCheckManifestSync_DetectsOrphanedSkill verifies that checkManifestSync
+// reports a skill installed on disk but not listed in ai.package.yaml.
+func TestCheckManifestSync_DetectsOrphanedSkill(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create an empty manifest (no resources declared)
+	m := &manifest.Manifest{
+		Resources: []string{},
+	}
+	manifestPath := filepath.Join(projectDir, manifest.ManifestFileName)
+	if err := m.Save(manifestPath); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create an installed skill symlink pointing to the repo
+	skillsDir := filepath.Join(projectDir, ".opencode", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills dir: %v", err)
+	}
+	repoSkillDir := filepath.Join(repoDir, "skills", "orphan-skill")
+	if err := os.MkdirAll(repoSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create repo skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write SKILL.md: %v", err)
+	}
+	if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "orphan-skill")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	if len(issues) != 1 {
+		t.Fatalf("Expected 1 orphaned issue, got %d: %+v", len(issues), issues)
+	}
+	if issues[0].IssueType != "orphaned" {
+		t.Errorf("Expected issue type 'orphaned', got %q", issues[0].IssueType)
+	}
+	if issues[0].Resource != "orphan-skill" {
+		t.Errorf("Expected resource 'orphan-skill', got %q", issues[0].Resource)
+	}
+	if issues[0].Severity != "warning" {
+		t.Errorf("Expected severity 'warning', got %q", issues[0].Severity)
+	}
+}
+
+// TestCheckManifestSync_DetectsOrphanedCommand verifies that checkManifestSync
+// reports a command installed on disk but not listed in ai.package.yaml.
+func TestCheckManifestSync_DetectsOrphanedCommand(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create an empty manifest
+	m := &manifest.Manifest{
+		Resources: []string{},
+	}
+	if err := m.Save(filepath.Join(projectDir, manifest.ManifestFileName)); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create an installed command symlink
+	commandsDir := filepath.Join(projectDir, ".claude", "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands dir: %v", err)
+	}
+	repoCmd := filepath.Join(repoDir, "commands", "orphan-cmd.md")
+	if err := os.MkdirAll(filepath.Dir(repoCmd), 0755); err != nil {
+		t.Fatalf("Failed to create repo cmd dir: %v", err)
+	}
+	if err := os.WriteFile(repoCmd, []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write command: %v", err)
+	}
+	if err := os.Symlink(repoCmd, filepath.Join(commandsDir, "orphan-cmd.md")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	if len(issues) != 1 {
+		t.Fatalf("Expected 1 orphaned issue, got %d: %+v", len(issues), issues)
+	}
+	if issues[0].IssueType != "orphaned" {
+		t.Errorf("Expected issue type 'orphaned', got %q", issues[0].IssueType)
+	}
+	if issues[0].Resource != "orphan-cmd" {
+		t.Errorf("Expected resource 'orphan-cmd', got %q", issues[0].Resource)
+	}
+}
+
+// TestCheckManifestSync_DetectsOrphanedNestedCommand verifies that orphan detection
+// works for namespaced commands in subdirectories (e.g., api/deploy).
+func TestCheckManifestSync_DetectsOrphanedNestedCommand(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create an empty manifest
+	m := &manifest.Manifest{
+		Resources: []string{},
+	}
+	if err := m.Save(filepath.Join(projectDir, manifest.ManifestFileName)); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create a nested command symlink: .opencode/commands/api/deploy.md
+	commandsDir := filepath.Join(projectDir, ".opencode", "commands", "api")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create nested commands dir: %v", err)
+	}
+	repoCmd := filepath.Join(repoDir, "commands", "api", "deploy.md")
+	if err := os.MkdirAll(filepath.Dir(repoCmd), 0755); err != nil {
+		t.Fatalf("Failed to create repo cmd dir: %v", err)
+	}
+	if err := os.WriteFile(repoCmd, []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write command: %v", err)
+	}
+	if err := os.Symlink(repoCmd, filepath.Join(commandsDir, "deploy.md")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	if len(issues) != 1 {
+		t.Fatalf("Expected 1 orphaned issue, got %d: %+v", len(issues), issues)
+	}
+	if issues[0].IssueType != "orphaned" {
+		t.Errorf("Expected issue type 'orphaned', got %q", issues[0].IssueType)
+	}
+	if issues[0].Resource != "api/deploy" {
+		t.Errorf("Expected resource 'api/deploy', got %q", issues[0].Resource)
+	}
+}
+
+// TestCheckManifestSync_NoOrphansWhenInManifest verifies that installed resources
+// that ARE in the manifest are not reported as orphaned.
+func TestCheckManifestSync_NoOrphansWhenInManifest(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create manifest declaring the skill
+	m := &manifest.Manifest{
+		Resources: []string{"skill/listed-skill"},
+	}
+	if err := m.Save(filepath.Join(projectDir, manifest.ManifestFileName)); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create installed skill symlink
+	skillsDir := filepath.Join(projectDir, ".opencode", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills dir: %v", err)
+	}
+	repoSkillDir := filepath.Join(repoDir, "skills", "listed-skill")
+	if err := os.MkdirAll(repoSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create repo skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write SKILL.md: %v", err)
+	}
+	if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "listed-skill")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	if len(issues) != 0 {
+		t.Errorf("Expected 0 issues when resource is in manifest, got %d: %+v", len(issues), issues)
+	}
+}
+
+// TestCheckManifestSync_NoOrphansWithoutManifest verifies no false positives
+// when no ai.package.yaml exists (returns nil, no orphan scanning).
+func TestCheckManifestSync_NoOrphansWithoutManifest(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create installed skill symlink — but NO manifest
+	skillsDir := filepath.Join(projectDir, ".opencode", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills dir: %v", err)
+	}
+	repoSkillDir := filepath.Join(repoDir, "skills", "some-skill")
+	if err := os.MkdirAll(repoSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create repo skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write SKILL.md: %v", err)
+	}
+	if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "some-skill")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	if len(issues) != 0 {
+		t.Errorf("Expected 0 issues when no manifest exists, got %d: %+v", len(issues), issues)
+	}
+}
+
+// TestCheckManifestSync_OrphanedIgnoresNonSymlinks verifies that regular files
+// and directories in tool dirs are not reported as orphans.
+func TestCheckManifestSync_OrphanedIgnoresNonSymlinks(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create an empty manifest
+	m := &manifest.Manifest{
+		Resources: []string{},
+	}
+	if err := m.Save(filepath.Join(projectDir, manifest.ManifestFileName)); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create a regular file and a regular directory in commands dir
+	commandsDir := filepath.Join(projectDir, ".claude", "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(commandsDir, "regular-file.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write regular file: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(commandsDir, "regular-dir"), 0755); err != nil {
+		t.Fatalf("Failed to create regular dir: %v", err)
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	// Should have 0 issues — regular files and empty dirs are not orphans
+	if len(issues) != 0 {
+		t.Errorf("Expected 0 issues for non-symlinks, got %d: %+v", len(issues), issues)
+	}
+}
+
+// TestCheckManifestSync_OrphanedDeduplicatesAcrossTools verifies that an orphan
+// installed in multiple tool directories is only reported once.
+func TestCheckManifestSync_OrphanedDeduplicatesAcrossTools(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create an empty manifest
+	m := &manifest.Manifest{
+		Resources: []string{},
+	}
+	if err := m.Save(filepath.Join(projectDir, manifest.ManifestFileName)); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create the same skill installed in both .opencode and .claude
+	repoSkillDir := filepath.Join(repoDir, "skills", "shared-skill")
+	if err := os.MkdirAll(repoSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create repo skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write SKILL.md: %v", err)
+	}
+
+	for _, toolDir := range []string{".opencode/skills", ".claude/skills"} {
+		skillsDir := filepath.Join(projectDir, toolDir)
+		if err := os.MkdirAll(skillsDir, 0755); err != nil {
+			t.Fatalf("Failed to create skills dir %s: %v", toolDir, err)
+		}
+		if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "shared-skill")); err != nil {
+			t.Fatalf("Failed to create symlink in %s: %v", toolDir, err)
+		}
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	// Count orphaned issues — should be exactly 1, not duplicated
+	orphanCount := 0
+	for _, issue := range issues {
+		if issue.IssueType == "orphaned" {
+			orphanCount++
+		}
+	}
+	if orphanCount != 1 {
+		t.Errorf("Expected 1 orphaned issue (deduplicated), got %d: %+v", orphanCount, issues)
+	}
+}
+
+// TestCheckManifestSync_OrphanedPackageMembersNotReported verifies that resources
+// installed as part of a package are not reported as orphaned when the package
+// is declared in the manifest.
+func TestCheckManifestSync_OrphanedPackageMembersNotReported(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create a package with one skill member
+	pkg := &resource.Package{
+		Name:        "my-pkg",
+		Description: "A test package",
+		Resources:   []string{"skill/pkg-skill"},
+	}
+	if err := resource.SavePackage(pkg, repoDir); err != nil {
+		t.Fatalf("Failed to save package: %v", err)
+	}
+
+	// Create manifest referencing the package (not the individual skill)
+	m := &manifest.Manifest{
+		Resources: []string{"package/my-pkg"},
+	}
+	if err := m.Save(filepath.Join(projectDir, manifest.ManifestFileName)); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Install the package member skill
+	skillsDir := filepath.Join(projectDir, ".opencode", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills dir: %v", err)
+	}
+	repoSkillDir := filepath.Join(repoDir, "skills", "pkg-skill")
+	if err := os.MkdirAll(repoSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create repo skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write SKILL.md: %v", err)
+	}
+	if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "pkg-skill")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	// The skill is a member of the declared package — it should NOT be orphaned
+	for _, issue := range issues {
+		if issue.IssueType == "orphaned" {
+			t.Errorf("Package member should not be reported as orphaned: %+v", issue)
+		}
+	}
+}
+
+// TestFindOrphanedResources tests the findOrphanedResources helper directly.
+func TestFindOrphanedResources(t *testing.T) {
+	tests := []struct {
+		name          string
+		resType       string
+		manifest      map[string]bool
+		setupFunc     func(string) error
+		expectedCount int
+		expectedName  string
+	}{
+		{
+			name:     "detects orphaned command symlink",
+			resType:  "command",
+			manifest: map[string]bool{},
+			setupFunc: func(dir string) error {
+				target := filepath.Join(dir, ".target", "cmd.md")
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
+					return err
+				}
+				return os.Symlink(target, filepath.Join(dir, "orphan-cmd.md"))
+			},
+			expectedCount: 1,
+			expectedName:  "orphan-cmd",
+		},
+		{
+			name:     "skips command in manifest",
+			resType:  "command",
+			manifest: map[string]bool{"command/listed-cmd": true},
+			setupFunc: func(dir string) error {
+				target := filepath.Join(dir, ".target", "cmd.md")
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
+					return err
+				}
+				return os.Symlink(target, filepath.Join(dir, "listed-cmd.md"))
+			},
+			expectedCount: 0,
+		},
+		{
+			name:     "detects orphaned nested command",
+			resType:  "command",
+			manifest: map[string]bool{},
+			setupFunc: func(dir string) error {
+				subDir := filepath.Join(dir, "api")
+				if err := os.MkdirAll(subDir, 0755); err != nil {
+					return err
+				}
+				target := filepath.Join(dir, ".target", "deploy.md")
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
+					return err
+				}
+				return os.Symlink(target, filepath.Join(subDir, "deploy.md"))
+			},
+			expectedCount: 1,
+			expectedName:  "api/deploy",
+		},
+		{
+			name:     "ignores regular files",
+			resType:  "command",
+			manifest: map[string]bool{},
+			setupFunc: func(dir string) error {
+				return os.WriteFile(filepath.Join(dir, "not-a-symlink.md"), []byte("test"), 0644)
+			},
+			expectedCount: 0,
+		},
+		{
+			name:     "handles nonexistent directory",
+			resType:  "skill",
+			manifest: map[string]bool{},
+			setupFunc: func(dir string) error {
+				// Remove the directory so it doesn't exist
+				return os.RemoveAll(dir)
+			},
+			expectedCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			testDir := filepath.Join(dir, "scan-dir")
+			if err := os.MkdirAll(testDir, 0755); err != nil {
+				t.Fatalf("Failed to create test dir: %v", err)
+			}
+
+			if err := tt.setupFunc(testDir); err != nil {
+				t.Fatalf("Setup failed: %v", err)
+			}
+
+			seen := make(map[string]bool)
+			issues := findOrphanedResources(testDir, tt.resType, tt.manifest, seen)
+
+			if len(issues) != tt.expectedCount {
+				t.Errorf("Expected %d issues, got %d: %+v", tt.expectedCount, len(issues), issues)
+			}
+
+			if tt.expectedCount > 0 && len(issues) > 0 && tt.expectedName != "" {
+				if issues[0].Resource != tt.expectedName {
+					t.Errorf("Expected resource %q, got %q", tt.expectedName, issues[0].Resource)
+				}
+			}
+		})
 	}
 }

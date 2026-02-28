@@ -220,50 +220,83 @@ func verifyDirectory(dir, tool, repoPath string) ([]VerifyIssue, error) {
 		}
 
 		if linkInfo.Mode()&os.ModeSymlink == 0 {
-			continue // Not a symlink
-		}
-
-		// Read target
-		target, err := os.Readlink(symlinkPath)
-		if err != nil {
-			issues = append(issues, VerifyIssue{
-				Resource:    entry.Name(),
-				Tool:        tool,
-				IssueType:   "unreadable",
-				Description: "Cannot read symlink target",
-				Path:        symlinkPath,
-				Severity:    "error",
-			})
+			// Not a symlink — if it's a directory, recurse one level
+			// for nested resources (e.g., namespaced commands like api/deploy.md)
+			if linkInfo.IsDir() {
+				subEntries, err := os.ReadDir(symlinkPath)
+				if err != nil {
+					continue
+				}
+				for _, subEntry := range subEntries {
+					if subEntry.IsDir() {
+						continue // Only one level of nesting
+					}
+					subPath := filepath.Join(symlinkPath, subEntry.Name())
+					subInfo, err := os.Lstat(subPath)
+					if err != nil {
+						continue
+					}
+					if subInfo.Mode()&os.ModeSymlink == 0 {
+						continue
+					}
+					namespacedName := entry.Name() + "/" + strings.TrimSuffix(subEntry.Name(), ".md")
+					if issue := verifySymlink(subPath, namespacedName, tool, repoPath); issue != nil {
+						issues = append(issues, *issue)
+					}
+				}
+			}
 			continue
 		}
 
-		// Check if target exists (os.Stat follows symlinks, detects broken ones)
-		if _, err := os.Stat(symlinkPath); err != nil {
-			issues = append(issues, VerifyIssue{
-				Resource:    entry.Name(),
-				Tool:        tool,
-				IssueType:   "broken",
-				Description: fmt.Sprintf("Symlink target doesn't exist: %s", target),
-				Path:        symlinkPath,
-				Severity:    "error",
-			})
-			continue
-		}
-
-		// Check if points to correct repo
-		if !strings.HasPrefix(target, repoPath) {
-			issues = append(issues, VerifyIssue{
-				Resource:    entry.Name(),
-				Tool:        tool,
-				IssueType:   "wrong-repo",
-				Description: fmt.Sprintf("Points to wrong repo: %s (expected: %s)", target, repoPath),
-				Path:        symlinkPath,
-				Severity:    "warning",
-			})
+		if issue := verifySymlink(symlinkPath, entry.Name(), tool, repoPath); issue != nil {
+			issues = append(issues, *issue)
 		}
 	}
 
 	return issues, nil
+}
+
+// verifySymlink checks a single symlink and returns a VerifyIssue if there is a problem.
+// Returns nil when the symlink is healthy.
+func verifySymlink(symlinkPath, resourceName, tool, repoPath string) *VerifyIssue {
+	// Read target
+	target, err := os.Readlink(symlinkPath)
+	if err != nil {
+		return &VerifyIssue{
+			Resource:    resourceName,
+			Tool:        tool,
+			IssueType:   "unreadable",
+			Description: "Cannot read symlink target",
+			Path:        symlinkPath,
+			Severity:    "error",
+		}
+	}
+
+	// Check if target exists (os.Stat follows symlinks, detects broken ones)
+	if _, err := os.Stat(symlinkPath); err != nil {
+		return &VerifyIssue{
+			Resource:    resourceName,
+			Tool:        tool,
+			IssueType:   "broken",
+			Description: fmt.Sprintf("Symlink target doesn't exist: %s", target),
+			Path:        symlinkPath,
+			Severity:    "error",
+		}
+	}
+
+	// Check if points to correct repo
+	if !strings.HasPrefix(target, repoPath) {
+		return &VerifyIssue{
+			Resource:    resourceName,
+			Tool:        tool,
+			IssueType:   "wrong-repo",
+			Description: fmt.Sprintf("Points to wrong repo: %s (expected: %s)", target, repoPath),
+			Path:        symlinkPath,
+			Severity:    "warning",
+		}
+	}
+
+	return nil
 }
 
 func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath string) ([]VerifyIssue, error) {
@@ -431,7 +464,140 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 		}
 	}
 
+	// Phase 2b: Disk → manifest (orphan detection)
+	// Build the expanded manifest set (includes package member resources)
+	expandedManifest := make(map[string]bool, len(mf.Resources))
+	for _, ref := range mf.Resources {
+		expandedManifest[ref] = true
+
+		// Expand packages — resolve each package to its member resources
+		if strings.HasPrefix(ref, "package/") {
+			packageName := strings.TrimPrefix(ref, "package/")
+			pkgPath := resource.GetPackagePath(packageName, repoPath)
+			pkg, err := resource.LoadPackage(pkgPath)
+			if err != nil {
+				continue
+			}
+			for _, memberRef := range pkg.Resources {
+				expandedManifest[memberRef] = true
+			}
+		}
+	}
+
+	// Scan all tool directories for installed symlinks
+	seen := make(map[string]bool) // Deduplicate across tools
+	for _, tool := range detectedTools {
+		toolInfo := tools.GetToolInfo(tool)
+		toolName := tool.String()
+
+		if toolInfo.SupportsCommands {
+			dir := filepath.Join(projectPath, toolInfo.CommandsDir)
+			orphans := findOrphanedResources(dir, "command", expandedManifest, seen)
+			for i := range orphans {
+				orphans[i].Tool = toolName
+				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
+			}
+			issues = append(issues, orphans...)
+		}
+
+		if toolInfo.SupportsSkills {
+			dir := filepath.Join(projectPath, toolInfo.SkillsDir)
+			orphans := findOrphanedResources(dir, "skill", expandedManifest, seen)
+			for i := range orphans {
+				orphans[i].Tool = toolName
+				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
+			}
+			issues = append(issues, orphans...)
+		}
+
+		if toolInfo.SupportsAgents {
+			dir := filepath.Join(projectPath, toolInfo.AgentsDir)
+			orphans := findOrphanedResources(dir, "agent", expandedManifest, seen)
+			for i := range orphans {
+				orphans[i].Tool = toolName
+				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
+			}
+			issues = append(issues, orphans...)
+		}
+	}
+
 	return issues, nil
+}
+
+// findOrphanedResources scans a directory for installed symlinks that are not
+// in the expanded manifest. Returns VerifyIssue entries for each orphan found.
+// The seen map is used to deduplicate across multiple tool directories.
+func findOrphanedResources(dir, resType string, expandedManifest map[string]bool, seen map[string]bool) []VerifyIssue {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	var issues []VerifyIssue
+	for _, entry := range entries {
+		entryPath := filepath.Join(dir, entry.Name())
+
+		info, err := os.Lstat(entryPath)
+		if err != nil {
+			continue
+		}
+
+		if info.Mode()&os.ModeSymlink != 0 {
+			// Top-level symlink
+			name := entry.Name()
+			// Commands and agents use .md-stripped names as resource references
+			if resType == "command" || resType == "agent" {
+				name = strings.TrimSuffix(name, ".md")
+			}
+			ref := resType + "/" + name
+			if !expandedManifest[ref] && !seen[ref] {
+				seen[ref] = true
+				issues = append(issues, VerifyIssue{
+					Resource:    name,
+					IssueType:   "orphaned",
+					Description: fmt.Sprintf("Installed but not listed in %s", manifest.ManifestFileName),
+					Severity:    "warning",
+				})
+			}
+		} else if info.IsDir() {
+			// Nested directory — scan one level for namespaced resources
+			subEntries, err := os.ReadDir(entryPath)
+			if err != nil {
+				continue
+			}
+			for _, subEntry := range subEntries {
+				if subEntry.IsDir() {
+					continue
+				}
+				subPath := filepath.Join(entryPath, subEntry.Name())
+				subInfo, err := os.Lstat(subPath)
+				if err != nil {
+					continue
+				}
+				if subInfo.Mode()&os.ModeSymlink == 0 {
+					continue
+				}
+				name := entry.Name() + "/" + strings.TrimSuffix(subEntry.Name(), ".md")
+				ref := resType + "/" + name
+				if !expandedManifest[ref] && !seen[ref] {
+					seen[ref] = true
+					issues = append(issues, VerifyIssue{
+						Resource:    name,
+						IssueType:   "orphaned",
+						Description: fmt.Sprintf("Installed but not listed in %s", manifest.ManifestFileName),
+						Path:        subPath,
+						Severity:    "warning",
+					})
+				}
+			}
+		}
+	}
+
+	return issues
 }
 
 func displayNoIssues(format output.Format) error {
@@ -606,10 +772,12 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo
 			fixed++
 
 		case "orphaned":
-			// Installed but not in manifest
-			fmt.Printf("  Orphaned resource: %s\n", issue.Resource)
-			fmt.Printf("    Run 'aimgr uninstall %s' to remove, or add to %s\n",
-				issue.Resource, manifest.ManifestFileName)
+			// Installed but not in manifest — determine type/name for uninstall hint
+			resType, resName := parseResourceFromIssue(issue)
+			ref := string(resType) + "/" + resName
+			fmt.Printf("  Orphaned resource: %s (%s)\n", issue.Resource, issue.Tool)
+			fmt.Printf("    Run 'aimgr uninstall %s' to remove, or add '%s' to %s\n",
+				ref, ref, manifest.ManifestFileName)
 		}
 	}
 
