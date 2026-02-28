@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.7.0] - 2026-02-28
+
+### Added
+- **Multi-argument describe** — `aimgr repo describe` now accepts multiple patterns/arguments (e.g., `aimgr repo describe skill/* command/*`)
+- **Package-aware sync status** — `aimgr list --installed` now correctly shows sync status for resources installed as part of a package
+- **Namespaced resource scanning** — Installer now detects resources in subdirectories (namespaced resources) during listing
+
+### Fixed
+- **golangci-lint v2 compliance** — Resolved all violations across 44 files, including a real bug where error variable shadowing in install.go silently lost errors
+- **Shell completion** — Single-argument commands no longer suggest completions after the first argument
+- **Install result accuracy** — Package install results now report correct resource type and name
+- **Duplicate manifest update removed** — Package installation no longer double-updates the manifest
+
+### Changed
+- **CI updated** — golangci-lint v2 now used in GitHub Actions workflow
+- **Linter config modernized** — `.golangci.yml` updated for v2 with strict rules enabled
+
+
 ## [2.6.1] - 2026-02-22
 
 ### Fixed
