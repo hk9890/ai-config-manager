@@ -65,18 +65,21 @@ Examples:
 			return nil
 		}
 
-		// Scan for issues
+		// Scan for issues (Phase 1: check symlinks on disk)
 		issues, err := scanProjectIssues(projectPath, detectedTools, repoPath)
 		if err != nil {
 			return fmt.Errorf("verification failed: %w", err)
 		}
 
-		// Check manifest vs installed
+		// Check manifest vs installed (Phase 2: check manifest references)
 		manifestIssues, err := checkManifestSync(projectPath, detectedTools, repoPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to check manifest sync: %v\n", err)
 		} else {
-			issues = append(issues, manifestIssues...)
+			// Deduplicate: Phase 1 may already report a broken symlink for a resource
+			// that Phase 2 also reports as "not-installed" (since os.Stat fails for
+			// broken symlinks). Remove Phase 2 duplicates to avoid double-reporting.
+			issues = deduplicateIssues(issues, manifestIssues)
 		}
 
 		// Parse format flag
@@ -121,6 +124,37 @@ type VerifyIssue struct {
 	Description string
 	Path        string
 	Severity    string // "error", "warning"
+}
+
+// deduplicateIssues merges manifest issues into existing issues, dropping any
+// manifest "not-installed" issue whose resource name matches an existing issue
+// (e.g., a "broken" symlink already detected in Phase 1).
+func deduplicateIssues(existing, manifestIssues []VerifyIssue) []VerifyIssue {
+	// Build a set of resource names already reported by Phase 1
+	seen := make(map[string]bool, len(existing))
+	for _, issue := range existing {
+		seen[issue.Resource] = true
+	}
+
+	result := make([]VerifyIssue, len(existing))
+	copy(result, existing)
+
+	for _, issue := range manifestIssues {
+		// For "not-installed" issues, extract the resource name (strip type prefix)
+		// and check if Phase 1 already reported it
+		if issue.IssueType == "not-installed" {
+			resName := issue.Resource
+			if parts := strings.SplitN(resName, "/", 2); len(parts) == 2 {
+				resName = parts[1]
+			}
+			if seen[resName] {
+				continue // Skip duplicate — already reported by Phase 1
+			}
+		}
+		result = append(result, issue)
+	}
+
+	return result
 }
 
 func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath string) ([]VerifyIssue, error) {
@@ -203,7 +237,7 @@ func verifyDirectory(dir, tool, repoPath string) ([]VerifyIssue, error) {
 			continue
 		}
 
-		// Check if target exists
+		// Check if target exists (os.Stat follows symlinks, detects broken ones)
 		if _, err := os.Stat(symlinkPath); err != nil {
 			issues = append(issues, VerifyIssue{
 				Resource:    entry.Name(),
@@ -235,11 +269,15 @@ func verifyDirectory(dir, tool, repoPath string) ([]VerifyIssue, error) {
 func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath string) ([]VerifyIssue, error) {
 	// Load manifest
 	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
+
+	// Check if manifest exists before loading — manifest.Load wraps the
+	// os.IsNotExist error so os.IsNotExist() doesn't work on the result.
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		return nil, nil // No manifest, no sync issues
+	}
+
 	mf, err := manifest.Load(manifestPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil // No manifest, no sync issues
-		}
 		return nil, err
 	}
 
@@ -274,7 +312,7 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 			}
 
 			// Check if all resources in the package are installed
-			allInstalled := true
+			var missingResources []string
 			for _, pkgRes := range pkg.Resources {
 				resInstalled := false
 				resParts := strings.SplitN(pkgRes, "/", 2)
@@ -315,9 +353,9 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 						continue
 					}
 
-					// Check if any of the paths exist
+					// Check if any of the paths exist (use os.Stat to detect broken symlinks)
 					for _, path := range checkPaths {
-						if _, err := os.Lstat(path); err == nil {
+						if _, err := os.Stat(path); err == nil {
 							resInstalled = true
 							break
 						}
@@ -329,17 +367,18 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 				}
 
 				if !resInstalled {
-					allInstalled = false
-					break
+					missingResources = append(missingResources, pkgRes)
 				}
 			}
 
-			if !allInstalled {
+			if len(missingResources) > 0 {
+				desc := fmt.Sprintf("Listed in %s but %d resource(s) not installed: %s",
+					manifest.ManifestFileName, len(missingResources), strings.Join(missingResources, ", "))
 				issues = append(issues, VerifyIssue{
 					Resource:    resourceRef,
 					Tool:        "any",
 					IssueType:   "not-installed",
-					Description: fmt.Sprintf("Listed in %s but not all package resources are installed", manifest.ManifestFileName),
+					Description: desc,
 					Path:        manifestPath,
 					Severity:    "warning",
 				})
@@ -373,7 +412,8 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 				continue
 			}
 
-			if _, err := os.Lstat(dir); err == nil {
+			// Use os.Stat to detect broken symlinks (not just symlink node existence)
+			if _, err := os.Stat(dir); err == nil {
 				installed = true
 				break
 			}

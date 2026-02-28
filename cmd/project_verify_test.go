@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hk9890/ai-config-manager/pkg/manifest"
@@ -40,10 +41,13 @@ func TestScanProjectIssues(t *testing.T) {
 				if err := os.MkdirAll(claudeDir, 0755); err != nil {
 					return err
 				}
-				// Create symlink to different repo
-				wrongRepo := filepath.Join(os.TempDir(), "wrong-repo")
-				_ = os.MkdirAll(wrongRepo, 0755)
-				target := filepath.Join(wrongRepo, "commands", "test-cmd")
+				// Create symlink to different repo (use a subdir of projectDir to avoid shared tmp issues)
+				wrongRepo := filepath.Join(projectDir, "wrong-repo")
+				wrongRepoCommands := filepath.Join(wrongRepo, "commands")
+				if err := os.MkdirAll(wrongRepoCommands, 0755); err != nil {
+					return err
+				}
+				target := filepath.Join(wrongRepoCommands, "test-cmd")
 				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
 					return err
 				}
@@ -720,5 +724,326 @@ func TestFixVerifyIssues_WrongRepoReinstalls(t *testing.T) {
 	expectedTarget := filepath.Join(repoDir, "skills", "fix-skill")
 	if actualTarget != expectedTarget {
 		t.Errorf("Symlink points to wrong target after fix: got %s, want %s", actualTarget, expectedTarget)
+	}
+}
+
+
+// TestCheckManifestSync_PackageListsMissingResources verifies that when a
+// package has missing resources, the issue description names each one.
+func TestCheckManifestSync_PackageListsMissingResources(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create a package definition in the repo with 3 resources
+	pkg := &resource.Package{
+		Name:        "test-pkg",
+		Description: "A test package",
+		Resources:   []string{"skill/installed-skill", "agent/missing-agent", "command/missing-cmd"},
+	}
+	if err := resource.SavePackage(pkg, repoDir); err != nil {
+		t.Fatalf("Failed to save package: %v", err)
+	}
+
+	// Create manifest referencing the package
+	m := &manifest.Manifest{
+		Resources: []string{"package/test-pkg"},
+	}
+	manifestPath := filepath.Join(projectDir, manifest.ManifestFileName)
+	if err := m.Save(manifestPath); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create tool directory and install only one of the three resources
+	skillsDir := filepath.Join(projectDir, ".opencode", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills dir: %v", err)
+	}
+	// Create the installed skill target in repo
+	repoSkillDir := filepath.Join(repoDir, "skills", "installed-skill")
+	if err := os.MkdirAll(repoSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create repo skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write SKILL.md: %v", err)
+	}
+	if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "installed-skill")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	// Also create agents dir (needed for opencode tool detection, but leave agent missing)
+	agentsDir := filepath.Join(projectDir, ".opencode", "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		t.Fatalf("Failed to create agents dir: %v", err)
+	}
+
+	// Also create commands dir (needed for opencode tool detection, but leave command missing)
+	commandsDir := filepath.Join(projectDir, ".opencode", "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands dir: %v", err)
+	}
+
+	// Detect tools
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	// Check manifest sync
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	if len(issues) != 1 {
+		t.Fatalf("Expected 1 issue, got %d: %+v", len(issues), issues)
+	}
+
+	issue := issues[0]
+	if issue.Resource != "package/test-pkg" {
+		t.Errorf("Expected resource 'package/test-pkg', got %q", issue.Resource)
+	}
+	if issue.IssueType != "not-installed" {
+		t.Errorf("Expected issue type 'not-installed', got %q", issue.IssueType)
+	}
+
+	// Verify the description includes the count and the missing resource names
+	desc := issue.Description
+	if !strings.Contains(desc, "2 resource(s) not installed") {
+		t.Errorf("Expected description to contain '2 resource(s) not installed', got: %s", desc)
+	}
+	if !strings.Contains(desc, "agent/missing-agent") {
+		t.Errorf("Expected description to contain 'agent/missing-agent', got: %s", desc)
+	}
+	if !strings.Contains(desc, "command/missing-cmd") {
+		t.Errorf("Expected description to contain 'command/missing-cmd', got: %s", desc)
+	}
+	// Verify installed resource is NOT in the missing list
+	if strings.Contains(desc, "installed-skill") {
+		t.Errorf("Description should NOT contain 'installed-skill' (it's installed), got: %s", desc)
+	}
+}
+
+// TestCheckManifestSync_PackageAllInstalledNoIssue verifies that a package
+// with all resources installed produces no issues.
+func TestCheckManifestSync_PackageAllInstalledNoIssue(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create a package definition with one resource
+	pkg := &resource.Package{
+		Name:        "complete-pkg",
+		Description: "A fully installed package",
+		Resources:   []string{"skill/good-skill"},
+	}
+	if err := resource.SavePackage(pkg, repoDir); err != nil {
+		t.Fatalf("Failed to save package: %v", err)
+	}
+
+	// Create manifest
+	m := &manifest.Manifest{
+		Resources: []string{"package/complete-pkg"},
+	}
+	if err := m.Save(filepath.Join(projectDir, manifest.ManifestFileName)); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Install the skill
+	skillsDir := filepath.Join(projectDir, ".opencode", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills dir: %v", err)
+	}
+	repoSkillDir := filepath.Join(repoDir, "skills", "good-skill")
+	if err := os.MkdirAll(repoSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create repo skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write SKILL.md: %v", err)
+	}
+	if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "good-skill")); err != nil {
+		t.Fatalf("Failed to create symlink: %v", err)
+	}
+
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	if len(issues) != 0 {
+		t.Errorf("Expected 0 issues for fully installed package, got %d: %+v", len(issues), issues)
+	}
+}
+// TestCheckManifestSync_DetectsBrokenSymlinkAsNotInstalled verifies that
+// checkManifestSync treats a broken symlink as "not installed" since os.Stat
+// correctly follows the symlink and fails when the target doesn't exist.
+func TestCheckManifestSync_DetectsBrokenSymlinkAsNotInstalled(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create manifest referencing a skill
+	m := &manifest.Manifest{
+		Resources: []string{"skill/broken-skill"},
+	}
+	manifestPath := filepath.Join(projectDir, manifest.ManifestFileName)
+	if err := m.Save(manifestPath); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create tool directory with a broken symlink (target doesn't exist)
+	skillsDir := filepath.Join(projectDir, ".claude", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills dir: %v", err)
+	}
+	brokenTarget := filepath.Join(repoDir, "skills", "broken-skill")
+	if err := os.Symlink(brokenTarget, filepath.Join(skillsDir, "broken-skill")); err != nil {
+		t.Fatalf("Failed to create broken symlink: %v", err)
+	}
+
+	// Detect tools
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	// Check manifest sync — should detect the broken symlink as "not-installed"
+	issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	if len(issues) != 1 {
+		t.Fatalf("Expected 1 issue, got %d: %+v", len(issues), issues)
+	}
+	if issues[0].IssueType != "not-installed" {
+		t.Errorf("Expected issue type 'not-installed', got %q", issues[0].IssueType)
+	}
+	if issues[0].Resource != "skill/broken-skill" {
+		t.Errorf("Expected resource 'skill/broken-skill', got %q", issues[0].Resource)
+	}
+}
+
+// TestDeduplicateIssues verifies that manifest "not-installed" issues are
+// dropped when Phase 1 already reported the same resource (e.g., as "broken").
+func TestDeduplicateIssues(t *testing.T) {
+	tests := []struct {
+		name           string
+		existing       []VerifyIssue
+		manifestIssues []VerifyIssue
+		expectedCount  int
+	}{
+		{
+			name: "removes duplicate broken+not-installed for same resource",
+			existing: []VerifyIssue{
+				{Resource: "my-skill", Tool: "claude", IssueType: "broken", Severity: "error"},
+			},
+			manifestIssues: []VerifyIssue{
+				{Resource: "skill/my-skill", Tool: "any", IssueType: "not-installed", Severity: "warning"},
+			},
+			expectedCount: 1, // Only the "broken" issue
+		},
+		{
+			name:     "keeps non-duplicate manifest issues",
+			existing: []VerifyIssue{},
+			manifestIssues: []VerifyIssue{
+				{Resource: "skill/other-skill", Tool: "any", IssueType: "not-installed", Severity: "warning"},
+			},
+			expectedCount: 1, // The "not-installed" issue is kept
+		},
+		{
+			name: "keeps non-not-installed manifest issues even if resource matches",
+			existing: []VerifyIssue{
+				{Resource: "my-skill", Tool: "claude", IssueType: "broken", Severity: "error"},
+			},
+			manifestIssues: []VerifyIssue{
+				{Resource: "skill/my-skill", Tool: "any", IssueType: "orphaned", Severity: "warning"},
+			},
+			expectedCount: 2, // Both kept (orphaned is not filtered)
+		},
+		{
+			name: "no manifest issues means no change",
+			existing: []VerifyIssue{
+				{Resource: "cmd", Tool: "opencode", IssueType: "broken", Severity: "error"},
+			},
+			manifestIssues: []VerifyIssue{},
+			expectedCount:  1,
+		},
+		{
+			name:           "both empty",
+			existing:       []VerifyIssue{},
+			manifestIssues: []VerifyIssue{},
+			expectedCount:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := deduplicateIssues(tt.existing, tt.manifestIssues)
+			if len(result) != tt.expectedCount {
+				t.Errorf("Expected %d issues, got %d: %+v", tt.expectedCount, len(result), result)
+			}
+		})
+	}
+}
+
+// TestBrokenSymlinkNoDuplicatesBetweenPhases verifies the end-to-end behavior:
+// a broken symlink that is also in the manifest produces exactly one issue
+// (the "broken" from Phase 1), not a duplicate "not-installed" from Phase 2.
+func TestBrokenSymlinkNoDuplicatesBetweenPhases(t *testing.T) {
+	projectDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Create manifest referencing a skill
+	m := &manifest.Manifest{
+		Resources: []string{"skill/test-skill"},
+	}
+	manifestPath := filepath.Join(projectDir, manifest.ManifestFileName)
+	if err := m.Save(manifestPath); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	// Create tool directory with a broken symlink
+	skillsDir := filepath.Join(projectDir, ".claude", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("Failed to create skills dir: %v", err)
+	}
+	brokenTarget := filepath.Join(repoDir, "skills", "test-skill")
+	if err := os.Symlink(brokenTarget, filepath.Join(skillsDir, "test-skill")); err != nil {
+		t.Fatalf("Failed to create broken symlink: %v", err)
+	}
+
+	// Detect tools
+	detectedTools, err := tools.DetectExistingTools(projectDir)
+	if err != nil {
+		t.Fatalf("Failed to detect tools: %v", err)
+	}
+
+	// Phase 1: scan for symlink issues
+	phase1Issues, err := scanProjectIssues(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("scanProjectIssues failed: %v", err)
+	}
+
+	// Phase 2: check manifest sync
+	phase2Issues, err := checkManifestSync(projectDir, detectedTools, repoDir)
+	if err != nil {
+		t.Fatalf("checkManifestSync failed: %v", err)
+	}
+
+	// Deduplicate
+	allIssues := deduplicateIssues(phase1Issues, phase2Issues)
+
+	// Should have exactly 1 issue (the "broken" from Phase 1)
+	if len(allIssues) != 1 {
+		t.Fatalf("Expected exactly 1 issue after dedup, got %d: %+v", len(allIssues), allIssues)
+	}
+	if allIssues[0].IssueType != "broken" {
+		t.Errorf("Expected issue type 'broken', got %q", allIssues[0].IssueType)
+	}
+	if allIssues[0].Resource != "test-skill" {
+		t.Errorf("Expected resource 'test-skill', got %q", allIssues[0].Resource)
 	}
 }
