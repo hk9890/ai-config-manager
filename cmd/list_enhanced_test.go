@@ -56,16 +56,10 @@ func TestListEnhanced_SingleTarget(t *testing.T) {
 	t.Run("json_format", func(t *testing.T) {
 		output := captureListOutput(t, "json")
 
-		// Parse JSON output
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &result); err != nil {
+		// Parse JSON output (listInstalledCmd outputs a plain array)
+		var resources []map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &resources); err != nil {
 			t.Fatalf("failed to parse JSON output: %v\nOutput: %s", err, output)
-		}
-
-		// Verify resources array exists
-		resources, ok := result["resources"].([]interface{})
-		if !ok {
-			t.Fatalf("expected resources to be an array, got: %T", result["resources"])
 		}
 
 		if len(resources) != 1 {
@@ -73,7 +67,7 @@ func TestListEnhanced_SingleTarget(t *testing.T) {
 		}
 
 		// Verify first resource
-		res := resources[0].(map[string]interface{})
+		res := resources[0]
 
 		// Check targets field is an array with claude
 		targets, ok := res["targets"].([]interface{})
@@ -94,19 +88,13 @@ func TestListEnhanced_SingleTarget(t *testing.T) {
 	t.Run("yaml_format", func(t *testing.T) {
 		output := captureListOutput(t, "yaml")
 
-		// Parse YAML output
-		var result map[string]interface{}
-		if err := yaml.Unmarshal([]byte(output), &result); err != nil {
+		// Parse YAML output (listInstalledCmd outputs a plain array)
+		var resources []map[string]interface{}
+		if err := yaml.Unmarshal([]byte(output), &resources); err != nil {
 			t.Fatalf("failed to parse YAML output: %v\nOutput: %s", err, output)
 		}
 
-		// Verify resources array
-		resources, ok := result["resources"].([]interface{})
-		if !ok {
-			t.Fatalf("expected resources to be an array, got: %T", result["resources"])
-		}
-
-		res := resources[0].(map[string]interface{})
+		res := resources[0]
 
 		// Check targets field is an array
 		targets, ok := res["targets"].([]interface{})
@@ -191,13 +179,12 @@ func TestListEnhanced_MultipleTargets(t *testing.T) {
 	t.Run("json_format", func(t *testing.T) {
 		output := captureListOutput(t, "json")
 
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &result); err != nil {
+		var resources []map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &resources); err != nil {
 			t.Fatalf("failed to parse JSON: %v", err)
 		}
 
-		resources := result["resources"].([]interface{})
-		res := resources[0].(map[string]interface{})
+		res := resources[0]
 
 		targets, ok := res["targets"].([]interface{})
 		if !ok {
@@ -310,13 +297,12 @@ func TestListEnhanced_NotInManifest(t *testing.T) {
 	t.Run("json_format", func(t *testing.T) {
 		output := captureListOutput(t, "json")
 
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &result); err != nil {
+		var resources []map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &resources); err != nil {
 			t.Fatalf("failed to parse JSON: %v", err)
 		}
 
-		resources := result["resources"].([]interface{})
-		res := resources[0].(map[string]interface{})
+		res := resources[0]
 
 		syncStatus, ok := res["sync_status"].(string)
 		if !ok {
@@ -380,10 +366,6 @@ func TestListEnhanced_NotInstalled(t *testing.T) {
 		t.Fatalf("failed to add command: %v", err)
 	}
 
-	if err := mgr.AddCommand(commandPath, "file://"+commandPath, "file"); err != nil {
-		t.Fatalf("failed to add command: %v", err)
-	}
-
 	// Create manifest WITH this resource, but DON'T install it
 	m := &manifest.Manifest{
 		Resources: []string{"command/test-cmd"},
@@ -400,57 +382,14 @@ func TestListEnhanced_NotInstalled(t *testing.T) {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
 
-	// Test JSON format
-	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json")
-
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &result); err != nil {
-			t.Fatalf("failed to parse JSON: %v", err)
-		}
-
-		resources := result["resources"].([]interface{})
-		res := resources[0].(map[string]interface{})
-
-		// Check targets is empty array
-		targets, ok := res["targets"].([]interface{})
-		if !ok {
-			t.Fatalf("expected targets to be array, got: %T", res["targets"])
-		}
-
-		if len(targets) != 0 {
-			t.Errorf("expected empty targets array, got: %v", targets)
-		}
-
-		// Check sync status
-		syncStatus := res["sync_status"].(string)
-		if syncStatus != "not-installed" {
-			t.Errorf("expected sync_status 'not-installed', got: %s", syncStatus)
-		}
-	})
-
-	// Test table format
-	t.Run("table_format", func(t *testing.T) {
+	// listInstalledCmd only shows installed resources (symlinks).
+	// A resource in the manifest but not installed won't appear in the list.
+	// The command should indicate no resources are installed.
+	t.Run("no_output_for_uninstalled", func(t *testing.T) {
 		output := captureListOutput(t, "table")
 
-		// Check for the "⚠" symbol (not-installed indicator)
-		lines := strings.Split(output, "\n")
-		foundWarning := false
-		for _, line := range lines {
-			if strings.Contains(line, "test-cmd") {
-				if strings.Contains(line, "⚠") {
-					foundWarning = true
-				}
-			}
-		}
-
-		if !foundWarning {
-			t.Errorf("expected to find '⚠' symbol for not-installed status")
-		}
-
-		// Verify legend
-		if !strings.Contains(output, "⚠ = Not installed") {
-			t.Errorf("expected legend to explain '⚠' symbol")
+		if !strings.Contains(output, "No resources installed") {
+			t.Errorf("expected 'No resources installed' message for manifest-only resource, got:\n%s", output)
 		}
 	})
 }
@@ -502,13 +441,12 @@ func TestListEnhanced_InSync(t *testing.T) {
 	t.Run("json_format", func(t *testing.T) {
 		output := captureListOutput(t, "json")
 
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &result); err != nil {
+		var resources []map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &resources); err != nil {
 			t.Fatalf("failed to parse JSON: %v", err)
 		}
 
-		resources := result["resources"].([]interface{})
-		res := resources[0].(map[string]interface{})
+		res := resources[0]
 
 		syncStatus := res["sync_status"].(string)
 		if syncStatus != "in-sync" {
@@ -573,10 +511,6 @@ func TestListEnhanced_NoManifest(t *testing.T) {
 		t.Fatalf("failed to add command: %v", err)
 	}
 
-	if err := mgr.AddCommand(commandPath, "file://"+commandPath, "file"); err != nil {
-		t.Fatalf("failed to add command: %v", err)
-	}
-
 	// Install resource
 	installResource(t, projectPath, repoPath, "claude", "commands", "test-cmd.md")
 
@@ -593,13 +527,12 @@ func TestListEnhanced_NoManifest(t *testing.T) {
 	t.Run("json_format", func(t *testing.T) {
 		output := captureListOutput(t, "json")
 
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &result); err != nil {
+		var resources []map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &resources); err != nil {
 			t.Fatalf("failed to parse JSON: %v", err)
 		}
 
-		resources := result["resources"].([]interface{})
-		res := resources[0].(map[string]interface{})
+		res := resources[0]
 
 		syncStatus := res["sync_status"].(string)
 		if syncStatus != "no-manifest" {
@@ -678,13 +611,12 @@ func TestListEnhanced_CopilotOnly(t *testing.T) {
 	t.Run("json_format", func(t *testing.T) {
 		output := captureListOutput(t, "json")
 
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &result); err != nil {
+		var resources []map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &resources); err != nil {
 			t.Fatalf("failed to parse JSON: %v", err)
 		}
 
-		resources := result["resources"].([]interface{})
-		res := resources[0].(map[string]interface{})
+		res := resources[0]
 
 		targets := res["targets"].([]interface{})
 		if len(targets) != 1 {
@@ -749,53 +681,14 @@ func TestListEnhanced_NoInstallations(t *testing.T) {
 		t.Fatalf("failed to change to project dir: %v", err)
 	}
 
-	// Test JSON format
-	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json")
-
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(output), &result); err != nil {
-			t.Fatalf("failed to parse JSON: %v\nOutput: %s", err, output)
-		}
-
-		resources := result["resources"].([]interface{})
-		if len(resources) == 0 {
-			t.Fatalf("expected at least 1 resource in repo, got none")
-		}
-		res := resources[0].(map[string]interface{})
-
-		// Verify targets is empty array (not null, not string)
-		targets, ok := res["targets"].([]interface{})
-		if !ok {
-			t.Fatalf("expected targets to be array, got: %T", res["targets"])
-		}
-
-		if len(targets) != 0 {
-			t.Errorf("expected empty targets array [], got: %v", targets)
-		}
-	})
-
-	// Test table format
-	t.Run("table_format", func(t *testing.T) {
+	// listInstalledCmd only shows installed resources (symlinks).
+	// A resource in the repo but not installed won't appear in the list.
+	// The command should indicate no resources are installed.
+	t.Run("no_output_for_uninstalled", func(t *testing.T) {
 		output := captureListOutput(t, "table")
 
-		// Check that targets column shows "-" for no installations
-		// The table has format: | name | targets | sync | desc |
-		// After Fields split, we get: [│, name, │, targets, │, sync, │, desc, │]
-		lines := strings.Split(output, "\n")
-		foundDash := false
-		for _, line := range lines {
-			if strings.Contains(line, "test-agent") {
-				// Should have "-" in targets column (index 3 after splitting by whitespace)
-				fields := strings.Fields(line)
-				if len(fields) >= 4 && fields[3] == "-" {
-					foundDash = true
-				}
-			}
-		}
-
-		if !foundDash {
-			t.Errorf("expected to find '-' in targets column for uninstalled resource")
+		if !strings.Contains(output, "No resources installed") {
+			t.Errorf("expected 'No resources installed' message for repo-only resource, got:\n%s", output)
 		}
 	})
 }
@@ -958,9 +851,9 @@ func captureListOutput(t *testing.T, format string) string {
 	os.Stdout = w
 
 	// Set format flag
-	originalFormat := formatFlag
-	formatFlag = format
-	defer func() { formatFlag = originalFormat }()
+	originalFormat := listInstalledFormatFlag
+	listInstalledFormatFlag = format
+	defer func() { listInstalledFormatFlag = originalFormat }()
 
 	// Capture output in goroutine
 	outChan := make(chan string)
@@ -971,7 +864,7 @@ func captureListOutput(t *testing.T, format string) string {
 	}()
 
 	// Execute command RunE directly
-	err = listCmd.RunE(listCmd, nil)
+	err = listInstalledCmd.RunE(listInstalledCmd, nil)
 
 	// Restore stdout
 	_ = w.Close()
