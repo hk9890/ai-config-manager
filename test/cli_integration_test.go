@@ -77,14 +77,14 @@ func runAimgr(t *testing.T, args ...string) (string, error) {
 
 // setupTestEnvironment creates isolated test directories and sets environment variables
 // to prevent tests from reading the user's actual config
-func setupTestEnvironment(t *testing.T) (repoDir string, configDir string) {
+func setupTestEnvironment(t *testing.T) {
 	t.Helper()
 
 	// Create isolated repo directory
-	repoDir = t.TempDir()
+	repoDir := t.TempDir()
 
 	// Create isolated config directory
-	configDir = t.TempDir()
+	configDir := t.TempDir()
 
 	// Set environment variables for complete isolation
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
@@ -105,15 +105,12 @@ func setupTestEnvironment(t *testing.T) (repoDir string, configDir string) {
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-
-	return repoDir, configDir
 }
 
 // TestCLIRepoAdd tests the 'aimgr repo add' command
 func TestCLIRepoAdd(t *testing.T) {
 	// Create temporary repo directory
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 
 	// Create test command using helper
 	cmdPath := createTestCommand(t, "test-cmd", "A test command")
@@ -131,8 +128,7 @@ func TestCLIRepoAdd(t *testing.T) {
 
 // TestCLIRepoList tests the 'aimgr repo list' command
 func TestCLIRepoList(t *testing.T) {
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 
 	// Create test command using helper
 	cmdPath := createTestCommand(t, "list-test", "A command for list testing")
@@ -156,8 +152,7 @@ func TestCLIRepoList(t *testing.T) {
 
 // TestCLIRepoShow tests the 'aimgr repo show' command
 func TestCLIRepoShow(t *testing.T) {
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 
 	// Create test command using helper, but we need custom metadata
 	// So we'll create it manually but in proper structure
@@ -211,8 +206,7 @@ license: MIT
 
 // TestCLIRepoShowSkill tests 'aimgr repo show skill'
 func TestCLIRepoShowSkill(t *testing.T) {
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 
 	// Create test skill using helper, but we need custom metadata
 	// So we'll create it manually but in proper structure
@@ -266,8 +260,7 @@ license: Apache-2.0
 
 // TestCLIRepoShowAgent tests 'aimgr repo show agent'
 func TestCLIRepoShowAgent(t *testing.T) {
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 
 	// Create test agent using helper, but we need custom metadata
 	// So we'll create it manually but in proper structure
@@ -317,8 +310,7 @@ version: "1.5.0"
 
 // TestCLIInstall tests 'aimgr install' command
 func TestCLIInstall(t *testing.T) {
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 	projectDir := t.TempDir()
 
 	// Create .claude directory to trigger Claude detection
@@ -351,8 +343,7 @@ func TestCLIInstall(t *testing.T) {
 
 // TestCLIInstallMultiple tests installing multiple resources at once
 func TestCLIInstallMultiple(t *testing.T) {
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 	projectDir := t.TempDir()
 
 	// Create .claude directory
@@ -403,8 +394,7 @@ func TestCLIInstallMultiple(t *testing.T) {
 
 // TestCLIUninstall tests the 'aimgr uninstall' command
 func TestCLIUninstall(t *testing.T) {
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 	projectDir := t.TempDir()
 
 	// Create .claude directory
@@ -523,8 +513,7 @@ func TestCLIUninstallSkipsExternalSymlinks(t *testing.T) {
 
 // TestCLIMetadataTracking tests that metadata is properly tracked
 func TestCLIMetadataTracking(t *testing.T) {
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 
 	// Create test command using helper
 	cmdPath := createTestCommand(t, "metadata-test", "Metadata test command")
@@ -567,8 +556,7 @@ func TestCLIMetadataTracking(t *testing.T) {
 // See: https://github.com/hk9890/ai-config-manager/issues/TBD
 func TestCLIMetadataDeletedOnRemove(t *testing.T) {
 	t.Skip("Orphan cleanup not yet implemented for file-path sources - needs architecture fix")
-	repoDir, _ := setupTestEnvironment(t)
-	_ = repoDir // Test environment setup (repo path set via env var)
+	setupTestEnvironment(t)
 
 	// Create test command using helper
 	cmdPath := createTestCommand(t, "meta-remove-test", "Remove test")

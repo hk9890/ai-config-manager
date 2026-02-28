@@ -107,7 +107,7 @@ Examples:
 
 		// If no unreferenced caches found
 		if len(unreferenced) == 0 {
-			return outputPruneResult(result, parsedFormat, pruneForceFlag, pruneDryRunFlag)
+			return outputPruneResult(result, parsedFormat)
 		}
 
 		// For table format, show interactive display
@@ -153,7 +153,7 @@ Examples:
 		}
 
 		// Output results
-		return outputPruneResult(result, parsedFormat, pruneForceFlag, pruneDryRunFlag)
+		return outputPruneResult(result, parsedFormat)
 	},
 }
 
@@ -190,7 +190,7 @@ func buildPruneResult(unreferenced []CachedRepo, dryRun bool) *PruneResult {
 }
 
 // outputPruneResult outputs prune results in the requested format
-func outputPruneResult(result *PruneResult, format output.Format, force bool, dryRun bool) error {
+func outputPruneResult(result *PruneResult, format output.Format) error {
 	switch format {
 	case output.JSON:
 		encoder := json.NewEncoder(os.Stdout)

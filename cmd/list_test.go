@@ -11,7 +11,7 @@ import (
 )
 
 // setupTestRepo creates a test repository with sample resources
-func setupTestRepo(t *testing.T) (string, *repo.Manager) {
+func setupTestRepo(t *testing.T) *repo.Manager {
 	repoDir := t.TempDir()
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
@@ -97,7 +97,7 @@ description: Reviews code quality
 		}
 	}
 
-	return repoDir, mgr
+	return mgr
 }
 
 // filterResources applies pattern matching to resources (mimics list command logic)
@@ -135,7 +135,7 @@ func filterResources(t *testing.T, mgr *repo.Manager, patternStr string) []resou
 }
 
 func TestListCmd_NoPattern(t *testing.T) {
-	_, mgr := setupTestRepo(t)
+	mgr := setupTestRepo(t)
 
 	// List all resources
 	resources, err := mgr.List(nil)
@@ -151,11 +151,12 @@ func TestListCmd_NoPattern(t *testing.T) {
 	// Check that all types are present
 	var cmdCount, skillCount, agentCount int
 	for _, res := range resources {
-		if res.Type == resource.Command {
+		switch res.Type {
+		case resource.Command:
 			cmdCount++
-		} else if res.Type == resource.Skill {
+		case resource.Skill:
 			skillCount++
-		} else if res.Type == resource.Agent {
+		case resource.Agent:
 			agentCount++
 		}
 	}
@@ -172,7 +173,7 @@ func TestListCmd_NoPattern(t *testing.T) {
 }
 
 func TestListCmd_TypeFilter(t *testing.T) {
-	_, mgr := setupTestRepo(t)
+	mgr := setupTestRepo(t)
 
 	tests := []struct {
 		name          string
@@ -219,7 +220,7 @@ func TestListCmd_TypeFilter(t *testing.T) {
 }
 
 func TestListCmd_NamePattern(t *testing.T) {
-	_, mgr := setupTestRepo(t)
+	mgr := setupTestRepo(t)
 
 	tests := []struct {
 		name          string
@@ -277,7 +278,7 @@ func TestListCmd_NamePattern(t *testing.T) {
 }
 
 func TestListCmd_NoMatches(t *testing.T) {
-	_, mgr := setupTestRepo(t)
+	mgr := setupTestRepo(t)
 
 	filtered := filterResources(t, mgr, "command/nonexistent*")
 
@@ -306,7 +307,7 @@ func TestListCmd_EmptyRepository(t *testing.T) {
 }
 
 func TestListCmd_InvalidPattern(t *testing.T) {
-	_, _ = setupTestRepo(t)
+	_ = setupTestRepo(t)
 
 	// Try to create matcher with invalid pattern
 	_, err := pattern.NewMatcher("command/[invalid")
@@ -316,7 +317,7 @@ func TestListCmd_InvalidPattern(t *testing.T) {
 }
 
 func TestListCmd_TypeAndNameCombinations(t *testing.T) {
-	_, mgr := setupTestRepo(t)
+	mgr := setupTestRepo(t)
 
 	tests := []struct {
 		name          string

@@ -10,6 +10,9 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
+// statusIconOK is the checkmark icon displayed for healthy/in-sync resources.
+const statusIconOK = "✓"
+
 // parseResourceArg parses a resource argument in the format "type/name"
 // Returns the resource type, name, and any error
 func parseResourceArg(arg string) (resource.ResourceType, string, error) {
@@ -128,79 +131,46 @@ func completeResourceArgs(cmd *cobra.Command, args []string, toComplete string) 
 	})(cmd, args, toComplete)
 }
 
+// completeResourceNames provides completion for resource names of the given type from the repository
+func completeResourceNames(resType resource.ResourceType) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		manager, err := NewManagerWithLogLevel()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		t := resType
+		resources, err := manager.List(&t)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+
+		var names []string
+		for _, res := range resources {
+			names = append(names, res.Name)
+		}
+
+		return names, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // completeCommandNames provides completion for command names from the repository
 func completeCommandNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	manager, err := NewManagerWithLogLevel()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	commandType := resource.Command
-	resources, err := manager.List(&commandType)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	var names []string
-	for _, res := range resources {
-		names = append(names, res.Name)
-	}
-
-	return names, cobra.ShellCompDirectiveNoFileComp
+	return completeResourceNames(resource.Command)(cmd, args, toComplete)
 }
 
 // completeSkillNames provides completion for skill names from the repository
 func completeSkillNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	manager, err := NewManagerWithLogLevel()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	skillType := resource.Skill
-	resources, err := manager.List(&skillType)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	var names []string
-	for _, res := range resources {
-		names = append(names, res.Name)
-	}
-
-	return names, cobra.ShellCompDirectiveNoFileComp
+	return completeResourceNames(resource.Skill)(cmd, args, toComplete)
 }
 
 // completeAgentNames provides completion for agent names from the repository
 func completeAgentNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if len(args) != 0 {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	manager, err := NewManagerWithLogLevel()
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	agentType := resource.Agent
-	resources, err := manager.List(&agentType)
-	if err != nil {
-		return nil, cobra.ShellCompDirectiveError
-	}
-
-	var names []string
-	for _, res := range resources {
-		names = append(names, res.Name)
-	}
-
-	return names, cobra.ShellCompDirectiveNoFileComp
+	return completeResourceNames(resource.Agent)(cmd, args, toComplete)
 }
 
 // completeInstallResources provides shell completion for install command with type prefix support

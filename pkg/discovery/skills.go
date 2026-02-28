@@ -36,6 +36,8 @@ func DiscoverSkills(basePath string, subpath string) ([]*resource.Resource, erro
 // DiscoverSkillsWithErrors searches for skills and returns both successful discoveries and errors
 // It searches in standard locations first, then falls back to recursive search
 // Returns successfully discovered skills, any errors encountered, and fatal errors
+//
+//nolint:gocyclo // Multi-strategy discovery with priority-ordered search paths and fallback logic; splitting would fragment search semantics.
 func DiscoverSkillsWithErrors(basePath string, subpath string) ([]*resource.Resource, []DiscoveryError, error) {
 	var allErrors []DiscoveryError
 

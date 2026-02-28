@@ -290,7 +290,7 @@ func formatAsJSON(result *BulkOperationResult) error {
 func formatAsYAML(result *BulkOperationResult) error {
 	encoder := yaml.NewEncoder(os.Stdout)
 	encoder.SetIndent(2)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(result)
 }
 

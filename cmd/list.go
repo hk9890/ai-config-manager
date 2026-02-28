@@ -244,11 +244,12 @@ func outputWithPackagesTable(manager *repo.Manager, resources []resource.Resourc
 	agents := []resource.Resource{}
 
 	for _, res := range resources {
-		if res.Type == resource.Command {
+		switch res.Type {
+		case resource.Command:
 			commands = append(commands, res)
-		} else if res.Type == resource.Skill {
+		case resource.Skill:
 			skills = append(skills, res)
-		} else if res.Type == resource.Agent {
+		case resource.Agent:
 			agents = append(agents, res)
 		}
 	}

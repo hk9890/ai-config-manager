@@ -85,7 +85,7 @@ Examples:
 		if !cleanYesFlag {
 			fmt.Print("Remove all these resources? [y/N]: ")
 			var response string
-			fmt.Scanln(&response)
+			_, _ = fmt.Scanln(&response)
 			response = strings.ToLower(strings.TrimSpace(response))
 			if response != "y" && response != "yes" {
 				fmt.Println("Clean cancelled.")
@@ -94,10 +94,7 @@ Examples:
 		}
 
 		// Remove all resources
-		removed, failed, err := cleanAll(projectPath, detectedTools, manager.GetRepoPath())
-		if err != nil {
-			return err
-		}
+		removed, failed := cleanAll(projectPath, detectedTools, manager.GetRepoPath())
 
 		// Report results
 		fmt.Printf("\n✓ Removed %d resource(s)\n", removed)
@@ -219,7 +216,7 @@ func displayCleanPreview(resources []CleanResource) {
 	_ = table.Format(output.Table)
 }
 
-func cleanAll(projectPath string, detectedTools []tools.Tool, repoPath string) (int, int, error) {
+func cleanAll(projectPath string, detectedTools []tools.Tool, repoPath string) (int, int) {
 	removed := 0
 	failed := 0
 
@@ -251,7 +248,7 @@ func cleanAll(projectPath string, detectedTools []tools.Tool, repoPath string) (
 		}
 	}
 
-	return removed, failed, nil
+	return removed, failed
 }
 
 func cleanDirectory(dir, repoPath string) (int, int) {

@@ -197,12 +197,11 @@ Examples:
 
 // uninstallAll uninstalls all resources currently installed in the project
 // Returns a list of successfully uninstalled resource IDs (type/name format)
-func uninstallAll(projectPath string, repoPath string, targetTools []tools.Tool) ([]string, error) {
+func uninstallAll(projectPath string, repoPath string, targetTools []tools.Tool) error {
 	fmt.Println("Uninstalling all resources from project...")
 	fmt.Println()
 
 	var results []uninstallResult
-	var uninstalled []string
 
 	// Scan each tool directory
 	for _, tool := range targetTools {
@@ -227,29 +226,17 @@ func uninstallAll(projectPath string, repoPath string, targetTools []tools.Tool)
 		}
 	}
 
-	// Collect successfully uninstalled resources
-	seen := make(map[string]bool)
-	for _, result := range results {
-		if result.success {
-			resourceID := fmt.Sprintf("%s/%s", result.resourceType, result.name)
-			if !seen[resourceID] {
-				seen[resourceID] = true
-				uninstalled = append(uninstalled, resourceID)
-			}
-		}
-	}
-
 	// Print results
 	printUninstallSummary(results)
 
 	// Return error if any resource failed
 	for _, result := range results {
 		if !result.success && !result.skipped {
-			return uninstalled, fmt.Errorf("some resources failed to uninstall")
+			return fmt.Errorf("some resources failed to uninstall")
 		}
 	}
 
-	return uninstalled, nil
+	return nil
 }
 
 // uninstallAllFromDir scans a tool directory and uninstalls all symlinks pointing to the repo

@@ -278,7 +278,7 @@ func verifyRepository(manager *repo.Manager, fix bool, matcher *pattern.Matcher)
 	// Check 4: Orphaned metadata (metadata without resources)
 	metadataDir := filepath.Join(repoPath, ".metadata")
 	if _, err := os.Stat(metadataDir); err == nil {
-		orphanedMeta, err := findVerifyOrphanedMetadata(manager, resourceMap, metadataDir, fix, matcher)
+		orphanedMeta, err := findVerifyOrphanedMetadata(resourceMap, metadataDir, fix, matcher)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check for orphaned metadata: %w", err)
 		}
@@ -314,7 +314,7 @@ func verifyRepository(manager *repo.Manager, fix bool, matcher *pattern.Matcher)
 }
 
 // findVerifyOrphanedMetadata finds metadata files without corresponding resources
-func findVerifyOrphanedMetadata(manager *repo.Manager, resourceMap map[string]resource.Resource, metadataDir string, fix bool, matcher *pattern.Matcher) ([]MetadataIssue, error) {
+func findVerifyOrphanedMetadata(resourceMap map[string]resource.Resource, metadataDir string, fix bool, matcher *pattern.Matcher) ([]MetadataIssue, error) {
 	var orphaned []MetadataIssue
 
 	// Determine which resource types to check based on the matcher
@@ -528,7 +528,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 			}
 			table.AddRow(mismatch.Name, string(mismatch.ResourceType), metaTypeStr)
 		}
-		table.Format(output.Table)
+		_ = table.Format(output.Table)
 		fmt.Println()
 	}
 
@@ -545,7 +545,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 			missingStr := strings.Join(issue.MissingResources, ", ")
 			table.AddRow(issue.Name, fmt.Sprintf("%d", len(issue.MissingResources)), missingStr)
 		}
-		table.Format(output.Table)
+		_ = table.Format(output.Table)
 		fmt.Println()
 	}
 
@@ -592,5 +592,5 @@ func init() {
 
 	// Keep --json for backward compatibility but mark deprecated
 	repoVerifyCmd.Flags().BoolVar(&verifyJSON, "json", false, "Output results in JSON format (deprecated: use --format=json)")
-	repoVerifyCmd.Flags().MarkDeprecated("json", "use --format=json instead")
+	_ = repoVerifyCmd.Flags().MarkDeprecated("json", "use --format=json instead")
 }

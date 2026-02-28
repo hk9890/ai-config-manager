@@ -208,17 +208,9 @@ func describeSkillDetails(manager *repo.Manager, res *resource.Resource, metadat
 	return nil
 }
 
-// describeCommandDetails displays detailed information for a command
-func describeCommandDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
-	// Load full command resource for additional details
-	commandPath := manager.GetPath(res.Name, resource.Command)
-	command, err := resource.LoadCommandResource(commandPath)
-	if err != nil {
-		return fmt.Errorf("failed to load command details: %w", err)
-	}
-
-	// Display information
-	fmt.Printf("Command: %s\n", res.Name)
+// printResourceHeader prints common resource fields (version, description, license, author)
+func printResourceHeader(typeName string, res *resource.Resource) {
+	fmt.Printf("%s: %s\n", typeName, res.Name)
 	if res.Version != "" {
 		fmt.Printf("Version: %s\n", res.Version)
 	}
@@ -229,6 +221,37 @@ func describeCommandDetails(manager *repo.Manager, res *resource.Resource, metad
 	if res.Author != "" {
 		fmt.Printf("Author: %s\n", res.Author)
 	}
+}
+
+// printMetadataBlock prints metadata source info or "not available"
+func printMetadataBlock(metadataAvailable bool, meta *metadata.ResourceMetadata) {
+	fmt.Println()
+	if metadataAvailable {
+		fmt.Printf("Source: %s\n", meta.SourceURL)
+		fmt.Printf("Source Type: %s\n", meta.SourceType)
+		if meta.SourceName != "" {
+			fmt.Printf("Source Name: %s\n", meta.SourceName)
+		}
+		fmt.Printf("First Installed: %s\n", formatTimestamp(meta.FirstInstalled))
+		fmt.Printf("Last Updated: %s\n", formatTimestamp(meta.LastUpdated))
+		fmt.Println()
+	} else {
+		fmt.Println("Metadata: Not available")
+		fmt.Println()
+	}
+}
+
+// describeCommandDetails displays detailed information for a command
+func describeCommandDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error { //nolint:dupl // command and agent describe share structure but have different type-specific fields
+	// Load full command resource for additional details
+	commandPath := manager.GetPath(res.Name, resource.Command)
+	command, err := resource.LoadCommandResource(commandPath)
+	if err != nil {
+		return fmt.Errorf("failed to load command details: %w", err)
+	}
+
+	// Display information
+	printResourceHeader("Command", res)
 
 	// Display command-specific fields
 	if command.Agent != "" {
@@ -241,30 +264,14 @@ func describeCommandDetails(manager *repo.Manager, res *resource.Resource, metad
 		fmt.Printf("Allowed Tools: %s\n", strings.Join(command.AllowedTools, ", "))
 	}
 
-	fmt.Println()
-
-	// Display metadata if available
-	if metadataAvailable {
-		fmt.Printf("Source: %s\n", meta.SourceURL)
-		fmt.Printf("Source Type: %s\n", meta.SourceType)
-		if meta.SourceName != "" {
-			fmt.Printf("Source Name: %s\n", meta.SourceName)
-		}
-		fmt.Printf("First Installed: %s\n", formatTimestamp(meta.FirstInstalled))
-		fmt.Printf("Last Updated: %s\n", formatTimestamp(meta.LastUpdated))
-		fmt.Println()
-	} else {
-		fmt.Println("Metadata: Not available")
-		fmt.Println()
-	}
-
+	printMetadataBlock(metadataAvailable, meta)
 	fmt.Printf("Location: %s\n", commandPath)
 
 	return nil
 }
 
 // describeAgentDetails displays detailed information for an agent
-func describeAgentDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error {
+func describeAgentDetails(manager *repo.Manager, res *resource.Resource, metadataAvailable bool, meta *metadata.ResourceMetadata) error { //nolint:dupl // agent and command describe share structure but have different type-specific fields
 	// Load full agent resource for additional details
 	agentPath := manager.GetPath(res.Name, resource.Agent)
 	agent, err := resource.LoadAgentResource(agentPath)
@@ -273,17 +280,7 @@ func describeAgentDetails(manager *repo.Manager, res *resource.Resource, metadat
 	}
 
 	// Display information
-	fmt.Printf("Agent: %s\n", res.Name)
-	if res.Version != "" {
-		fmt.Printf("Version: %s\n", res.Version)
-	}
-	fmt.Printf("Description: %s\n", res.Description)
-	if res.License != "" {
-		fmt.Printf("License: %s\n", res.License)
-	}
-	if res.Author != "" {
-		fmt.Printf("Author: %s\n", res.Author)
-	}
+	printResourceHeader("Agent", res)
 
 	// Display agent-specific fields (OpenCode format)
 	if agent.Type != "" {
@@ -296,23 +293,7 @@ func describeAgentDetails(manager *repo.Manager, res *resource.Resource, metadat
 		fmt.Printf("Capabilities: %s\n", strings.Join(agent.Capabilities, ", "))
 	}
 
-	fmt.Println()
-
-	// Display metadata if available
-	if metadataAvailable {
-		fmt.Printf("Source: %s\n", meta.SourceURL)
-		fmt.Printf("Source Type: %s\n", meta.SourceType)
-		if meta.SourceName != "" {
-			fmt.Printf("Source Name: %s\n", meta.SourceName)
-		}
-		fmt.Printf("First Installed: %s\n", formatTimestamp(meta.FirstInstalled))
-		fmt.Printf("Last Updated: %s\n", formatTimestamp(meta.LastUpdated))
-		fmt.Println()
-	} else {
-		fmt.Println("Metadata: Not available")
-		fmt.Println()
-	}
-
+	printMetadataBlock(metadataAvailable, meta)
 	fmt.Printf("Location: %s\n", agentPath)
 
 	return nil

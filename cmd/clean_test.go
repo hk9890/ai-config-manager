@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hk9890/ai-config-manager/pkg/repo"
@@ -232,7 +233,7 @@ func TestCleanDirectory(t *testing.T) {
 
 					if linkInfo.Mode()&os.ModeSymlink != 0 {
 						target, err := os.Readlink(path)
-						if err == nil && filepath.HasPrefix(target, repoDir) {
+						if err == nil && strings.HasPrefix(target, repoDir) {
 							t.Errorf("Symlink %s pointing to repo was not removed", entry.Name())
 						}
 					}
@@ -278,10 +279,7 @@ func TestCleanAll(t *testing.T) {
 	}
 
 	// Clean all
-	removed, failed, err := cleanAll(projectDir, detectedTools, repoDir)
-	if err != nil {
-		t.Fatalf("cleanAll failed: %v", err)
-	}
+	removed, failed := cleanAll(projectDir, detectedTools, repoDir)
 
 	if removed != 1 {
 		t.Errorf("Removed = %d, want 1", removed)

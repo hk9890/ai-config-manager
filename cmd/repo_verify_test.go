@@ -150,7 +150,7 @@ func TestRepoVerifyWithFix(t *testing.T) {
 	}
 
 	// Run verification with fix
-	result, err = verifyRepository(manager, true, nil)
+	_, err = verifyRepository(manager, true, nil)
 	if err != nil {
 		t.Fatalf("Verification with fix failed: %v", err)
 	}

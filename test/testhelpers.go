@@ -131,7 +131,7 @@ Test skill content.
 
 // createTestAgentInDir creates an agent in the specified base directory.
 // The agent will be created at baseDir/agents/<name>.md
-func createTestAgentInDir(t *testing.T, baseDir, name, description string) string {
+func createTestAgentInDir(t *testing.T, baseDir, name, description string) {
 	agentsDir := filepath.Join(baseDir, "agents")
 	if err := os.MkdirAll(agentsDir, 0755); err != nil {
 		t.Fatalf("Failed to create agents directory: %v", err)
@@ -148,8 +148,6 @@ Test agent content.
 	if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
 		t.Fatalf("Failed to create agent file: %v", err)
 	}
-
-	return agentPath
 }
 
 // copyFile copies a file from src to dst

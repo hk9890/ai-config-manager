@@ -546,7 +546,7 @@ func TestAddBulk(t *testing.T) {
 				// Add first command
 				cmd1Path := filepath.Join(commandsDir, "existing.md")
 				os.WriteFile(cmd1Path, []byte("---\ndescription: Existing\n---\n"), 0644)
-				manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
+				_ = manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
 
 				// Try to add again
 				cmd2Path := filepath.Join(commandsDir, "existing.md")
@@ -570,7 +570,7 @@ func TestAddBulk(t *testing.T) {
 				// Add first command
 				cmd1Path := filepath.Join(commandsDir, "forced.md")
 				os.WriteFile(cmd1Path, []byte("---\ndescription: Original\n---\n"), 0644)
-				manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
+				_ = manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
 
 				// Force overwrite
 				cmd2Path := filepath.Join(commandsDir, "forced.md")
@@ -595,7 +595,7 @@ func TestAddBulk(t *testing.T) {
 				// Add first command
 				cmd1Path := filepath.Join(commandsDir, "conflict.md")
 				os.WriteFile(cmd1Path, []byte("---\ndescription: Conflict\n---\n"), 0644)
-				manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
+				_ = manager.AddCommand(cmd1Path, "file://"+cmd1Path, "file")
 
 				// Try to add again without flags
 				cmd2Path := filepath.Join(commandsDir, "conflict.md")

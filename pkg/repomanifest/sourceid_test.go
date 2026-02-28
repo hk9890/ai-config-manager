@@ -164,7 +164,7 @@ func TestGenerateSourceID_Format(t *testing.T) {
 			// Verify remaining chars are valid hex
 			hexPart := id[4:]
 			for _, c := range hexPart {
-				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 					t.Errorf("expected hex characters after 'src-', got %q in %q", string(c), id)
 					break
 				}

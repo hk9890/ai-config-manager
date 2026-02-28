@@ -158,7 +158,7 @@ func TestGetCachePath(t *testing.T) {
 
 	// Should be under workspace directory
 	expectedPrefix := filepath.Join(tmpDir, ".workspace")
-	if !filepath.HasPrefix(cachePath, expectedPrefix) {
+	if !strings.HasPrefix(cachePath, expectedPrefix) {
 		t.Errorf("getCachePath returned path outside workspace: %s", cachePath)
 	}
 
@@ -227,7 +227,9 @@ func TestIsValidCache(t *testing.T) {
 func TestMetadataOperations(t *testing.T) {
 	tmpDir := t.TempDir()
 	mgr, _ := NewManager(tmpDir)
-	mgr.Init()
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
 
 	// Load metadata (should create empty if not exists)
 	metadata, err := mgr.loadMetadata()
@@ -284,7 +286,9 @@ func TestMetadataOperations(t *testing.T) {
 func TestUpdateMetadataEntry(t *testing.T) {
 	tmpDir := t.TempDir()
 	mgr, _ := NewManager(tmpDir)
-	mgr.Init()
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
 
 	url := "https://github.com/anthropics/skills"
 	ref := "main"
@@ -426,7 +430,9 @@ func TestUpdate_EmptyInputs(t *testing.T) {
 func TestUpdate_CacheNotExists(t *testing.T) {
 	tmpDir := t.TempDir()
 	mgr, _ := NewManager(tmpDir)
-	mgr.Init()
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
 
 	// Try to update a repo that was never cloned
 	err := mgr.Update("https://github.com/test/repo", "main")

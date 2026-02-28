@@ -107,6 +107,8 @@ func (m *Manager) GetRepoPath() string {
 
 // Init initializes the repository directory structure and git repository.
 // This is idempotent - safe to call multiple times.
+//
+//nolint:gocyclo // Sequential initialization of directory structure, git repo, gitignore, and initial commit; must remain atomic for idempotency.
 func (m *Manager) Init() error {
 	// Create main repo directory
 	if m.logger != nil {
@@ -328,18 +330,16 @@ logs/
 	// Initial commit if git was just initialized
 	if !alreadyGit {
 		// Add .gitignore and ai.repo.yaml
+		// Don't fail on add error - might not have anything to add
 		addCmd := exec.Command("git", "add", ".gitignore", repomanifest.ManifestFileName)
 		addCmd.Dir = m.repoPath
-		if _, err := addCmd.CombinedOutput(); err != nil {
-			// Don't fail on add error - might not have anything to add
-			// Continue to try commit anyway
-		}
+		_, _ = addCmd.CombinedOutput()
 
 		// Create initial commit
 		commitCmd := exec.Command("git", "commit", "-m", "aimgr: initialize repository")
 		commitCmd.Dir = m.repoPath
 		// Don't fail on commit error - might not have anything to commit
-		commitCmd.CombinedOutput()
+		_, _ = commitCmd.CombinedOutput()
 	}
 
 	return nil

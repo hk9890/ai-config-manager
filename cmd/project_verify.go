@@ -133,7 +133,7 @@ func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath 
 		// Check commands
 		if toolInfo.SupportsCommands {
 			commandsDir := filepath.Join(projectPath, toolInfo.CommandsDir)
-			found, err := verifyDirectory(commandsDir, "command", toolName, repoPath)
+			found, err := verifyDirectory(commandsDir, toolName, repoPath)
 			if err != nil {
 				return nil, err
 			}
@@ -143,7 +143,7 @@ func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath 
 		// Check skills
 		if toolInfo.SupportsSkills {
 			skillsDir := filepath.Join(projectPath, toolInfo.SkillsDir)
-			found, err := verifyDirectory(skillsDir, "skill", toolName, repoPath)
+			found, err := verifyDirectory(skillsDir, toolName, repoPath)
 			if err != nil {
 				return nil, err
 			}
@@ -153,7 +153,7 @@ func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath 
 		// Check agents
 		if toolInfo.SupportsAgents {
 			agentsDir := filepath.Join(projectPath, toolInfo.AgentsDir)
-			found, err := verifyDirectory(agentsDir, "agent", toolName, repoPath)
+			found, err := verifyDirectory(agentsDir, toolName, repoPath)
 			if err != nil {
 				return nil, err
 			}
@@ -164,7 +164,7 @@ func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath 
 	return issues, nil
 }
 
-func verifyDirectory(dir, resType, tool, repoPath string) ([]VerifyIssue, error) {
+func verifyDirectory(dir, tool, repoPath string) ([]VerifyIssue, error) {
 	// Check if directory exists
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil, nil

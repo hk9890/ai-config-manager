@@ -353,10 +353,10 @@ func renderTable(data *TableData) error {
 
 			// Add rows
 			for _, row := range rows {
-				table.Append(row)
+				_ = table.Append(row)
 			}
 
-			table.Render()
+			_ = table.Render()
 			return nil
 		}
 	}
@@ -372,9 +372,9 @@ func renderTable(data *TableData) error {
 	table.Header(headerInterfaces...)
 
 	for _, row := range rows {
-		table.Append(row)
+		_ = table.Append(row)
 	}
 
-	table.Render()
+	_ = table.Render()
 	return nil
 }

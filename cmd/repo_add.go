@@ -132,7 +132,7 @@ Examples:
 		}
 
 		// Add source to manifest after successful add
-		if err := addSourceToManifest(manager, parsed, importMode); err != nil {
+		if err := addSourceToManifest(manager, parsed); err != nil {
 			// Don't fail the entire operation if manifest tracking fails
 			fmt.Fprintf(os.Stderr, "Warning: Failed to track source in manifest: %v\n", err)
 		} else {
@@ -263,6 +263,8 @@ func addResourceFile(filePath string, res *resource.Resource, resType resource.R
 
 // applyFilter filters discovered resources based on a pattern.
 // Returns filtered slices and a boolean indicating if filtering was applied.
+//
+//nolint:gocyclo // Orchestrates pattern matching across 4 resource types with type-specific matching logic; splitting would scatter filter semantics.
 func applyFilter(filterPattern string, commands, skills, agents []*resource.Resource, packages []*resource.Package) ([]*resource.Resource, []*resource.Resource, []*resource.Resource, []*resource.Package, error) {
 	if filterPattern == "" {
 		// No filter, return all resources
@@ -393,6 +395,8 @@ func importFromLocalPath(
 }
 
 // importFromLocalPathWithMode is the same as importFromLocalPath but allows specifying import mode.
+//
+//nolint:gocyclo // Multi-phase import pipeline (discover, filter, import, metadata, git) that must stay cohesive for correctness.
 func importFromLocalPathWithMode(
 	localPath string, // Local directory to import from
 	manager *repo.Manager, // Repository manager
@@ -827,8 +831,10 @@ func selectResource(resources []*resource.Resource, resourceType string) (*resou
 // DO NOT DELETE - These complement the discovery system, they don't duplicate it.
 // See: ai-config-manager-m5zt investigation
 
-// findCommandFile finds the actual file path for a command by name
-func findCommandFile(searchPath, name string) (string, error) {
+// findResourceFile finds the actual file path for a command or agent resource by name.
+// It walks the searchPath, skipping tool installation directories, and uses the provided
+// loader function to validate and match resources by name.
+func findResourceFile(searchPath, name string, loader func(string) (*resource.Resource, error), typeName string) (string, error) {
 	var found string
 	err := filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -845,12 +851,12 @@ func findCommandFile(searchPath, name string) (string, error) {
 		if filepath.Ext(path) != ".md" {
 			return nil
 		}
-		// Load and check if it's the command we're looking for
-		cmd, err := resource.LoadCommand(path)
+		// Load and check if it's the resource we're looking for
+		res, err := loader(path)
 		if err != nil {
-			return nil // Skip invalid commands
+			return nil // Skip invalid resources
 		}
-		if cmd.Name == name {
+		if res.Name == name {
 			found = path
 			return filepath.SkipAll
 		}
@@ -860,9 +866,14 @@ func findCommandFile(searchPath, name string) (string, error) {
 		return "", err
 	}
 	if found == "" {
-		return "", fmt.Errorf("command file not found for: %s", name)
+		return "", fmt.Errorf("%s file not found for: %s", typeName, name)
 	}
 	return found, nil
+}
+
+// findCommandFile finds the actual file path for a command by name
+func findCommandFile(searchPath, name string) (string, error) {
+	return findResourceFile(searchPath, name, resource.LoadCommand, "command")
 }
 
 // findSkillDir finds the directory path for a skill by name
@@ -907,40 +918,7 @@ func findSkillDir(searchPath, name string) (string, error) {
 
 // findAgentFile finds the actual file path for an agent by name
 func findAgentFile(searchPath, name string) (string, error) {
-	var found string
-	err := filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			// Skip tool installation directories
-			dirName := info.Name()
-			if dirName == ".claude" || dirName == ".opencode" || dirName == ".github" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if filepath.Ext(path) != ".md" {
-			return nil
-		}
-		// Load and check if it's the agent we're looking for
-		agent, err := resource.LoadAgent(path)
-		if err != nil {
-			return nil // Skip invalid agents
-		}
-		if agent.Name == name {
-			found = path
-			return filepath.SkipAll
-		}
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	if found == "" {
-		return "", fmt.Errorf("agent file not found for: %s", name)
-	}
-	return found, nil
+	return findResourceFile(searchPath, name, resource.LoadAgent, "agent")
 }
 
 // findPackageFile finds the actual file path for a package by name
@@ -1105,7 +1083,7 @@ func formatGitHubShortURL(parsed *source.ParsedSource) string {
 }
 
 // addSourceToManifest adds the source to ai.repo.yaml manifest
-func addSourceToManifest(manager *repo.Manager, parsed *source.ParsedSource, importMode string) error {
+func addSourceToManifest(manager *repo.Manager, parsed *source.ParsedSource) error {
 	// Load existing manifest
 	manifest, err := repomanifest.Load(manager.GetRepoPath())
 	if err != nil {

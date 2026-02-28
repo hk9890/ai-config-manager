@@ -10,7 +10,7 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/tools"
 )
 
-func setupTestRepo(t *testing.T) (*repo.Manager, string) {
+func setupTestRepo(t *testing.T) *repo.Manager {
 	t.Helper()
 
 	// Create temp repo
@@ -52,7 +52,7 @@ description: A test skill
 		t.Fatalf("Failed to add skill to repo: %v", err)
 	}
 
-	return manager, tmpDir
+	return manager
 }
 
 func TestNewInstaller(t *testing.T) {
@@ -216,7 +216,7 @@ install:
 }
 
 func TestInstallCommand(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
@@ -255,7 +255,7 @@ func TestInstallCommand(t *testing.T) {
 }
 
 func TestInstallCommandMultipleTools(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	// Create both .claude and .opencode directories
@@ -296,7 +296,7 @@ func TestInstallCommandMultipleTools(t *testing.T) {
 }
 
 func TestInstallSkill(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
@@ -335,7 +335,7 @@ func TestInstallSkill(t *testing.T) {
 }
 
 func TestUninstall(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
@@ -366,7 +366,7 @@ func TestUninstall(t *testing.T) {
 }
 
 func TestUninstallNotInstalled(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
@@ -382,7 +382,7 @@ func TestUninstallNotInstalled(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
@@ -437,7 +437,7 @@ func TestList(t *testing.T) {
 }
 
 func TestIsInstalled(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	installer, err := NewInstaller(projectDir, []tools.Tool{tools.Claude})
@@ -523,7 +523,7 @@ func TestNewInstallerWithTargets(t *testing.T) {
 }
 
 func TestExplicitTargetOverridesDetection(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	// Create .claude directory (normally would be auto-detected)
@@ -572,7 +572,7 @@ func TestExplicitTargetOverridesDetection(t *testing.T) {
 }
 
 func TestInstallSkillToCopilot(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	// Create installer targeting Copilot/VSCode
@@ -638,7 +638,7 @@ func TestInstallSkillToCopilot(t *testing.T) {
 }
 
 func TestInstallSkillMultipleToolsIncludingCopilot(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	// Create installer targeting all three tools
@@ -671,7 +671,7 @@ func TestInstallSkillMultipleToolsIncludingCopilot(t *testing.T) {
 }
 
 func TestInstallSkillCopilotSkipsCommands(t *testing.T) {
-	manager, _ := setupTestRepo(t)
+	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
 	// Create installer targeting Copilot (doesn't support commands)

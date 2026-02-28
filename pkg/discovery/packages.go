@@ -43,8 +43,8 @@ func DiscoverPackages(basePath string, subpath string) ([]*resource.Package, err
 	}
 
 	// Try priority locations first
-	packages, err := searchPriorityPackageLocations(searchPath)
-	if err == nil && len(packages) > 0 {
+	packages := searchPriorityPackageLocations(searchPath)
+	if len(packages) > 0 {
 		if logger != nil {
 			logger.Debug("package discovery completed from priority locations",
 				"packages_found", len(packages))
@@ -76,7 +76,7 @@ func DiscoverPackages(basePath string, subpath string) ([]*resource.Package, err
 }
 
 // searchPriorityPackageLocations searches standard package directories
-func searchPriorityPackageLocations(basePath string) ([]*resource.Package, error) {
+func searchPriorityPackageLocations(basePath string) []*resource.Package {
 	priorityDirs := []string{
 		filepath.Join(basePath, "packages"),
 		filepath.Join(basePath, ".claude", "packages"),
@@ -115,7 +115,7 @@ func searchPriorityPackageLocations(basePath string) ([]*resource.Package, error
 		allPackages = append(allPackages, packages...)
 	}
 
-	return allPackages, nil
+	return allPackages
 }
 
 // recursiveSearchPackages performs a recursive search for package files

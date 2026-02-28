@@ -102,7 +102,7 @@ func DiscoverCommandsWithErrors(basePath string, subpath string) ([]*resource.Re
 
 	// Also do recursive search to find commands outside priority directories
 	// (e.g., in nested/ or other top-level directories)
-	recursiveCommands, recursiveErrors := recursiveSearchCommands(searchPath, 0, searchPath)
+	recursiveCommands, recursiveErrors := recursiveSearchCommands(searchPath, 0)
 	allErrors = append(allErrors, recursiveErrors...)
 	allCommands = append(allCommands, recursiveCommands...)
 
@@ -178,7 +178,7 @@ func searchCommandsInDirectory(dir string, depth int, basePath string) ([]*resou
 // basePath is used to calculate relative paths
 // This function ONLY looks for commands/ directories and delegates to searchCommandsInDirectory
 // It does NOT parse files directly - this prevents false positives from non-resource directories
-func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]*resource.Resource, []DiscoveryError) {
+func recursiveSearchCommands(currentPath string, depth int) ([]*resource.Resource, []DiscoveryError) {
 	if depth > maxDepth {
 		return nil, nil
 	}
@@ -237,7 +237,7 @@ func recursiveSearchCommands(currentPath string, depth int, basePath string) ([]
 		}
 
 		// For non-'commands' directories, continue recursive search
-		subCommands, subErrors := recursiveSearchCommands(entryPath, depth+1, basePath)
+		subCommands, subErrors := recursiveSearchCommands(entryPath, depth+1)
 		allCommands = append(allCommands, subCommands...)
 		allErrors = append(allErrors, subErrors...)
 	}

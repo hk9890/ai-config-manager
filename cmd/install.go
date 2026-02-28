@@ -124,7 +124,7 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Handle zero-arg install (from ai.package.yaml)
 		if len(args) == 0 {
-			return installFromManifest(cmd)
+			return installFromManifest()
 		}
 
 		// Get project path (current directory or flag)
@@ -150,13 +150,13 @@ Examples:
 			installer, err = install.NewInstallerWithTargets(projectPath, explicitTargets)
 		} else {
 			// Auto-detect existing tools or use config defaults
-			cfg, err := config.LoadGlobal()
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
+			cfg, cfgErr := config.LoadGlobal()
+			if cfgErr != nil {
+				return fmt.Errorf("failed to load config: %w", cfgErr)
 			}
-			defaultTargets, err := cfg.GetDefaultTargets()
-			if err != nil {
-				return fmt.Errorf("invalid default targets in config: %w", err)
+			defaultTargets, tgtErr := cfg.GetDefaultTargets()
+			if tgtErr != nil {
+				return fmt.Errorf("invalid default targets in config: %w", tgtErr)
 			}
 			// NewInstaller will auto-detect existing tool directories
 			installer, err = install.NewInstaller(projectPath, defaultTargets)
@@ -258,7 +258,7 @@ Examples:
 }
 
 // installFromManifest installs all resources from ai.package.yaml
-func installFromManifest(cmd *cobra.Command) error {
+func installFromManifest() error {
 	installingFromManifest = true
 	defer func() { installingFromManifest = false }()
 
@@ -326,13 +326,13 @@ func installFromManifest(cmd *cobra.Command) error {
 		installer, err = install.NewInstallerWithTargets(projectPath, targetTools)
 	} else {
 		// Use defaults from config
-		cfg, err := config.LoadGlobal()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+		cfg, cfgErr := config.LoadGlobal()
+		if cfgErr != nil {
+			return fmt.Errorf("failed to load config: %w", cfgErr)
 		}
-		defaultTargets, err := cfg.GetDefaultTargets()
-		if err != nil {
-			return fmt.Errorf("invalid default targets in config: %w", err)
+		defaultTargets, tgtErr := cfg.GetDefaultTargets()
+		if tgtErr != nil {
+			return fmt.Errorf("invalid default targets in config: %w", tgtErr)
 		}
 		installer, err = install.NewInstaller(projectPath, defaultTargets)
 	}

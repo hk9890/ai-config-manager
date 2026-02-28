@@ -219,7 +219,7 @@ func formatSyncStatus(projectPath string, resourceRef string, isInstalled bool) 
 
 	switch status {
 	case SyncStatusInSync:
-		return "✓"
+		return statusIconOK
 	case SyncStatusNotInManifest:
 		return "*"
 	case SyncStatusNotInstalled:
@@ -236,9 +236,9 @@ func buildResourceInfo(resources []resource.Resource, projectPath string, detect
 	infos := make([]ResourceInfo, 0, len(resources))
 
 	for _, res := range resources {
-		health := "ok"
+		health := string(resource.HealthOK)
 		if res.Health == resource.HealthBroken {
-			health = "broken"
+			health = string(resource.HealthBroken)
 		}
 
 		info := ResourceInfo{
@@ -316,11 +316,12 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 	agents := []ResourceInfo{}
 
 	for _, info := range infos {
-		if info.Type == resource.Command {
+		switch info.Type {
+		case resource.Command:
 			commands = append(commands, info)
-		} else if info.Type == resource.Skill {
+		case resource.Skill:
 			skills = append(skills, info)
-		} else if info.Type == resource.Agent {
+		case resource.Agent:
 			agents = append(agents, info)
 		}
 	}
@@ -336,8 +337,8 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		targets := strings.Join(cmd.Targets, ", ")
 		resourceRef := fmt.Sprintf("command/%s", cmd.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0)
-		status := "✓"
-		if cmd.Health == "broken" {
+		status := statusIconOK
+		if cmd.Health == string(resource.HealthBroken) {
 			status = "✗ broken"
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, cmd.Description)
@@ -353,8 +354,8 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		targets := strings.Join(skill.Targets, ", ")
 		resourceRef := fmt.Sprintf("skill/%s", skill.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0)
-		status := "✓"
-		if skill.Health == "broken" {
+		status := statusIconOK
+		if skill.Health == string(resource.HealthBroken) {
 			status = "✗ broken"
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, skill.Description)
@@ -370,8 +371,8 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		targets := strings.Join(agent.Targets, ", ")
 		resourceRef := fmt.Sprintf("agent/%s", agent.Name)
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0)
-		status := "✓"
-		if agent.Health == "broken" {
+		status := statusIconOK
+		if agent.Health == string(resource.HealthBroken) {
 			status = "✗ broken"
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, agent.Description)
@@ -389,7 +390,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 	// Count broken resources and print warning to stderr
 	brokenCount := 0
 	for _, info := range infos {
-		if info.Health == "broken" {
+		if info.Health == string(resource.HealthBroken) {
 			brokenCount++
 		}
 	}

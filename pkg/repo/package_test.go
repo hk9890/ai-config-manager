@@ -372,13 +372,13 @@ func TestValidatePackageResources(t *testing.T) {
 	// Add some resources
 	cmdPath := filepath.Join(tmpDir, "existing-cmd.md")
 	os.WriteFile(cmdPath, []byte("---\ndescription: Existing command\n---\n"), 0644)
-	manager.AddCommand(cmdPath, "file://"+cmdPath, "file")
+	_ = manager.AddCommand(cmdPath, "file://"+cmdPath, "file")
 
 	skillDir := filepath.Join(tmpDir, "existing-skill")
 	os.MkdirAll(skillDir, 0755)
 	os.WriteFile(filepath.Join(skillDir, "SKILL.md"),
 		[]byte("---\nname: existing-skill\ndescription: Existing skill\n---\n"), 0644)
-	manager.AddSkill(skillDir, "file://"+skillDir, "file")
+	_ = manager.AddSkill(skillDir, "file://"+skillDir, "file")
 
 	// Test package with mix of existing and missing resources
 	pkg := &resource.Package{
@@ -426,7 +426,7 @@ func TestListPackages(t *testing.T) {
 	}
 	pkg1Data, _ := json.MarshalIndent(pkg1Content, "", "  ")
 	os.WriteFile(pkg1Path, pkg1Data, 0644)
-	manager.AddPackage(pkg1Path, "file://"+pkg1Path, "file")
+	_ = manager.AddPackage(pkg1Path, "file://"+pkg1Path, "file")
 
 	pkg2Path := filepath.Join(tmpDir, "pkg2.package.json")
 	pkg2Content := map[string]interface{}{
@@ -436,7 +436,7 @@ func TestListPackages(t *testing.T) {
 	}
 	pkg2Data, _ := json.MarshalIndent(pkg2Content, "", "  ")
 	os.WriteFile(pkg2Path, pkg2Data, 0644)
-	manager.AddPackage(pkg2Path, "file://"+pkg2Path, "file")
+	_ = manager.AddPackage(pkg2Path, "file://"+pkg2Path, "file")
 
 	// List packages
 	packages, err := manager.ListPackages()

@@ -9,6 +9,9 @@ import (
 	"github.com/hk9890/ai-config-manager/pkg/resource"
 )
 
+// List returns resources from the repository, optionally filtered by type.
+//
+//nolint:gocyclo // Iterates 4 resource types with per-type loading, symlink resolution, and metadata enrichment; splitting would duplicate setup logic.
 func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource, error) {
 	var resources []resource.Resource
 

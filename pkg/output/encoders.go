@@ -18,6 +18,6 @@ func EncodeJSON(w io.Writer, data interface{}) error {
 func EncodeYAML(w io.Writer, data interface{}) error {
 	encoder := yaml.NewEncoder(w)
 	encoder.SetIndent(2)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(data)
 }

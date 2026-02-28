@@ -114,7 +114,7 @@ func NewAgentResource(name, description string) *AgentResource {
 }
 
 // WriteAgent writes an agent resource to a file
-func WriteAgent(agent *AgentResource, filePath string) error {
+func WriteAgent(agent *AgentResource, filePath string) error { //nolint:dupl // agent and command Write share structure but have different type-specific fields
 	// Build frontmatter
 	frontmatter := Frontmatter{
 		"description": agent.Description,

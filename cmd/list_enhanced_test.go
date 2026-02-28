@@ -54,7 +54,7 @@ func TestListEnhanced_SingleTarget(t *testing.T) {
 
 	// Test JSON output format
 	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json", "")
+		output := captureListOutput(t, "json")
 
 		// Parse JSON output
 		var result map[string]interface{}
@@ -92,7 +92,7 @@ func TestListEnhanced_SingleTarget(t *testing.T) {
 
 	// Test YAML output format
 	t.Run("yaml_format", func(t *testing.T) {
-		output := captureListOutput(t, "yaml", "")
+		output := captureListOutput(t, "yaml")
 
 		// Parse YAML output
 		var result map[string]interface{}
@@ -125,7 +125,7 @@ func TestListEnhanced_SingleTarget(t *testing.T) {
 
 	// Test table format
 	t.Run("table_format", func(t *testing.T) {
-		output := captureListOutput(t, "table", "")
+		output := captureListOutput(t, "table")
 
 		// Verify table contains "claude" in the targets column
 		if !strings.Contains(output, "claude") {
@@ -189,7 +189,7 @@ func TestListEnhanced_MultipleTargets(t *testing.T) {
 
 	// Test JSON format
 	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json", "")
+		output := captureListOutput(t, "json")
 
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -232,7 +232,7 @@ func TestListEnhanced_MultipleTargets(t *testing.T) {
 
 	// Test table format - should show comma-separated list
 	t.Run("table_format", func(t *testing.T) {
-		output := captureListOutput(t, "table", "")
+		output := captureListOutput(t, "table")
 
 		// Should contain both tool names
 		if !strings.Contains(output, "claude") {
@@ -308,7 +308,7 @@ func TestListEnhanced_NotInManifest(t *testing.T) {
 
 	// Test JSON format
 	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json", "")
+		output := captureListOutput(t, "json")
 
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -330,7 +330,7 @@ func TestListEnhanced_NotInManifest(t *testing.T) {
 
 	// Test table format
 	t.Run("table_format", func(t *testing.T) {
-		output := captureListOutput(t, "table", "")
+		output := captureListOutput(t, "table")
 
 		// Check for the "*" symbol (not-in-manifest indicator)
 		lines := strings.Split(output, "\n")
@@ -402,7 +402,7 @@ func TestListEnhanced_NotInstalled(t *testing.T) {
 
 	// Test JSON format
 	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json", "")
+		output := captureListOutput(t, "json")
 
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -431,7 +431,7 @@ func TestListEnhanced_NotInstalled(t *testing.T) {
 
 	// Test table format
 	t.Run("table_format", func(t *testing.T) {
-		output := captureListOutput(t, "table", "")
+		output := captureListOutput(t, "table")
 
 		// Check for the "⚠" symbol (not-installed indicator)
 		lines := strings.Split(output, "\n")
@@ -500,7 +500,7 @@ func TestListEnhanced_InSync(t *testing.T) {
 
 	// Test JSON format
 	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json", "")
+		output := captureListOutput(t, "json")
 
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -524,7 +524,7 @@ func TestListEnhanced_InSync(t *testing.T) {
 
 	// Test table format
 	t.Run("table_format", func(t *testing.T) {
-		output := captureListOutput(t, "table", "")
+		output := captureListOutput(t, "table")
 
 		// Check for the "✓" symbol (in-sync indicator)
 		lines := strings.Split(output, "\n")
@@ -591,7 +591,7 @@ func TestListEnhanced_NoManifest(t *testing.T) {
 
 	// Test JSON format
 	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json", "")
+		output := captureListOutput(t, "json")
 
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -609,7 +609,7 @@ func TestListEnhanced_NoManifest(t *testing.T) {
 
 	// Test table format
 	t.Run("table_format", func(t *testing.T) {
-		output := captureListOutput(t, "table", "")
+		output := captureListOutput(t, "table")
 
 		// Check for the "-" symbol (no-manifest indicator) in sync column
 		// Table format: | name | targets | sync | desc |
@@ -676,7 +676,7 @@ func TestListEnhanced_CopilotOnly(t *testing.T) {
 
 	// Test JSON format
 	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json", "")
+		output := captureListOutput(t, "json")
 
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -698,7 +698,7 @@ func TestListEnhanced_CopilotOnly(t *testing.T) {
 
 	// Test table format
 	t.Run("table_format", func(t *testing.T) {
-		output := captureListOutput(t, "table", "")
+		output := captureListOutput(t, "table")
 
 		if !strings.Contains(output, "copilot") {
 			t.Errorf("expected table to contain 'copilot'")
@@ -751,7 +751,7 @@ func TestListEnhanced_NoInstallations(t *testing.T) {
 
 	// Test JSON format
 	t.Run("json_format", func(t *testing.T) {
-		output := captureListOutput(t, "json", "")
+		output := captureListOutput(t, "json")
 
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(output), &result); err != nil {
@@ -777,7 +777,7 @@ func TestListEnhanced_NoInstallations(t *testing.T) {
 
 	// Test table format
 	t.Run("table_format", func(t *testing.T) {
-		output := captureListOutput(t, "table", "")
+		output := captureListOutput(t, "table")
 
 		// Check that targets column shows "-" for no installations
 		// The table has format: | name | targets | sync | desc |
@@ -946,7 +946,7 @@ func installResource(t *testing.T, projectPath string, repoPath string, tool str
 }
 
 // captureListOutput runs the list command and captures output
-func captureListOutput(t *testing.T, format string, pattern string) string {
+func captureListOutput(t *testing.T, format string) string {
 	t.Helper()
 
 	// Save and redirect stdout
@@ -962,12 +962,6 @@ func captureListOutput(t *testing.T, format string, pattern string) string {
 	formatFlag = format
 	defer func() { formatFlag = originalFormat }()
 
-	// Build args
-	var args []string
-	if pattern != "" {
-		args = append(args, pattern)
-	}
-
 	// Capture output in goroutine
 	outChan := make(chan string)
 	go func() {
@@ -977,7 +971,7 @@ func captureListOutput(t *testing.T, format string, pattern string) string {
 	}()
 
 	// Execute command RunE directly
-	err = listCmd.RunE(listCmd, args)
+	err = listCmd.RunE(listCmd, nil)
 
 	// Restore stdout
 	_ = w.Close()

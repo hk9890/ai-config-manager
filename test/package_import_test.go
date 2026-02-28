@@ -244,7 +244,7 @@ func TestPackageAutoImportMixedResources(t *testing.T) {
 	_ = createTestCommandInDir(t, opencodeDir, "cmd1", "Command 1")
 	_ = createTestCommandInDir(t, opencodeDir, "cmd2", "Command 2")
 	_ = createTestSkillInDir(t, opencodeDir, "skill1", "Skill 1")
-	_ = createTestAgentInDir(t, opencodeDir, "agent1", "Agent 1")
+	createTestAgentInDir(t, opencodeDir, "agent1", "Agent 1")
 
 	// Create packages directory at root level (not in .opencode)
 	packagesDir := filepath.Join(sourceDir, "packages")

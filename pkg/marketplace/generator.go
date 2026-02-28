@@ -70,10 +70,7 @@ func GeneratePackages(marketplace *MarketplaceConfig, basePath string) ([]*Packa
 		}
 
 		// Discover resources in plugin source directory
-		resources, err := discoverResources(sourcePath)
-		if err != nil {
-			return nil, fmt.Errorf("plugin %d (%s): failed to discover resources: %w", i, plugin.Name, err)
-		}
+		resources := discoverResources(sourcePath)
 
 		// Skip plugins with no resources
 		if len(resources) == 0 {
@@ -141,7 +138,7 @@ func sanitizeName(name string) string {
 
 // discoverResources discovers all resources (commands, skills, agents) in a directory.
 // It searches for resources in standard locations and falls back to recursive search.
-func discoverResources(sourcePath string) ([]*resource.Resource, error) {
+func discoverResources(sourcePath string) []*resource.Resource {
 	var allResources []*resource.Resource
 
 	// Discover commands
@@ -169,7 +166,7 @@ func discoverResources(sourcePath string) ([]*resource.Resource, error) {
 		allResources = append(allResources, agents...)
 	}
 
-	return allResources, nil
+	return allResources
 }
 
 // buildResourceReferences converts resources to type/name reference format.

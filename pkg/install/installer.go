@@ -438,6 +438,65 @@ func (i *Installer) Uninstall(name string, resourceType resource.ResourceType, r
 	return nil
 }
 
+// scanFileSymlinks scans a directory for symlinked file-based resources (commands, agents)
+// and adds them to the resourceMap. loader is the function to load the resource from a target path.
+func scanFileSymlinks(dir string, resType resource.ResourceType, loader func(string) (*resource.Resource, error), tool tools.Tool, resourceMap map[string]resource.Resource) error {
+	if _, err := os.Stat(dir); err != nil {
+		return nil // Directory doesn't exist, skip
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("failed to read %s directory for %s: %w", resType, tool, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		symlinkPath := filepath.Join(dir, entry.Name())
+		info, err := os.Lstat(symlinkPath)
+		if err != nil {
+			continue
+		}
+
+		// Only list symlinks
+		if info.Mode()&os.ModeSymlink == 0 {
+			continue
+		}
+
+		// Read the symlink target
+		target, err := os.Readlink(symlinkPath)
+		if err != nil {
+			continue
+		}
+
+		// Check if target exists
+		if _, err := os.Stat(target); err != nil {
+			// Broken symlink — create a minimal resource entry
+			name := strings.TrimSuffix(entry.Name(), ".md")
+			resourceMap[name] = resource.Resource{
+				Name:   name,
+				Type:   resType,
+				Path:   target,
+				Health: resource.HealthBroken,
+			}
+			continue
+		}
+
+		// Load the resource
+		res, err := loader(target)
+		if err != nil {
+			continue
+		}
+
+		res.Health = resource.HealthOK
+		// Deduplicate by name
+		resourceMap[res.Name] = *res
+	}
+	return nil
+}
+
 // List lists all installed resources in the project (deduplicated across tools)
 func (i *Installer) List() ([]resource.Resource, error) {
 	// Use a map to deduplicate resources by name
@@ -450,57 +509,8 @@ func (i *Installer) List() ([]resource.Resource, error) {
 		// List commands
 		if toolInfo.SupportsCommands {
 			commandsDir := filepath.Join(i.projectPath, toolInfo.CommandsDir)
-			if _, err := os.Stat(commandsDir); err == nil {
-				entries, err := os.ReadDir(commandsDir)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read commands directory for %s: %w", tool, err)
-				}
-
-				for _, entry := range entries {
-					if entry.IsDir() {
-						continue
-					}
-
-					symlinkPath := filepath.Join(commandsDir, entry.Name())
-					info, err := os.Lstat(symlinkPath)
-					if err != nil {
-						continue
-					}
-
-					// Only list symlinks
-					if info.Mode()&os.ModeSymlink == 0 {
-						continue
-					}
-
-					// Read the symlink target
-					target, err := os.Readlink(symlinkPath)
-					if err != nil {
-						continue
-					}
-
-					// Check if target exists
-					if _, err := os.Stat(target); err != nil {
-						// Broken symlink — create a minimal resource entry
-						name := strings.TrimSuffix(entry.Name(), ".md")
-						resourceMap[name] = resource.Resource{
-							Name:   name,
-							Type:   resource.Command,
-							Path:   target,
-							Health: resource.HealthBroken,
-						}
-						continue
-					}
-
-					// Load the resource
-					res, err := resource.LoadCommand(target)
-					if err != nil {
-						continue
-					}
-
-					res.Health = resource.HealthOK
-					// Deduplicate by name
-					resourceMap[res.Name] = *res
-				}
+			if err := scanFileSymlinks(commandsDir, resource.Command, resource.LoadCommand, tool, resourceMap); err != nil {
+				return nil, err
 			}
 		}
 
@@ -560,57 +570,8 @@ func (i *Installer) List() ([]resource.Resource, error) {
 		// List agents
 		if toolInfo.SupportsAgents {
 			agentsDir := filepath.Join(i.projectPath, toolInfo.AgentsDir)
-			if _, err := os.Stat(agentsDir); err == nil {
-				entries, err := os.ReadDir(agentsDir)
-				if err != nil {
-					return nil, fmt.Errorf("failed to read agents directory for %s: %w", tool, err)
-				}
-
-				for _, entry := range entries {
-					if entry.IsDir() {
-						continue
-					}
-
-					symlinkPath := filepath.Join(agentsDir, entry.Name())
-					info, err := os.Lstat(symlinkPath)
-					if err != nil {
-						continue
-					}
-
-					// Only list symlinks
-					if info.Mode()&os.ModeSymlink == 0 {
-						continue
-					}
-
-					// Read the symlink target
-					target, err := os.Readlink(symlinkPath)
-					if err != nil {
-						continue
-					}
-
-					// Check if target exists
-					if _, err := os.Stat(target); err != nil {
-						// Broken symlink — create a minimal resource entry
-						name := strings.TrimSuffix(entry.Name(), ".md")
-						resourceMap[name] = resource.Resource{
-							Name:   name,
-							Type:   resource.Agent,
-							Path:   target,
-							Health: resource.HealthBroken,
-						}
-						continue
-					}
-
-					// Load the resource
-					res, err := resource.LoadAgent(target)
-					if err != nil {
-						continue
-					}
-
-					res.Health = resource.HealthOK
-					// Deduplicate by name
-					resourceMap[res.Name] = *res
-				}
+			if err := scanFileSymlinks(agentsDir, resource.Agent, resource.LoadAgent, tool, resourceMap); err != nil {
+				return nil, err
 			}
 		}
 	}

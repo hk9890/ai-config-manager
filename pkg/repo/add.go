@@ -32,6 +32,8 @@ func (m *Manager) AddCommandWithRef(sourcePath, sourceURL, sourceType, ref strin
 // addResource is the generic internal method that adds any resource type using the strategy pattern
 // The loader parameter is a strategy function that knows how to load the specific resource type
 // The isDirectory parameter indicates whether to copy/symlink a directory (true) or file (false)
+//
+//nolint:gocyclo // Core import pipeline handling copy/symlink modes, conflict detection, metadata, and git; must remain atomic.
 func (m *Manager) addResource(sourcePath, sourceURL, sourceType, ref string, opts ImportOptions,
 	resType resource.ResourceType, loader resourceLoader, isDirectory bool) error {
 	// Ensure repo is initialized

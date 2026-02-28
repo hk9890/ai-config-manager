@@ -192,7 +192,7 @@ func LoadCommandResourceWithBase(filePath string, basePath string) (*CommandReso
 	}
 
 	// Validate
-	if err := cmd.Resource.Validate(); err != nil {
+	if err := cmd.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
@@ -218,7 +218,7 @@ func NewCommandResource(name, description string) *CommandResource {
 }
 
 // WriteCommand writes a command resource to a file
-func WriteCommand(cmd *CommandResource, filePath string) error {
+func WriteCommand(cmd *CommandResource, filePath string) error { //nolint:dupl // command and agent Write share structure but have different type-specific fields
 	// Build frontmatter
 	frontmatter := Frontmatter{
 		"description": cmd.Description,

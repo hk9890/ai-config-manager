@@ -182,7 +182,7 @@ func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata
 	for _, source := range sources {
 		// Health check
 		health := checkSourceHealth(source)
-		healthIcon := "✓"
+		healthIcon := statusIconOK
 		if !health {
 			healthIcon = "✗"
 		}

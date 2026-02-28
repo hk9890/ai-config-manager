@@ -161,7 +161,7 @@ func TestVerifyDirectory(t *testing.T) {
 			}
 
 			// Verify directory
-			issues, err := verifyDirectory(testDir, "command", "claude", repoDir)
+			issues, err := verifyDirectory(testDir, "claude", repoDir)
 			if err != nil {
 				t.Fatalf("verifyDirectory failed: %v", err)
 			}
