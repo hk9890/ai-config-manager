@@ -211,7 +211,7 @@ Examples:
 		// Process packages via installPackage()
 		for _, pkgRef := range packageRefs {
 			packageName := strings.TrimPrefix(pkgRef, "package/")
-			err := installPackage(packageName, projectPath, installer, manager)
+			err := installPackage(packageName, installer, manager)
 			if err != nil {
 				results = append(results, installResult{
 					resourceType: resource.PackageType,
@@ -545,7 +545,7 @@ func init() {
 }
 
 // installPackage installs all resources from a package
-func installPackage(packageName string, projectPath string, installer *install.Installer, manager *repo.Manager) error {
+func installPackage(packageName string, installer *install.Installer, manager *repo.Manager) error {
 	repoPath := manager.GetRepoPath()
 	pkgPath := resource.GetPackagePath(packageName, repoPath)
 
