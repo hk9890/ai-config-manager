@@ -335,7 +335,7 @@ func TestListEnhanced_NotInManifest(t *testing.T) {
 		}
 
 		// Verify legend exists
-		if !strings.Contains(output, "* = Not in manifest") {
+		if !strings.Contains(output, "* = Not in ai.package.yaml") {
 			t.Errorf("expected legend to explain '*' symbol")
 		}
 	})
@@ -564,7 +564,7 @@ func TestListEnhanced_NoManifest(t *testing.T) {
 		}
 
 		// Verify legend
-		if !strings.Contains(output, "- = No manifest") {
+		if !strings.Contains(output, "- = No ai.package.yaml") {
 			t.Errorf("expected legend to explain '-' symbol")
 		}
 	})

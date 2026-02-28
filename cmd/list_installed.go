@@ -54,9 +54,9 @@ Output columns:
 
 Sync Status Symbols:
   ✓ = In sync (resource is both in manifest and installed)
-  * = Not in manifest (installed but not declared in ai.package.yaml)
+  * = Not in ai.package.yaml (installed but not declared in ai.package.yaml)
   ⚠ = Not installed (declared in manifest but not installed yet)
-  - = No manifest (no ai.package.yaml file exists in current directory)
+  - = No ai.package.yaml (no ai.package.yaml file exists in current directory)
 
 The sync status helps you keep your installations aligned with your project's
 ai.package.yaml manifest file. Resources marked with * should be added to the
@@ -382,7 +382,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if cmd.Health == string(resource.HealthBroken) {
-			status = "✗ broken"
+			status = "✗"
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, cmd.Description)
 	}
@@ -399,7 +399,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if skill.Health == string(resource.HealthBroken) {
-			status = "✗ broken"
+			status = "✗"
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, skill.Description)
 	}
@@ -416,7 +416,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if agent.Health == string(resource.HealthBroken) {
-			status = "✗ broken"
+			status = "✗"
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, agent.Description)
 	}
@@ -428,7 +428,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 
 	// Print legend
 	fmt.Println("\nLegend:")
-	fmt.Println("  ✓ = In sync  * = Not in manifest  ⚠ = Not installed  - = No manifest")
+	fmt.Println("  ✓ = In sync  * = Not in ai.package.yaml  ⚠ = Not installed  - = No ai.package.yaml")
 
 	// Count broken resources and print warning to stderr
 	brokenCount := 0
