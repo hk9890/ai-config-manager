@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.9.0] - 2026-03-01
+
+### Added
+- **`--prune-package` flag for `aimgr repair`** — Repair command now supports `--prune-package` to remove packages during repair operations
+
+### Fixed
+- **Shell completions** — Deprecated `--fix` flags removed from completions; added missing completions for repair commands
+- **Verify help text** — `verify` command help text and hints now recommend using `repair` instead of the deprecated `--fix` flag
+- **Error messages for deprecated flags** — Corrected error messages that incorrectly referenced deprecated flags and non-existent config keys
+- **Install saves to manifest** — `aimgr install` now correctly saves already-installed resources to the manifest
+- **5 broken tests resolved** — Fixed broken tests across logging, completions, verify, and parser packages
+- **Lint errors resolved** — Fixed `unparam` lint errors in `repo_repair_test.go` and resolved `golangci-lint` failures (goconst, gocyclo, staticcheck)
+
+### Changed
+- **Integration tests for repair** — Added comprehensive integration tests for `aimgr repair` and `repo repair` commands
+- **Documentation structure** — Added standard doc structure and slimmed AGENTS.md to focus on routing/reference
+
+
 ## [2.8.0] - 2026-03-01
 
 ### Fixed
