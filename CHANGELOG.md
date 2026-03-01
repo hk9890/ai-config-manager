@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.8.0] - 2026-03-01
+
+### Fixed
+- **Orphaned metadata cleanup** — `repo remove` now handles cases where resource file is gone but metadata persists, preventing "resource not found" errors during sync cleanup
+- **Verify subdirectory scanning** — `verify` now scans subdirectories for nested commands and detects orphaned resources
+- **List legend labels** — Improved list legend labels and shortened broken status display
+- **Package verify output** — Named missing resources in package verify output  
+- **Command references** — Corrected 'aimgr project verify' references to 'aimgr verify' in sync/remove warning messages
+- **Test fixes** — Corrected TestListEnhanced tests to use listInstalledCmd
+
+
 ## [2.7.0] - 2026-02-28
 
 ### Added
