@@ -1,156 +1,41 @@
-# AGENTS.md
+# aimgr (ai-config-manager)
 
-Quick reference for AI coding agents working in the ai-config-manager repository.
+CLI tool (Go 1.25.6) for managing AI resources (commands, skills, agents, packages) across AI coding tools. Centralized repository with symlink-based installation.
 
-## ⚠️ CRITICAL: Repository Safety for Testing
+**Tech Stack**: Go 1.25.6, Cobra, Viper, XDG directories, GoReleaser
 
-**NEVER run `aimgr repo` commands against the global repository during testing or bug reproduction!**
+## Coding
 
-The default repository location is `~/.local/share/ai-config/repo/` which contains your real aimgr configuration. Testing against this will corrupt your development environment.
+Read `docs/CODING.md` for build commands, project structure, code conventions, and **critical safety rules**.
 
-### ✅ Safe Testing Methods
+Read `CONTRIBUTING.md` for contribution workflow and commit conventions.
 
-**Method 1: Environment Variable (RECOMMENDED)**
-```bash
-# Set up isolated test repository
-export AIMGR_REPO_PATH=/tmp/test-repo-$(date +%s)
+## Testing
 
-# Now all aimgr commands use the test repo
-aimgr repo init
-aimgr repo add /path/to/resources
-git -C "$AIMGR_REPO_PATH" status
-```
+Read `docs/TESTING.md` for test commands, isolation requirements, and patterns.
 
-**Method 2: Config File**
-```bash
-# Create temporary config
-cat > /tmp/test-config.yaml << 'YAML'
-repo:
-  path: /tmp/test-repo
-YAML
+## Releases
 
-# Use config for each command
-aimgr --config /tmp/test-config.yaml repo init
-aimgr --config /tmp/test-config.yaml repo add /path/to/resources
-```
+Load the **github-releases** skill for release workflow. Read `docs/RELEASING.md` for process details.
 
-**Method 3: Programmatic Testing (Go tests)**
-```go
-// In test files, ALWAYS use NewManagerWithPath with t.TempDir()
-func TestSomething(t *testing.T) {
-    repoDir := t.TempDir()
-    manager := repo.NewManagerWithPath(repoDir)
-    // ... test code
-}
-```
+## Monitoring
 
-### ❌ NEVER Do This
+Load the **observability-triage** skill for log analysis and issue triage.
 
-```bash
-# DON'T: This uses your global repo!
-aimgr repo add /some/test/resources
+## Landing the Plane (Session Completion)
 
-# DON'T: This pollutes your actual repository!
-cd ~/.local/share/ai-config/repo
-aimgr repo add test-resource
-```
+**When ending a work session**, complete ALL steps:
 
-**Bottom line**: Every test operation MUST explicitly specify a temporary repository location. No exceptions.
+1. **File issues for remaining work** -- Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) -- Tests, linters, builds
+3. **Update issue status** -- Close finished work, update in-progress items
+4. **PUSH TO REMOTE** -- This is MANDATORY:
+   ```bash
+   git pull --rebase
+   bd sync
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Verify** -- All changes committed AND pushed
 
-## Project Overview
-
-**aimgr** is a CLI tool (Go 1.25.6) for managing AI resources (commands, skills, agents, packages) across multiple AI coding tools. It uses a centralized repository (`~/.local/share/ai-config/repo/`) with symlink-based installation to tool directories (`.claude/`, `.opencode/`, `.github/skills/`, `.windsurf/skills/`).
-
-**Architecture**: CLI (Cobra) → Business Logic (`pkg/`) → Storage (XDG directories)
-
-## Quick Commands
-
-```bash
-# Build & Install
-make build      # Build binary
-make install    # Build and install to ~/bin
-
-# Testing
-make test                # All tests (vet → unit → integration → test/...)
-make unit-test           # Fast unit tests only
-make integration-test    # Slow integration tests
-
-# Code Quality
-make fmt        # Format all Go code
-make vet        # Run go vet
-```
-
-## ⚠️ CRITICAL: Use Locally Built Binary
-
-**ALWAYS use `./aimgr` (the locally built binary) when testing changes, NOT `aimgr` from PATH!**
-
-Version managers (mise, asdf, etc.) may install older versions at `~/.local/share/mise/installs/...` which will be found first in PATH. Testing with the wrong binary wastes time and causes confusion.
-
-```bash
-# ✅ CORRECT: Use local binary
-./aimgr --version
-./aimgr repo init
-
-# ❌ WRONG: May use mise/asdf version
-aimgr --version
-which aimgr  # Returns mise path, not ./aimgr!
-```
-
-**Quick check before testing:**
-```bash
-# Verify you're using the local build
-./aimgr --version  # Should show your current dev version
-which aimgr        # Shows mise/system version (ignore this!)
-```
-
-## Use Case Guide
-
-Delegate to the right documentation based on what you need to do:
-
-### Writing Code / Implementing Features
-
-→ See **[docs/contributor-guide/code-style.md](docs/contributor-guide/code-style.md)** for:
-- Naming conventions (files, packages, types, resources)
-- Import organization (3 groups: stdlib, external, internal)
-- Error handling (always wrap with `%w`)
-- File operations (paths, permissions, defer)
-- Symlink handling (CRITICAL: use `os.Stat()` not `entry.IsDir()`)
-- Best practices summary
-
-→ See **[docs/contributor-guide/architecture.md](docs/contributor-guide/architecture.md)** for:
-- System overview and components
-- Package structure (17 packages) and responsibilities
-- Architecture rules (5 critical rules)
-- Data flows (import, install, sync)
-- Key design patterns
-
-### Writing Tests / Analyzing Test Failures
-
-→ See **[docs/contributor-guide/testing.md](docs/contributor-guide/testing.md)** for:
-- Test types (unit, integration, E2E)
-- Test isolation with `t.TempDir()`
-- Table-driven test patterns
-- Running specific tests
-- Common test failures and fixes
-
-### Planning / Adding New Functionality
-
-→ See **[docs/contributor-guide/architecture.md](docs/contributor-guide/architecture.md)** for:
-- System overview and components
-- Package responsibilities (`pkg/` structure)
-- Architecture rules you MUST follow
-- Data flows for different operations
-
-### Releasing New Versions
-
-→ Use the **github-releases skill** (if available in your environment)
-
-If not available, see **[docs/contributor-guide/release-process.md](docs/contributor-guide/release-process.md)**
-
-## Before Committing
-
-1. `make fmt` - Format code
-2. `make test` - All tests pass
-3. Follow code style guide (see docs/contributor-guide/code-style.md)
-4. Git operations use `pkg/workspace` (see architecture.md)
-5. Tests use `t.TempDir()` and `NewManagerWithPath()` (see testing.md)
+**CRITICAL**: Work is NOT complete until `git push` succeeds.
