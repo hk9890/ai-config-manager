@@ -245,7 +245,7 @@ func completeConfigKeys(cmd *cobra.Command, args []string, toComplete string) ([
 	if len(args) != 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	keys := []string{"install.targets", "default-tool", "repo.path"}
+	keys := []string{"install.targets"}
 	return keys, cobra.ShellCompDirectiveNoFileComp
 }
 

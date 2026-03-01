@@ -113,7 +113,7 @@ Examples:
 
 		// Show fix suggestion only for table format
 		if parsedFormat == output.Table {
-			fmt.Println("\nRun 'aimgr verify --fix' to automatically fix these issues")
+			fmt.Println("\nRun 'aimgr repair' to automatically fix these issues")
 		}
 		return nil
 	},

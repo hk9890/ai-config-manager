@@ -438,7 +438,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		}
 	}
 	if brokenCount > 0 {
-		fmt.Fprintf(os.Stderr, "\n⚠ %d broken resource(s) found. Run 'aimgr verify --fix' to repair.\n", brokenCount)
+		fmt.Fprintf(os.Stderr, "\n⚠ %d broken resource(s) found. Run 'aimgr repair' to fix.\n", brokenCount)
 	}
 
 	return nil

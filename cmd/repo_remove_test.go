@@ -1039,8 +1039,8 @@ func TestRepoRemove_WarnsAboutProjectSymlinks(t *testing.T) {
 	if !strings.Contains(stderrOutput, "command/warn-cmd") {
 		t.Errorf("Expected warning to mention resource name, got stderr: %q", stderrOutput)
 	}
-	if !strings.Contains(stderrOutput, "aimgr verify") {
-		t.Errorf("Expected warning to suggest 'aimgr verify', got stderr: %q", stderrOutput)
+	if !strings.Contains(stderrOutput, "aimgr repair") {
+		t.Errorf("Expected warning to suggest 'aimgr repair', got stderr: %q", stderrOutput)
 	}
 }
 

@@ -49,8 +49,8 @@ func TestRepoCommandHasSubcommands(t *testing.T) {
 }
 
 func TestRepoCommandDocumentation(t *testing.T) {
-	// Verify long description mentions key subcommands
-	expectedMentions := []string{"add", "remove"}
+	// Verify long description mentions key concepts
+	expectedMentions := []string{"repository", "resources"}
 
 	for _, mention := range expectedMentions {
 		if !strings.Contains(repoCmd.Long, mention) {

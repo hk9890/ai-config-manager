@@ -245,7 +245,7 @@ func warnProjectSymlinks(resources []resource.Resource) {
 	}
 	fmt.Fprintf(os.Stderr, "⚠ Warning: removing %d resource(s) (%s) may break symlinks in projects that have them installed.\n",
 		len(resources), strings.Join(names, ", "))
-	fmt.Fprintf(os.Stderr, "  Run 'aimgr verify --fix' in affected projects to clean up broken symlinks.\n\n")
+	fmt.Fprintf(os.Stderr, "  Run 'aimgr repair' in affected projects to clean up broken symlinks.\n\n")
 }
 
 func init() {

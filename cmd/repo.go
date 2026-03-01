@@ -13,10 +13,7 @@ var repoCmd = &cobra.Command{
 The repo command group provides subcommands for adding, removing, and listing
 resources (commands, skills, and agents) in the centralized aimgr repository.
 
-Available subcommands:
-  add     - Add resources to the repository
-  remove  - Remove resources from the repository
-  list    - List resources in the repository`,
+Use 'aimgr repo --help' to see all available subcommands.`,
 }
 
 func init() {

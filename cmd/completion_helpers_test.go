@@ -132,7 +132,7 @@ func TestCompleteConfigKeys(t *testing.T) {
 	completions, directive := completeConfigKeys(cmd, args, toComplete)
 
 	// Verify expected config keys are present
-	expectedKeys := []string{"repo.path"}
+	expectedKeys := []string{"install.targets"}
 	found := false
 	for _, key := range expectedKeys {
 		for _, completion := range completions {
@@ -144,7 +144,7 @@ func TestCompleteConfigKeys(t *testing.T) {
 	}
 
 	if !found {
-		t.Error("Expected at least repo.path in completions")
+		t.Error("Expected at least install.targets in completions")
 	}
 
 	// Verify directive

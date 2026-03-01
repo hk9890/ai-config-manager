@@ -79,7 +79,7 @@ Pattern matching is supported using glob syntax:
 Multi-tool behavior:
   - If tool directories exist (.claude, .opencode, .github/skills), installs to ALL of them
   - If no tool directories exist, creates and installs to your default tool
-  - Default tool is configured in ~/.config/aimgr/aimgr.yaml (use 'aimgr config set default-tool <tool>')
+  - Default tool is configured in ~/.config/aimgr/aimgr.yaml (use 'aimgr config set install.targets <tool>')
 
 Supported tools:
   - claude:   Claude Code (.claude/commands, .claude/skills, .claude/agents)
