@@ -103,6 +103,8 @@ Examples:
 
 		// Auto-fix if requested
 		if verifyFixFlag {
+			// TODO: Remove --fix flag in a future version. Replaced by 'aimgr repair'.
+			fmt.Fprintln(os.Stderr, "Warning: --fix is deprecated. Use 'aimgr repair' instead.")
 			if parsedFormat == output.Table {
 				fmt.Println("\nAttempting to fix issues...")
 			}
@@ -810,7 +812,7 @@ var (
 func init() {
 	rootCmd.AddCommand(projectVerifyCmd)
 	projectVerifyCmd.Flags().StringVar(&verifyProjectPath, "project-path", "", "Project directory path (default: current directory)")
-	projectVerifyCmd.Flags().BoolVar(&verifyFixFlag, "fix", false, "Automatically fix issues by reinstalling resources")
+	projectVerifyCmd.Flags().BoolVar(&verifyFixFlag, "fix", false, "Automatically fix issues by reinstalling resources (deprecated: use 'aimgr repair' instead)")
 	projectVerifyCmd.Flags().StringVar(&verifyFormatFlag2, "format", "table", "Output format (table|json|yaml)")
 
 	// Register completion functions

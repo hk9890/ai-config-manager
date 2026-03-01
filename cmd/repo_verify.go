@@ -129,6 +129,12 @@ Examples:
 			return outputVerifyResults(&result, parsedFormat, verifyFix)
 		}
 
+		// Print deprecation warning if --fix is used
+		if verifyFix {
+			// TODO: Remove --fix flag in a future version. Replaced by 'aimgr repo repair'.
+			fmt.Fprintln(os.Stderr, "Warning: --fix is deprecated. Use 'aimgr repo repair' instead.")
+		}
+
 		// Parse pattern if provided
 		var matcher *pattern.Matcher
 		if len(args) > 0 {
@@ -584,7 +590,7 @@ func formatResourceReference(resourceType resource.ResourceType, name string) st
 
 func init() {
 	repoCmd.AddCommand(repoVerifyCmd)
-	repoVerifyCmd.Flags().BoolVar(&verifyFix, "fix", false, "Automatically fix issues (create missing metadata, remove orphaned)")
+	repoVerifyCmd.Flags().BoolVar(&verifyFix, "fix", false, "Automatically fix issues (create missing metadata, remove orphaned) (deprecated: use 'aimgr repo repair' instead)")
 
 	// Add new --format flag
 	repoVerifyCmd.Flags().StringVar(&verifyFormatFlag, "format", "table", "Output format (table|json|yaml)")

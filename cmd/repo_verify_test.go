@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
@@ -314,5 +315,60 @@ func TestVerifyRepository_TypeMismatch(t *testing.T) {
 
 	if len(result.TypeMismatches) == 0 {
 		t.Error("Expected type mismatch to be detected")
+	}
+}
+
+// TestRepoVerifyFixDeprecationWarning verifies that using --fix with 'aimgr repo verify'
+// prints a deprecation warning to stderr.
+func TestRepoVerifyFixDeprecationWarning(t *testing.T) {
+	// Create temp directory for test repository
+	repoDir := t.TempDir()
+
+	// Set AIMGR_REPO_PATH to use test directory
+	oldEnv := os.Getenv("AIMGR_REPO_PATH")
+	defer func() {
+		if oldEnv != "" {
+			_ = os.Setenv("AIMGR_REPO_PATH", oldEnv)
+		} else {
+			_ = os.Unsetenv("AIMGR_REPO_PATH")
+		}
+	}()
+	_ = os.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Initialize repository
+	manager := repo.NewManagerWithPath(repoDir)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	// Create a resource without metadata so there is something for --fix to act on
+	commandPath := filepath.Join(repoDir, "commands", "dep-test-cmd")
+	if err := os.WriteFile(commandPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
+		t.Fatalf("Failed to create command: %v", err)
+	}
+
+	// Set the verifyFix flag to simulate --fix being passed
+	oldVerifyFix := verifyFix
+	verifyFix = true
+	defer func() { verifyFix = oldVerifyFix }()
+
+	// Capture stderr
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	// Run verify command
+	_ = repoVerifyCmd.RunE(repoVerifyCmd, []string{})
+
+	// Restore stderr and read captured output
+	w.Close()
+	os.Stderr = oldStderr
+	captured := make([]byte, 4096)
+	n, _ := r.Read(captured)
+	stderrOutput := string(captured[:n])
+
+	// Verify deprecation warning was printed
+	if !strings.Contains(stderrOutput, "Warning: --fix is deprecated. Use 'aimgr repo repair' instead.") {
+		t.Errorf("Expected deprecation warning on stderr, got: %q", stderrOutput)
 	}
 }
