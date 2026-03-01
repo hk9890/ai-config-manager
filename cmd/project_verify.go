@@ -28,12 +28,12 @@ This command checks for common installation issues:
   - Resources in ai.package.yaml that aren't installed
   - Orphaned installations (not in ai.package.yaml)
 
-Use --fix to automatically repair issues by reinstalling broken resources.
+Use 'aimgr repair' to automatically fix issues (--fix is deprecated).
 
 Examples:
   aimgr verify                           # Check current directory
   aimgr verify --project-path ~/project  # Check specific directory
-  aimgr verify --fix                     # Auto-fix issues by reinstalling
+  aimgr repair                           # Auto-fix issues by reinstalling
   aimgr verify --format json             # JSON output for scripts
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {

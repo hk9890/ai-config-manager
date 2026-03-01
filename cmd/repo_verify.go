@@ -98,7 +98,7 @@ Examples:
   aimgr repo verify                  # Check all resources
   aimgr repo verify skill/*          # Check only skills
   aimgr repo verify command/test*    # Check commands starting with "test"
-  aimgr repo verify --fix            # Fix issues automatically
+  aimgr repo repair                  # Fix issues automatically
   aimgr repo verify --format=json    # Machine-readable output
   aimgr repo verify --format=yaml    # YAML output`,
 	Args: cobra.MaximumNArgs(1),
@@ -567,7 +567,7 @@ func displayVerifyResults(result *VerifyResult, fixed bool) {
 
 		if !fixed && (len(result.ResourcesWithoutMetadata) > 0 || len(result.OrphanedMetadata) > 0) {
 			fmt.Println()
-			fmt.Println("Run 'aimgr repo verify --fix' to automatically resolve these issues.")
+			fmt.Println("Run 'aimgr repo repair' to automatically resolve these issues.")
 		}
 	}
 }

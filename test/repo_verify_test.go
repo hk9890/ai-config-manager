@@ -985,9 +985,9 @@ description: No metadata
 		t.Errorf("Expected 'ERRORS found', got: %s", output)
 	}
 
-	// Should suggest --fix
-	if !strings.Contains(output, "--fix") {
-		t.Errorf("Expected suggestion to use --fix, got: %s", output)
+	// Should suggest repair
+	if !strings.Contains(output, "aimgr repo repair") {
+		t.Errorf("Expected suggestion to use 'aimgr repo repair', got: %s", output)
 	}
 }
 
