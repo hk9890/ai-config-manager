@@ -37,24 +37,22 @@ func setupRepairTestRepo(t *testing.T) (*repo.Manager, func()) {
 }
 
 // createTestCommand creates a valid .md command file in the repo commands/ directory.
-// Returns the path to the created file.
-func createTestCommand(t *testing.T, repoPath, name string) string {
+func createTestCommand(t *testing.T, repoPath, name string) {
 	t.Helper()
 	cmdPath := filepath.Join(repoPath, "commands", name+".md")
 	content := fmt.Sprintf("---\ndescription: Test command %s\n---\n\n# %s\n", name, name)
 	if err := os.WriteFile(cmdPath, []byte(content), 0644); err != nil {
 		t.Fatalf("Failed to create command %s: %v", name, err)
 	}
-	return cmdPath
 }
 
-// createTestMetadata creates metadata for a given resource.
+// createTestMetadata creates metadata for a given resource (always as a Command type).
 // Uses a non-file:// SourceURL to avoid triggering missing-source-path warnings.
-func createTestMetadata(t *testing.T, repoPath, name string, resType resource.ResourceType) {
+func createTestMetadata(t *testing.T, repoPath, name string) {
 	t.Helper()
 	meta := &metadata.ResourceMetadata{
 		Name:       name,
-		Type:       resType,
+		Type:       resource.Command,
 		SourceType: "local",
 		SourceURL:  "https://example.com/source", // not file://, so no missing-source-path check
 	}
@@ -101,7 +99,7 @@ func TestRepoRepair_NoIssues(t *testing.T) {
 
 	// Create a command with proper metadata
 	createTestCommand(t, repoPath, "healthy-cmd")
-	createTestMetadata(t, repoPath, "healthy-cmd", resource.Command)
+	createTestMetadata(t, repoPath, "healthy-cmd")
 
 	// Run the diagnostic scan
 	verifyResult, err := verifyRepository(manager, false, nil)
@@ -201,7 +199,7 @@ func TestRepoRepair_OrphanedMetadata(t *testing.T) {
 	repoPath := manager.GetRepoPath()
 
 	// Create metadata without corresponding resource
-	createTestMetadata(t, repoPath, "orphaned-cmd", resource.Command)
+	createTestMetadata(t, repoPath, "orphaned-cmd")
 
 	// Verify the issue is detected
 	verifyResult, err := verifyRepository(manager, false, nil)
@@ -339,7 +337,7 @@ func TestRepoRepair_DryRun(t *testing.T) {
 	createTestCommand(t, repoPath, "dry-run-cmd")
 
 	// Create orphaned metadata (no corresponding resource file)
-	createTestMetadata(t, repoPath, "orphan-dry", resource.Command)
+	createTestMetadata(t, repoPath, "orphan-dry")
 	orphanPath := metadata.GetMetadataPath("orphan-dry", resource.Command, repoPath)
 
 	// Run diagnostic scan
@@ -397,7 +395,7 @@ func TestRepoRepair_MixedIssues(t *testing.T) {
 	createTestCommand(t, repoPath, "missing-meta-cmd")
 
 	// 2. Orphaned metadata (fixable)
-	createTestMetadata(t, repoPath, "orphan-mixed", resource.Command)
+	createTestMetadata(t, repoPath, "orphan-mixed")
 
 	// 3. Type mismatch (unfixable): command file with metadata saying "agent"
 	createTestCommand(t, repoPath, "type-mismatch-cmd")
