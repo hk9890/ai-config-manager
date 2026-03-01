@@ -203,7 +203,7 @@ func completeResourceTypes(cmd *cobra.Command, args []string, toComplete string)
 	if len(args) != 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	types := []string{"command", "skill", "agent"}
+	types := []string{"command", "skill", "agent", "package"}
 	return types, cobra.ShellCompDirectiveNoFileComp
 }
 
@@ -245,7 +245,7 @@ func completeConfigKeys(cmd *cobra.Command, args []string, toComplete string) ([
 	if len(args) != 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	keys := []string{"install.targets", "default-tool"}
+	keys := []string{"install.targets", "default-tool", "repo.path"}
 	return keys, cobra.ShellCompDirectiveNoFileComp
 }
 
@@ -256,14 +256,14 @@ func completeConfigSetArgs(cmd *cobra.Command, args []string, toComplete string)
 		return []string{"install.targets"}, cobra.ShellCompDirectiveNoFileComp
 	} else if len(args) == 1 && args[0] == "install.targets" {
 		// Complete tool names for install.targets
-		return []string{"claude", "opencode", "copilot"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"claude", "opencode", "copilot", "windsurf"}, cobra.ShellCompDirectiveNoFileComp
 	}
 	return nil, cobra.ShellCompDirectiveNoFileComp
 }
 
-// completeToolNames provides completion for tool names (claude, opencode, copilot)
+// completeToolNames provides completion for tool names (claude, opencode, copilot, windsurf)
 func completeToolNames(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return []string{"claude", "opencode", "copilot"}, cobra.ShellCompDirectiveNoFileComp
+	return []string{"claude", "opencode", "copilot", "windsurf"}, cobra.ShellCompDirectiveNoFileComp
 }
 
 // completeFormatFlag provides completion for --format flag values

@@ -128,10 +128,12 @@ func TestParseResourceArg_ValidFormats(t *testing.T) {
 			errContains: "invalid resource type",
 		},
 		{
-			name:        "too many slashes",
-			arg:         "skill/sub/name",
-			wantErr:     true,
-			errContains: "invalid format",
+			// hierarchical names (e.g. api/deploy) are intentionally supported via SplitN(..., 2)
+			name:     "too many slashes",
+			arg:      "skill/sub/name",
+			wantType: resource.Skill,
+			wantName: "sub/name",
+			wantErr:  false,
 		},
 		{
 			name:        "just slash",

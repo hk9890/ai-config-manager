@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hk9890/ai-config-manager/pkg/metadata"
 	"github.com/hk9890/ai-config-manager/pkg/output"
@@ -22,18 +24,20 @@ func TestRepoVerifyCommand(t *testing.T) {
 		{
 			name: "healthy repository with no issues",
 			setupRepo: func(mgr *repo.Manager) error {
-				// Create a command with proper metadata
-				commandPath := filepath.Join(mgr.GetRepoPath(), "commands", "test-cmd")
-				if err := os.WriteFile(commandPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
+				// Create a command with proper metadata (.md extension required by List())
+				commandContent := "---\nname: test-cmd\ndescription: A test command\n---\nCommand content here\n"
+				commandPath := filepath.Join(mgr.GetRepoPath(), "commands", "test-cmd.md")
+				if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
 					return err
 				}
 
-				// Create metadata for the command
+				// Create metadata for the command. Use a non-file:// source URL so that
+				// verifyRepository does not trigger a "missing source path" warning.
 				meta := &metadata.ResourceMetadata{
 					Name:       "test-cmd",
 					Type:       resource.Command,
-					SourceType: "local",
-					SourceURL:  "file:///test/source",
+					SourceType: "github",
+					SourceURL:  "https://github.com/test/repo",
 				}
 				return metadata.Save(meta, mgr.GetRepoPath(), "local")
 			},
@@ -43,9 +47,10 @@ func TestRepoVerifyCommand(t *testing.T) {
 		{
 			name: "resource without metadata",
 			setupRepo: func(mgr *repo.Manager) error {
-				// Create a command without metadata
-				commandPath := filepath.Join(mgr.GetRepoPath(), "commands", "no-meta-cmd")
-				return os.WriteFile(commandPath, []byte("#!/bin/bash\necho test"), 0755)
+				// Create a command without metadata (.md extension required by List())
+				commandContent := "---\nname: no-meta-cmd\ndescription: A command without metadata\n---\nCommand content here\n"
+				commandPath := filepath.Join(mgr.GetRepoPath(), "commands", "no-meta-cmd.md")
+				return os.WriteFile(commandPath, []byte(commandContent), 0644)
 			},
 			wantErrors:   false,
 			wantWarnings: true,
@@ -134,9 +139,10 @@ func TestRepoVerifyWithFix(t *testing.T) {
 		t.Fatalf("Failed to initialize repo: %v", err)
 	}
 
-	// Create a resource without metadata
-	commandPath := filepath.Join(repoDir, "commands", "test-cmd")
-	if err := os.WriteFile(commandPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
+	// Create a resource without metadata (.md extension required by List())
+	commandContent := "---\nname: test-cmd\ndescription: A test command\n---\nCommand content here\n"
+	commandPath := filepath.Join(repoDir, "commands", "test-cmd.md")
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
 		t.Fatalf("Failed to create command: %v", err)
 	}
 
@@ -285,20 +291,36 @@ func TestVerifyRepository_TypeMismatch(t *testing.T) {
 		t.Fatalf("Failed to initialize repo: %v", err)
 	}
 
-	// Create a command
-	commandPath := filepath.Join(repoDir, "commands", "test-cmd")
-	if err := os.WriteFile(commandPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
+	// Create a command (.md extension required by List())
+	commandContent := "---\nname: test-cmd\ndescription: A test command\n---\nCommand content here\n"
+	commandPath := filepath.Join(repoDir, "commands", "test-cmd.md")
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
 		t.Fatalf("Failed to create command: %v", err)
 	}
 
-	// Create metadata with wrong type (skill instead of command)
-	meta := &metadata.ResourceMetadata{
-		Name:       "test-cmd",
-		Type:       resource.Skill, // Wrong type!
-		SourceType: "local",
-		SourceURL:  "file:///test/source",
+	// Create metadata with wrong type (skill instead of command).
+	// The metadata must be stored in the commands metadata directory so that
+	// verifyRepository can find it via GetMetadata("test-cmd", resource.Command).
+	// We write the JSON directly so the file path uses the command type but the
+	// "type" field inside the JSON contains "skill", triggering the mismatch check.
+	wrongTypeMeta := metadata.ResourceMetadata{
+		Name:           "test-cmd",
+		Type:           resource.Skill, // Wrong type in JSON content!
+		SourceType:     "local",
+		SourceURL:      "file:///test/source",
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
 	}
-	if err := metadata.Save(meta, repoDir, "local"); err != nil {
+	metaData, err := json.MarshalIndent(wrongTypeMeta, "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to marshal metadata: %v", err)
+	}
+	// Store at the commands path so GetMetadata("test-cmd", resource.Command) finds it
+	metaPath := metadata.GetMetadataPath("test-cmd", resource.Command, repoDir)
+	if err := os.MkdirAll(filepath.Dir(metaPath), 0755); err != nil {
+		t.Fatalf("Failed to create metadata directory: %v", err)
+	}
+	if err := os.WriteFile(metaPath, metaData, 0644); err != nil {
 		t.Fatalf("Failed to save metadata: %v", err)
 	}
 
@@ -342,8 +364,10 @@ func TestRepoVerifyFixDeprecationWarning(t *testing.T) {
 	}
 
 	// Create a resource without metadata so there is something for --fix to act on
-	commandPath := filepath.Join(repoDir, "commands", "dep-test-cmd")
-	if err := os.WriteFile(commandPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
+	// (.md extension required by List())
+	commandContent := "---\nname: dep-test-cmd\ndescription: A test command for deprecation warning test\n---\nCommand content here\n"
+	commandPath := filepath.Join(repoDir, "commands", "dep-test-cmd.md")
+	if err := os.WriteFile(commandPath, []byte(commandContent), 0644); err != nil {
 		t.Fatalf("Failed to create command: %v", err)
 	}
 

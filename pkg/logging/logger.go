@@ -32,6 +32,11 @@ import (
 // Returns an error if the log directory cannot be created or the log file
 // cannot be opened for writing.
 func NewRepoLogger(repoPath string, level slog.Level) (*slog.Logger, error) {
+	// Verify the repo path exists before creating subdirectories
+	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("repo path does not exist: %s", repoPath)
+	}
+
 	// Create logs directory if it doesn't exist
 	logsDir := filepath.Join(repoPath, "logs")
 	if err := os.MkdirAll(logsDir, 0755); err != nil {

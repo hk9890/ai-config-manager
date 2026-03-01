@@ -291,10 +291,13 @@ func TestNewRepoLogger_NestedPath(t *testing.T) {
 	// Create isolated temp directory
 	tmpDir := t.TempDir()
 
-	// Use nested path that doesn't exist yet
+	// Use nested path - must be created first; NewRepoLogger only creates the logs subdir
 	nestedPath := filepath.Join(tmpDir, "level1", "level2", "level3")
+	if err := os.MkdirAll(nestedPath, 0755); err != nil {
+		t.Fatalf("failed to create nested path: %v", err)
+	}
 
-	// Create logger - should create all parent directories
+	// Create logger - repo path already exists, should create logs subdirectory
 	logger, err := NewRepoLogger(nestedPath, slog.LevelDebug)
 	if err != nil {
 		t.Fatalf("NewRepoLogger() with nested path error = %v", err)
