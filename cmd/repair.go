@@ -254,7 +254,7 @@ func applyRepairFixes(projectPath string, issues []VerifyIssue, repoManager *rep
 				Resource:    issue.Resource,
 				Tool:        issue.Tool,
 				IssueType:   issue.IssueType,
-				Description: fmt.Sprintf("Run 'aimgr uninstall %s' to remove, or add '%s' to %s", ref, ref, manifest.ManifestFileName),
+				Description: fmt.Sprintf("Run 'aimgr uninstall %s' to remove, or run 'aimgr install %s' to add to %s", ref, ref, manifest.ManifestFileName),
 			})
 
 		case issueTypeUnreadable:

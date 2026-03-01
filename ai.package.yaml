@@ -8,3 +8,5 @@ resources:
     - skill/github-task-sync
     - package/skill-development
     - skill/observability-triage
+    - skill/ai-resource-manager
+    - skill/pptx

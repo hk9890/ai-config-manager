@@ -235,9 +235,9 @@ Examples:
 			results = append(results, result)
 		}
 
-		// Update manifest for successfully installed resources
+		// Update manifest for successfully installed or already-installed resources
 		for _, result := range results {
-			if result.success && !result.skipped {
+			if result.success || result.skipped {
 				resourceRef := fmt.Sprintf("%s/%s", result.resourceType, result.name)
 				if err := updateManifest(projectPath, resourceRef); err != nil {
 					fmt.Printf("⚠ Warning: failed to update manifest: %v\n", err)

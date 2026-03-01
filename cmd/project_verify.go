@@ -764,7 +764,7 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo
 			resType, resName := parseResourceFromIssue(issue)
 			ref := string(resType) + "/" + resName
 			fmt.Printf("  Orphaned resource: %s (%s)\n", issue.Resource, issue.Tool)
-			fmt.Printf("    Run 'aimgr uninstall %s' to remove, or add '%s' to %s\n",
+			fmt.Printf("    Run 'aimgr uninstall %s' to remove, or run 'aimgr install %s' to add to %s\n",
 				ref, ref, manifest.ManifestFileName)
 		}
 	}
