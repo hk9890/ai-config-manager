@@ -14,9 +14,10 @@ import (
 func (m *Manager) Remove(name string, resourceType resource.ResourceType) error {
 	path := m.GetPath(name, resourceType)
 
-	// Check if resource exists (Lstat so dangling symlinks are found too)
+	// Check if resource file exists (Lstat so dangling symlinks are found too)
+	resourceExists := true
 	if _, err := os.Lstat(path); err != nil {
-		return fmt.Errorf("resource '%s' not found", name)
+		resourceExists = false
 	}
 
 	// Get resource info before removal (needed for modifications cleanup)
@@ -43,28 +44,31 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 		)
 	}
 
-	// Remove the resource
-	if m.logger != nil {
-		m.logger.Debug("removing resource file/directory",
-			"resource", name,
-			"type", string(resourceType),
-			"path", path,
-		)
-	}
-	if err := os.RemoveAll(path); err != nil {
+	// Remove the resource file only if it exists
+	if resourceExists {
 		if m.logger != nil {
-			m.logger.Error("failed to remove resource",
+			m.logger.Debug("removing resource file/directory",
 				"resource", name,
 				"type", string(resourceType),
 				"path", path,
-				"error", err.Error(),
 			)
 		}
-		return fmt.Errorf("failed to remove resource: %w", err)
+		if err := os.RemoveAll(path); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to remove resource",
+					"resource", name,
+					"type", string(resourceType),
+					"path", path,
+					"error", err.Error(),
+				)
+			}
+			return fmt.Errorf("failed to remove resource: %w", err)
+		}
 	}
 
-	// Remove metadata file
+	// Remove metadata file (always attempt — handles orphaned metadata)
 	metadataPath := metadata.GetMetadataPath(name, resourceType, m.repoPath)
+	metadataRemoved := false
 	if _, err := os.Stat(metadataPath); err == nil {
 		if m.logger != nil {
 			m.logger.Debug("removing metadata file",
@@ -84,6 +88,12 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 			}
 			return fmt.Errorf("failed to remove metadata: %w", err)
 		}
+		metadataRemoved = true
+	}
+
+	// If neither resource file nor metadata existed, it's truly not found
+	if !resourceExists && !metadataRemoved {
+		return fmt.Errorf("resource '%s' not found", name)
 	}
 
 	// Commit the removal

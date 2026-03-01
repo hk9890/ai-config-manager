@@ -376,7 +376,7 @@ func removeOrphanedResources(manager *repo.Manager, removedResources map[string]
 
 	// Warn about breaking project symlinks before removing (bmz1.3)
 	fmt.Fprintf(os.Stderr, "\n⚠ Removed resources may have active project installations.\n")
-	fmt.Fprintf(os.Stderr, "  Run 'aimgr project verify --fix' in affected projects to clean up broken symlinks.\n\n")
+	fmt.Fprintf(os.Stderr, "  Run 'aimgr verify --fix' in affected projects to clean up broken symlinks.\n\n")
 
 	if syncDryRunFlag {
 		fmt.Printf("\nWould remove %d resource(s) no longer in sources:\n", totalToRemove)

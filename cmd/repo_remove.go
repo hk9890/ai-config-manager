@@ -237,7 +237,7 @@ func formatSourcesList(manifest *repomanifest.Manifest) string {
 // warnProjectSymlinks prints a warning when removing resources that may be
 // installed in project directories. Since there is no central registry of
 // project installations, this emits a generic warning directing users to
-// run 'aimgr project verify' in affected projects.
+// run 'aimgr verify' in affected projects.
 func warnProjectSymlinks(resources []resource.Resource) {
 	var names []string
 	for _, res := range resources {
@@ -245,7 +245,7 @@ func warnProjectSymlinks(resources []resource.Resource) {
 	}
 	fmt.Fprintf(os.Stderr, "⚠ Warning: removing %d resource(s) (%s) may break symlinks in projects that have them installed.\n",
 		len(resources), strings.Join(names, ", "))
-	fmt.Fprintf(os.Stderr, "  Run 'aimgr project verify --fix' in affected projects to clean up broken symlinks.\n\n")
+	fmt.Fprintf(os.Stderr, "  Run 'aimgr verify --fix' in affected projects to clean up broken symlinks.\n\n")
 }
 
 func init() {
