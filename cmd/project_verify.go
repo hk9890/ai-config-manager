@@ -120,11 +120,20 @@ Examples:
 type VerifyIssue struct {
 	Resource    string
 	Tool        string
-	IssueType   string // "broken", "wrong-repo", "not-installed", "orphaned"
+	IssueType   string // issueTypeBroken, issueTypeWrongRepo, issueTypeNotInstalled, issueTypeOrphaned
 	Description string
 	Path        string
 	Severity    string // "error", "warning"
 }
+
+// Issue type constants for VerifyIssue.IssueType
+const (
+	issueTypeBroken       = "broken"
+	issueTypeWrongRepo    = "wrong-repo"
+	issueTypeNotInstalled = "not-installed"
+	issueTypeOrphaned     = "orphaned"
+	issueTypeUnreadable   = "unreadable"
+)
 
 // deduplicateIssues merges manifest issues into existing issues, dropping any
 // manifest "not-installed" issue whose resource name matches an existing issue
@@ -142,7 +151,7 @@ func deduplicateIssues(existing, manifestIssues []VerifyIssue) []VerifyIssue {
 	for _, issue := range manifestIssues {
 		// For "not-installed" issues, extract the resource name (strip type prefix)
 		// and check if Phase 1 already reported it
-		if issue.IssueType == "not-installed" {
+		if issue.IssueType == issueTypeNotInstalled {
 			resName := issue.Resource
 			if parts := strings.SplitN(resName, "/", 2); len(parts) == 2 {
 				resName = parts[1]
@@ -265,7 +274,7 @@ func verifySymlink(symlinkPath, resourceName, tool, repoPath string) *VerifyIssu
 		return &VerifyIssue{
 			Resource:    resourceName,
 			Tool:        tool,
-			IssueType:   "unreadable",
+			IssueType:   issueTypeUnreadable,
 			Description: "Cannot read symlink target",
 			Path:        symlinkPath,
 			Severity:    "error",
@@ -277,7 +286,7 @@ func verifySymlink(symlinkPath, resourceName, tool, repoPath string) *VerifyIssu
 		return &VerifyIssue{
 			Resource:    resourceName,
 			Tool:        tool,
-			IssueType:   "broken",
+			IssueType:   issueTypeBroken,
 			Description: fmt.Sprintf("Symlink target doesn't exist: %s", target),
 			Path:        symlinkPath,
 			Severity:    "error",
@@ -289,7 +298,7 @@ func verifySymlink(symlinkPath, resourceName, tool, repoPath string) *VerifyIssu
 		return &VerifyIssue{
 			Resource:    resourceName,
 			Tool:        tool,
-			IssueType:   "wrong-repo",
+			IssueType:   issueTypeWrongRepo,
 			Description: fmt.Sprintf("Points to wrong repo: %s (expected: %s)", target, repoPath),
 			Path:        symlinkPath,
 			Severity:    "warning",
@@ -316,7 +325,7 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 
 	var issues []VerifyIssue
 
-	// Check each resource in manifest
+	// Phase 2a: Manifest → disk (check each resource in manifest is installed)
 	for _, resourceRef := range mf.Resources {
 		// Parse resource type and name
 		parts := strings.SplitN(resourceRef, "/", 2)
@@ -328,135 +337,17 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 
 		// Special handling for packages - check if all constituent resources are installed
 		if resType == "package" {
-			// Load package definition
-			packagePath := resource.GetPackagePath(resName, repoPath)
-			pkg, err := resource.LoadPackage(packagePath)
-			if err != nil {
-				// Package definition doesn't exist or is invalid
-				issues = append(issues, VerifyIssue{
-					Resource:    resourceRef,
-					Tool:        "any",
-					IssueType:   "not-installed",
-					Description: fmt.Sprintf("Package definition not found in repository: %v", err),
-					Path:        manifestPath,
-					Severity:    "warning",
-				})
-				continue
-			}
-
-			// Check if all resources in the package are installed
-			var missingResources []string
-			for _, pkgRes := range pkg.Resources {
-				resInstalled := false
-				resParts := strings.SplitN(pkgRes, "/", 2)
-				if len(resParts) != 2 {
-					continue
-				}
-
-				// Check if this resource is installed
-				for _, tool := range detectedTools {
-					toolInfo := tools.GetToolInfo(tool)
-					var checkPaths []string
-
-					switch resParts[0] {
-					case "skill":
-						if !toolInfo.SupportsSkills {
-							continue
-						}
-						// Skills are directories
-						checkPaths = []string{filepath.Join(projectPath, toolInfo.SkillsDir, resParts[1])}
-					case "command":
-						if !toolInfo.SupportsCommands {
-							continue
-						}
-						// Commands can be files or nested: check both directory and .md file
-						basePath := filepath.Join(projectPath, toolInfo.CommandsDir, resParts[1])
-						checkPaths = []string{
-							basePath,         // Directory (for nested commands)
-							basePath + ".md", // File
-						}
-					case "agent":
-						if !toolInfo.SupportsAgents {
-							continue
-						}
-						// Agents are files
-						basePath := filepath.Join(projectPath, toolInfo.AgentsDir, resParts[1])
-						checkPaths = []string{basePath + ".md"}
-					default:
-						continue
-					}
-
-					// Check if any of the paths exist (use os.Stat to detect broken symlinks)
-					for _, path := range checkPaths {
-						if _, err := os.Stat(path); err == nil {
-							resInstalled = true
-							break
-						}
-					}
-
-					if resInstalled {
-						break
-					}
-				}
-
-				if !resInstalled {
-					missingResources = append(missingResources, pkgRes)
-				}
-			}
-
-			if len(missingResources) > 0 {
-				desc := fmt.Sprintf("Listed in %s but %d resource(s) not installed: %s",
-					manifest.ManifestFileName, len(missingResources), strings.Join(missingResources, ", "))
-				issues = append(issues, VerifyIssue{
-					Resource:    resourceRef,
-					Tool:        "any",
-					IssueType:   "not-installed",
-					Description: desc,
-					Path:        manifestPath,
-					Severity:    "warning",
-				})
-			}
+			pkgIssues := checkPackageInstalled(resourceRef, resName, projectPath, manifestPath, detectedTools, repoPath)
+			issues = append(issues, pkgIssues...)
 			continue
 		}
 
 		// Check if regular resource is installed in any tool
-		installed := false
-		for _, tool := range detectedTools {
-			toolInfo := tools.GetToolInfo(tool)
-			var dir string
-
-			switch resType {
-			case "skill":
-				if !toolInfo.SupportsSkills {
-					continue
-				}
-				dir = filepath.Join(projectPath, toolInfo.SkillsDir, resName)
-			case "command":
-				if !toolInfo.SupportsCommands {
-					continue
-				}
-				dir = filepath.Join(projectPath, toolInfo.CommandsDir, resName)
-			case "agent":
-				if !toolInfo.SupportsAgents {
-					continue
-				}
-				dir = filepath.Join(projectPath, toolInfo.AgentsDir, resName)
-			default:
-				continue
-			}
-
-			// Use os.Stat to detect broken symlinks (not just symlink node existence)
-			if _, err := os.Stat(dir); err == nil {
-				installed = true
-				break
-			}
-		}
-
-		if !installed {
+		if !isResourceInstalledInTools(resType, resName, projectPath, detectedTools) {
 			issues = append(issues, VerifyIssue{
 				Resource:    resourceRef,
 				Tool:        "any",
-				IssueType:   "not-installed",
+				IssueType:   issueTypeNotInstalled,
 				Description: fmt.Sprintf("Listed in %s but not installed", manifest.ManifestFileName),
 				Path:        manifestPath,
 				Severity:    "warning",
@@ -465,6 +356,100 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 	}
 
 	// Phase 2b: Disk → manifest (orphan detection)
+	orphanIssues := findOrphanedInTools(mf, projectPath, detectedTools, repoPath)
+	issues = append(issues, orphanIssues...)
+
+	return issues, nil
+}
+
+// checkPackageInstalled verifies all resources in a package are installed.
+// Returns issues for missing package definitions or uninstalled member resources.
+func checkPackageInstalled(resourceRef, resName, projectPath, manifestPath string, detectedTools []tools.Tool, repoPath string) []VerifyIssue {
+	// Load package definition
+	packagePath := resource.GetPackagePath(resName, repoPath)
+	pkg, err := resource.LoadPackage(packagePath)
+	if err != nil {
+		// Package definition doesn't exist or is invalid
+		return []VerifyIssue{{
+			Resource:    resourceRef,
+			Tool:        "any",
+			IssueType:   issueTypeNotInstalled,
+			Description: fmt.Sprintf("Package definition not found in repository: %v", err),
+			Path:        manifestPath,
+			Severity:    "warning",
+		}}
+	}
+
+	// Check if all resources in the package are installed
+	var missingResources []string
+	for _, pkgRes := range pkg.Resources {
+		resParts := strings.SplitN(pkgRes, "/", 2)
+		if len(resParts) != 2 {
+			continue
+		}
+
+		if !isResourceInstalledInTools(resParts[0], resParts[1], projectPath, detectedTools) {
+			missingResources = append(missingResources, pkgRes)
+		}
+	}
+
+	if len(missingResources) > 0 {
+		desc := fmt.Sprintf("Listed in %s but %d resource(s) not installed: %s",
+			manifest.ManifestFileName, len(missingResources), strings.Join(missingResources, ", "))
+		return []VerifyIssue{{
+			Resource:    resourceRef,
+			Tool:        "any",
+			IssueType:   issueTypeNotInstalled,
+			Description: desc,
+			Path:        manifestPath,
+			Severity:    "warning",
+		}}
+	}
+
+	return nil
+}
+
+// isResourceInstalledInTools checks if a resource of the given type and name
+// is installed in at least one of the detected tools.
+func isResourceInstalledInTools(resType, resName, projectPath string, detectedTools []tools.Tool) bool {
+	for _, tool := range detectedTools {
+		toolInfo := tools.GetToolInfo(tool)
+		var checkPaths []string
+
+		switch resType {
+		case "skill":
+			if !toolInfo.SupportsSkills {
+				continue
+			}
+			checkPaths = []string{filepath.Join(projectPath, toolInfo.SkillsDir, resName)}
+		case "command":
+			if !toolInfo.SupportsCommands {
+				continue
+			}
+			basePath := filepath.Join(projectPath, toolInfo.CommandsDir, resName)
+			checkPaths = []string{basePath, basePath + ".md"}
+		case "agent":
+			if !toolInfo.SupportsAgents {
+				continue
+			}
+			basePath := filepath.Join(projectPath, toolInfo.AgentsDir, resName)
+			checkPaths = []string{basePath + ".md"}
+		default:
+			continue
+		}
+
+		for _, path := range checkPaths {
+			if _, err := os.Stat(path); err == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// findOrphanedInTools builds the expanded manifest set and scans all tool
+// directories for installed symlinks not declared in the manifest.
+func findOrphanedInTools(mf *manifest.Manifest, projectPath string, detectedTools []tools.Tool, repoPath string) []VerifyIssue {
 	// Build the expanded manifest set (includes package member resources)
 	expandedManifest := make(map[string]bool, len(mf.Resources))
 	for _, ref := range mf.Resources {
@@ -485,6 +470,7 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 	}
 
 	// Scan all tool directories for installed symlinks
+	var issues []VerifyIssue
 	seen := make(map[string]bool) // Deduplicate across tools
 	for _, tool := range detectedTools {
 		toolInfo := tools.GetToolInfo(tool)
@@ -521,7 +507,7 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 		}
 	}
 
-	return issues, nil
+	return issues
 }
 
 // findOrphanedResources scans a directory for installed symlinks that are not
@@ -558,7 +544,7 @@ func findOrphanedResources(dir, resType string, expandedManifest map[string]bool
 				seen[ref] = true
 				issues = append(issues, VerifyIssue{
 					Resource:    name,
-					IssueType:   "orphaned",
+					IssueType:   issueTypeOrphaned,
 					Description: fmt.Sprintf("Installed but not listed in %s", manifest.ManifestFileName),
 					Severity:    "warning",
 				})
@@ -587,7 +573,7 @@ func findOrphanedResources(dir, resType string, expandedManifest map[string]bool
 					seen[ref] = true
 					issues = append(issues, VerifyIssue{
 						Resource:    name,
-						IssueType:   "orphaned",
+						IssueType:   issueTypeOrphaned,
 						Description: fmt.Sprintf("Installed but not listed in %s", manifest.ManifestFileName),
 						Path:        subPath,
 						Severity:    "warning",
@@ -642,7 +628,7 @@ func displayVerifyIssues(issues []VerifyIssue, format output.Format) error {
 		for _, issue := range issues {
 			symbol := "⚠"
 			if issue.Severity == "error" {
-				symbol = "✗"
+				symbol = statusIconFail
 			}
 			table.AddRow(issue.Resource, issue.Tool, symbol+" "+issue.IssueType, issue.Description)
 		}
@@ -660,7 +646,7 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo
 
 	for _, issue := range issues {
 		switch issue.IssueType {
-		case "broken", "wrong-repo":
+		case issueTypeBroken, issueTypeWrongRepo:
 			fmt.Printf("  Fixing %s...\n", issue.Resource)
 
 			// Remove broken symlink
@@ -717,7 +703,7 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo
 			fmt.Printf("    ✓ Reinstalled %s/%s\n", resType, resName)
 			fixed++
 
-		case "not-installed":
+		case issueTypeNotInstalled:
 			fmt.Printf("  Installing %s...\n", issue.Resource)
 
 			// Parse "type/name" from the resource reference
@@ -771,7 +757,7 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo
 			fmt.Printf("    ✓ Installed %s\n", issue.Resource)
 			fixed++
 
-		case "orphaned":
+		case issueTypeOrphaned:
 			// Installed but not in manifest — determine type/name for uninstall hint
 			resType, resName := parseResourceFromIssue(issue)
 			ref := string(resType) + "/" + resName

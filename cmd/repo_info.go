@@ -184,7 +184,7 @@ func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata
 		health := checkSourceHealth(source)
 		healthIcon := statusIconOK
 		if !health {
-			healthIcon = "✗"
+			healthIcon = statusIconFail
 		}
 
 		// Determine source type and location
@@ -222,9 +222,9 @@ func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata
 func formatSource(source *repomanifest.Source, metadata *sourcemetadata.SourceMetadata) string {
 	// Health check
 	health := checkSourceHealth(source)
-	healthIcon := "✓"
+	healthIcon := statusIconOK
 	if !health {
-		healthIcon = "✗"
+		healthIcon = statusIconFail
 	}
 
 	// Determine source type and location

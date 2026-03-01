@@ -382,7 +382,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(cmd.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if cmd.Health == string(resource.HealthBroken) {
-			status = "✗"
+			status = statusIconFail
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, cmd.Description)
 	}
@@ -399,7 +399,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(skill.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if skill.Health == string(resource.HealthBroken) {
-			status = "✗"
+			status = statusIconFail
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, skill.Description)
 	}
@@ -416,7 +416,7 @@ func outputInstalledTable(infos []ResourceInfo, projectPath string) error {
 		syncSymbol := formatSyncStatus(projectPath, resourceRef, len(agent.Targets) > 0, expandedManifest)
 		status := statusIconOK
 		if agent.Health == string(resource.HealthBroken) {
-			status = "✗"
+			status = statusIconFail
 		}
 		table.AddRow(resourceRef, targets, syncSymbol, status, agent.Description)
 	}

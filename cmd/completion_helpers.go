@@ -13,6 +13,9 @@ import (
 // statusIconOK is the checkmark icon displayed for healthy/in-sync resources.
 const statusIconOK = "✓"
 
+// statusIconFail is the cross icon displayed for broken/unhealthy resources.
+const statusIconFail = "✗"
+
 // parseResourceArg parses a resource argument in the format "type/name"
 // Returns the resource type, name, and any error
 func parseResourceArg(arg string) (resource.ResourceType, string, error) {

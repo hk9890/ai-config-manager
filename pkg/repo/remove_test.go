@@ -93,9 +93,8 @@ func TestRemove_Normal(t *testing.T) {
 
 	// Add a command properly (creates both file and metadata)
 	testCmd := m.GetPath("normal-cmd", resource.Command)
-	if err := os.MkdirAll(m.GetPath("", resource.Command), 0755); err != nil {
-		// commands dir already created by Init, but just in case
-	}
+	// commands dir already created by Init, but ensure it exists
+	_ = os.MkdirAll(m.GetPath("", resource.Command), 0755)
 	cmdContent := "---\ndescription: A normal command\n---\n\n# Normal Command\n"
 	if err := os.WriteFile(testCmd, []byte(cmdContent), 0644); err != nil {
 		t.Fatalf("Failed to create test command file: %v", err)
