@@ -255,4 +255,7 @@ func init() {
 	repoCmd.AddCommand(repoRepairCmd)
 	repoRepairCmd.Flags().StringVar(&repoRepairFormatFlag, "format", "text", "Output format (text|json)")
 	repoRepairCmd.Flags().BoolVar(&repoRepairDryRun, "dry-run", false, "Show what would be fixed without making changes")
+
+	// Register completion functions
+	_ = repoRepairCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
 }

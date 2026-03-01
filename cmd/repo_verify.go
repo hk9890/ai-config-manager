@@ -78,7 +78,7 @@ This command performs the following checks:
   - Type mismatches between resource and metadata (error)
   - Packages with missing resource references (error)
 
-Use --fix to automatically resolve issues:
+Use 'aimgr repo repair' to automatically resolve issues (--fix is deprecated):
   - Create missing metadata for resources
   - Remove orphaned metadata files
 
@@ -590,7 +590,8 @@ func formatResourceReference(resourceType resource.ResourceType, name string) st
 
 func init() {
 	repoCmd.AddCommand(repoVerifyCmd)
-	repoVerifyCmd.Flags().BoolVar(&verifyFix, "fix", false, "Automatically fix issues (create missing metadata, remove orphaned) (deprecated: use 'aimgr repo repair' instead)")
+	repoVerifyCmd.Flags().BoolVar(&verifyFix, "fix", false, "Automatically fix issues (create missing metadata, remove orphaned)")
+	_ = repoVerifyCmd.Flags().MarkDeprecated("fix", "use 'aimgr repo repair' instead")
 
 	// Add new --format flag
 	repoVerifyCmd.Flags().StringVar(&verifyFormatFlag, "format", "table", "Output format (table|json|yaml)")

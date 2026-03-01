@@ -812,7 +812,8 @@ var (
 func init() {
 	rootCmd.AddCommand(projectVerifyCmd)
 	projectVerifyCmd.Flags().StringVar(&verifyProjectPath, "project-path", "", "Project directory path (default: current directory)")
-	projectVerifyCmd.Flags().BoolVar(&verifyFixFlag, "fix", false, "Automatically fix issues by reinstalling resources (deprecated: use 'aimgr repair' instead)")
+	projectVerifyCmd.Flags().BoolVar(&verifyFixFlag, "fix", false, "Automatically fix issues by reinstalling resources")
+	_ = projectVerifyCmd.Flags().MarkDeprecated("fix", "use 'aimgr repair' instead")
 	projectVerifyCmd.Flags().StringVar(&verifyFormatFlag2, "format", "table", "Output format (table|json|yaml)")
 
 	// Register completion functions

@@ -398,4 +398,5 @@ func init() {
 	listCmd.Flags().StringVar(&formatFlag, "format", "table", "Output format (table|json|yaml)")
 	listCmd.Flags().StringVar(&sourceFilterFlag, "source", "", "Filter by source name")
 	_ = listCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+	_ = listCmd.RegisterFlagCompletionFunc("source", completeSourceNames)
 }
