@@ -1,135 +1,120 @@
-# Discover Useful Resources
+# Discover & Recommend Resources
 
-Scan a project and recommend AI resources that would be useful based on
-the project's tech stack, tooling, and configuration.
+Scan project context, match against the aimgr repository, and recommend relevant resources.
 
-**Sections:** [Workflow](#workflow) · [What to Check](#what-to-check) · [Notes for Agents](#notes-for-agents)
+**Sections:** [Workflow](#workflow) · [Signal Table](#signal-table) · [Filtering & Ranking](#filtering--ranking) · [Notes](#notes-for-agents)
 
 ---
 
 ## Workflow
 
-### 1. Scan the Project
+### 1. Read Project Context
 
-Look for files and directories that indicate technologies and frameworks:
-
-| Signal | What It Indicates |
-|--------|-------------------|
-| `package.json` | Node.js/JavaScript/TypeScript project |
-| `tsconfig.json` | TypeScript |
-| `go.mod` | Go project |
-| `pyproject.toml`, `requirements.txt`, `setup.py` | Python project |
-| `Cargo.toml` | Rust project |
-| `pom.xml`, `build.gradle` | Java/Kotlin project |
-| `Gemfile` | Ruby project |
-| `Dockerfile`, `docker-compose.yml` | Container workflows |
-| `.github/workflows/` | GitHub Actions CI/CD |
-| `.gitlab-ci.yml` | GitLab CI/CD |
-| `Makefile` | Build automation |
-| `.env`, `.env.example` | Environment configuration |
-| `*.pptx` files | PowerPoint/presentation needs |
-| `*.pdf` files | PDF processing needs |
-| `.beads/` | Beads task tracking |
-| `CONTRIBUTING.md` | Open-source contribution workflow |
-| `docs/` | Documentation project |
-| `terraform/`, `*.tf` | Infrastructure as code |
-| `k8s/`, `*.yaml` (with apiVersion) | Kubernetes |
+Check for `.coder/project.yaml` first (written by opencode-coder plugin at startup):
 
 ```bash
-# Quick scan for project signals
-ls -la
+cat .coder/project.yaml 2>/dev/null
+```
+
+If present, parse:
+- `git.platform` — github, gitlab, bitbucket, or null
+- `beads.initialized` — whether beads is set up
+- `aimgr.installed` — whether aimgr is available
+
+**If absent:** Fall back to file-based scanning (step 2). Do NOT run inline detection commands.
+
+### 2. Scan for Tech Signals
+
+Look for files that indicate the project's tech stack:
+
+```bash
 ls package.json go.mod pyproject.toml Cargo.toml Dockerfile 2>/dev/null
 ls -d .github/workflows .beads docs 2>/dev/null
 ```
 
-### 2. Query Available Resources
+See [Signal Table](#signal-table) for the full mapping.
+
+### 3. Query Available Resources
 
 ```bash
 aimgr repo list --format=json
+aimgr list                      # Already installed — exclude from recommendations
 ```
 
-Parse the output to get resource names and descriptions. Match against
-discovered project signals.
+### 4. Filter and Rank
 
-### 3. Match and Recommend
+Apply [exclusion rules](#exclusion-rules), then [rank](#ranking) by relevance.
 
-Compare project signals against resource descriptions. Matching should be
-**dynamic** — based on what's actually in the repository, not a hardcoded list.
+### 5. Present Recommendations
 
-**Example reasoning:**
-
-> This project has `go.mod` → Go project. Available skills include
-> `skill/go-testing` ("Test Go projects") — this is relevant.
-> Project also has `.github/workflows/` → CI/CD present. `skill/ci-cd`
-> would complement existing workflows.
-
-### 4. Present Recommendations
-
-Present a concise table with rationale:
+Use the `question()` tool — **mandatory user interaction, do NOT auto-install**:
 
 ```text
 Based on your project, these resources look useful:
 
 | Resource | Why |
 |----------|-----|
-| skill/go-testing | Go project detected (go.mod) |
-| skill/pptx | PowerPoint files found in docs/ |
-| skill/observability-triage | Monitoring config detected |
+| skill/go-testing | Go project (go.mod) |
+| skill/github-releases | GitHub repo detected |
+| skill/pptx | .pptx files found |
 
 Want me to install any of these?
 ```
 
-**Rules:**
-- Only recommend resources not already installed (`aimgr list` to check)
-- Explain *why* each recommendation is relevant
-- Let the user choose — don't auto-install
-- Group by relevance (most useful first)
+After selection: `aimgr install <chosen-resources>`
 
-### 5. Install Chosen Resources
-
-After user selects:
-
-```bash
-aimgr install skill/go-testing skill/pptx
-```
-
-⚠️ **Restart Required:** Remind the user to restart their AI tool after installation.
+⚠️ Remind user to restart their AI tool after install.
 
 ---
 
-## What to Check
+## Signal Table
 
-### Already Installed
+| Signal | Indicates |
+|--------|-----------|
+| `package.json` | Node.js / JavaScript / TypeScript |
+| `tsconfig.json` | TypeScript |
+| `go.mod` | Go |
+| `pyproject.toml`, `requirements.txt` | Python |
+| `Cargo.toml` | Rust |
+| `pom.xml`, `build.gradle` | Java / Kotlin |
+| `Gemfile` | Ruby |
+| `Dockerfile`, `docker-compose.yml` | Containers |
+| `.github/workflows/` | GitHub Actions CI/CD |
+| `.gitlab-ci.yml` | GitLab CI/CD |
+| `*.pptx` | Presentation needs |
+| `*.pdf` | PDF processing needs |
+| `.beads/` | Beads task tracking |
+| `docs/`, `CONTRIBUTING.md` | Documentation workflows |
+| `terraform/`, `*.tf` | Infrastructure as code |
 
-Before recommending, check what's already installed:
+---
 
-```bash
-aimgr list
-```
+## Filtering & Ranking
 
-Don't recommend resources that are already present.
+### Exclusion Rules
 
-### Packages
+Non-negotiable — agent MUST apply these:
 
-Check for packages that bundle multiple related resources:
+| Rule | Action |
+|------|--------|
+| Skill mentions "bitbucket" and `git.platform` ≠ bitbucket | EXCLUDE |
+| Skill mentions "github" and `git.platform` ≠ github | EXCLUDE |
+| Skill mentions "gitlab" and `git.platform` ≠ gitlab | EXCLUDE |
+| Skill name contains `-dev` (internal development skills) | EXCLUDE |
+| Already installed (`aimgr list`) | EXCLUDE (mention as "already installed") |
 
-```bash
-aimgr repo list package/*
-aimgr repo describe package/some-package
-```
+### Ranking
 
-A single package may cover multiple needs more cleanly than individual skills.
+- Platform-matching skills rank highest
+- Skills complementing already-installed ones rank higher
+- Generic skills (fix-documentation, observability-triage) are always candidates
+- Check for packages that bundle related resources: `aimgr repo describe package/*`
 
 ---
 
 ## Notes for Agents
 
-- **Don't hardcode mappings.** The repository contents change over time.
-  Always query `aimgr repo list` for current availability.
-- **Be conservative.** Only recommend resources with a clear signal match.
-  Don't recommend everything in the repo.
-- **Respect user choice.** Present options, don't install without asking.
-- **Check descriptions.** Resource descriptions (from `repo list --format=json`)
-  are the primary matching signal.
-
-📚 Run `aimgr repo list --help` and `aimgr repo describe --help` for full options.
+- **Don't hardcode mappings.** Always query `aimgr repo list` — repository contents change.
+- **Be conservative.** Only recommend with a clear signal match.
+- **Respect user choice.** Present options, never auto-install.
+- **Match on descriptions.** Resource descriptions from `repo list --format=json` are the primary signal.
