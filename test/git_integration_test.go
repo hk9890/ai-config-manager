@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/source"
-	"github.com/hk9890/ai-config-manager/pkg/workspace"
-	"github.com/hk9890/ai-config-manager/test/testutil"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/source"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/workspace"
+	"github.com/dynatrace-oss/ai-config-manager/test/testutil"
 )
 
-const controlledRepo = "https://github.com/hk9890/ai-tools"
+const controlledRepo = "https://github.com/dynatrace-oss/ai-config-manager"
 
 // TestGitClone_BasicFetch verifies we can clone a real GitHub repo
 func TestGitClone_BasicFetch(t *testing.T) {

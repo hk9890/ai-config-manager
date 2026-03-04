@@ -186,7 +186,7 @@ aimgr: remove agent: code-reviewer
 ### Sync Operations
 
 ```
-aimgr: sync from gh:hk9890/ai-tools (3 resources updated)
+aimgr: sync from gh:your-org/ai-tools (3 resources updated)
 ```
 
 ## Working with Remote Repositories
@@ -397,7 +397,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install aimgr
         run: |
-          curl -sSL https://raw.githubusercontent.com/hk9890/ai-config-manager/main/install.sh | sh
+          curl -sSL https://raw.githubusercontent.com/dynatrace-oss/ai-config-manager/main/install.sh | sh
       - name: Verify resources
         run: |
           aimgr repo verify

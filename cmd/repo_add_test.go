@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/discovery"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/discovery"
 )
 
 // TestPrintDiscoveryErrors_Deduplication verifies that duplicate errors for the same path are deduplicated

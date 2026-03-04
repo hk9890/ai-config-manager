@@ -19,7 +19,7 @@ We take the security of `aimgr` seriously. If you discover a security vulnerabil
 
 ### How to Report
 
-**Create a GitHub Security Advisory:** Use the [GitHub Security Advisory](https://github.com/hk9890/ai-config-manager/security/advisories/new) feature for private disclosure.
+**Create a GitHub Security Advisory:** Use the [GitHub Security Advisory](https://github.com/dynatrace-oss/ai-config-manager/security/advisories/new) feature for private disclosure.
 
 **Please include:**
 - A description of the vulnerability
@@ -140,7 +140,7 @@ Security updates are released as soon as possible after a vulnerability is confi
 
 ```bash
 # Update via go install
-go install github.com/hk9890/ai-config-manager/cmd/aimgr@latest
+go install github.com/dynatrace-oss/ai-config-manager/cmd/aimgr@latest
 
 # Or rebuild from source
 cd ai-config-manager
@@ -149,6 +149,6 @@ make install
 ```
 
 Subscribe to releases on GitHub to be notified of security updates:
-https://github.com/hk9890/ai-config-manager/releases
+https://github.com/dynatrace-oss/ai-config-manager/releases
 
 Thank you for helping keep `aimgr` and its users safe!

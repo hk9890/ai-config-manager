@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
 	"github.com/olekukonko/tablewriter"
 	"gopkg.in/yaml.v3"
 )

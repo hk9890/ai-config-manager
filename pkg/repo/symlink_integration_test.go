@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
 )
 
 // TestImportModes_URLSourceCopies verifies that resources from Git URLs are copied (not symlinked)

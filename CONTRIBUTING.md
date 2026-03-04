@@ -14,7 +14,7 @@ Thank you for your interest in contributing to aimgr! This guide will help you g
 
 ```bash
 # Clone the repository
-git clone https://github.com/hk9890/ai-config-manager.git
+git clone https://github.com/dynatrace-oss/ai-config-manager.git
 cd ai-config-manager
 
 # Build the binary
@@ -43,7 +43,7 @@ make test   # Should pass all tests
 2. Clone your fork locally
 3. Add upstream remote:
    ```bash
-   git remote add upstream https://github.com/hk9890/ai-config-manager.git
+   git remote add upstream https://github.com/dynatrace-oss/ai-config-manager.git
    ```
 
 ### 2. Create a Feature Branch
@@ -211,8 +211,8 @@ make clean             # Remove build artifacts
 
 ## Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/hk9890/ai-config-manager/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/hk9890/ai-config-manager/discussions)
+- **Issues**: [GitHub Issues](https://github.com/dynatrace-oss/ai-config-manager/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/dynatrace-oss/ai-config-manager/discussions)
 - **Documentation**: 
   - User docs: [README.md](README.md)
   - AI agent guide: [AGENTS.md](AGENTS.md)

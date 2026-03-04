@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/repo"
-	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repomanifest"
 )
 
 func TestPerformSoftDrop(t *testing.T) {

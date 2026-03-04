@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/discovery"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/discovery"
 )
 
 func TestDiscoverMixed_AllResourceTypes(t *testing.T) {

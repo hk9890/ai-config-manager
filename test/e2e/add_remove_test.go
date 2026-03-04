@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/metadata"
-	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
-	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/metadata"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repomanifest"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/sourcemetadata"
 )
 
 // createAddRemoveTestSource creates a source directory with test resources:

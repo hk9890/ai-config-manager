@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/manifest"
-	"github.com/hk9890/ai-config-manager/pkg/repo"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/manifest"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
 )
 
 // repairTestProject holds the paths for a repair integration test setup.

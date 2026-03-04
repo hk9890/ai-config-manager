@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/marketplace"
-	"github.com/hk9890/ai-config-manager/pkg/repo"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/marketplace"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
 )
 
 // TestMarketplaceImportCompleteWorkflow tests the complete marketplace import workflow

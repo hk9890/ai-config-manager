@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/pattern"
-	"github.com/hk9890/ai-config-manager/pkg/repo"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/pattern"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
 )
 
 // setupTestRepo creates a test repository with sample resources

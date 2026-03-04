@@ -553,7 +553,7 @@ func TestCLIMetadataTracking(t *testing.T) {
 
 // TestCLIMetadataDeletedOnRemove tests metadata is deleted with resource
 // NOTE: Currently skipped because orphan cleanup doesn't work for file-path sources
-// See: https://github.com/hk9890/ai-config-manager/issues/TBD
+// See: https://github.com/dynatrace-oss/ai-config-manager/issues/TBD
 func TestCLIMetadataDeletedOnRemove(t *testing.T) {
 	t.Skip("Orphan cleanup not yet implemented for file-path sources - needs architecture fix")
 	setupTestEnvironment(t)

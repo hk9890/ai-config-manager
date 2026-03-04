@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hk9890/ai-config-manager/pkg/output"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/output"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
 	"github.com/spf13/cobra"
 )
 

@@ -6,7 +6,7 @@ Documentation for developers working on ai-config-manager.
 
 ```bash
 # Clone and setup
-git clone https://github.com/hk9890/ai-config-manager.git
+git clone https://github.com/dynatrace-oss/ai-config-manager.git
 cd ai-config-manager
 
 # Build and test
@@ -64,7 +64,7 @@ import (
 
     "github.com/spf13/cobra"  // 2. External dependencies
 
-    "github.com/hk9890/ai-config-manager/pkg/resource"  // 3. Internal
+    "github.com/dynatrace-oss/ai-config-manager/pkg/resource"  // 3. Internal
 )
 ```
 
@@ -108,8 +108,8 @@ See [Code Style Guide](code-style.md) for complete details.
 
 ## Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/hk9890/ai-config-manager/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/hk9890/ai-config-manager/discussions)
+- **Issues**: [GitHub Issues](https://github.com/dynatrace-oss/ai-config-manager/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/dynatrace-oss/ai-config-manager/discussions)
 
 ---
 

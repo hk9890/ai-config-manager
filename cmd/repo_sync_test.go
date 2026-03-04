@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hk9890/ai-config-manager/pkg/repo"
-	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
-	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repomanifest"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/sourcemetadata"
 )
 
 // Test helper: create a minimal test source directory with resources

@@ -105,7 +105,7 @@ End-to-end tests exercising the full system.
 
 **Correct Usage**:
 ```go
-import "github.com/hk9890/ai-config-manager/pkg/workspace"
+import "github.com/dynatrace-oss/ai-config-manager/pkg/workspace"
 
 mgr, _ := workspace.NewManager(repoPath)
 clonePath, err := mgr.GetOrClone(gitURL, ref)  // Cached

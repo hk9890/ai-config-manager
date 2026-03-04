@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hk9890/ai-config-manager/pkg/repomanifest"
-	"github.com/hk9890/ai-config-manager/pkg/sourcemetadata"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repomanifest"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/sourcemetadata"
 )
 
 func TestFormatTimeSince(t *testing.T) {

@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	pkgerrors "github.com/hk9890/ai-config-manager/pkg/errors"
-	"github.com/hk9890/ai-config-manager/pkg/metadata"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
+	pkgerrors "github.com/dynatrace-oss/ai-config-manager/pkg/errors"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/metadata"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
 )
 
 // BulkImportOptions contains options for bulk import operations

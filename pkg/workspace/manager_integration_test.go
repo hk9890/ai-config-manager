@@ -22,7 +22,7 @@ func TestGetOrClone_Integration(t *testing.T) {
 	}
 
 	// Use a small, stable public repository for testing
-	testURL := "https://github.com/hk9890/ai-config-manager-test-repo"
+	testURL := "https://github.com/dynatrace-oss/ai-config-manager-test-repo"
 	testRef := "main"
 
 	// First call should clone
@@ -84,7 +84,7 @@ func TestUpdate_Integration(t *testing.T) {
 	}
 
 	// Use a small, stable public repository for testing
-	testURL := "https://github.com/hk9890/ai-config-manager-test-repo"
+	testURL := "https://github.com/dynatrace-oss/ai-config-manager-test-repo"
 	testRef := "main"
 
 	// First clone the repo
@@ -134,7 +134,7 @@ func TestListCached_WithCaches(t *testing.T) {
 	}
 
 	// Use the test repository
-	testURL := "https://github.com/hk9890/ai-config-manager-test-repo"
+	testURL := "https://github.com/dynatrace-oss/ai-config-manager-test-repo"
 
 	// Clone to cache
 	_, err = mgr.GetOrClone(testURL, "main")
@@ -173,7 +173,7 @@ func TestRemove(t *testing.T) {
 	}
 
 	// Use the test repository
-	testURL := "https://github.com/hk9890/ai-config-manager-test-repo"
+	testURL := "https://github.com/dynatrace-oss/ai-config-manager-test-repo"
 
 	// Clone to cache
 	cachePath, err := mgr.GetOrClone(testURL, "main")

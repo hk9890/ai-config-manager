@@ -252,11 +252,11 @@ chmod +x $(which aimgr)
 
 ### aimgr Not Found
 
-Install from [GitHub releases](https://github.com/hk9890/ai-config-manager/releases)
+Install from [GitHub releases](https://github.com/dynatrace-oss/ai-config-manager/releases)
 or build from source:
 
 ```bash
-go install github.com/hk9890/ai-config-manager/cmd/aimgr@latest
+go install github.com/dynatrace-oss/ai-config-manager/cmd/aimgr@latest
 ```
 
 Ensure `~/go/bin` or `~/.local/bin` is in your `PATH`.

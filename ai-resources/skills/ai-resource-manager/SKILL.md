@@ -33,7 +33,7 @@ Manage AI resources via `aimgr`. Resources live in `~/.local/share/ai-config/rep
 | Issue | Fix |
 |-------|-----|
 | Skills not loading | Restart AI tool |
-| `aimgr` not found | `go install github.com/hk9890/ai-config-manager/cmd/aimgr@latest` |
+| `aimgr` not found | `go install github.com/dynatrace-oss/ai-config-manager/cmd/aimgr@latest` |
 | Resource not found | `aimgr repo sync` |
 | Broken symlinks | `aimgr repair` or `aimgr repo repair` |
 
@@ -50,5 +50,5 @@ Details in [install-uninstall.md](references/install-uninstall.md) and [manage-r
 | GitHub Copilot | ✅ | ❌ | ❌ |
 | Windsurf | ✅ | ❌ | ❌ |
 
-- Repo: <https://github.com/hk9890/ai-config-manager>
-- Issues: <https://github.com/hk9890/ai-config-manager/issues>
+- Repo: <https://github.com/dynatrace-oss/ai-config-manager>
+- Issues: <https://github.com/dynatrace-oss/ai-config-manager/issues>

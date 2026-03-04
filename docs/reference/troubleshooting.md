@@ -189,5 +189,5 @@ aimgr install skill/<TAB>
 ## Getting More Help
 
 - **Command help:** Run `aimgr --help` or `aimgr <command> --help`
-- **Documentation:** [GitHub Repository](https://github.com/hk9890/ai-config-manager)
-- **Issues:** [Report bugs or request features](https://github.com/hk9890/ai-config-manager/issues)
+- **Documentation:** [GitHub Repository](https://github.com/dynatrace-oss/ai-config-manager)
+- **Issues:** [Report bugs or request features](https://github.com/dynatrace-oss/ai-config-manager/issues)

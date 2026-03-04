@@ -225,7 +225,7 @@ The base config includes a commented-out local path source:
 ```
 
 This is intentional - local paths won't work in CI. For CI-compatible tests:
-- Use GitHub sources (e.g., `https://github.com/hk9890/ai-tools`)
+- Use GitHub sources (e.g., `https://github.com/dynatrace-oss/ai-config-manager`)
 - Or copy test fixtures to `test/testdata/repos/` (committed)
 - Or create `*.local.yaml` configs for local-only scenarios
 

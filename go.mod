@@ -1,4 +1,4 @@
-module github.com/hk9890/ai-config-manager
+module github.com/dynatrace-oss/ai-config-manager
 
 go 1.25.6
 

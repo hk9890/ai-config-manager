@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
 )
 
 // TestRepoAdd_ManifestCommitted verifies that manifest changes are committed to git

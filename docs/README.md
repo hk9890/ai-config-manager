@@ -80,14 +80,14 @@ If you're an AI coding agent working on this repository, see **[AGENTS.md](../AG
 - **[CHANGELOG.md](../CHANGELOG.md)** - Version history
 
 ### External Resources
-- **[GitHub Repository](https://github.com/hk9890/ai-config-manager)** - Source code and issue tracker
-- **[GitHub Releases](https://github.com/hk9890/ai-config-manager/releases)** - Download releases and binaries
+- **[GitHub Repository](https://github.com/dynatrace-oss/ai-config-manager)** - Source code and issue tracker
+- **[GitHub Releases](https://github.com/dynatrace-oss/ai-config-manager/releases)** - Download releases and binaries
 - **[AgentSkills.io](https://agentskills.io/home)** - Community skill format specification
 
 ---
 
 ## Getting Help
 
-- **Questions**: [GitHub Discussions](https://github.com/hk9890/ai-config-manager/discussions)
-- **Bug Reports**: [GitHub Issues](https://github.com/hk9890/ai-config-manager/issues)
-- **Feature Requests**: [GitHub Issues](https://github.com/hk9890/ai-config-manager/issues)
+- **Questions**: [GitHub Discussions](https://github.com/dynatrace-oss/ai-config-manager/discussions)
+- **Bug Reports**: [GitHub Issues](https://github.com/dynatrace-oss/ai-config-manager/issues)
+- **Feature Requests**: [GitHub Issues](https://github.com/dynatrace-oss/ai-config-manager/issues)

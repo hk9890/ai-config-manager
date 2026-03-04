@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/manifest"
-	"github.com/hk9890/ai-config-manager/pkg/output"
-	"github.com/hk9890/ai-config-manager/pkg/repo"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
-	"github.com/hk9890/ai-config-manager/pkg/tools"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/manifest"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/output"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/tools"
 )
 
 // TestRepair_NoIssues verifies that repair reports success when there are no issues.

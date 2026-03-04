@@ -25,9 +25,9 @@ This runs: `go vet`, unit tests, and integration tests. All must pass.
 The version in `pkg/version/version.go` is a placeholder. The actual version is injected at build time via ldflags by GoReleaser:
 
 ```
--X github.com/hk9890/ai-config-manager/pkg/version.Version={{.Version}}
--X github.com/hk9890/ai-config-manager/pkg/version.GitCommit={{.ShortCommit}}
--X github.com/hk9890/ai-config-manager/pkg/version.BuildDate={{.Date}}
+-X github.com/dynatrace-oss/ai-config-manager/pkg/version.Version={{.Version}}
+-X github.com/dynatrace-oss/ai-config-manager/pkg/version.GitCommit={{.ShortCommit}}
+-X github.com/dynatrace-oss/ai-config-manager/pkg/version.BuildDate={{.Date}}
 ```
 
 **Do not manually update version files.**
@@ -129,7 +129,7 @@ cat > /tmp/release-notes.md << 'NOTES'
 - Item (commit)
 
 ## Full Changelog
-https://github.com/hk9890/ai-config-manager/compare/vOLD...vNEW
+https://github.com/dynatrace-oss/ai-config-manager/compare/vOLD...vNEW
 NOTES
 
 gh release edit vX.Y.Z --notes-file /tmp/release-notes.md
@@ -143,7 +143,7 @@ gh release view vX.Y.Z
 
 ## Post-Release
 
-1. Verify release: https://github.com/hk9890/ai-config-manager/releases
+1. Verify release: https://github.com/dynatrace-oss/ai-config-manager/releases
 2. Test binary download works
 3. Monitor issues
 
@@ -160,4 +160,4 @@ Then fix and re-release with incremented version.
 ## Related
 
 - [CHANGELOG.md](../../CHANGELOG.md) - Version history
-- [GitHub Releases](https://github.com/hk9890/ai-config-manager/releases) - Official releases
+- [GitHub Releases](https://github.com/dynatrace-oss/ai-config-manager/releases) - Official releases

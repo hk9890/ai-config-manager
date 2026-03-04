@@ -3,7 +3,7 @@ package repo
 import (
 	"os"
 
-	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
 )
 
 func (m *Manager) validatePackageResources(pkg *resource.Package) []string {

@@ -13,7 +13,7 @@
 aimgr repo init
 
 # 2. Add a source (local directory or GitHub repo)
-aimgr repo add gh:hk9890/ai-tools
+aimgr repo add gh:your-org/ai-tools
 
 # 3. View what's available
 aimgr repo list
@@ -27,14 +27,14 @@ aimgr install skill/pdf-processing
 
 ## Installation
 
-Download the binary for your platform from the [Releases page](https://github.com/hk9890/ai-config-manager/releases):
+Download the binary for your platform from the [Releases page](https://github.com/dynatrace-oss/ai-config-manager/releases):
 
 | Platform | Command |
 |----------|---------|
-| Linux (amd64) | `curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_linux_amd64.tar.gz \| tar xz && sudo mv aimgr /usr/local/bin/` |
-| Linux (arm64) | `curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_linux_arm64.tar.gz \| tar xz && sudo mv aimgr /usr/local/bin/` |
-| macOS (Intel) | `curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_darwin_amd64.tar.gz \| tar xz && sudo mv aimgr /usr/local/bin/` |
-| macOS (Apple Silicon) | `curl -L https://github.com/hk9890/ai-config-manager/releases/latest/download/aimgr_VERSION_darwin_arm64.tar.gz \| tar xz && sudo mv aimgr /usr/local/bin/` |
+| Linux (amd64) | `curl -L https://github.com/dynatrace-oss/ai-config-manager/releases/latest/download/aimgr_VERSION_linux_amd64.tar.gz \| tar xz && sudo mv aimgr /usr/local/bin/` |
+| Linux (arm64) | `curl -L https://github.com/dynatrace-oss/ai-config-manager/releases/latest/download/aimgr_VERSION_linux_arm64.tar.gz \| tar xz && sudo mv aimgr /usr/local/bin/` |
+| macOS (Intel) | `curl -L https://github.com/dynatrace-oss/ai-config-manager/releases/latest/download/aimgr_VERSION_darwin_amd64.tar.gz \| tar xz && sudo mv aimgr /usr/local/bin/` |
+| macOS (Apple Silicon) | `curl -L https://github.com/dynatrace-oss/ai-config-manager/releases/latest/download/aimgr_VERSION_darwin_arm64.tar.gz \| tar xz && sudo mv aimgr /usr/local/bin/` |
 
 *Replace `VERSION` with the actual version (e.g., `v0.1.0`).*
 
@@ -76,9 +76,9 @@ aimgr repo add ~/my-resources/      # Your own resources
 
 Add from GitHub:
 ```bash
-aimgr repo add gh:hk9890/ai-tools                  # All resources
-aimgr repo add gh:hk9890/ai-tools --filter "skill/*"  # Filtered
-aimgr repo add gh:hk9890/ai-tools@v1.0.0          # Specific version
+aimgr repo add gh:your-org/ai-tools
+aimgr repo add gh:your-org/ai-tools --filter "skill/*"  # Filtered
+aimgr repo add gh:your-org/ai-tools@v1.0.0          # Specific version
 ```
 
 **Note:** Local sources are symlinked (live editing). GitHub sources are copied.
@@ -216,5 +216,5 @@ aimgr install skill/foo --force
 ## Getting Help
 
 - **Command help:** `aimgr --help` or `aimgr <command> --help`
-- **Documentation:** [GitHub Repository](https://github.com/hk9890/ai-config-manager)
-- **Issues:** [Report bugs or request features](https://github.com/hk9890/ai-config-manager/issues)
+- **Documentation:** [GitHub Repository](https://github.com/dynatrace-oss/ai-config-manager)
+- **Issues:** [Report bugs or request features](https://github.com/dynatrace-oss/ai-config-manager/issues)

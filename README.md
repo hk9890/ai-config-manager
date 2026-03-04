@@ -1,10 +1,10 @@
 # aimgr - AI Resources Manager
 
-[![Build Status](https://github.com/hk9890/ai-config-manager/actions/workflows/build.yml/badge.svg)](https://github.com/hk9890/ai-config-manager/actions/workflows/build.yml)
-[![codecov](https://codecov.io/gh/hk9890/ai-config-manager/branch/main/graph/badge.svg)](https://codecov.io/gh/hk9890/ai-config-manager)
-[![Release](https://img.shields.io/github/v/release/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/releases)
-[![License](https://img.shields.io/github/license/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/blob/main/LICENSE)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/hk9890/ai-config-manager)](https://github.com/hk9890/ai-config-manager/blob/main/go.mod)
+[![Build Status](https://github.com/dynatrace-oss/ai-config-manager/actions/workflows/build.yml/badge.svg)](https://github.com/dynatrace-oss/ai-config-manager/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/dynatrace-oss/ai-config-manager/branch/main/graph/badge.svg)](https://codecov.io/gh/dynatrace-oss/ai-config-manager)
+[![Release](https://img.shields.io/github/v/release/dynatrace-oss/ai-config-manager)](https://github.com/dynatrace-oss/ai-config-manager/releases)
+[![License](https://img.shields.io/github/license/dynatrace-oss/ai-config-manager)](https://github.com/dynatrace-oss/ai-config-manager/blob/main/LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/dynatrace-oss/ai-config-manager)](https://github.com/dynatrace-oss/ai-config-manager/blob/main/go.mod)
 
 A command-line tool for discovering, installing, and managing AI resources (commands, skills, agents, packages) across multiple AI coding tools including Claude Code, OpenCode, GitHub Copilot, and Windsurf.
 
@@ -43,14 +43,14 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 The easiest way to install `aimgr` is using Go:
 
 ```bash
-go install github.com/hk9890/ai-config-manager/cmd/aimgr@latest
+go install github.com/dynatrace-oss/ai-config-manager/cmd/aimgr@latest
 ```
 
 ### From Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/hk9890/ai-config-manager.git
+git clone https://github.com/dynatrace-oss/ai-config-manager.git
 cd ai-config-manager
 
 # Build and install to ~/bin

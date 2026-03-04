@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hk9890/ai-config-manager/pkg/manifest"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/manifest"
 	"github.com/spf13/cobra"
 )
 

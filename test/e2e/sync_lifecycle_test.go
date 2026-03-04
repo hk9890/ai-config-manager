@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/metadata"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/metadata"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
 )
 
 // TestSyncRemovesDeletedResources verifies that sync detects and removes

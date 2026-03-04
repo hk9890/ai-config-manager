@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
-	"github.com/hk9890/ai-config-manager/pkg/resource"
-	"github.com/hk9890/ai-config-manager/pkg/tools"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/tools"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 )

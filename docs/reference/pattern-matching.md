@@ -162,7 +162,7 @@ aimgr repo remove command/*
 ### Basic Pattern Matching
 
 ```go
-import "github.com/hk9890/ai-config-manager/pkg/pattern"
+import "github.com/dynatrace-oss/ai-config-manager/pkg/pattern"
 
 // Parse pattern to extract type and check if it's a pattern
 resourceType, patternStr, isPattern := pattern.ParsePattern("skill/pdf*")

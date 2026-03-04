@@ -87,7 +87,7 @@ license: License (optional)
 ## Usage in Tests
 
 ```go
-import "github.com/hk9890/ai-config-manager/test/testutil"
+import "github.com/dynatrace-oss/ai-config-manager/test/testutil"
 
 func TestExample(t *testing.T) {
     fixturePath := testutil.GetFixturePath("skills-standard")

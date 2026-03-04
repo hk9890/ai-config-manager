@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hk9890/ai-config-manager/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/pkg/repo"
 )
 
 // Test describeDetailedResource with exact match

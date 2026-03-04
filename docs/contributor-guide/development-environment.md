@@ -34,7 +34,7 @@ Restart shell or run: `source ~/.bashrc`
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/hk9890/ai-config-manager.git
+git clone https://github.com/dynatrace-oss/ai-config-manager.git
 cd ai-config-manager
 ```
 
@@ -188,4 +188,4 @@ If not using mise, install Go 1.25.6 manually:
 
 - mise: https://mise.jdx.dev/
 - Go: https://go.dev/doc/
-- Repository: https://github.com/hk9890/ai-config-manager
+- Repository: https://github.com/dynatrace-oss/ai-config-manager
