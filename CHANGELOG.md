@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [3.0.1] - 2026-03-05
+
+### Fixed
+- **Automatic version detection for `go install` users** — Version is now automatically detected from Go's embedded build info when installed via `go install`. No more manually updating a hardcoded version string after each release. Works for all install methods:
+  - `go install ...@v3.0.1` — version from build info
+  - GoReleaser / `make build` — version from ldflags
+  - Local development — shows `dev`
+
+
 ## [3.0.0] - 2026-03-04
 
 ### Breaking Changes
