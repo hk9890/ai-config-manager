@@ -884,8 +884,16 @@ func setupMultiPluginMarketplace(t *testing.T, baseDir string) {
 		if err != nil {
 			t.Fatalf("Failed to read command from helper: %v", err)
 		}
-		if err := os.WriteFile(cmdPath, content, 0644); err != nil {
+		file, err := os.OpenFile(cmdPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			t.Fatalf("Failed to open command for write: %v", err)
+		}
+		if _, err := file.Write(content); err != nil {
+			_ = file.Close()
 			t.Fatalf("Failed to create command: %v", err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatalf("Failed to close command file: %v", err)
 		}
 	}
 }

@@ -1,4 +1,6 @@
 {"created_at":"2026-03-08T00:09:40Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao","issue_id":"ai-config-manager-4ao.1","type":"parent-child"}
+{"created_at":"2026-03-08T00:46:47Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao.8","issue_id":"ai-config-manager-4ao.1","type":"blocks"}
+{"created_at":"2026-03-08T00:37:48Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-5e4","issue_id":"ai-config-manager-4ao.1","type":"blocks"}
 {"created_at":"2026-03-08T00:09:40Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao","issue_id":"ai-config-manager-4ao.2","type":"parent-child"}
 {"created_at":"2026-03-08T00:09:40Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao.1","issue_id":"ai-config-manager-4ao.2","type":"blocks"}
 {"created_at":"2026-03-08T00:09:40Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao","issue_id":"ai-config-manager-4ao.3","type":"parent-child"}
@@ -11,3 +13,7 @@
 {"created_at":"2026-03-08T00:09:41Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao.5","issue_id":"ai-config-manager-4ao.6","type":"blocks"}
 {"created_at":"2026-03-08T00:09:40Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao","issue_id":"ai-config-manager-4ao.7","type":"parent-child"}
 {"created_at":"2026-03-08T00:09:41Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao.6","issue_id":"ai-config-manager-4ao.7","type":"blocks"}
+{"created_at":"2026-03-08T00:46:36Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao","issue_id":"ai-config-manager-4ao.8","type":"parent-child"}
+{"created_at":"2026-03-08T00:49:42Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-jhd","issue_id":"ai-config-manager-4ao.8","type":"blocks"}
+{"created_at":"2026-03-08T00:36:36Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao.1","issue_id":"ai-config-manager-5e4","type":"discovered-from"}
+{"created_at":"2026-03-08T00:49:38Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao.8","issue_id":"ai-config-manager-jhd","type":"discovered-from"}
