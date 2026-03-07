@@ -264,7 +264,8 @@ func migrateConfig(oldPath, newPath string) error {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
-	// Write to new location
+	// Path is determined by GetConfigPath()/--config and migration writes exactly that target.
+	// #nosec G703 -- destination is an explicit config path, not an arbitrary filesystem write sink
 	if err := os.WriteFile(newPath, data, 0644); err != nil {
 		return fmt.Errorf("writing new config: %w", err)
 	}

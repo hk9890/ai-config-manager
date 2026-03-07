@@ -23,6 +23,8 @@ import (
 
 var forceFlag bool
 
+const sourceTypeGitHub = "github"
+
 var (
 	skipExistingFlag bool
 	dryRunFlag       bool
@@ -740,7 +742,7 @@ func addBulkFromGitHubWithFilter(parsed *source.ParsedSource, manager *repo.Mana
 	}
 
 	// Determine source type
-	sourceType := "github"
+	sourceType := sourceTypeGitHub
 	if parsed.Type == source.GitURL {
 		sourceType = "git-url"
 	}
@@ -1020,11 +1022,11 @@ func determineSourceInfo(parsed *source.ParsedSource, localPath string) (string,
 	switch parsed.Type {
 	case source.GitHub:
 		// GitHub source: type="github", url="gh:owner/repo/path"
-		return "github", formatGitHubShortURL(parsed), nil
+		return sourceTypeGitHub, formatGitHubShortURL(parsed), nil
 
 	case source.GitURL:
 		// Git URL: type="github", url=original URL
-		return "github", parsed.URL, nil
+		return sourceTypeGitHub, parsed.URL, nil
 
 	case source.Local:
 		// Local source: need to determine if file or directory
@@ -1054,7 +1056,7 @@ func determineSourceInfo(parsed *source.ParsedSource, localPath string) (string,
 
 // formatGitHubSourceInfo formats GitHub source info for metadata
 func formatGitHubSourceInfo(parsed *source.ParsedSource) (string, string) {
-	return "github", formatGitHubShortURL(parsed)
+	return sourceTypeGitHub, formatGitHubShortURL(parsed)
 }
 
 // formatGitHubShortURL formats a GitHub URL in the gh:owner/repo/path format

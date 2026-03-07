@@ -47,7 +47,7 @@ func (f *fakeWorkspaceManager) Update(url string, ref string) error {
 	return f.updateErr
 }
 
-func runGit(t *testing.T, dir string, args ...string) string {
+func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
@@ -56,7 +56,6 @@ func runGit(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
 	}
 
-	return strings.TrimSpace(string(output))
 }
 
 func createRemoteGitSource(t *testing.T) (remoteURL string, worktreePath string) {
