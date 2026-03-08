@@ -47,36 +47,47 @@ Idempotent — safe to run multiple times. Location determined by:
 
 ## Manifest Workflow
 
-`ai.repo.yaml` is the local repository manifest.
+`ai.repo.yaml` is the local repository manifest. The main collaboration model is to publish that file somewhere central and let others apply it into their own local repo.
 
 ```bash
-# Inspect the current local manifest
-aimgr repo show-manifest
-
-# Merge another manifest into that same local file
-aimgr repo apply-manifest ./ai.repo.yaml
+# Import a shared manifest from a central location
 aimgr repo apply-manifest https://example.com/platform/ai.repo.yaml
 
-# Round-trip through stdin
-aimgr repo show-manifest | aimgr repo apply-manifest -
+# Import another shared manifest; sources are merged locally
+aimgr repo apply-manifest https://example.com/team/ai.repo.yaml
+
+# Inspect or publish your current local manifest
+aimgr repo show-manifest
+aimgr repo show-manifest > ai.repo.yaml
+
+# Local/shared file also works
+aimgr repo apply-manifest ./ai.repo.yaml
 ```
 
 ### Command roles
 
 - `aimgr repo init` — bootstrap an empty local repository and create `ai.repo.yaml`
-- `aimgr repo show-manifest` — read and print the current local `ai.repo.yaml`
-- `aimgr repo apply-manifest <path-or-url>` — read another manifest and merge it into the local `ai.repo.yaml`
+- `aimgr repo show-manifest` — read and print the current local `ai.repo.yaml` so you can inspect it or publish it for others
+- `aimgr repo apply-manifest <path-or-url>` — read a shared manifest and merge it into the local `ai.repo.yaml`
+
+### Intended sharing model
+
+- one team or user publishes a real `ai.repo.yaml` somewhere central
+- other users run `apply-manifest` against that shared file
+- users may apply multiple shared manifests; aimgr merges the sources into one local manifest
+- if a user wants to share their current setup, they use `show-manifest` and commit or upload that output
 
 ### Accepted `apply-manifest` inputs
 
 - local path to `ai.repo.yaml`
-- stdin via `-` or `/dev/stdin`
 - HTTP(S) URL pointing directly to `ai.repo.yaml`
+- stdin via `-` or `/dev/stdin` (convenience input)
 
 ### Notes
 
 - `apply-manifest` is mutating, so ask before running it
-- direct stdin round-trips are supported
+- the primary collaboration flow is publishing and consuming a real `ai.repo.yaml`
+- stdin round-trips like `show-manifest | apply-manifest -` are supported, but only as a convenience
 - stdin and remote manifests reject relative `path:` sources because they have no safe local resolution base
 
 ---

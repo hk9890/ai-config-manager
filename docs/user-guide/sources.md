@@ -172,22 +172,44 @@ sources:
 
 ## Sharing source configuration with `ai.repo.yaml` (`show-manifest` / `apply-manifest` v1)
 
-Use `aimgr repo show-manifest` to read the current local `ai.repo.yaml`, and `aimgr repo apply-manifest <path-or-url>` to merge another manifest into that same local file.
+Use `aimgr repo apply-manifest <path-or-url>` to import a shared `ai.repo.yaml` into your local repository config, and `aimgr repo show-manifest` to print your current local manifest when you want to publish it for others.
 
 ### Command responsibilities
 
 - `aimgr repo init`: local repository bootstrap only (create repo layout, git, initial `ai.repo.yaml`)
-- `aimgr repo show-manifest`: print the current local `ai.repo.yaml`
-- `aimgr repo apply-manifest <path-or-url>`: load a manifest and merge its sources into local `ai.repo.yaml` (auto-initializes if needed)
+- `aimgr repo show-manifest`: print the current local `ai.repo.yaml` so you can inspect it or publish it somewhere shareable
+- `aimgr repo apply-manifest <path-or-url>`: load a shared manifest and merge its sources into local `ai.repo.yaml` (auto-initializes if needed)
 - Deferred for future versions: export/lockfile workflows (not part of `repo apply-manifest` v1)
+
+### Collaboration model
+
+The intended sharing model is:
+
+1. One team or person publishes an `ai.repo.yaml` somewhere central.
+2. Other users run `aimgr repo apply-manifest <path-or-url>` against that file.
+3. Users can apply more than one shared manifest; each apply merges additional sources into the same local `ai.repo.yaml`.
+4. If a user wants to share their own current setup, they run `aimgr repo show-manifest` and commit or upload that output somewhere others can access it.
+
+Example:
+
+```bash
+# import team baseline
+aimgr repo apply-manifest https://example.com/platform/ai.repo.yaml
+
+# add another shared manifest on top
+aimgr repo apply-manifest https://example.com/data-science/ai.repo.yaml
+
+# publish your resulting local config for someone else
+aimgr repo show-manifest > ai.repo.yaml
+```
 
 ### Accepted `repo apply-manifest` inputs in v1
 
-`repo apply-manifest` accepts only explicit manifest files:
+`repo apply-manifest` accepts only explicit manifest inputs:
 
 1. Local file path to `ai.repo.yaml`
-2. Stdin via `-` or `/dev/stdin`
-3. HTTP(S) URL pointing directly to `ai.repo.yaml`
+2. HTTP(S) URL pointing directly to `ai.repo.yaml`
+3. Stdin via `-` or `/dev/stdin` (convenience input, not the primary sharing model)
 
 Examples:
 
@@ -195,7 +217,6 @@ Examples:
 aimgr repo show-manifest
 aimgr repo apply-manifest ./ai.repo.yaml
 aimgr repo apply-manifest /tmp/team/ai.repo.yaml
-aimgr repo show-manifest | aimgr repo apply-manifest -
 aimgr repo apply-manifest https://example.com/platform/ai.repo.yaml
 ```
 
@@ -227,6 +248,16 @@ In merge mode:
 - Identical sources become no-ops (idempotent)
 - `include` filters are replaced by default for same-location updates (`--include-mode replace`)
 - Use `--include-mode preserve` to keep existing local include filters
+
+Applying multiple manifests is also valid:
+
+```bash
+aimgr repo apply-manifest https://example.com/platform/ai.repo.yaml
+aimgr repo apply-manifest https://example.com/team/ai.repo.yaml
+aimgr repo sync
+```
+
+After those commands, the local `ai.repo.yaml` contains the merged source list from both shared manifests.
 
 ### Shareable manifest schema (v1)
 
@@ -274,6 +305,8 @@ Repeated apply of the same manifest should be idempotent.
 - Absolute `path` values remain valid but are only practical for machine-local setups
 
 For cross-machine sharing, prefer `url` sources in remote manifests.
+
+Stdin support (`-` or `/dev/stdin`) is available for advanced shell workflows, but the normal collaboration flow is publishing a real `ai.repo.yaml` and having others apply it from a file path or URL.
 
 ---
 

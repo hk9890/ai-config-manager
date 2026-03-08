@@ -194,14 +194,15 @@ This section documents command boundaries for shareable manifests.
 
 - `aimgr repo show-manifest`
   - Reads and prints the current local `ai.repo.yaml`
+  - Intended for inspection or publishing the current local manifest somewhere shareable
   - Does not modify repository state
 
 - `aimgr repo apply-manifest <path-or-url>`
-  - Loads a manifest from `<path-or-url>` and merges sources into local `ai.repo.yaml`
+  - Loads a shared manifest from `<path-or-url>` and merges sources into local `ai.repo.yaml`
   - v1 accepts only explicit `ai.repo.yaml` inputs:
     1. local filesystem path to `ai.repo.yaml`
-    2. stdin via `-` or `/dev/stdin`
-    3. HTTP(S) URL directly to `ai.repo.yaml`
+    2. HTTP(S) URL directly to `ai.repo.yaml`
+    3. stdin via `-` or `/dev/stdin` (convenience input)
   - Bare repository URLs are out of scope in v1
 
 - Deferred (future work)
@@ -217,6 +218,13 @@ This section documents command boundaries for shareable manifests.
 - Source state such as sync timestamps remains in `.metadata/sources.json`
 
 ### apply-manifest merge rules (v1)
+
+Intended workflow:
+
+1. A team or user publishes a real `ai.repo.yaml` somewhere central.
+2. Other users apply that manifest into their own local repository.
+3. Users may apply multiple shared manifests; each apply merges additional sources into the same local `ai.repo.yaml`.
+4. If a user wants to share their current merged setup, they use `repo show-manifest` and publish that output.
 
 When applying an incoming manifest to the local manifest:
 
@@ -241,9 +249,14 @@ Guidance: for remote/shared manifests, prefer `url` sources.
 ### Concrete v1 apply examples
 
 ```bash
-aimgr repo show-manifest
-aimgr repo apply-manifest ./ai.repo.yaml
-aimgr repo show-manifest | aimgr repo apply-manifest -
-aimgr repo apply-manifest /tmp/team/ai.repo.yaml
+# consume one shared manifest
 aimgr repo apply-manifest https://example.com/team/ai.repo.yaml
+
+# consume another shared manifest and merge it locally
+aimgr repo apply-manifest https://example.com/platform/ai.repo.yaml
+
+# publish your current local manifest for someone else
+aimgr repo show-manifest > ai.repo.yaml
 ```
+
+Convenience-only stdin round-trips such as `aimgr repo show-manifest | aimgr repo apply-manifest -` are supported, but they are not the primary sharing model.

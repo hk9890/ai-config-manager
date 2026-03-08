@@ -25,24 +25,32 @@ aimgr install skill/pdf-processing
 
 ### Bootstrap from a shared manifest (alternative to manual add)
 
-If your team publishes an `ai.repo.yaml`, you can bootstrap in one command:
+If your team publishes an `ai.repo.yaml` at a central location, everyone else can bootstrap from that file:
 
 ```bash
-# Local manifest file
-aimgr repo apply-manifest ./ai.repo.yaml
-
-# Remote manifest URL
+# Shared manifest URL
 aimgr repo apply-manifest https://example.com/platform/ai.repo.yaml
+
+# Or a checked-out local copy of the same manifest
+aimgr repo apply-manifest ./ai.repo.yaml
 ```
 
 `repo apply-manifest` will auto-initialize a fresh repository when needed, then merge sources into local `ai.repo.yaml`.
-Use `aimgr repo show-manifest` to print that same local file.
 
-You can also round-trip the manifest through stdin:
+Important workflow:
+- a team can publish one shared `ai.repo.yaml` somewhere central
+- users can apply that shared manifest into their own local repo
+- users can apply multiple manifests over time, and aimgr merges all sources into the same local `ai.repo.yaml`
+- if someone wants to publish their own current setup, they can use `aimgr repo show-manifest` and commit that output somewhere shareable
+
+For example, a user can publish their local manifest like this:
 
 ```bash
-aimgr repo show-manifest | aimgr repo apply-manifest -
+aimgr repo show-manifest > ai.repo.yaml
+# commit that file to a repo, wiki, gist, or shared config location
 ```
+
+Stdin support exists as a convenience for advanced workflows, but it is not the primary sharing model.
 
 ---
 
@@ -126,7 +134,7 @@ aimgr repo add local:~/my-resources/          # Local (symlinked)
 aimgr repo add gh:owner/repo            # GitHub (copied)
 aimgr repo add gh:owner/repo@v1.0.0     # Specific version
 
-# Or merge sources from a shared manifest into local ai.repo.yaml
+# Import one or more shared manifests into local ai.repo.yaml
 aimgr repo apply-manifest ./ai.repo.yaml
 aimgr repo apply-manifest https://example.com/platform/ai.repo.yaml
 
