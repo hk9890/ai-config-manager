@@ -22,6 +22,7 @@
 {"created_at":"2026-03-08T16:58:07Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-72l","issue_id":"ai-config-manager-72l.1","type":"parent-child"}
 {"created_at":"2026-03-08T16:58:07Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-72l","issue_id":"ai-config-manager-72l.2","type":"parent-child"}
 {"created_at":"2026-03-08T16:58:08Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-72l.1","issue_id":"ai-config-manager-72l.2","type":"blocks"}
+{"created_at":"2026-03-08T18:14:15Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-bez","issue_id":"ai-config-manager-72l.2","type":"blocks"}
 {"created_at":"2026-03-08T16:58:07Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-72l","issue_id":"ai-config-manager-72l.3","type":"parent-child"}
 {"created_at":"2026-03-08T16:58:08Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-72l.2","issue_id":"ai-config-manager-72l.3","type":"blocks"}
 {"created_at":"2026-03-08T16:58:08Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-72l","issue_id":"ai-config-manager-72l.4","type":"parent-child"}
