@@ -24,6 +24,7 @@ func TestRepoCommandHasSubcommands(t *testing.T) {
 	// Verify repo command has expected subcommands
 	expectedSubcommands := []string{
 		"add",
+		"apply",
 		"remove",
 		"init",
 		"verify",

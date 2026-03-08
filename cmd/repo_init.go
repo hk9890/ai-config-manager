@@ -18,6 +18,16 @@ This command:
   - Creates ai.repo.yaml manifest for source tracking
   - Creates .gitignore to exclude .workspace/ cache directory
 
+Scope note:
+  - repo init is local bootstrap only
+  - it does not load or merge external manifest files
+  - shared manifests are handled by repo apply <path-or-url>
+
+Fresh setup guidance:
+  - run repo init when you want an empty local repository first
+  - run repo apply <path-or-url> when bootstrapping from a shared manifest
+    (repo apply initializes automatically if the repo does not exist)
+
 The repository location is determined by (in order of precedence):
   1. AIMGR_REPO_PATH environment variable
   2. repo.path in config file (~/.config/aimgr/aimgr.yaml)

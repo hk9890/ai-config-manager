@@ -182,3 +182,60 @@ See [Git Tracking](git-tracking.md) for details on how aimgr uses Git.
 - [Field Mappings](../user-guide/configuration.md#field-mappings) - How .modifications/ is generated
 - [Workspace Caching](workspace-caching.md) - Details on .workspace/ cache
 - [Git Tracking](git-tracking.md) - How aimgr uses Git internally
+
+## `repo init` vs `repo apply` (v1 contract)
+
+This section documents command boundaries for shareable manifests.
+
+- `aimgr repo init`
+  - Local bootstrap only
+  - Creates repository directories, git repo, `.gitignore`, and initial `ai.repo.yaml`
+  - Does **not** consume external manifests
+
+- `aimgr repo apply <path-or-url>`
+  - Loads a manifest from `<path-or-url>` and merges sources into local `ai.repo.yaml`
+  - v1 accepts only explicit `ai.repo.yaml` inputs:
+    1. local filesystem path to `ai.repo.yaml`
+    2. HTTP(S) URL directly to `ai.repo.yaml`
+  - Bare repository URLs are out of scope in v1
+
+- Deferred (future work)
+  - Manifest export command(s)
+  - Lockfile/version pinning workflows beyond current `ref`
+
+### Shareable manifest vs local state
+
+`ai.repo.yaml` used for sharing should contain portable source definitions only.
+
+- Internal/generated `sources[].id` values are local-only state
+- `id` may exist in local persisted manifests, but `repo apply` must not require it in input
+- Source state such as sync timestamps remains in `.metadata/sources.json`
+
+### Apply merge rules (v1)
+
+When applying an incoming manifest to the local manifest:
+
+1. Validate incoming manifest (`version`, source shape, duplicate names, include patterns)
+2. For each incoming source:
+   - **Name not present locally**: add source
+   - **Name present + identical definition** (`path/url/ref/subpath/include`): no-op
+   - **Name present + different definition**: report conflict; do not silently overwrite
+3. Re-applying an unchanged manifest is idempotent
+
+Incoming manifests with duplicate source names are invalid and rejected.
+
+### Relative path resolution for apply
+
+- **Local manifest input** (`./ai.repo.yaml`): resolve relative `path` entries against the manifest file directory
+- **Remote HTTP(S) manifest input**: reject relative `path` entries in v1 (receiver-local filesystem target is ambiguous)
+- Absolute `path` remains literal (usable for local-machine manifests)
+
+Guidance: for remote/shared manifests, prefer `url` sources.
+
+### Concrete v1 apply examples
+
+```bash
+aimgr repo apply ./ai.repo.yaml
+aimgr repo apply /tmp/team/ai.repo.yaml
+aimgr repo apply https://example.com/team/ai.repo.yaml
+```

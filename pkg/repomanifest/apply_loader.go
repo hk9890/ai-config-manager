@@ -1,0 +1,136 @@
+package repomanifest
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
+var windowsDrivePathPattern = regexp.MustCompile(`^[a-zA-Z]:[\\/]`)
+
+// LoadForApply loads a shareable manifest from either:
+//   - a local ai.repo.yaml path
+//   - an HTTP(S) URL that points directly to ai.repo.yaml
+//
+// For local manifests, relative source path values are resolved relative to the
+// manifest file directory. For remote manifests, relative source path values
+// are rejected because receiver-local resolution would be ambiguous.
+func LoadForApply(input string) (*Manifest, error) {
+	return loadForApplyWithClient(input, http.DefaultClient)
+}
+
+func loadForApplyWithClient(input string, client *http.Client) (*Manifest, error) {
+	if strings.TrimSpace(input) == "" {
+		return nil, fmt.Errorf("manifest input cannot be empty")
+	}
+
+	parsedURL, err := url.Parse(input)
+	if err != nil {
+		return nil, fmt.Errorf("invalid manifest input: %w", err)
+	}
+
+	if parsedURL.Scheme == "http" || parsedURL.Scheme == "https" {
+		return loadRemoteForApply(parsedURL, client)
+	}
+
+	if parsedURL.Scheme != "" && !isWindowsDrivePath(input) {
+		return nil, fmt.Errorf("manifest input must be a local %s path or HTTP(S) URL", ManifestFileName)
+	}
+
+	return loadLocalForApply(input)
+}
+
+func isWindowsDrivePath(input string) bool {
+	return windowsDrivePathPattern.MatchString(input)
+}
+
+func loadLocalForApply(input string) (*Manifest, error) {
+	absPath, err := filepath.Abs(input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve manifest path: %w", err)
+	}
+
+	if filepath.Base(absPath) != ManifestFileName {
+		return nil, fmt.Errorf("local manifest path must point to %s", ManifestFileName)
+	}
+
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read local manifest: %w", err)
+	}
+
+	manifest, err := parseManifestYAML(data)
+	if err != nil {
+		return nil, err
+	}
+
+	manifestDir := filepath.Dir(absPath)
+	for _, source := range manifest.Sources {
+		if source.Path == "" || filepath.IsAbs(source.Path) {
+			continue
+		}
+		source.Path = filepath.Clean(filepath.Join(manifestDir, source.Path))
+	}
+
+	return manifest, nil
+}
+
+func loadRemoteForApply(manifestURL *url.URL, client *http.Client) (*Manifest, error) {
+	if path.Base(manifestURL.Path) != ManifestFileName {
+		return nil, fmt.Errorf("remote manifest URL must point directly to %s", ManifestFileName)
+	}
+
+	if client == nil {
+		client = http.DefaultClient
+	}
+
+	resp, err := client.Get(manifestURL.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch remote manifest: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch remote manifest: unexpected status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read remote manifest response: %w", err)
+	}
+
+	manifest, err := parseManifestYAML(data)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, source := range manifest.Sources {
+		if source.Path == "" || filepath.IsAbs(source.Path) {
+			continue
+		}
+		return nil, fmt.Errorf("remote manifest source %q has relative path %q: relative path sources are not supported for remote manifests", source.Name, source.Path)
+	}
+
+	return manifest, nil
+}
+
+func parseManifestYAML(data []byte) (*Manifest, error) {
+	var manifest Manifest
+	if err := yaml.Unmarshal(data, &manifest); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest YAML: %w", err)
+	}
+
+	if err := manifest.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid manifest: %w", err)
+	}
+
+	return &manifest, nil
+}

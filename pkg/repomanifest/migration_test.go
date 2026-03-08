@@ -47,7 +47,7 @@ sources:
 	}
 }
 
-func TestMigrateSourceIDs_PersistsToDisk(t *testing.T) {
+func TestMigrateSourceIDs_DoesNotPersistToDisk(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Write a manifest without source IDs
@@ -61,7 +61,7 @@ sources:
 		t.Fatalf("failed to write test manifest: %v", err)
 	}
 
-	// Load triggers migration and saves
+	// Load triggers in-memory migration only
 	m, err := Load(tmpDir)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -72,14 +72,17 @@ sources:
 		t.Fatal("expected source to have an ID after migration")
 	}
 
-	// Read the file back directly to verify it was persisted
+	// Read the file back directly to verify ID was NOT persisted
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("failed to read manifest file: %v", err)
 	}
 
-	if !strings.Contains(string(data), generatedID) {
-		t.Errorf("manifest file does not contain generated ID %q:\n%s", generatedID, string(data))
+	if strings.Contains(string(data), generatedID) {
+		t.Errorf("manifest file should not contain generated runtime ID %q:\n%s", generatedID, string(data))
+	}
+	if strings.Contains(string(data), "id:") {
+		t.Errorf("manifest file should not contain id field after load:\n%s", string(data))
 	}
 }
 
@@ -176,9 +179,8 @@ sources:
 		t.Fatalf("failed to write test manifest: %v", err)
 	}
 
-	// Make the directory read-only so Save() will fail
-	// (the file itself is readable but the directory prevents writing new files
-	// or truncating existing ones on some systems)
+	// Make file/dir read-only. Load no longer persists IDs, but it should still
+	// succeed and populate runtime IDs in memory.
 	if err := os.Chmod(path, 0444); err != nil {
 		t.Fatalf("failed to chmod manifest file: %v", err)
 	}
@@ -191,7 +193,7 @@ sources:
 		os.Chmod(path, 0644)   //nolint:errcheck
 	})
 
-	// Load should NOT crash even if it can't persist the migration
+	// Load should work and generate in-memory IDs
 	m, err := Load(tmpDir)
 	if err != nil {
 		t.Fatalf("Load() should not fail for read-only manifest, got: %v", err)

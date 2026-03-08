@@ -3,10 +3,24 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
 )
+
+func TestRepoInitHelpClarifiesApplyRelationship(t *testing.T) {
+	help := repoInitCmd.Long
+	for _, expected := range []string{
+		"repo init is local bootstrap only",
+		"repo apply <path-or-url>",
+		"bootstrapping from a shared manifest",
+	} {
+		if !strings.Contains(help, expected) {
+			t.Fatalf("expected repo init help to mention %q", expected)
+		}
+	}
+}
 
 func TestRepoInitCommand(t *testing.T) {
 	tests := []struct {

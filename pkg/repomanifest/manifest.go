@@ -2,7 +2,6 @@ package repomanifest
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -35,6 +34,32 @@ type Source struct {
 	Ref     string   `yaml:"ref,omitempty"`
 	Subpath string   `yaml:"subpath,omitempty"`
 	Include []string `yaml:"include,omitempty"`
+}
+
+// MarshalYAML writes shareable source config to ai.repo.yaml.
+// Local-only runtime state (ID) is intentionally omitted.
+func (s *Source) MarshalYAML() (interface{}, error) {
+	type sourceYAML struct {
+		Name    string   `yaml:"name"`
+		Path    string   `yaml:"path,omitempty"`
+		URL     string   `yaml:"url,omitempty"`
+		Ref     string   `yaml:"ref,omitempty"`
+		Subpath string   `yaml:"subpath,omitempty"`
+		Include []string `yaml:"include,omitempty"`
+	}
+
+	if s == nil {
+		return sourceYAML{}, nil
+	}
+
+	return sourceYAML{
+		Name:    s.Name,
+		Path:    s.Path,
+		URL:     s.URL,
+		Ref:     s.Ref,
+		Subpath: s.Subpath,
+		Include: s.Include,
+	}, nil
 }
 
 // GetMode returns the implicit mode for this source
@@ -78,13 +103,9 @@ func Load(repoPath string) (*Manifest, error) {
 		return nil, fmt.Errorf("failed to migrate manifest: %w", err)
 	}
 
-	// Migrate sources without IDs (auto-generate from URL/path)
-	if m.migrateSourceIDs() {
-		if err := m.Save(repoPath); err != nil {
-			// Read-only manifest: log warning but continue without persisting IDs
-			slog.Warn("could not persist migrated source IDs", "path", repoPath, "error", err)
-		}
-	}
+	// Ensure every source has an in-memory runtime ID. IDs are local-only state
+	// derived from URL/path and are intentionally not persisted in ai.repo.yaml.
+	m.migrateSourceIDs()
 
 	// Validate the manifest
 	if err := m.Validate(); err != nil {
@@ -386,8 +407,8 @@ func generateSourceName(source *Source) string {
 	return name
 }
 
-// migrateSourceIDs generates IDs for any sources that lack them.
-// Returns true if any IDs were generated (indicating the manifest should be saved).
+// migrateSourceIDs generates runtime IDs for any sources that lack them.
+// Returns true if any IDs were generated.
 func (m *Manifest) migrateSourceIDs() bool {
 	migrated := false
 	for i := range m.Sources {

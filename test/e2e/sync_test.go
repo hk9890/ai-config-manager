@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
 )
 
 // TestE2E_SyncIdempotency verifies that sync operations are idempotent.
@@ -144,6 +146,99 @@ func TestE2E_SyncIdempotency(t *testing.T) {
 	}
 
 	t.Log("✓ Sync idempotency verified: second sync made no changes")
+}
+
+// TestE2E_ApplyThenSyncPreservesIncludeFilters verifies that applying a shared
+// manifest and then syncing keeps include filters intact and only imports
+// resources matched by those patterns.
+func TestE2E_ApplyThenSyncPreservesIncludeFilters(t *testing.T) {
+	configPath := loadTestConfig(t, "e2e-test")
+	repoPath := t.TempDir()
+	env := map[string]string{"AIMGR_REPO_PATH": repoPath}
+
+	// Create local source fixture with both matching and non-matching resources.
+	sourceDir := t.TempDir()
+	commandsDir := filepath.Join(sourceDir, "commands")
+	if err := os.MkdirAll(commandsDir, 0755); err != nil {
+		t.Fatalf("Failed to create commands dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(commandsDir, "apply-sync-keep.md"), []byte("---\ndescription: keep\n---\n# keep\n"), 0644); err != nil {
+		t.Fatalf("Failed to create keep command: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(commandsDir, "apply-sync-drop.md"), []byte("---\ndescription: drop\n---\n# drop\n"), 0644); err != nil {
+		t.Fatalf("Failed to create drop command: %v", err)
+	}
+
+	keepSkillDir := filepath.Join(sourceDir, "skills", "apply-sync-keep")
+	if err := os.MkdirAll(keepSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create keep skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(keepSkillDir, "SKILL.md"), []byte("---\ndescription: keep skill\n---\n# keep\n"), 0644); err != nil {
+		t.Fatalf("Failed to create keep skill: %v", err)
+	}
+
+	dropSkillDir := filepath.Join(sourceDir, "skills", "apply-sync-drop")
+	if err := os.MkdirAll(dropSkillDir, 0755); err != nil {
+		t.Fatalf("Failed to create drop skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dropSkillDir, "SKILL.md"), []byte("---\ndescription: drop skill\n---\n# drop\n"), 0644); err != nil {
+		t.Fatalf("Failed to create drop skill: %v", err)
+	}
+
+	manifestPath := filepath.Join(t.TempDir(), repomanifest.ManifestFileName)
+	manifestContent := "version: 1\n" +
+		"sources:\n" +
+		"  - name: filtered-local\n" +
+		"    path: " + sourceDir + "\n" +
+		"    include:\n" +
+		"      - command/apply-sync-keep\n" +
+		"      - skill/apply-sync-keep\n"
+	if err := os.WriteFile(manifestPath, []byte(manifestContent), 0644); err != nil {
+		t.Fatalf("Failed to write apply manifest: %v", err)
+	}
+
+	// Apply should auto-initialize the repo and persist include filters.
+	stdout, stderr, err := runAimgrWithEnv(t, configPath, env, "repo", "apply", manifestPath)
+	if err != nil {
+		t.Fatalf("repo apply failed: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
+	}
+
+	appliedManifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("Failed to load applied manifest: %v", err)
+	}
+	if len(appliedManifest.Sources) != 1 {
+		t.Fatalf("Expected one source after apply, got %d", len(appliedManifest.Sources))
+	}
+	gotInclude := strings.Join(appliedManifest.Sources[0].Include, ",")
+	if gotInclude != "command/apply-sync-keep,skill/apply-sync-keep" {
+		t.Fatalf("unexpected include filters after apply: %s", gotInclude)
+	}
+
+	// Sync should only import resources matching include filters.
+	stdout, stderr, err = runAimgrWithEnv(t, configPath, env, "repo", "sync")
+	if err != nil {
+		t.Fatalf("repo sync failed: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
+	}
+
+	assertFileExists(t, filepath.Join(repoPath, "commands", "apply-sync-keep.md"))
+	assertFileExists(t, filepath.Join(repoPath, "skills", "apply-sync-keep", "SKILL.md"))
+
+	if _, err := os.Lstat(filepath.Join(repoPath, "commands", "apply-sync-drop.md")); err == nil {
+		t.Fatalf("unexpected non-included command imported")
+	}
+	if _, err := os.Lstat(filepath.Join(repoPath, "skills", "apply-sync-drop")); err == nil {
+		t.Fatalf("unexpected non-included skill imported")
+	}
+
+	// include list remains unchanged after sync.
+	afterSyncManifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("Failed to load manifest after sync: %v", err)
+	}
+	if strings.Join(afterSyncManifest.Sources[0].Include, ",") != gotInclude {
+		t.Fatalf("include filters changed after sync")
+	}
 }
 
 // syncStats holds the parsed statistics from sync output

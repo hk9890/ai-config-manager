@@ -148,6 +148,31 @@ aimgr repo add local:~/resources/ --filter "package/*"
 aimgr repo add gh:owner/repo --filter "web-*"
 ```
 
+The same pattern syntax is used in shared `ai.repo.yaml` manifests via `sources[].include`
+(for `aimgr repo apply <path-or-url>`):
+
+```yaml
+version: 1
+sources:
+  - name: community
+    url: https://github.com/example/ai-tools
+    include:
+      - skill/*
+      - command/release-*
+```
+
+`include` semantics match repeated `--filter` flags (`OR` logic): a resource is included if any
+pattern matches.
+
+After applying and syncing:
+
+```bash
+aimgr repo apply ./ai.repo.yaml
+aimgr repo sync
+```
+
+`repo sync` continues using the `sources[].include` filters persisted by `repo apply`.
+
 **Remove with pattern:**
 ```bash
 # Remove all test resources

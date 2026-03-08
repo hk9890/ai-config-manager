@@ -273,6 +273,63 @@ func TestSave(t *testing.T) {
 	if loaded.Sources[0].Name != m.Sources[0].Name {
 		t.Errorf("source name mismatch: got %s, want %s", loaded.Sources[0].Name, m.Sources[0].Name)
 	}
+
+	// Saved manifest should be shareable and omit runtime-only IDs.
+	raw, err := os.ReadFile(filepath.Join(tmpDir, ManifestFileName))
+	if err != nil {
+		t.Fatalf("failed to read saved manifest: %v", err)
+	}
+	if strings.Contains(string(raw), "id:") {
+		t.Errorf("saved manifest must not persist source IDs:\n%s", string(raw))
+	}
+}
+
+func TestLoad_LegacyIDFieldsPreservedInMemory(t *testing.T) {
+	tmpDir := t.TempDir()
+	manifestPath := filepath.Join(tmpDir, ManifestFileName)
+
+	legacy := `version: 1
+sources:
+  - id: src-legacy123456
+    name: legacy-source
+    url: https://github.com/example/repo
+    include:
+      - skill/pdf*
+`
+	if err := os.WriteFile(manifestPath, []byte(legacy), 0644); err != nil {
+		t.Fatalf("failed to write legacy manifest: %v", err)
+	}
+
+	m, err := Load(tmpDir)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	src, found := m.GetSource("legacy-source")
+	if !found {
+		t.Fatalf("expected to find source legacy-source")
+	}
+	if src.ID != "src-legacy123456" {
+		t.Fatalf("expected legacy ID preserved in memory, got %q", src.ID)
+	}
+	if len(src.Include) != 1 || src.Include[0] != "skill/pdf*" {
+		t.Fatalf("include changed unexpectedly: %v", src.Include)
+	}
+
+	if err := m.Save(tmpDir); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatalf("failed to read manifest after save: %v", err)
+	}
+	if strings.Contains(string(raw), "id:") {
+		t.Errorf("saved manifest should omit legacy id field:\n%s", string(raw))
+	}
+	if !strings.Contains(string(raw), "include:") || !strings.Contains(string(raw), "skill/pdf*") {
+		t.Errorf("include patterns must round-trip unchanged:\n%s", string(raw))
+	}
 }
 
 func TestSave_CreatesDirectory(t *testing.T) {

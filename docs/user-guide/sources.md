@@ -164,8 +164,111 @@ sources:
 | `url` | string | Git repository URL (for remote sources) | One of path/url |
 | `ref` | string | Git branch/tag/commit (for remote sources) | No |
 | `subpath` | string | Subdirectory within repository (for remote sources) | No |
+| `include` | array of string | Resource filter patterns (same syntax as `--filter`) | No |
 
 **Note:** Import mode is implicit based on source type. Path sources use `symlink` mode; URL sources use `copy` mode.
+
+---
+
+## Sharing source configuration with `ai.repo.yaml` (`repo apply` v1)
+
+Use `aimgr repo apply <path-or-url>` to load and merge a shared manifest into your local repository configuration.
+
+### Command responsibilities
+
+- `aimgr repo init`: local repository bootstrap only (create repo layout, git, initial `ai.repo.yaml`)
+- `aimgr repo apply <path-or-url>`: load a manifest and merge its sources into local `ai.repo.yaml` (auto-initializes if needed)
+- Deferred for future versions: export/lockfile workflows (not part of `repo apply` v1)
+
+### Accepted `repo apply` inputs in v1
+
+`repo apply` accepts only explicit manifest files:
+
+1. Local file path to `ai.repo.yaml`
+2. HTTP(S) URL pointing directly to `ai.repo.yaml`
+
+Examples:
+
+```bash
+aimgr repo apply ./ai.repo.yaml
+aimgr repo apply /tmp/team/ai.repo.yaml
+aimgr repo apply https://example.com/platform/ai.repo.yaml
+```
+
+Not supported in v1:
+
+- Bare repository URLs (for example `https://github.com/org/repo`)
+- Implicit discovery of manifests inside a repository URL
+
+### Bootstrap and merge flows
+
+Fresh repository bootstrap from a shared manifest:
+
+```bash
+# No prior repo init required
+aimgr repo apply ./ai.repo.yaml
+aimgr repo sync
+```
+
+Merge into an existing repository with local sources:
+
+```bash
+# Existing ai.repo.yaml already contains local/team sources
+aimgr repo apply https://example.com/platform/ai.repo.yaml
+aimgr repo sync
+```
+
+In merge mode:
+- Existing sources are kept unless there is a name/location conflict
+- Identical sources become no-ops (idempotent)
+- `include` filters are replaced by default for same-location updates (`--include-mode replace`)
+- Use `--include-mode preserve` to keep existing local include filters
+
+### Shareable manifest schema (v1)
+
+Shareable manifests are human-authored and portable:
+
+```yaml
+version: 1
+sources:
+  - name: team-local
+    path: ./resources
+    include:
+      - skill/pdf*
+      - command/lint-*
+
+  - name: community-tools
+    url: https://github.com/example/ai-tools
+    ref: v1.2.0
+    include:
+      - skill/*
+      - package/web-*
+```
+
+Rules:
+
+- `source.include` uses the same glob syntax as `aimgr repo add --filter`
+- `id` is local/internal state and must not be required in shareable manifests
+- A source must specify exactly one of `path` or `url`
+
+### Merge and conflict behavior
+
+When applying a manifest onto the local `ai.repo.yaml`:
+
+- **New source name** → add source
+- **Same source name + identical definition** (`path/url/ref/subpath/include`) → no-op (idempotent)
+- **Same source name + different definition** → conflict (must be explicit, no silent overwrite)
+- **Duplicate names within the incoming manifest** → validation error
+
+Repeated apply of the same manifest should be idempotent.
+
+### Relative path resolution
+
+- Applying a **local manifest file**: relative `path` values are resolved relative to the manifest file's directory
+- Applying a **remote HTTP(S) manifest**: relative `path` values are rejected in v1 (ambiguous on the receiver machine)
+- Absolute `path` values remain valid but are only practical for machine-local setups
+
+For cross-machine sharing, prefer `url` sources in remote manifests.
 
 ---
 
