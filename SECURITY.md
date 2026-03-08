@@ -2,15 +2,13 @@
 
 ## Supported Versions
 
-We release patches for security vulnerabilities for the following versions:
+We release patches for security vulnerabilities for the currently supported major version:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.4.x   | :white_check_mark: |
-| 1.3.x   | :white_check_mark: |
-| 1.2.x   | :x:                |
-| 1.1.x   | :x:                |
-| 1.0.x   | :x:                |
+| 3.x     | :white_check_mark: |
+| 2.x     | :x:                |
+| 1.x     | :x:                |
 | < 1.0   | :x:                |
 
 ## Reporting a Vulnerability

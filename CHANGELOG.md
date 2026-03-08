@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [3.1.0] - 2026-03-08
+
+### Added
+- **Persistent source filtering for `repo sync`** — `aimgr repo sync` now preserves and applies per-source filters from the repository manifest, making repeated syncs more predictable for multi-source setups.
+
+### Fixed
+- **`repo list --source` package filtering** — package results now respect the selected source filter, and invalid include patterns produce clearer warnings.
+- **Remote sync cache refresh** — `repo sync` now refreshes cached remote repositories before importing so repeated syncs pick up upstream changes reliably.
+- **Go install documentation path** — README and security documentation now use the correct `/v3/` module path for `go install`.
+
+### Changed
+- **Repo sync output polish** — sync now prints clearer compact per-source summaries, earlier startup feedback, and friendlier removal labels.
+
+
 ## [3.0.1] - 2026-03-05
 
 ### Fixed
@@ -838,12 +852,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform support (Linux, macOS)
 - Configuration management with XDG base directory support
 
+[3.1.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v3.0.1...v3.1.0
+[3.0.1]: https://github.com/dynatrace-oss/ai-config-manager/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.10.0...v3.0.0
+[2.10.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.9.0...v2.10.0
+[2.9.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.7.0...v2.8.0
+[2.7.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.6.1...v2.7.0
+[2.6.1]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.6.0...v2.6.1
+[2.6.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.5.0...v2.6.0
+[2.5.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.2.1...v2.3.0
+[2.2.1]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v2.1.0...v2.2.0
+[1.23.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.22.3...v1.23.0
+[1.20.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.19.1...v1.20.0
+[1.15.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.14.0...v1.15.0
+[1.14.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.13.0...v1.14.0
+[1.13.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.12.0...v1.13.0
+[1.12.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.11.0...v1.12.0
+[1.11.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.10.0...v1.11.0
+[1.10.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.9.0...v1.10.0
+[1.9.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.8.1...v1.9.0
+[1.8.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.7.0...v1.8.0
+[1.6.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/dynatrace-oss/ai-config-manager/releases/tag/v1.0.0
-
-[1.5.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.4.0...v1.5.0
-[1.8.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v1.7.0...v1.8.0
+[1.0.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v0.3.1...v1.0.0
