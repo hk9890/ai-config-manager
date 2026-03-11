@@ -4,6 +4,16 @@ User-facing documentation for **aimgr** (ai-config-manager), a CLI tool for mana
 
 ## Documentation
 
+### [Concepts](concepts.md)
+
+Compact overview of the main aimgr concepts from a user perspective.
+
+**Key Topics:**
+- What aimgr does
+- `ai.repo.yaml` for sources and syncing
+- `ai.package.yaml` for project dependencies
+- How repository and project manifests work together
+
 ### [Getting Started](getting-started.md)
 
 **Start here if you're new to aimgr!** This guide covers installation, first steps, common operations, and practical workflows.
