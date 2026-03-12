@@ -289,13 +289,19 @@ func uninstallAllFromDir(projectPath, repoPath, toolDir string, resourceType res
 
 		// Extract resource name
 		var resourceName string
-		if resourceType == resource.Command || resourceType == resource.Agent {
+		if resourceType == resource.Command {
 			// Remove .md extension
 			if strings.HasSuffix(name, ".md") {
 				resourceName = strings.TrimSuffix(name, ".md")
 			} else {
 				continue
 			}
+		} else if resourceType == resource.Agent {
+			logicalName, ok := tools.AgentLogicalName(tool, name)
+			if !ok {
+				continue
+			}
+			resourceName = logicalName
 		} else {
 			// Skill - name is the directory name
 			resourceName = name
@@ -368,7 +374,7 @@ func processUninstall(arg string, projectPath string, repoPath string, targetToo
 			if !toolInfo.SupportsAgents {
 				continue
 			}
-			symlinkPath = filepath.Join(projectPath, toolInfo.AgentsDir, name+".md")
+			symlinkPath = filepath.Join(projectPath, toolInfo.AgentsDir, tools.AgentArtifactName(tool, name))
 		default:
 			result.success = false
 			result.message = fmt.Sprintf("invalid resource type: %s", resourceType)
@@ -532,19 +538,19 @@ func expandUninstallPattern(projectPath, resourceArg string, detectedTools []too
 		// Scan each resource type directory
 		if resourceType == "" || resourceType == resource.Command {
 			if toolInfo.SupportsCommands {
-				foundMatches := scanToolDir(projectPath, toolInfo.CommandsDir, resource.Command, matcher)
+				foundMatches := scanToolDir(projectPath, toolInfo.CommandsDir, resource.Command, tool, matcher)
 				matches = append(matches, foundMatches...)
 			}
 		}
 		if resourceType == "" || resourceType == resource.Skill {
 			if toolInfo.SupportsSkills {
-				foundMatches := scanToolDir(projectPath, toolInfo.SkillsDir, resource.Skill, matcher)
+				foundMatches := scanToolDir(projectPath, toolInfo.SkillsDir, resource.Skill, tool, matcher)
 				matches = append(matches, foundMatches...)
 			}
 		}
 		if resourceType == "" || resourceType == resource.Agent {
 			if toolInfo.SupportsAgents {
-				foundMatches := scanToolDir(projectPath, toolInfo.AgentsDir, resource.Agent, matcher)
+				foundMatches := scanToolDir(projectPath, toolInfo.AgentsDir, resource.Agent, tool, matcher)
 				matches = append(matches, foundMatches...)
 			}
 		}
@@ -555,7 +561,7 @@ func expandUninstallPattern(projectPath, resourceArg string, detectedTools []too
 }
 
 // scanToolDir scans a tool directory for resources matching a pattern
-func scanToolDir(projectPath, toolDir string, resourceType resource.ResourceType, matcher *pattern.Matcher) []string {
+func scanToolDir(projectPath, toolDir string, resourceType resource.ResourceType, tool tools.Tool, matcher *pattern.Matcher) []string {
 	// Build full path
 	fullPath := filepath.Join(projectPath, toolDir)
 
@@ -570,14 +576,20 @@ func scanToolDir(projectPath, toolDir string, resourceType resource.ResourceType
 	for _, entry := range entries {
 		name := entry.Name()
 
-		// For commands and agents, remove .md extension
-		if resourceType == resource.Command || resourceType == resource.Agent {
+		// For commands and agents, derive logical names from artifact filename
+		if resourceType == resource.Command {
 			if strings.HasSuffix(name, ".md") {
 				name = strings.TrimSuffix(name, ".md")
 			} else {
 				// Skip non-.md files
 				continue
 			}
+		} else if resourceType == resource.Agent {
+			logicalName, ok := tools.AgentLogicalName(tool, name)
+			if !ok {
+				continue
+			}
+			name = logicalName
 		}
 
 		// For skills, name is the directory name (no extension to remove)

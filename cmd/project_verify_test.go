@@ -226,7 +226,7 @@ func TestVerifyDirectory(t *testing.T) {
 			}
 
 			// Verify directory
-			issues, err := verifyDirectory(testDir, "claude", repoDir)
+			issues, err := verifyDirectory(testDir, tools.Claude, repoDir)
 			if err != nil {
 				t.Fatalf("verifyDirectory failed: %v", err)
 			}
@@ -376,7 +376,7 @@ func TestVerifyDirectory_NestedCommands(t *testing.T) {
 				t.Fatalf("Setup failed: %v", err)
 			}
 
-			issues, err := verifyDirectory(testDir, "claude", repoDir)
+			issues, err := verifyDirectory(testDir, tools.Claude, repoDir)
 			if err != nil {
 				t.Fatalf("verifyDirectory failed: %v", err)
 			}
@@ -668,6 +668,15 @@ func TestParseResourceFromIssue(t *testing.T) {
 			},
 			expectedType: resource.Agent,
 			expectedName: "my-agent",
+		},
+		{
+			name: "copilot agent strips .agent.md extension",
+			issue: VerifyIssue{
+				Resource: "reviewer.agent.md",
+				Path:     "/project/.github/agents/reviewer.agent.md",
+			},
+			expectedType: resource.Agent,
+			expectedName: "reviewer",
 		},
 		{
 			name: "command strips .md extension",
@@ -1808,6 +1817,23 @@ func TestFindOrphanedResources(t *testing.T) {
 			expectedName:  "orphan-cmd",
 		},
 		{
+			name:     "detects orphaned copilot agent symlink with .agent.md",
+			resType:  "agent",
+			manifest: map[string]bool{},
+			setupFunc: func(dir string) error {
+				target := filepath.Join(dir, ".target", "reviewer.md")
+				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
+					return err
+				}
+				return os.Symlink(target, filepath.Join(dir, "reviewer.agent.md"))
+			},
+			expectedCount: 1,
+			expectedName:  "reviewer",
+		},
+		{
 			name:     "skips command in manifest",
 			resType:  "command",
 			manifest: map[string]bool{"command/listed-cmd": true},
@@ -1878,7 +1904,11 @@ func TestFindOrphanedResources(t *testing.T) {
 			}
 
 			seen := make(map[string]bool)
-			issues := findOrphanedResources(testDir, tt.resType, tt.manifest, seen)
+			targetTool := tools.Claude
+			if tt.resType == "agent" && strings.Contains(tt.name, "copilot") {
+				targetTool = tools.Copilot
+			}
+			issues := findOrphanedResources(testDir, tt.resType, targetTool, tt.manifest, seen)
 
 			if len(issues) != tt.expectedCount {
 				t.Errorf("Expected %d issues, got %d: %+v", tt.expectedCount, len(issues), issues)

@@ -297,6 +297,56 @@ Review code for quality.
 	}
 }
 
+func TestGenerateForResource_AgentFileCopilotSuffix(t *testing.T) {
+	tmpDir := t.TempDir()
+	repoPath := filepath.Join(tmpDir, "repo")
+
+	agentsDir := filepath.Join(repoPath, "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		t.Fatalf("failed to create agents directory: %v", err)
+	}
+
+	agentContent := `---
+description: A code reviewer agent
+model: gpt-4
+---
+# Code Reviewer
+`
+	agentPath := filepath.Join(agentsDir, "reviewer.md")
+	if err := os.WriteFile(agentPath, []byte(agentContent), 0644); err != nil {
+		t.Fatalf("failed to write agent file: %v", err)
+	}
+
+	mappings := config.TypeMappings{
+		Agent: config.FieldMappings{
+			"model": {
+				"gpt-4": {
+					"copilot": "gpt-4-copilot",
+				},
+			},
+		},
+	}
+
+	gen := NewGenerator(repoPath, mappings, nil)
+	res, err := resource.LoadAgent(agentPath)
+	if err != nil {
+		t.Fatalf("failed to load agent: %v", err)
+	}
+
+	generatedTools, err := gen.GenerateForResource(res)
+	if err != nil {
+		t.Fatalf("GenerateForResource() error = %v", err)
+	}
+	if len(generatedTools) != 1 || generatedTools[0] != "copilot" {
+		t.Fatalf("GenerateForResource() tools = %v, want [copilot]", generatedTools)
+	}
+
+	modPath := filepath.Join(repoPath, ".modifications", "copilot", "agents", "reviewer.agent.md")
+	if _, err := os.Stat(modPath); os.IsNotExist(err) {
+		t.Errorf("copilot agent modification not created at %s", modPath)
+	}
+}
+
 func TestGenerateForResource_NoMappings(t *testing.T) {
 	tmpDir := t.TempDir()
 	repoPath := filepath.Join(tmpDir, "repo")
@@ -592,6 +642,33 @@ func TestGetModificationPath_AgentFile(t *testing.T) {
 	}
 
 	path := gen.GetModificationPath(res, "opencode")
+	if path != modFile {
+		t.Errorf("GetModificationPath() = %q, want %q", path, modFile)
+	}
+}
+
+func TestGetModificationPath_AgentFileCopilot(t *testing.T) {
+	tmpDir := t.TempDir()
+	repoPath := filepath.Join(tmpDir, "repo")
+
+	modDir := filepath.Join(repoPath, ".modifications", "copilot", "agents")
+	if err := os.MkdirAll(modDir, 0755); err != nil {
+		t.Fatalf("failed to create modifications directory: %v", err)
+	}
+	modFile := filepath.Join(modDir, "reviewer.agent.md")
+	if err := os.WriteFile(modFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	gen := NewGenerator(repoPath, config.TypeMappings{}, nil)
+
+	res := &resource.Resource{
+		Name: "reviewer",
+		Type: resource.Agent,
+		Path: filepath.Join(repoPath, "agents", "reviewer.md"),
+	}
+
+	path := gen.GetModificationPath(res, "copilot")
 	if path != modFile {
 		t.Errorf("GetModificationPath() = %q, want %q", path, modFile)
 	}

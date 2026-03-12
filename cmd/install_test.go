@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,6 +128,77 @@ func containsMiddle(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func captureInstallSummaryOutput(t *testing.T, fn func()) string {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdout pipe: %v", err)
+	}
+	os.Stdout = w
+
+	fn()
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close stdout writer: %v", err)
+	}
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("failed to read captured stdout: %v", err)
+	}
+
+	if err := r.Close(); err != nil {
+		t.Fatalf("failed to close stdout reader: %v", err)
+	}
+
+	return buf.String()
+}
+
+func TestPrintInstallSummary_CopilotAgentPathUsesAgentSuffix(t *testing.T) {
+	results := []installResult{{
+		resourceType: resource.Agent,
+		name:         "reviewer",
+		success:      true,
+		toolsAdded:   []tools.Tool{tools.Copilot},
+	}}
+
+	output := captureInstallSummaryOutput(t, func() {
+		printInstallSummary(results)
+	})
+
+	if !strings.Contains(output, "  → .github/agents/reviewer.agent.md") {
+		t.Fatalf("expected Copilot agent summary path with .agent.md, got output:\n%s", output)
+	}
+
+	if strings.Contains(output, "  → .github/agents/reviewer.md") {
+		t.Fatalf("expected Copilot agent summary path to not use .md suffix, got output:\n%s", output)
+	}
+}
+
+func TestPrintInstallSummary_ClaudeOpenCodeAgentPathsRemainMd(t *testing.T) {
+	results := []installResult{{
+		resourceType: resource.Agent,
+		name:         "reviewer",
+		success:      true,
+		toolsAdded:   []tools.Tool{tools.Claude, tools.OpenCode},
+	}}
+
+	output := captureInstallSummaryOutput(t, func() {
+		printInstallSummary(results)
+	})
+
+	if !strings.Contains(output, "  → .claude/agents/reviewer.md") {
+		t.Fatalf("expected Claude agent summary path with .md, got output:\n%s", output)
+	}
+
+	if !strings.Contains(output, "  → .opencode/agents/reviewer.md") {
+		t.Fatalf("expected OpenCode agent summary path with .md, got output:\n%s", output)
+	}
 }
 
 // Test helpers for setting up test resources

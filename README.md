@@ -28,14 +28,19 @@ A command-line tool for discovering, installing, and managing AI resources (comm
 |------|----------|--------|--------|-----------|
 | **[Claude Code](https://code.claude.com/)** | ✅ | ✅ | ✅ | `.claude/` |
 | **[OpenCode](https://opencode.ai/)** | ✅ | ✅ | ✅ | `.opencode/` |
-| **[VSCode / GitHub Copilot](https://github.com/features/copilot)** | ❌ | ✅ | ❌ | `.github/skills/` |
+| **[VSCode / GitHub Copilot](https://github.com/features/copilot)** | ❌* | ✅ | ✅* | `.github/skills/`, `.github/agents/` |
 | **[Windsurf](https://codeium.com/windsurf)** | ❌ | ✅ | ❌ | `.windsurf/skills/` |
 
 **Notes:** 
-- VSCode / GitHub Copilot and Windsurf only support [Agent Skills](https://www.agentskills.io/)
+- The support matrix reflects current aimgr direct-install support, not every upstream customization surface a tool may expose
+- VSCode / GitHub Copilot and Windsurf support direct skill installation via aimgr
 - Skills for Copilot and Windsurf use the same `SKILL.md` format as other tools
 - Use `--tool=copilot` or `--tool=vscode` for GitHub Copilot (both names work)
 - Use `--tool=windsurf` for Windsurf
+- GitHub Copilot / VS Code agent installs use `.github/agents/*.agent.md` (installed artifact naming)
+- Repository source agents remain logical aimgr resources in `agents/*.md`
+- GitHub Copilot / VS Code prompt files use `.github/prompts/*.prompt.md`, but aimgr intentionally does not map/install `command` resources there
+- GitHub Copilot CLI has its own plugin/customization model for commands and slash commands, which is not the same as project-level `commands/*.md` installs
 
 ## Installation
 

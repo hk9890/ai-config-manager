@@ -153,6 +153,66 @@ func TestSaveOnInstall(t *testing.T) {
 	}
 }
 
+// TestCopilotCommandInstallRejectedDoesNotUpdateManifest verifies explicit
+// copilot command installs are rejected and do not touch ai.package.yaml.
+func TestCopilotCommandInstallRejectedDoesNotUpdateManifest(t *testing.T) {
+	repoDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	// Seed manifest with a known resource to ensure rejected installs don't modify it.
+	manifestPath := filepath.Join(projectDir, manifest.ManifestFileName)
+	originalManifest := `resources:
+  - skill/existing-skill
+`
+	if err := os.WriteFile(manifestPath, []byte(originalManifest), 0644); err != nil {
+		t.Fatalf("Failed to create manifest: %v", err)
+	}
+
+	// Add command to repository.
+	cmdPath := createTestCommand(t, "copilot-reject", "Command used for copilot rejection test")
+	if _, err := runAimgr(t, "repo", "add", "--force", "local:"+cmdPath); err != nil {
+		t.Fatalf("Failed to add command: %v", err)
+	}
+
+	// Explicit copilot target install should fail.
+	output, err := runAimgr(t, "install", "command/copilot-reject", "--target", "copilot", "--project-path", projectDir)
+	if err == nil {
+		t.Fatalf("Expected install to fail for explicit copilot command target. Output: %s", output)
+	}
+
+	if !strings.Contains(strings.ToLower(output), "not supported") || !strings.Contains(strings.ToLower(output), "copilot") {
+		t.Fatalf("Expected clear unsupported copilot error, got output: %s", output)
+	}
+
+	if strings.Contains(output, "✓ Installed command 'copilot-reject'") {
+		t.Fatalf("Output must not report success for rejected resource. Output: %s", output)
+	}
+
+	if strings.Contains(output, "✓ Added to ai.package.yaml") {
+		t.Fatalf("Output must not report manifest update for rejected resource. Output: %s", output)
+	}
+
+	// Manifest should remain unchanged.
+	updatedManifest, readErr := os.ReadFile(manifestPath)
+	if readErr != nil {
+		t.Fatalf("Failed to read manifest after rejected install: %v", readErr)
+	}
+	if string(updatedManifest) != originalManifest {
+		t.Fatalf("Manifest changed after rejected install.\nGot:\n%s\nWant:\n%s", string(updatedManifest), originalManifest)
+	}
+
+	// Rejected command should not appear in manifest resources.
+	m, loadErr := manifest.Load(manifestPath)
+	if loadErr != nil {
+		t.Fatalf("Failed to load manifest after rejected install: %v", loadErr)
+	}
+	if m.Has("command/copilot-reject") {
+		t.Fatalf("Manifest should not contain rejected command resource: %v", m.Resources)
+	}
+}
+
 // TestNoSaveFlag tests that --no-save skips yaml update
 func TestNoSaveFlag(t *testing.T) {
 	repoDir := t.TempDir()

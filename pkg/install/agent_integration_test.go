@@ -199,7 +199,7 @@ This agent tests installation to multiple tools simultaneously.
 - Claude Code
 - OpenCode
 
-Note: Copilot and Windsurf do not support agents.
+Note: Windsurf does not support agents.
 `
 	if err := os.WriteFile(agentFile, []byte(agentContent), 0644); err != nil {
 		t.Fatalf("Failed to create test agent: %v", err)
@@ -221,7 +221,6 @@ Note: Copilot and Windsurf do not support agents.
 	tmpProject := t.TempDir()
 
 	// Install to multiple tools: Claude, OpenCode, and Copilot
-	// (Copilot should be skipped since it doesn't support agents)
 	t.Log("Installing agent to Claude, OpenCode, and Copilot")
 	allTools := []tools.Tool{tools.Claude, tools.OpenCode, tools.Copilot}
 	installer, err := NewInstallerWithTargets(tmpProject, allTools)
@@ -237,6 +236,7 @@ Note: Copilot and Windsurf do not support agents.
 	supportedPaths := map[tools.Tool]string{
 		tools.Claude:   filepath.Join(tmpProject, ".claude", "agents", "multi-tool-agent.md"),
 		tools.OpenCode: filepath.Join(tmpProject, ".opencode", "agents", "multi-tool-agent.md"),
+		tools.Copilot:  filepath.Join(tmpProject, ".github", "agents", "multi-tool-agent.agent.md"),
 	}
 
 	for tool, expectedPath := range supportedPaths {
@@ -269,13 +269,7 @@ Note: Copilot and Windsurf do not support agents.
 		t.Logf("✓ %s installation verified", tool)
 	}
 
-	// Verify Copilot did NOT create an agents directory
-	t.Log("Verifying Copilot did not create agents directory")
-	copilotAgentsDir := filepath.Join(tmpProject, ".github", "agents")
-	if _, err := os.Stat(copilotAgentsDir); err == nil {
-		t.Error("Copilot should not create agents directory (agents not supported)")
-	}
-	t.Logf("✓ Copilot correctly skipped agent installation")
+	t.Logf("✓ Copilot agent installation verified with .agent.md naming")
 
 	// List should return only one agent (deduplicated)
 	t.Log("Verifying list deduplication")
@@ -403,8 +397,8 @@ func TestAgentToolSupport(t *testing.T) {
 		},
 		{
 			tool:          tools.Copilot,
-			shouldSupport: false,
-			expectedDir:   "",
+			shouldSupport: true,
+			expectedDir:   ".github/agents",
 		},
 		{
 			tool:          tools.Windsurf,

@@ -3,6 +3,7 @@ package install
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
@@ -670,7 +671,7 @@ func TestInstallSkillMultipleToolsIncludingCopilot(t *testing.T) {
 	}
 }
 
-func TestInstallSkillCopilotSkipsCommands(t *testing.T) {
+func TestInstallCommandCopilotReturnsUnsupportedError(t *testing.T) {
 	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
 
@@ -680,10 +681,14 @@ func TestInstallSkillCopilotSkipsCommands(t *testing.T) {
 		t.Fatalf("NewInstallerWithTargets() error = %v", err)
 	}
 
-	// Try to install command - should succeed but not create anything
+	// Try to install command - should fail clearly
 	err = installer.InstallCommand("test-cmd", manager)
-	if err != nil {
-		t.Fatalf("InstallCommand() error = %v", err)
+	if err == nil {
+		t.Fatal("InstallCommand() expected error for unsupported copilot command install, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "not supported") || !strings.Contains(err.Error(), "copilot") {
+		t.Fatalf("InstallCommand() error = %v, want message mentioning unsupported copilot target", err)
 	}
 
 	// Verify no .github/commands directory was created

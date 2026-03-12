@@ -3,6 +3,11 @@
 {"issue_id":"ai-config-manager-292","label":"area:docs"}
 {"issue_id":"ai-config-manager-292","label":"area:repo"}
 {"issue_id":"ai-config-manager-292","label":"area:ux"}
+{"issue_id":"ai-config-manager-4a5","label":"area:copilot"}
+{"issue_id":"ai-config-manager-4a5.1","label":"area:copilot"}
+{"issue_id":"ai-config-manager-4a5.2","label":"area:copilot"}
+{"issue_id":"ai-config-manager-4a5.3","label":"area:copilot"}
+{"issue_id":"ai-config-manager-4a5.4","label":"area:copilot"}
 {"issue_id":"ai-config-manager-4ao","label":"marked-for-compaction"}
 {"issue_id":"ai-config-manager-4ao.1","label":"marked-for-compaction"}
 {"issue_id":"ai-config-manager-4ao.2","label":"marked-for-compaction"}

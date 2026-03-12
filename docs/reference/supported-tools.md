@@ -9,7 +9,7 @@ aimgr supports installing AI resources to multiple AI coding tools. This referen
 | Claude Code | Yes | Yes | Yes | `.claude/` |
 | OpenCode | Yes | Yes | Yes | `.opencode/` |
 | Windsurf | - | Yes | - | `.windsurf/skills/` |
-| GitHub Copilot | - | Yes | - | `.github/skills/` |
+| GitHub Copilot | - | Yes | Yes | `.github/skills/`, `.github/agents/` |
 
 **Key:**
 - **Commands**: Slash commands (e.g., `/review`, `/deploy`)
@@ -73,12 +73,26 @@ GitHub Copilot is GitHub's AI pair programmer, integrated into VSCode.
 |----------|-------|
 | Config Directory | `.github/` |
 | Skills Path | `.github/skills/` |
-| Commands | Not supported |
-| Agents | Not supported |
+| Agents Path | `.github/agents/` |
+| Commands | aimgr direct install not supported |
+| Agents | aimgr direct install supported (`.agent.md` installed artifacts) |
 | CLI Aliases | `copilot`, `vscode` |
 
 **Documentation:**
 - [GitHub Copilot Documentation](https://docs.github.com/en/copilot)
+
+**Validated upstream conventions (March 2026):**
+- Agent Skills live under `.github/skills/<skill-name>/SKILL.md`
+- VS Code custom agents live under `.github/agents/*.agent.md`
+- VS Code slash commands are prompt files under `.github/prompts/*.prompt.md`
+- Copilot CLI also supports slash commands/reusable prompts and plugin-defined commands, but that model is not the same as aimgr's current `command` resource type
+
+**aimgr contract:**
+- aimgr installs Copilot skills and agents
+- Copilot agents are installed as `.github/agents/<name>.agent.md`
+- Repository source agents remain standard aimgr logical resources in `agents/<name>.md`
+- aimgr does **not** currently install VS Code prompt files
+- aimgr does **not** map generic `commands/*.md` resources to Copilot prompt files automatically
 
 ## Resource Formats
 
@@ -129,7 +143,7 @@ When installing to a project, aimgr automatically detects which tools are alread
 
 - `.claude/` - Claude Code detected
 - `.opencode/` - OpenCode detected
-- `.github/skills/` - GitHub Copilot detected
+- `.github/skills/` or `.github/agents/` - GitHub Copilot detected (once)
 - `.windsurf/skills/` - Windsurf detected
 
 If tool directories already exist, aimgr installs to those tools. If no tool directories exist, it uses your configured default targets.

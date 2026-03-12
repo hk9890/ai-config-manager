@@ -104,7 +104,7 @@ Examples:
 
 		if len(detectedTools) == 0 {
 			fmt.Println("No tool directories found in this project.")
-			fmt.Println("\nExpected directories: .claude, .opencode, or .github/skills")
+			fmt.Println("\nExpected directories: .claude, .opencode, .github/skills, or .github/agents")
 			fmt.Println("Install resources with: aimgr install <resource>")
 			return nil
 		}
@@ -387,7 +387,7 @@ func isInstalledInTool(projectPath, name string, resType resource.ResourceType, 
 		if !toolInfo.SupportsAgents {
 			return false
 		}
-		checkPath = fmt.Sprintf("%s/%s/%s.md", projectPath, toolInfo.AgentsDir, name)
+		checkPath = filepath.Join(projectPath, toolInfo.AgentsDir, tools.AgentArtifactName(tool, name))
 	default:
 		return false
 	}

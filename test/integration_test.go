@@ -400,7 +400,7 @@ description: A test command for multi-tool testing
 		}
 	})
 
-	t.Run("copilot skills only no commands", func(t *testing.T) {
+	t.Run("copilot skills only rejects commands", func(t *testing.T) {
 		projectDir := t.TempDir()
 
 		// Create .github/skills directory
@@ -420,10 +420,13 @@ description: A test command for multi-tool testing
 			t.Errorf("Expected Copilot as only target, got %v", targets)
 		}
 
-		// Try to install command - should work but not create anything
-		// (Copilot doesn't support commands)
-		if err := installer.InstallCommand("multi-test-cmd", manager); err != nil {
-			t.Fatalf("Failed to install command: %v", err)
+		// Try to install command - should fail clearly
+		err = installer.InstallCommand("multi-test-cmd", manager)
+		if err == nil {
+			t.Fatal("InstallCommand() expected error for unsupported copilot command install, got nil")
+		}
+		if !strings.Contains(err.Error(), "not supported") || !strings.Contains(err.Error(), "copilot") {
+			t.Fatalf("InstallCommand() error = %v, want unsupported copilot message", err)
 		}
 
 		// Verify NOT created in .github (Copilot doesn't support commands)

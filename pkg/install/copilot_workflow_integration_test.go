@@ -235,6 +235,119 @@ func TestCopilotToolDetection(t *testing.T) {
 	t.Logf("✓ Copilot detected when .github/skills/ exists")
 }
 
+func TestCopilotToolDetection_AgentsDirOnly(t *testing.T) {
+	tmpProject := t.TempDir()
+
+	agentsDir := filepath.Join(tmpProject, ".github", "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		t.Fatalf("Failed to create .github/agents: %v", err)
+	}
+
+	detected, err := tools.DetectExistingTools(tmpProject)
+	if err != nil {
+		t.Fatalf("DetectExistingTools failed: %v", err)
+	}
+
+	if len(detected) != 1 || detected[0] != tools.Copilot {
+		t.Fatalf("Expected only Copilot detected, got: %v", detected)
+	}
+}
+
+func TestCopilotToolDetection_DetectsOnceWithSkillsAndAgents(t *testing.T) {
+	tmpProject := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(tmpProject, ".github", "skills"), 0755); err != nil {
+		t.Fatalf("Failed to create .github/skills: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmpProject, ".github", "agents"), 0755); err != nil {
+		t.Fatalf("Failed to create .github/agents: %v", err)
+	}
+
+	detected, err := tools.DetectExistingTools(tmpProject)
+	if err != nil {
+		t.Fatalf("DetectExistingTools failed: %v", err)
+	}
+
+	copilotCount := 0
+	for _, tool := range detected {
+		if tool == tools.Copilot {
+			copilotCount++
+		}
+	}
+
+	if copilotCount != 1 {
+		t.Fatalf("Expected Copilot detected exactly once, got %d in %v", copilotCount, detected)
+	}
+}
+
+func TestCopilotAgentWorkflow(t *testing.T) {
+	tmpSource := t.TempDir()
+	agentFile := filepath.Join(tmpSource, "test-copilot-agent.md")
+	agentContent := `---
+description: Test agent for VSCode/Copilot workflow
+type: reviewer
+---
+
+# Test Copilot Agent
+`
+	if err := os.WriteFile(agentFile, []byte(agentContent), 0644); err != nil {
+		t.Fatalf("Failed to create test agent: %v", err)
+	}
+
+	tmpRepo := t.TempDir()
+	mgr := repo.NewManagerWithPath(tmpRepo)
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repository: %v", err)
+	}
+
+	if err := mgr.AddAgent(agentFile, "file://"+agentFile, "file"); err != nil {
+		t.Fatalf("Failed to import agent: %v", err)
+	}
+
+	tmpProject := t.TempDir()
+	installer, err := NewInstallerWithTargets(tmpProject, []tools.Tool{tools.Copilot})
+	if err != nil {
+		t.Fatalf("Failed to create installer: %v", err)
+	}
+
+	if err := installer.InstallAgent("test-copilot-agent", mgr); err != nil {
+		t.Fatalf("Failed to install agent: %v", err)
+	}
+
+	agentInstallPath := filepath.Join(tmpProject, ".github", "agents", "test-copilot-agent.agent.md")
+	info, err := os.Lstat(agentInstallPath)
+	if err != nil {
+		t.Fatalf("Agent not found at %s: %v", agentInstallPath, err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("Expected symlink at %s", agentInstallPath)
+	}
+
+	installed, err := installer.List()
+	if err != nil {
+		t.Fatalf("Failed to list installed resources: %v", err)
+	}
+
+	found := false
+	for _, res := range installed {
+		if res.Type == resource.Agent && res.Name == "test-copilot-agent" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Agent 'test-copilot-agent' not found in list")
+	}
+
+	if err := installer.Uninstall("test-copilot-agent", resource.Agent, mgr); err != nil {
+		t.Fatalf("Failed to uninstall agent: %v", err)
+	}
+
+	if _, err := os.Lstat(agentInstallPath); err == nil {
+		t.Fatalf("Agent still exists at %s after uninstall", agentInstallPath)
+	}
+}
+
 // TestMultiToolSkillInstallation verifies skills can be installed to multiple tools
 func TestMultiToolSkillInstallation(t *testing.T) {
 	// Setup: Create test skill
@@ -363,8 +476,12 @@ This skill tests installation to multiple tools simultaneously.
 	t.Logf("✓ Skill removed from all tools")
 }
 
-// TestCopilotSkillsOnlySupport verifies Copilot only supports skills (not commands or agents)
-func TestCopilotSkillsOnlySupport(t *testing.T) {
+// TestCopilotCurrentAimgrContract verifies the current aimgr contract for the
+// copilot/vscode target.
+//
+// aimgr models direct skill and agent installation for this target, while
+// prompt-file/command installation remains intentionally unsupported.
+func TestCopilotCurrentAimgrContract(t *testing.T) {
 	copilotInfo := tools.GetToolInfo(tools.Copilot)
 
 	if copilotInfo.SupportsCommands {
@@ -375,23 +492,23 @@ func TestCopilotSkillsOnlySupport(t *testing.T) {
 		t.Errorf("Copilot should support skills")
 	}
 
-	if copilotInfo.SupportsAgents {
-		t.Errorf("Copilot should not support agents")
+	if !copilotInfo.SupportsAgents {
+		t.Errorf("Copilot should support agents")
 	}
 
 	if copilotInfo.CommandsDir != "" {
 		t.Errorf("Copilot CommandsDir should be empty, got %s", copilotInfo.CommandsDir)
 	}
 
-	if copilotInfo.AgentsDir != "" {
-		t.Errorf("Copilot AgentsDir should be empty, got %s", copilotInfo.AgentsDir)
+	if copilotInfo.AgentsDir != ".github/agents" {
+		t.Errorf("Copilot AgentsDir should be .github/agents, got %s", copilotInfo.AgentsDir)
 	}
 
 	if copilotInfo.SkillsDir != ".github/skills" {
 		t.Errorf("Copilot SkillsDir = %s, want .github/skills", copilotInfo.SkillsDir)
 	}
 
-	t.Logf("✓ Copilot correctly supports only skills")
+	t.Logf("✓ Copilot current aimgr contract supports skills+agents and disables commands")
 }
 
 // TestCopilotWithFixtureSkills tests using skills from the testdata fixtures

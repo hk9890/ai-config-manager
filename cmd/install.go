@@ -77,14 +77,14 @@ Pattern matching is supported using glob syntax:
   - {a,b} matches any alternative
 
 Multi-tool behavior:
-  - If tool directories exist (.claude, .opencode, .github/skills), installs to ALL of them
+  - If tool directories exist (.claude, .opencode, .github/skills, .github/agents), installs to ALL of them
   - If no tool directories exist, creates and installs to your default tool
   - Default tool is configured in ~/.config/aimgr/aimgr.yaml (use 'aimgr config set install.targets <tool>')
 
 Supported tools:
   - claude:   Claude Code (.claude/commands, .claude/skills, .claude/agents)
   - opencode: OpenCode (.opencode/commands, .opencode/skills, .opencode/agents)
-  - copilot:  GitHub Copilot (.github/skills only - no commands or agents support)
+  - copilot:  GitHub Copilot (.github/skills and .github/agents; commands/prompt files remain unsupported)
 
 Examples:
   # Install from ai.package.yaml
@@ -501,7 +501,7 @@ func printInstallSummary(results []installResult) {
 					}
 				case resource.Agent:
 					if toolInfo.SupportsAgents {
-						installPath = fmt.Sprintf("%s/%s.md", toolInfo.AgentsDir, result.name)
+						installPath = fmt.Sprintf("%s/%s", toolInfo.AgentsDir, tools.AgentArtifactName(tool, result.name))
 					}
 				}
 				if installPath != "" {

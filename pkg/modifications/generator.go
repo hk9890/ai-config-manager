@@ -30,6 +30,7 @@ import (
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/config"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/frontmatter"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/tools"
 )
 
 // ModificationsDirName is the name of the modifications directory in the repo
@@ -210,7 +211,11 @@ func (g *Generator) getModificationFilePath(res *resource.Resource, toolName str
 		return filepath.Join(g.ModificationsDir(), toolName, typePlural, res.Name, "SKILL.md")
 	case resource.Agent, resource.Command:
 		// Agents/Commands: .modifications/<tool>/<type>s/<name>.md
-		return filepath.Join(g.ModificationsDir(), toolName, typePlural, res.Name+".md")
+		fileName := res.Name + ".md"
+		if res.Type == resource.Agent {
+			fileName = tools.AgentArtifactNameForToolName(toolName, res.Name)
+		}
+		return filepath.Join(g.ModificationsDir(), toolName, typePlural, fileName)
 	default:
 		return ""
 	}
@@ -382,7 +387,11 @@ func (g *Generator) GetModificationPath(res *resource.Resource, toolName string)
 		checkPath = filepath.Join(g.ModificationsDir(), toolName, typePlural, res.Name)
 	case resource.Agent, resource.Command:
 		// For agents/commands, return the file path
-		checkPath = filepath.Join(g.ModificationsDir(), toolName, typePlural, res.Name+".md")
+		fileName := res.Name + ".md"
+		if res.Type == resource.Agent {
+			fileName = tools.AgentArtifactNameForToolName(toolName, res.Name)
+		}
+		checkPath = filepath.Join(g.ModificationsDir(), toolName, typePlural, fileName)
 	default:
 		return ""
 	}

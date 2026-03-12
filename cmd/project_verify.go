@@ -173,12 +173,11 @@ func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath 
 
 	for _, tool := range detectedTools {
 		toolInfo := tools.GetToolInfo(tool)
-		toolName := tool.String()
 
 		// Check commands
 		if toolInfo.SupportsCommands {
 			commandsDir := filepath.Join(projectPath, toolInfo.CommandsDir)
-			found, err := verifyDirectory(commandsDir, toolName, repoPath)
+			found, err := verifyDirectory(commandsDir, tool, repoPath)
 			if err != nil {
 				return nil, err
 			}
@@ -188,7 +187,7 @@ func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath 
 		// Check skills
 		if toolInfo.SupportsSkills {
 			skillsDir := filepath.Join(projectPath, toolInfo.SkillsDir)
-			found, err := verifyDirectory(skillsDir, toolName, repoPath)
+			found, err := verifyDirectory(skillsDir, tool, repoPath)
 			if err != nil {
 				return nil, err
 			}
@@ -198,7 +197,7 @@ func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath 
 		// Check agents
 		if toolInfo.SupportsAgents {
 			agentsDir := filepath.Join(projectPath, toolInfo.AgentsDir)
-			found, err := verifyDirectory(agentsDir, toolName, repoPath)
+			found, err := verifyDirectory(agentsDir, tool, repoPath)
 			if err != nil {
 				return nil, err
 			}
@@ -209,7 +208,8 @@ func scanProjectIssues(projectPath string, detectedTools []tools.Tool, repoPath 
 	return issues, nil
 }
 
-func verifyDirectory(dir, tool, repoPath string) ([]VerifyIssue, error) {
+func verifyDirectory(dir string, tool tools.Tool, repoPath string) ([]VerifyIssue, error) {
+	toolName := tool.String()
 	// Check if directory exists
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil, nil
@@ -250,8 +250,16 @@ func verifyDirectory(dir, tool, repoPath string) ([]VerifyIssue, error) {
 					if subInfo.Mode()&os.ModeSymlink == 0 {
 						continue
 					}
-					namespacedName := entry.Name() + "/" + strings.TrimSuffix(subEntry.Name(), ".md")
-					if issue := verifySymlink(subPath, namespacedName, tool, repoPath); issue != nil {
+					namePart := strings.TrimSuffix(subEntry.Name(), ".md")
+					if strings.Contains(strings.ToLower(dir), "/agents") {
+						logicalName, ok := tools.AgentLogicalName(tool, subEntry.Name())
+						if !ok {
+							continue
+						}
+						namePart = logicalName
+					}
+					namespacedName := entry.Name() + "/" + namePart
+					if issue := verifySymlink(subPath, namespacedName, toolName, repoPath); issue != nil {
 						issues = append(issues, *issue)
 					}
 				}
@@ -259,7 +267,16 @@ func verifyDirectory(dir, tool, repoPath string) ([]VerifyIssue, error) {
 			continue
 		}
 
-		if issue := verifySymlink(symlinkPath, entry.Name(), tool, repoPath); issue != nil {
+		resourceName := entry.Name()
+		if strings.Contains(strings.ToLower(dir), "/agents") {
+			logicalName, ok := tools.AgentLogicalName(tool, entry.Name())
+			if !ok {
+				continue
+			}
+			resourceName = logicalName
+		}
+
+		if issue := verifySymlink(symlinkPath, resourceName, toolName, repoPath); issue != nil {
 			issues = append(issues, *issue)
 		}
 	}
@@ -434,8 +451,7 @@ func isResourceInstalledInTools(resType, resName, projectPath string, detectedTo
 			if !toolInfo.SupportsAgents {
 				continue
 			}
-			basePath := filepath.Join(projectPath, toolInfo.AgentsDir, resName)
-			checkPaths = []string{basePath + ".md"}
+			checkPaths = []string{filepath.Join(projectPath, toolInfo.AgentsDir, tools.AgentArtifactName(tool, resName))}
 		default:
 			continue
 		}
@@ -480,7 +496,7 @@ func findOrphanedInTools(mf *manifest.Manifest, projectPath string, detectedTool
 
 		if toolInfo.SupportsCommands {
 			dir := filepath.Join(projectPath, toolInfo.CommandsDir)
-			orphans := findOrphanedResources(dir, "command", expandedManifest, seen)
+			orphans := findOrphanedResources(dir, "command", tool, expandedManifest, seen)
 			for i := range orphans {
 				orphans[i].Tool = toolName
 				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
@@ -490,7 +506,7 @@ func findOrphanedInTools(mf *manifest.Manifest, projectPath string, detectedTool
 
 		if toolInfo.SupportsSkills {
 			dir := filepath.Join(projectPath, toolInfo.SkillsDir)
-			orphans := findOrphanedResources(dir, "skill", expandedManifest, seen)
+			orphans := findOrphanedResources(dir, "skill", tool, expandedManifest, seen)
 			for i := range orphans {
 				orphans[i].Tool = toolName
 				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
@@ -500,7 +516,7 @@ func findOrphanedInTools(mf *manifest.Manifest, projectPath string, detectedTool
 
 		if toolInfo.SupportsAgents {
 			dir := filepath.Join(projectPath, toolInfo.AgentsDir)
-			orphans := findOrphanedResources(dir, "agent", expandedManifest, seen)
+			orphans := findOrphanedResources(dir, "agent", tool, expandedManifest, seen)
 			for i := range orphans {
 				orphans[i].Tool = toolName
 				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
@@ -515,7 +531,7 @@ func findOrphanedInTools(mf *manifest.Manifest, projectPath string, detectedTool
 // findOrphanedResources scans a directory for installed symlinks that are not
 // in the expanded manifest. Returns VerifyIssue entries for each orphan found.
 // The seen map is used to deduplicate across multiple tool directories.
-func findOrphanedResources(dir, resType string, expandedManifest map[string]bool, seen map[string]bool) []VerifyIssue {
+func findOrphanedResources(dir, resType string, tool tools.Tool, expandedManifest map[string]bool, seen map[string]bool) []VerifyIssue {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil
 	}
@@ -538,8 +554,14 @@ func findOrphanedResources(dir, resType string, expandedManifest map[string]bool
 			// Top-level symlink
 			name := entry.Name()
 			// Commands and agents use .md-stripped names as resource references
-			if resType == "command" || resType == "agent" {
+			if resType == "command" {
 				name = strings.TrimSuffix(name, ".md")
+			} else if resType == "agent" {
+				logicalName, ok := tools.AgentLogicalName(tool, name)
+				if !ok {
+					continue
+				}
+				name = logicalName
 			}
 			ref := resType + "/" + name
 			if !expandedManifest[ref] && !seen[ref] {
@@ -569,7 +591,15 @@ func findOrphanedResources(dir, resType string, expandedManifest map[string]bool
 				if subInfo.Mode()&os.ModeSymlink == 0 {
 					continue
 				}
-				name := entry.Name() + "/" + strings.TrimSuffix(subEntry.Name(), ".md")
+				namePart := strings.TrimSuffix(subEntry.Name(), ".md")
+				if resType == "agent" {
+					logicalName, ok := tools.AgentLogicalName(tool, subEntry.Name())
+					if !ok {
+						continue
+					}
+					namePart = logicalName
+				}
+				name := entry.Name() + "/" + namePart
 				ref := resType + "/" + name
 				if !expandedManifest[ref] && !seen[ref] {
 					seen[ref] = true
@@ -786,8 +816,20 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo
 func parseResourceFromIssue(issue VerifyIssue) (resource.ResourceType, string) {
 	name := issue.Resource
 
-	// Determine type from the directory path
+	inferredTool := tools.OpenCode
 	pathLower := strings.ToLower(issue.Path)
+	switch {
+	case strings.Contains(pathLower, "/.claude/"):
+		inferredTool = tools.Claude
+	case strings.Contains(pathLower, "/.opencode/"):
+		inferredTool = tools.OpenCode
+	case strings.Contains(pathLower, "/.github/"):
+		inferredTool = tools.Copilot
+	case strings.Contains(pathLower, "/.windsurf/"):
+		inferredTool = tools.Windsurf
+	}
+
+	// Determine type from the directory path
 	switch {
 	case strings.Contains(pathLower, "/commands/"):
 		name = strings.TrimSuffix(name, ".md")
@@ -795,7 +837,10 @@ func parseResourceFromIssue(issue VerifyIssue) (resource.ResourceType, string) {
 	case strings.Contains(pathLower, "/skills/"):
 		return resource.Skill, name
 	case strings.Contains(pathLower, "/agents/"):
-		name = strings.TrimSuffix(name, ".md")
+		logicalName, ok := tools.AgentLogicalName(inferredTool, name)
+		if ok {
+			name = logicalName
+		}
 		return resource.Agent, name
 	default:
 		// Fallback — try to infer from name

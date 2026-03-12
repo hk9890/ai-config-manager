@@ -57,7 +57,7 @@ Available keys:
 Valid tools:
   claude   - Claude Code (supports commands, skills, and agents)
   opencode - OpenCode (supports commands, skills, and agents)
-  copilot  - GitHub Copilot (supports skills only)
+  copilot  - GitHub Copilot (supports skills and agents; prompt/command installs unsupported)
 
 Examples:
   aimgr config set install.targets claude

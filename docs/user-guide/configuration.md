@@ -300,7 +300,7 @@ install:
 **Valid tools:**
 - `claude` - Claude Code (`.claude/` directories)
 - `opencode` - OpenCode (`.opencode/` directories)
-- `copilot` or `vscode` - VSCode / GitHub Copilot (`.github/skills/` directories, skills only)
+- `copilot` or `vscode` - VSCode / GitHub Copilot (skills in `.github/skills/`, agents in `.github/agents/<name>.agent.md`; prompt-file commands in `.github/prompts/` are intentionally unsupported)
 - `windsurf` - Windsurf (`.windsurf/skills/` directories, skills only)
 
 **Behavior:**

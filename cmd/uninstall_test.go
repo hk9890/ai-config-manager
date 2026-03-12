@@ -485,7 +485,7 @@ func TestScanToolDir_Commands(t *testing.T) {
 	}
 
 	// Scan .claude/commands directory
-	matches := scanToolDir(projectPath, ".claude/commands", resource.Command, matcher)
+	matches := scanToolDir(projectPath, ".claude/commands", resource.Command, tools.Claude, matcher)
 
 	// Should find both commands
 	if len(matches) != 2 {
@@ -508,7 +508,7 @@ func TestScanToolDir_Skills(t *testing.T) {
 	}
 
 	// Scan .claude/skills directory
-	matches := scanToolDir(projectPath, ".claude/skills", resource.Skill, matcher)
+	matches := scanToolDir(projectPath, ".claude/skills", resource.Skill, tools.Claude, matcher)
 
 	// Should find both skills
 	if len(matches) != 2 {
@@ -526,7 +526,7 @@ func TestScanToolDir_NonExistentDirectory(t *testing.T) {
 	}
 
 	// Scan non-existent directory
-	matches := scanToolDir(projectPath, ".claude/commands", resource.Command, matcher)
+	matches := scanToolDir(projectPath, ".claude/commands", resource.Command, tools.Claude, matcher)
 
 	// Should return nil (no matches)
 	if matches != nil {
@@ -682,6 +682,73 @@ func TestUninstallAll_EmptyDirectory(t *testing.T) {
 	err := uninstallAll(projectPath, repoPath, []tools.Tool{tools.Claude})
 	if err != nil {
 		t.Fatalf("uninstallAll() failed on empty directories: %v", err)
+	}
+}
+
+func TestProcessUninstall_CopilotAgentUsesAgentSuffix(t *testing.T) {
+	tempDir := t.TempDir()
+
+	repoDir := filepath.Join(tempDir, "repo")
+	if err := os.MkdirAll(filepath.Join(repoDir, "agents"), 0755); err != nil {
+		t.Fatalf("failed to create repo: %v", err)
+	}
+
+	manager := repo.NewManagerWithPath(repoDir)
+
+	projectDir := filepath.Join(tempDir, "project")
+	agentsDir := filepath.Join(projectDir, ".github", "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		t.Fatalf("failed to create project dirs: %v", err)
+	}
+
+	agentRepoPath := filepath.Join(repoDir, "agents", "reviewer.md")
+	if err := os.WriteFile(agentRepoPath, []byte("---\ndescription: reviewer\n---\n# Reviewer"), 0644); err != nil {
+		t.Fatalf("failed to create agent: %v", err)
+	}
+
+	symlinkPath := filepath.Join(agentsDir, "reviewer.agent.md")
+	if err := os.Symlink(agentRepoPath, symlinkPath); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	result := processUninstall("agent/reviewer", projectDir, repoDir, []tools.Tool{tools.Copilot}, manager)
+	if !result.success {
+		t.Fatalf("processUninstall() failed: %v", result.message)
+	}
+
+	if _, err := os.Lstat(symlinkPath); !os.IsNotExist(err) {
+		t.Errorf("copilot agent symlink still exists after uninstall")
+	}
+}
+
+func TestExpandUninstallPattern_CopilotAgentSuffix(t *testing.T) {
+	tempDir := t.TempDir()
+	projectDir := filepath.Join(tempDir, "project")
+	agentsDir := filepath.Join(projectDir, ".github", "agents")
+	if err := os.MkdirAll(agentsDir, 0755); err != nil {
+		t.Fatalf("failed to create project dirs: %v", err)
+	}
+
+	repoDir := filepath.Join(tempDir, "repo")
+	agentRepoPath := filepath.Join(repoDir, "agents", "reviewer.md")
+	if err := os.MkdirAll(filepath.Dir(agentRepoPath), 0755); err != nil {
+		t.Fatalf("failed to create repo dirs: %v", err)
+	}
+	if err := os.WriteFile(agentRepoPath, []byte("---\ndescription: reviewer\n---\n# Reviewer"), 0644); err != nil {
+		t.Fatalf("failed to create agent: %v", err)
+	}
+
+	if err := os.Symlink(agentRepoPath, filepath.Join(agentsDir, "reviewer.agent.md")); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+
+	matches, err := expandUninstallPattern(projectDir, "agent/*", []tools.Tool{tools.Copilot})
+	if err != nil {
+		t.Fatalf("expandUninstallPattern failed: %v", err)
+	}
+
+	if len(matches) != 1 || matches[0] != "agent/reviewer" {
+		t.Fatalf("matches = %v, want [agent/reviewer]", matches)
 	}
 }
 

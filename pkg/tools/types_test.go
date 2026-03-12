@@ -174,10 +174,10 @@ func TestGetToolInfo(t *testing.T) {
 			wantName:          "GitHub Copilot / VSCode",
 			wantCommandsDir:   "",
 			wantSkillsDir:     ".github/skills",
-			wantAgentsDir:     "",
+			wantAgentsDir:     ".github/agents",
 			wantSupportsCmd:   false,
 			wantSupportsSkil:  true,
-			wantSupportsAgent: false,
+			wantSupportsAgent: true,
 		},
 		{
 			name:              "Windsurf",
@@ -244,6 +244,16 @@ func TestDetectExistingTools(t *testing.T) {
 		{
 			name:          "only Copilot",
 			setupDirs:     []string{".github/skills"},
+			expectedTools: []Tool{Copilot},
+		},
+		{
+			name:          "only Copilot agents directory",
+			setupDirs:     []string{".github/agents"},
+			expectedTools: []Tool{Copilot},
+		},
+		{
+			name:          "Copilot detected once with skills and agents",
+			setupDirs:     []string{".github/skills", ".github/agents"},
 			expectedTools: []Tool{Copilot},
 		},
 		{
@@ -345,5 +355,53 @@ func TestAllTools(t *testing.T) {
 		if !found {
 			t.Errorf("AllTools() missing %v", expected)
 		}
+	}
+}
+
+func TestAgentArtifactName(t *testing.T) {
+	tests := []struct {
+		name     string
+		tool     Tool
+		logical  string
+		expected string
+	}{
+		{name: "claude", tool: Claude, logical: "reviewer", expected: "reviewer.md"},
+		{name: "opencode", tool: OpenCode, logical: "reviewer", expected: "reviewer.md"},
+		{name: "copilot", tool: Copilot, logical: "reviewer", expected: "reviewer.agent.md"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := AgentArtifactName(tt.tool, tt.logical); got != tt.expected {
+				t.Errorf("AgentArtifactName() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAgentLogicalName(t *testing.T) {
+	tests := []struct {
+		name      string
+		tool      Tool
+		artifact  string
+		expected  string
+		shouldMap bool
+	}{
+		{name: "claude valid", tool: Claude, artifact: "reviewer.md", expected: "reviewer", shouldMap: true},
+		{name: "copilot valid", tool: Copilot, artifact: "reviewer.agent.md", expected: "reviewer", shouldMap: true},
+		{name: "copilot invalid md", tool: Copilot, artifact: "reviewer.md", shouldMap: false},
+		{name: "claude invalid no ext", tool: Claude, artifact: "reviewer", shouldMap: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := AgentLogicalName(tt.tool, tt.artifact)
+			if ok != tt.shouldMap {
+				t.Fatalf("AgentLogicalName() ok = %v, want %v", ok, tt.shouldMap)
+			}
+			if ok && got != tt.expected {
+				t.Errorf("AgentLogicalName() = %q, want %q", got, tt.expected)
+			}
+		})
 	}
 }

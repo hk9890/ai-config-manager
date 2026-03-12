@@ -187,6 +187,19 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 		return fmt.Errorf("command not found in repository: %w", err)
 	}
 
+	// Validate that at least one target supports commands.
+	// This prevents false-positive "installed" outcomes when all selected targets
+	// intentionally do not support command/prompt artifacts (e.g., Copilot).
+	commandTargets := make([]string, 0, len(i.targetTools))
+	for _, tool := range i.targetTools {
+		if tools.GetToolInfo(tool).SupportsCommands {
+			commandTargets = append(commandTargets, tool.String())
+		}
+	}
+	if len(commandTargets) == 0 {
+		return fmt.Errorf("command installation is not supported for target(s): %s", strings.Join(toolNames(i.targetTools), ", "))
+	}
+
 	// Install to each target tool
 	for _, tool := range i.targetTools {
 		toolInfo := tools.GetToolInfo(tool)
@@ -243,6 +256,14 @@ func (i *Installer) InstallCommand(name string, repoManager *repo.Manager) error
 	}
 
 	return nil
+}
+
+func toolNames(targets []tools.Tool) []string {
+	names := make([]string, 0, len(targets))
+	for _, target := range targets {
+		names = append(names, target.String())
+	}
+	return names
 }
 
 // InstallSkill installs a skill resource by creating symlinks to target tools
@@ -329,7 +350,7 @@ func (i *Installer) InstallAgent(name string, repoManager *repo.Manager) error {
 		}
 
 		// Symlink path
-		symlinkPath := filepath.Join(agentsDir, filepath.Base(res.Path))
+		symlinkPath := filepath.Join(agentsDir, tools.AgentArtifactName(tool, res.Name))
 
 		// Determine source path (modification if exists, otherwise original)
 		sourcePath := i.getSymlinkSource(res, tool, repoManager.GetRepoPath())
@@ -390,7 +411,7 @@ func (i *Installer) Uninstall(name string, resourceType resource.ResourceType, r
 			if !toolInfo.SupportsAgents {
 				continue
 			}
-			symlinkPath = filepath.Join(i.projectPath, toolInfo.AgentsDir, name+".md")
+			symlinkPath = filepath.Join(i.projectPath, toolInfo.AgentsDir, tools.AgentArtifactName(tool, name))
 		default:
 			return fmt.Errorf("invalid resource type: %s", resourceType)
 		}
@@ -477,7 +498,15 @@ func scanFileSymlinks(dir string, resType resource.ResourceType, loader func(str
 					continue
 				}
 				// Build namespaced name: "dirname/filename-without-ext"
-				name := entry.Name() + "/" + strings.TrimSuffix(subEntry.Name(), ".md")
+				namePart := strings.TrimSuffix(subEntry.Name(), ".md")
+				if resType == resource.Agent {
+					logicalName, ok := tools.AgentLogicalName(tool, subEntry.Name())
+					if !ok {
+						continue
+					}
+					namePart = logicalName
+				}
+				name := entry.Name() + "/" + namePart
 				// Check if target exists
 				if _, err := os.Stat(target); err != nil {
 					// Broken symlink
@@ -522,6 +551,13 @@ func scanFileSymlinks(dir string, resType resource.ResourceType, loader func(str
 		if _, err := os.Stat(target); err != nil {
 			// Broken symlink — create a minimal resource entry
 			name := strings.TrimSuffix(entry.Name(), ".md")
+			if resType == resource.Agent {
+				logicalName, ok := tools.AgentLogicalName(tool, entry.Name())
+				if !ok {
+					continue
+				}
+				name = logicalName
+			}
 			resourceMap[name] = resource.Resource{
 				Name:   name,
 				Type:   resType,
@@ -654,7 +690,7 @@ func (i *Installer) IsInstalled(name string, resourceType resource.ResourceType)
 			if !toolInfo.SupportsAgents {
 				continue
 			}
-			symlinkPath = filepath.Join(i.projectPath, toolInfo.AgentsDir, name+".md")
+			symlinkPath = filepath.Join(i.projectPath, toolInfo.AgentsDir, tools.AgentArtifactName(tool, name))
 		default:
 			return false
 		}
