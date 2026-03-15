@@ -128,31 +128,36 @@ aimgr uninstall command/test --no-save     # Remove but keep in manifest
 aimgr uninstall "skill/*"                  # Pattern matching
 ```
 
-To remove **all** installed resources:
+To remove **all** installed resources from owned directories:
 
 ```bash
-aimgr clean                   # Interactive confirmation
-aimgr clean --yes             # Skip confirmation
+aimgr clean
 ```
 
-`clean` removes all symlinks but preserves `ai.package.yaml`, so you can
-reinstall with `aimgr install`.
+`clean` empties owned resource directories and preserves `ai.package.yaml`.
+To restore declared resources, run `aimgr repair`.
 
 ---
 
 ## Repair Installations
 
-Fix broken symlinks, missing resources, and stale files:
+Reconcile owned directories to `ai.package.yaml`:
 
 ```bash
 # Diagnose (read-only)
 aimgr verify
 
-# Fix automatically
+# Reconcile automatically
 aimgr repair
 
-# Full cleanup
-aimgr repair --reset --prune-package --force
+# Preview planned actions safely
+aimgr repair --dry-run
+
+# Optional: also clean invalid manifest references
+aimgr repair --prune-package
+
+# Migration equivalent of old reset+force flow
+aimgr clean && aimgr repair
 ```
 
 ### What `repair` Fixes
@@ -162,16 +167,20 @@ aimgr repair --reset --prune-package --force
 | Broken symlinks | Reinstalls from repository |
 | Wrong-repo symlinks | Reinstalls from correct repository |
 | Missing resources (in manifest) | Installs from repository |
-| Orphaned resources (not in manifest) | Prints hint to uninstall |
+| Undeclared content in owned dirs | Removes undeclared files/symlinks/directories |
+| Declared resources manually removed | Reinstalls (manifest is source of truth) |
 
 ### Additional Flags
 
 | Flag | Description |
 |------|-------------|
-| `--reset` | Remove unmanaged files (not installed by aimgr) |
 | `--prune-package` | Remove invalid references from ai.package.yaml |
 | `--dry-run` | Preview without changes |
-| `--force` | Skip confirmation prompts |
+
+`--prune-package` is manifest cleanup. It is separate from owned-folder reconciliation.
+
+To permanently remove a resource, update `ai.package.yaml`
+(for example: `aimgr uninstall <resource>` without `--no-save`).
 
 ### Common Workflow
 
@@ -182,9 +191,18 @@ aimgr verify && aimgr repair
 # After updating repository sources
 aimgr repo sync && aimgr repair
 
-# Full reset
-aimgr clean --yes && aimgr install
+# Full reset + restore declared resources
+aimgr clean && aimgr repair
 ```
+
+### Migration Map (breaking behavior updates)
+
+| Old usage | New usage |
+|---|---|
+| `aimgr repair --reset` | `aimgr repair` |
+| `aimgr repair --force` | `aimgr repair` |
+| `aimgr clean --yes` | `aimgr clean` |
+| `aimgr repair --reset --force` | `aimgr clean && aimgr repair` |
 
 ---
 

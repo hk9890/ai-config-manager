@@ -131,21 +131,41 @@ aimgr repo remove skill foo
 aimgr repair --prune-package --dry-run
 
 # Remove invalid references
-aimgr repair --prune-package --force
+aimgr repair --prune-package
 ```
 
-### Unmanaged files in resource directories
+### Undeclared files in owned resource directories
 
-**Problem:** Resource directories contain files that weren't installed by aimgr.
+**Problem:** Owned resource directories contain content not declared in `ai.package.yaml`.
 
-**Solution:** Use `aimgr repair --reset` to find and remove unmanaged files:
+**Solution:** Use `aimgr repair` to reconcile owned directories to the manifest:
 ```bash
-# Preview what would be removed
-aimgr repair --reset --dry-run
+# Preview planned installs/fixes/removals
+aimgr repair --dry-run
 
-# Remove unmanaged files
-aimgr repair --reset --force
+# Apply reconciliation
+aimgr repair
 ```
+
+If you want a full wipe of owned resource dirs first, then restore declared resources:
+
+```bash
+aimgr clean && aimgr repair
+```
+
+### Resource keeps coming back after manual deletion
+
+**Problem:** You manually removed a skill/command/agent from a tool folder, but `aimgr repair` reinstalls it.
+
+**What it means:** The resource is still declared in `ai.package.yaml`, so repair restores it.
+
+**Solution:** Remove it from the manifest (for example with uninstall that saves manifest updates):
+
+```bash
+aimgr uninstall skill/my-skill
+```
+
+Avoid `--no-save` if you want permanent removal.
 
 ### Repository metadata issues
 

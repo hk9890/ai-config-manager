@@ -79,6 +79,24 @@ func TestLoadAgent(t *testing.T) {
 	}
 }
 
+func TestLoadAgent_CopilotInstalledArtifactNameNormalizesLogicalName(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "copilot-installed.agent.md")
+	content := "---\ndescription: Copilot installed artifact for testing\n---\n# Agent\n"
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	res, err := LoadAgent(filePath)
+	if err != nil {
+		t.Fatalf("LoadAgent() error = %v", err)
+	}
+
+	if res.Name != "copilot-installed" {
+		t.Fatalf("LoadAgent() name = %q, want %q", res.Name, "copilot-installed")
+	}
+}
+
 func TestLoadAgent_InvalidExtension(t *testing.T) {
 	// Create a temporary non-markdown file
 	tmpDir := t.TempDir()

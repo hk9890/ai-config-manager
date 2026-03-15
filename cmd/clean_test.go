@@ -1,336 +1,178 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/resource"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/tools"
 )
 
-func TestPreviewClean(t *testing.T) {
-	// Create temp directories
-	projectDir := t.TempDir()
-	repoDir := t.TempDir()
-
-	// Create tool directories
-	claudeDir := filepath.Join(projectDir, ".claude", "commands")
-	if err := os.MkdirAll(claudeDir, 0755); err != nil {
-		t.Fatalf("Failed to create tool directory: %v", err)
-	}
-
-	// Create symlinks pointing to repo
-	repoCommand := filepath.Join(repoDir, "commands", "test-cmd")
-	if err := os.MkdirAll(filepath.Dir(repoCommand), 0755); err != nil {
-		t.Fatalf("Failed to create repo directory: %v", err)
-	}
-	if err := os.WriteFile(repoCommand, []byte("#!/bin/bash\necho test"), 0755); err != nil {
-		t.Fatalf("Failed to create repo command: %v", err)
-	}
-
-	symlinkPath := filepath.Join(claudeDir, "test-cmd")
-	if err := os.Symlink(repoCommand, symlinkPath); err != nil {
-		t.Fatalf("Failed to create symlink: %v", err)
-	}
-
-	// Detect tools
-	detectedTools, err := tools.DetectExistingTools(projectDir)
-	if err != nil {
-		t.Fatalf("Failed to detect tools: %v", err)
-	}
-
-	// Preview clean
-	resources, err := previewClean(projectDir, detectedTools, repoDir)
-	if err != nil {
-		t.Fatalf("previewClean failed: %v", err)
-	}
-
-	// Verify results
-	if len(resources) != 1 {
-		t.Errorf("Expected 1 resource, got %d", len(resources))
-	}
-
-	if len(resources) > 0 {
-		if resources[0].Name != "test-cmd" {
-			t.Errorf("Resource name = %v, want test-cmd", resources[0].Name)
-		}
-		if resources[0].Type != "command" {
-			t.Errorf("Resource type = %v, want command", resources[0].Type)
-		}
-	}
-}
-
-func TestScanDirectory(t *testing.T) {
+func TestParseCleanFormat(t *testing.T) {
 	tests := []struct {
-		name          string
-		setupFunc     func(string, string) error
-		expectedCount int
+		name    string
+		raw     string
+		wantErr bool
 	}{
-		{
-			name: "finds symlinks pointing to repo",
-			setupFunc: func(dir, repoPath string) error {
-				target := filepath.Join(repoPath, "commands", "test-cmd")
-				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-					return err
-				}
-				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
-					return err
-				}
-				return os.Symlink(target, filepath.Join(dir, "test-cmd"))
-			},
-			expectedCount: 1,
-		},
-		{
-			name: "ignores symlinks not pointing to repo",
-			setupFunc: func(dir, repoPath string) error {
-				otherDir := filepath.Join(os.TempDir(), "other")
-				_ = os.MkdirAll(otherDir, 0755)
-				target := filepath.Join(otherDir, "test-cmd")
-				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
-					return err
-				}
-				return os.Symlink(target, filepath.Join(dir, "test-cmd"))
-			},
-			expectedCount: 0,
-		},
-		{
-			name: "ignores regular files",
-			setupFunc: func(dir, repoPath string) error {
-				return os.WriteFile(filepath.Join(dir, "regular-file"), []byte("test"), 0644)
-			},
-			expectedCount: 0,
-		},
-		{
-			name: "handles non-existent directory",
-			setupFunc: func(dir, repoPath string) error {
-				// Don't create the directory
-				return nil
-			},
-			expectedCount: 0,
-		},
+		{name: "default table", raw: ""},
+		{name: "table", raw: "table"},
+		{name: "json", raw: "json"},
+		{name: "yaml rejected", raw: "yaml", wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			repoDir := t.TempDir()
-
-			// Create directory for test
-			testDir := filepath.Join(dir, "commands")
-			if tt.name != "handles non-existent directory" {
-				if err := os.MkdirAll(testDir, 0755); err != nil {
-					t.Fatalf("Failed to create test directory: %v", err)
-				}
+			_, err := parseCleanFormat(tt.raw)
+			if tt.wantErr && err == nil {
+				t.Fatalf("expected error")
 			}
-
-			// Setup test scenario
-			if err := tt.setupFunc(testDir, repoDir); err != nil {
-				t.Fatalf("Setup failed: %v", err)
-			}
-
-			// Scan directory
-			resources, err := scanDirectory(testDir, "command", "claude", repoDir)
-			if err != nil {
-				t.Fatalf("scanDirectory failed: %v", err)
-			}
-
-			if len(resources) != tt.expectedCount {
-				t.Errorf("Expected %d resources, got %d", tt.expectedCount, len(resources))
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
 }
 
-func TestCleanDirectory(t *testing.T) {
-	tests := []struct {
-		name            string
-		setupFunc       func(string, string) error
-		expectedRemoved int
-		expectedFailed  int
-	}{
-		{
-			name: "removes symlinks pointing to repo",
-			setupFunc: func(dir, repoPath string) error {
-				target := filepath.Join(repoPath, "commands", "test-cmd")
-				if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-					return err
-				}
-				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
-					return err
-				}
-				return os.Symlink(target, filepath.Join(dir, "test-cmd"))
-			},
-			expectedRemoved: 1,
-			expectedFailed:  0,
-		},
-		{
-			name: "ignores symlinks not pointing to repo",
-			setupFunc: func(dir, repoPath string) error {
-				otherDir := filepath.Join(os.TempDir(), "other")
-				_ = os.MkdirAll(otherDir, 0755)
-				target := filepath.Join(otherDir, "test-cmd")
-				if err := os.WriteFile(target, []byte("test"), 0644); err != nil {
-					return err
-				}
-				return os.Symlink(target, filepath.Join(dir, "test-cmd"))
-			},
-			expectedRemoved: 0,
-			expectedFailed:  0,
-		},
-		{
-			name: "ignores regular files",
-			setupFunc: func(dir, repoPath string) error {
-				return os.WriteFile(filepath.Join(dir, "regular-file"), []byte("test"), 0644)
-			},
-			expectedRemoved: 0,
-			expectedFailed:  0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			repoDir := t.TempDir()
-
-			// Create directory
-			testDir := filepath.Join(dir, "commands")
-			if err := os.MkdirAll(testDir, 0755); err != nil {
-				t.Fatalf("Failed to create test directory: %v", err)
-			}
-
-			// Setup test scenario
-			if err := tt.setupFunc(testDir, repoDir); err != nil {
-				t.Fatalf("Setup failed: %v", err)
-			}
-
-			// Clean directory
-			removed, failed := cleanDirectory(testDir, repoDir)
-
-			if removed != tt.expectedRemoved {
-				t.Errorf("Removed = %d, want %d", removed, tt.expectedRemoved)
-			}
-
-			if failed != tt.expectedFailed {
-				t.Errorf("Failed = %d, want %d", failed, tt.expectedFailed)
-			}
-
-			// Verify symlinks were actually removed
-			if tt.expectedRemoved > 0 {
-				entries, err := os.ReadDir(testDir)
-				if err != nil {
-					t.Fatalf("Failed to read directory: %v", err)
-				}
-
-				// Check that no symlinks pointing to repo remain
-				for _, entry := range entries {
-					path := filepath.Join(testDir, entry.Name())
-					linkInfo, err := os.Lstat(path)
-					if err != nil {
-						continue
-					}
-
-					if linkInfo.Mode()&os.ModeSymlink != 0 {
-						target, err := os.Readlink(path)
-						if err == nil && strings.HasPrefix(target, repoDir) {
-							t.Errorf("Symlink %s pointing to repo was not removed", entry.Name())
-						}
-					}
-				}
-			}
-		})
-	}
-}
-
-func TestCleanAll(t *testing.T) {
-	// Create temp directories
+func TestCleanOwnedResourceDirs_RemovesAllEntryTypesAndKeepsRoots(t *testing.T) {
 	projectDir := t.TempDir()
-	repoDir := t.TempDir()
 
-	// Initialize repo
-	manager := repo.NewManagerWithPath(repoDir)
-	if err := manager.Init(); err != nil {
-		t.Fatalf("Failed to initialize repo: %v", err)
-	}
-
-	// Create tool directories
-	claudeDir := filepath.Join(projectDir, ".claude", "commands")
-	if err := os.MkdirAll(claudeDir, 0755); err != nil {
-		t.Fatalf("Failed to create tool directory: %v", err)
-	}
-
-	// Create repo command
-	repoCommand := filepath.Join(repoDir, "commands", "test-cmd")
-	if err := os.WriteFile(repoCommand, []byte("#!/bin/bash\necho test"), 0755); err != nil {
-		t.Fatalf("Failed to create repo command: %v", err)
-	}
-
-	// Create symlink
-	symlinkPath := filepath.Join(claudeDir, "test-cmd")
-	if err := os.Symlink(repoCommand, symlinkPath); err != nil {
-		t.Fatalf("Failed to create symlink: %v", err)
-	}
-
-	// Detect tools
-	detectedTools, err := tools.DetectExistingTools(projectDir)
-	if err != nil {
-		t.Fatalf("Failed to detect tools: %v", err)
-	}
-
-	// Clean all
-	removed, failed := cleanAll(projectDir, detectedTools, repoDir)
-
-	if removed != 1 {
-		t.Errorf("Removed = %d, want 1", removed)
-	}
-
-	if failed != 0 {
-		t.Errorf("Failed = %d, want 0", failed)
-	}
-
-	// Verify symlink was removed
-	if _, err := os.Lstat(symlinkPath); !os.IsNotExist(err) {
-		t.Error("Symlink was not removed")
-	}
-}
-
-func TestCleanCommand_NoToolDirectories(t *testing.T) {
-	// Create temp directory with no tool directories
-	projectDir := t.TempDir()
-	repoDir := t.TempDir()
-
-	// Set AIMGR_REPO_PATH
-	oldEnv := os.Getenv("AIMGR_REPO_PATH")
-	defer func() {
-		if oldEnv != "" {
-			_ = os.Setenv("AIMGR_REPO_PATH", oldEnv)
-		} else {
-			_ = os.Unsetenv("AIMGR_REPO_PATH")
+	commandsDir := filepath.Join(projectDir, ".claude", "commands")
+	skillsDir := filepath.Join(projectDir, ".claude", "skills")
+	agentsDir := filepath.Join(projectDir, ".claude", "agents")
+	for _, d := range []string{commandsDir, skillsDir, agentsDir} {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			t.Fatalf("mkdir %s: %v", d, err)
 		}
-	}()
-	_ = os.Setenv("AIMGR_REPO_PATH", repoDir)
-
-	// Initialize repo
-	manager := repo.NewManagerWithPath(repoDir)
-	if err := manager.Init(); err != nil {
-		t.Fatalf("Failed to initialize repo: %v", err)
 	}
 
-	// Change to project directory
-	originalDir, err := os.Getwd()
+	regularFile := filepath.Join(commandsDir, "manual.md")
+	if err := os.WriteFile(regularFile, []byte("manual"), 0644); err != nil {
+		t.Fatalf("write regular file: %v", err)
+	}
+
+	symlinkTarget := filepath.Join(projectDir, "elsewhere.txt")
+	if err := os.WriteFile(symlinkTarget, []byte("outside"), 0644); err != nil {
+		t.Fatalf("write symlink target: %v", err)
+	}
+	if err := os.Symlink(symlinkTarget, filepath.Join(skillsDir, "wrong-repo-link")); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+
+	if err := os.Symlink(filepath.Join(projectDir, "missing-target"), filepath.Join(skillsDir, "broken-link")); err != nil {
+		t.Fatalf("create broken symlink: %v", err)
+	}
+
+	nested := filepath.Join(agentsDir, "namespace", "inner.txt")
+	if err := os.MkdirAll(filepath.Dir(nested), 0755); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+	if err := os.WriteFile(nested, []byte("nested"), 0644); err != nil {
+		t.Fatalf("write nested file: %v", err)
+	}
+
+	owned := []OwnedResourceDir{
+		{Path: commandsDir, Tool: tools.Claude, ResourceType: resource.Command},
+		{Path: skillsDir, Tool: tools.Claude, ResourceType: resource.Skill},
+		{Path: agentsDir, Tool: tools.Claude, ResourceType: resource.Agent},
+	}
+
+	removed, failed := cleanOwnedResourceDirs(owned)
+	if len(failed) != 0 {
+		t.Fatalf("expected no failures, got %v", failed)
+	}
+	if len(removed) != 4 {
+		t.Fatalf("expected 4 removed top-level entries, got %d", len(removed))
+	}
+
+	for _, d := range []string{commandsDir, skillsDir, agentsDir} {
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			t.Fatalf("readdir %s: %v", d, err)
+		}
+		if len(entries) != 0 {
+			t.Fatalf("expected owned root dir %s to remain empty, found %d entries", d, len(entries))
+		}
+	}
+}
+
+func TestSummarizeCleanResult_CountsByType(t *testing.T) {
+	projectDir := t.TempDir()
+	ownedPath := filepath.Join(projectDir, ".claude", "skills")
+	if err := os.MkdirAll(ownedPath, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	summary := summarizeCleanResult(
+		[]OwnedResourceDir{{Path: ownedPath}, {Path: filepath.Join(projectDir, ".claude", "agents")}},
+		[]CleanRemovedEntry{
+			{EntryType: "file"},
+			{EntryType: "symlink"},
+			{EntryType: "directory"},
+		},
+		[]CleanFailedEntry{{}, {}},
+	)
+
+	if summary.OwnedDirsDetected != 2 || summary.OwnedDirsExisting != 1 {
+		t.Fatalf("unexpected owned dir counts: %+v", summary)
+	}
+	if summary.Removed != 3 || summary.RemovedFiles != 1 || summary.RemovedSymlinks != 1 || summary.RemovedDirs != 1 {
+		t.Fatalf("unexpected removed counts: %+v", summary)
+	}
+	if summary.Failed != 2 {
+		t.Fatalf("unexpected failed count: %+v", summary)
+	}
+}
+
+func TestDisplayCleanResult_JSONIncludesDetails(t *testing.T) {
+	old := os.Stdout
+	r, w, err := os.Pipe()
 	if err != nil {
-		t.Fatalf("Failed to get current directory: %v", err)
+		t.Fatalf("pipe: %v", err)
 	}
-	defer func() { _ = os.Chdir(originalDir) }()
+	os.Stdout = w
 
-	if err := os.Chdir(projectDir); err != nil {
-		t.Fatalf("Failed to change to project directory: %v", err)
+	result := CleanResult{
+		Warnings: []string{"warn"},
+		Removed:  []CleanRemovedEntry{{Tool: "claude", ResourceType: "skill", Path: "/tmp/p", EntryType: "symlink"}},
+		Failed:   []CleanFailedEntry{{Tool: "claude", ResourceType: "skill", Path: "/tmp/f", EntryType: "file", Error: "boom"}},
+		Summary:  CleanSummary{Removed: 1, Failed: 1},
 	}
 
-	// Run clean command - should exit gracefully with no tools
-	err = cleanCmd.RunE(cleanCmd, []string{})
+	err = displayCleanResult(result, "json")
+	_ = w.Close()
+	os.Stdout = old
 	if err != nil {
-		t.Errorf("Clean command should succeed with no tool directories, got error: %v", err)
+		t.Fatalf("display json failed: %v", err)
+	}
+
+	buf := make([]byte, 8192)
+	n, _ := r.Read(buf)
+
+	var parsed CleanResult
+	if err := json.Unmarshal(buf[:n], &parsed); err != nil {
+		t.Fatalf("invalid json: %v\n%s", err, string(buf[:n]))
+	}
+	if len(parsed.Removed) != 1 || len(parsed.Failed) != 1 || parsed.Summary.Removed != 1 {
+		t.Fatalf("unexpected parsed result: %+v", parsed)
+	}
+}
+
+func TestCollectCleanWarnings_MissingManifest(t *testing.T) {
+	projectDir := t.TempDir()
+	warnings := collectCleanWarnings(projectDir)
+	if len(warnings) != 1 {
+		t.Fatalf("expected one warning, got %d", len(warnings))
+	}
+	if !strings.Contains(warnings[0], "ai.package.yaml") || !strings.Contains(warnings[0], "will not be able to restore") {
+		t.Fatalf("unexpected warning: %s", warnings[0])
+	}
+}
+
+func TestCleanCommand_HelpDoesNotExposeYesFlag(t *testing.T) {
+	if cleanCmd.Flags().Lookup("yes") != nil {
+		t.Fatalf("clean command should not expose --yes")
 	}
 }

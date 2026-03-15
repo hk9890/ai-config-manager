@@ -26,14 +26,14 @@ This command checks for common installation issues:
   - Broken symlinks (target doesn't exist)
   - Symlinks pointing to wrong repository
   - Resources in ai.package.yaml that aren't installed
-  - Orphaned installations (not in ai.package.yaml)
+  - Undeclared content in owned directories (not in ai.package.yaml)
 
-Use 'aimgr repair' to automatically fix issues (--fix is deprecated).
+Use 'aimgr repair' to reconcile project resources to ai.package.yaml.
 
 Examples:
   aimgr verify                           # Check current directory
   aimgr verify --project-path ~/project  # Check specific directory
-  aimgr repair                           # Auto-fix issues by reinstalling
+  aimgr repair                           # Reconcile owned directories to ai.package.yaml
   aimgr verify --format json             # JSON output for scripts
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -54,18 +54,30 @@ Examples:
 		}
 		repoPath := manager.GetRepoPath()
 
-		// Detect tools
-		detectedTools, err := tools.DetectExistingTools(projectPath)
+		ownedDirs, err := detectOwnedResourceDirs(projectPath)
 		if err != nil {
 			return fmt.Errorf("failed to detect tools: %w", err)
 		}
+		detectedTools := toolsFromOwnedDirs(ownedDirs)
 
-		if len(detectedTools) == 0 {
+		if len(ownedDirs) == 0 {
 			fmt.Println("No tool directories found in this project.")
 			return nil
 		}
 
-		// Scan for issues (Phase 1: check symlinks on disk)
+		// Parse format flag
+		parsedFormat, err := output.ParseFormat(verifyFormatFlag2)
+		if err != nil {
+			return err
+		}
+
+		// --fix is deprecated and now acts as a warning-emitting wrapper around repair.
+		if verifyFixFlag {
+			fmt.Fprintln(os.Stderr, "Warning: --fix is deprecated. Running 'aimgr repair' reconciliation.")
+			return runVerifyFixWrapper(projectPath, manager, parsedFormat, ownedDirs)
+		}
+
+		// Scan for issues (Phase 1: check symlink integrity on disk)
 		issues, err := scanProjectIssues(projectPath, detectedTools, repoPath)
 		if err != nil {
 			return fmt.Errorf("verification failed: %w", err)
@@ -82,12 +94,6 @@ Examples:
 			issues = deduplicateIssues(issues, manifestIssues)
 		}
 
-		// Parse format flag
-		parsedFormat, err := output.ParseFormat(verifyFormatFlag2)
-		if err != nil {
-			return err
-		}
-
 		// Report results
 		if len(issues) == 0 {
 			return displayNoIssues(parsedFormat)
@@ -101,19 +107,9 @@ Examples:
 			return err
 		}
 
-		// Auto-fix if requested
-		if verifyFixFlag {
-			// TODO: Remove --fix flag in a future version. Replaced by 'aimgr repair'.
-			fmt.Fprintln(os.Stderr, "Warning: --fix is deprecated. Use 'aimgr repair' instead.")
-			if parsedFormat == output.Table {
-				fmt.Println("\nAttempting to fix issues...")
-			}
-			return fixVerifyIssues(projectPath, issues, manager)
-		}
-
 		// Show fix suggestion only for table format
 		if parsedFormat == output.Table {
-			fmt.Println("\nRun 'aimgr repair' to automatically fix these issues")
+			fmt.Println("\nRun 'aimgr repair' to reconcile these issues")
 		}
 		return nil
 	},
@@ -122,7 +118,7 @@ Examples:
 type VerifyIssue struct {
 	Resource    string
 	Tool        string
-	IssueType   string // issueTypeBroken, issueTypeWrongRepo, issueTypeNotInstalled, issueTypeOrphaned
+	IssueType   string // issueTypeBroken, issueTypeWrongRepo, issueTypeNotInstalled, issueTypeUndeclared
 	Description string
 	Path        string
 	Severity    string // "error", "warning"
@@ -133,7 +129,7 @@ const (
 	issueTypeBroken       = "broken"
 	issueTypeWrongRepo    = "wrong-repo"
 	issueTypeNotInstalled = "not-installed"
-	issueTypeOrphaned     = "orphaned"
+	issueTypeUndeclared   = "undeclared"
 	issueTypeUnreadable   = "unreadable"
 )
 
@@ -374,9 +370,9 @@ func checkManifestSync(projectPath string, detectedTools []tools.Tool, repoPath 
 		}
 	}
 
-	// Phase 2b: Disk → manifest (orphan detection)
-	orphanIssues := findOrphanedInTools(mf, projectPath, detectedTools, repoPath)
-	issues = append(issues, orphanIssues...)
+	// Phase 2b: Disk → manifest (undeclared content in owned directories)
+	undeclaredIssues := findUndeclaredInOwnedDirs(mf, projectPath, repoPath)
+	issues = append(issues, undeclaredIssues...)
 
 	return issues, nil
 }
@@ -465,14 +461,12 @@ func isResourceInstalledInTools(resType, resName, projectPath string, detectedTo
 	return false
 }
 
-// findOrphanedInTools builds the expanded manifest set and scans all tool
-// directories for installed symlinks not declared in the manifest.
-func findOrphanedInTools(mf *manifest.Manifest, projectPath string, detectedTools []tools.Tool, repoPath string) []VerifyIssue {
+// findUndeclaredInOwnedDirs builds the expanded manifest set and scans owned
+// resource directories for undeclared content not covered by ai.package.yaml.
+func findUndeclaredInOwnedDirs(mf *manifest.Manifest, projectPath string, repoPath string) []VerifyIssue {
 	// Build the expanded manifest set (includes package member resources)
 	expandedManifest := make(map[string]bool, len(mf.Resources))
 	for _, ref := range mf.Resources {
-		expandedManifest[ref] = true
-
 		// Expand packages — resolve each package to its member resources
 		if strings.HasPrefix(ref, "package/") {
 			packageName := strings.TrimPrefix(ref, "package/")
@@ -484,54 +478,64 @@ func findOrphanedInTools(mf *manifest.Manifest, projectPath string, detectedTool
 			for _, memberRef := range pkg.Resources {
 				expandedManifest[memberRef] = true
 			}
+			continue
+		}
+
+		expandedManifest[ref] = true
+	}
+
+	ownedDirs, err := detectOwnedResourceDirs(projectPath)
+	if err != nil {
+		return nil
+	}
+
+	declaredPaths := make(map[string]struct{})
+	for ref := range expandedManifest {
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			continue
+		}
+		for _, p := range desiredInstallPaths(projectPath, ownedDirs, resType, resName) {
+			declaredPaths[p.path] = struct{}{}
 		}
 	}
 
-	// Scan all tool directories for installed symlinks
+	undeclaredPaths, err := collectUndeclaredPaths(ownedDirs, declaredPaths)
+	if err != nil {
+		return nil
+	}
+
+	// Convert undeclared paths to verify issues
 	var issues []VerifyIssue
-	seen := make(map[string]bool) // Deduplicate across tools
-	for _, tool := range detectedTools {
-		toolInfo := tools.GetToolInfo(tool)
-		toolName := tool.String()
-
-		if toolInfo.SupportsCommands {
-			dir := filepath.Join(projectPath, toolInfo.CommandsDir)
-			orphans := findOrphanedResources(dir, "command", tool, expandedManifest, seen)
-			for i := range orphans {
-				orphans[i].Tool = toolName
-				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
+	for _, undeclaredPath := range undeclaredPaths {
+		for _, owned := range ownedDirs {
+			if undeclaredPath != owned.Path && !strings.HasPrefix(undeclaredPath, owned.Path+string(os.PathSeparator)) {
+				continue
 			}
-			issues = append(issues, orphans...)
-		}
 
-		if toolInfo.SupportsSkills {
-			dir := filepath.Join(projectPath, toolInfo.SkillsDir)
-			orphans := findOrphanedResources(dir, "skill", tool, expandedManifest, seen)
-			for i := range orphans {
-				orphans[i].Tool = toolName
-				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
+			rel, err := filepath.Rel(owned.Path, undeclaredPath)
+			if err != nil {
+				rel = filepath.Base(undeclaredPath)
 			}
-			issues = append(issues, orphans...)
-		}
-
-		if toolInfo.SupportsAgents {
-			dir := filepath.Join(projectPath, toolInfo.AgentsDir)
-			orphans := findOrphanedResources(dir, "agent", tool, expandedManifest, seen)
-			for i := range orphans {
-				orphans[i].Tool = toolName
-				orphans[i].Path = filepath.Join(dir, orphans[i].Resource)
-			}
-			issues = append(issues, orphans...)
+			issues = append(issues, VerifyIssue{
+				Resource:    filepath.ToSlash(rel),
+				Tool:        owned.Tool.String(),
+				IssueType:   issueTypeUndeclared,
+				Description: fmt.Sprintf("Exists in owned directory but is not declared in %s", manifest.ManifestFileName),
+				Path:        undeclaredPath,
+				Severity:    "warning",
+			})
+			break
 		}
 	}
 
 	return issues
 }
 
-// findOrphanedResources scans a directory for installed symlinks that are not
-// in the expanded manifest. Returns VerifyIssue entries for each orphan found.
+// findUndeclaredResources scans a directory for installed symlinks that are not
+// in the expanded manifest. Returns VerifyIssue entries for each undeclared entry found.
 // The seen map is used to deduplicate across multiple tool directories.
-func findOrphanedResources(dir, resType string, tool tools.Tool, expandedManifest map[string]bool, seen map[string]bool) []VerifyIssue {
+func findUndeclaredResources(dir, resType string, tool tools.Tool, expandedManifest map[string]bool, seen map[string]bool) []VerifyIssue {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil
 	}
@@ -568,7 +572,7 @@ func findOrphanedResources(dir, resType string, tool tools.Tool, expandedManifes
 				seen[ref] = true
 				issues = append(issues, VerifyIssue{
 					Resource:    name,
-					IssueType:   issueTypeOrphaned,
+					IssueType:   issueTypeUndeclared,
 					Description: fmt.Sprintf("Installed but not listed in %s", manifest.ManifestFileName),
 					Severity:    "warning",
 				})
@@ -605,7 +609,7 @@ func findOrphanedResources(dir, resType string, tool tools.Tool, expandedManifes
 					seen[ref] = true
 					issues = append(issues, VerifyIssue{
 						Resource:    name,
-						IssueType:   issueTypeOrphaned,
+						IssueType:   issueTypeUndeclared,
 						Description: fmt.Sprintf("Installed but not listed in %s", manifest.ManifestFileName),
 						Path:        subPath,
 						Severity:    "warning",
@@ -670,6 +674,63 @@ func displayVerifyIssues(issues []VerifyIssue, format output.Format) error {
 	default:
 		return fmt.Errorf("unsupported format: %s", format)
 	}
+}
+
+func runVerifyFixWrapper(projectPath string, manager *repo.Manager, parsedFormat output.Format, ownedDirs []OwnedResourceDir) error {
+	repairFormat := parsedFormat
+	if repairFormat == output.YAML {
+		repairFormat = output.Table
+	}
+
+	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
+	mf, err := manifest.Load(manifestPath)
+	if err != nil {
+		return fmt.Errorf("failed to load %s: %w", manifest.ManifestFileName, err)
+	}
+
+	expanded, expandErrs := expandManifestRefs(mf, manager.GetRepoPath())
+
+	result := RepairResult{
+		DryRun: false,
+		Planned: RepairPlan{
+			Installs:     make([]RepairAction, 0),
+			Fixes:        make([]RepairAction, 0),
+			Removals:     make([]RepairAction, 0),
+			PrunePackage: make([]RepairAction, 0),
+		},
+		Applied: RepairPlan{
+			Installs:     make([]RepairAction, 0),
+			Fixes:        make([]RepairAction, 0),
+			Removals:     make([]RepairAction, 0),
+			PrunePackage: make([]RepairAction, 0),
+		},
+		Failed: make([]RepairErr, 0),
+	}
+
+	for _, e := range expandErrs {
+		result.Failed = append(result.Failed, RepairErr{IssueType: "manifest", Message: e.Error()})
+	}
+
+	plan, err := buildReconcilePlan(projectPath, manager.GetRepoPath(), ownedDirs, expanded)
+	if err != nil {
+		return err
+	}
+	result.Planned.Installs = append(result.Planned.Installs, plan.Installs...)
+	result.Planned.Fixes = append(result.Planned.Fixes, plan.Fixes...)
+	result.Planned.Removals = append(result.Planned.Removals, plan.Removals...)
+
+	if len(result.Failed) == 0 {
+		if err := applyReconcilePlan(projectPath, manager, ownedDirs, plan, &result); err != nil {
+			result.Failed = append(result.Failed, RepairErr{IssueType: "repair", Message: err.Error()})
+		}
+	}
+
+	result.Summary = repairStats(result)
+	if noPlannedWork(result) && len(result.Failed) == 0 {
+		return repairDisplayNoIssues(repairFormat)
+	}
+
+	return repairDisplayResult(result, repairFormat)
 }
 
 func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo.Manager) error {
@@ -789,11 +850,11 @@ func fixVerifyIssues(projectPath string, issues []VerifyIssue, repoManager *repo
 			fmt.Printf("    ✓ Installed %s\n", issue.Resource)
 			fixed++
 
-		case issueTypeOrphaned:
+		case issueTypeUndeclared:
 			// Installed but not in manifest — determine type/name for uninstall hint
 			resType, resName := parseResourceFromIssue(issue)
 			ref := string(resType) + "/" + resName
-			fmt.Printf("  Orphaned resource: %s (%s)\n", issue.Resource, issue.Tool)
+			fmt.Printf("  Undeclared resource: %s (%s)\n", issue.Resource, issue.Tool)
 			fmt.Printf("    Run 'aimgr uninstall %s' to remove, or run 'aimgr install %s' to add to %s\n",
 				ref, ref, manifest.ManifestFileName)
 		}
@@ -857,8 +918,8 @@ var (
 func init() {
 	rootCmd.AddCommand(projectVerifyCmd)
 	projectVerifyCmd.Flags().StringVar(&verifyProjectPath, "project-path", "", "Project directory path (default: current directory)")
-	projectVerifyCmd.Flags().BoolVar(&verifyFixFlag, "fix", false, "Automatically fix issues by reinstalling resources")
-	_ = projectVerifyCmd.Flags().MarkDeprecated("fix", "use 'aimgr repair' instead")
+	projectVerifyCmd.Flags().BoolVar(&verifyFixFlag, "fix", false, "Run repair reconciliation (deprecated, use 'aimgr repair')")
+	_ = projectVerifyCmd.Flags().MarkDeprecated("fix", "use 'aimgr repair' (reconcile project resources)")
 	projectVerifyCmd.Flags().StringVar(&verifyFormatFlag2, "format", "table", "Output format (table|json|yaml)")
 
 	// Register completion functions

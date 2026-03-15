@@ -1,141 +1,92 @@
 # Repairing Resources
 
-`aimgr repair` diagnoses and fixes issues with installed resources in your project. It replaces the deprecated `verify --fix` workflow with a dedicated command that has clear, composable flags.
+`aimgr repair` reconciles your project's **owned resource directories** with `ai.package.yaml`.
+It is the replacement for the deprecated `verify --fix` workflow.
+
+Owned resource directories are tool-specific `commands/`, `skills/`, and `agents/` folders
+(for example `.claude/commands`, `.opencode/skills`, `.github/skills`).
 
 ---
 
 ## Quick Start
 
 ```bash
-# Check what's wrong (read-only)
+# Diagnose drift (read-only)
 aimgr verify
 
-# Fix it
+# Reconcile owned directories to ai.package.yaml
 aimgr repair
 ```
 
 ---
 
-## What `repair` Fixes
+## New Model: Owned Directories + Manifest Reconciliation
 
-By default (no flags), `aimgr repair` handles the most common issues:
+The project model is now:
 
-| Issue | What Happened | What Repair Does |
-|-------|---------------|------------------|
-| **Broken symlinks** | Target file was deleted or moved | Removes broken symlink, reinstalls from repository |
-| **Wrong-repo symlinks** | Symlink points to a different repository | Removes wrong symlink, reinstalls from correct repository |
-| **Missing resources** | Listed in `ai.package.yaml` but not installed | Installs from repository |
-| **Orphaned resources** | Installed but not in `ai.package.yaml` | Prints a hint (not auto-removed) |
+- `aimgr clean` empties owned resource directories (without editing `ai.package.yaml`)
+- `aimgr repair` restores/reconciles those directories to match `ai.package.yaml`
 
-```bash
-$ aimgr repair
+`repair` performs reconciliation in this order:
 
-  Fixing skill/pdf-processing...
-    ✓ Reinstalled skill/pdf-processing
-  Installing command/test...
-    ✓ Installed command/test
+1. Validate and load `ai.package.yaml`
+2. Expand `package/*` entries to concrete resources
+3. Install/fix declared resources first
+4. Remove remaining undeclared content from owned directories
+5. Optionally prune invalid manifest refs when `--prune-package` is used
 
-✓ Fixed 2 issue(s)
+This keeps recovery safer: declared resources are restored before undeclared content is removed.
 
-1 orphaned resource(s) found (not auto-removed):
-  - skill/old-skill (claude): Run 'aimgr uninstall skill/old-skill' to remove, or run 'aimgr install skill/old-skill' to add to ai.package.yaml
-```
+---
+
+## What `repair` Does
+
+With a valid `ai.package.yaml`, `aimgr repair`:
+
+| Category | What It Does |
+|---|---|
+| Declared but missing | Installs resource |
+| Declared but broken/conflicting | Replaces and reinstalls resource |
+| Declared but manually deleted | Reinstalls resource |
+| Undeclared content in owned dirs | Removes it |
+
+### Important: Manual Deletion Is Not Permanent
+
+If a resource is still declared in `ai.package.yaml`, `aimgr repair` will reinstall it.
+
+To remove a resource permanently, update `ai.package.yaml` (for example, use
+`aimgr uninstall <resource>` **without** `--no-save`).
 
 ---
 
 ## Flags
 
-### `--reset` — Remove Unmanaged Files
+### `--dry-run` — Preview Reconciliation Plan
 
-After standard repair, scans resource directories (`commands/`, `skills/`, `agents/`) for files that weren't installed by aimgr and offers to remove them.
-
-A file is **unmanaged** if it's not a symlink pointing to your aimgr repository. This includes:
-- Regular files manually placed in resource directories
-- Symlinks pointing to non-repository locations
-- Stale files left behind from manual operations
+Show planned installs, fixes/replacements, removals, and prune actions without applying changes.
 
 ```bash
-# Interactive — asks for confirmation
-aimgr repair --reset
-
-# Preview what would be removed
-aimgr repair --reset --dry-run
-
-# Remove without prompting
-aimgr repair --reset --force
+aimgr repair --dry-run
+aimgr repair --prune-package --dry-run
 ```
 
-Example output:
-```bash
-$ aimgr repair --reset
+### `--prune-package` — Manifest Cleanup (Separate Concern)
 
-Found 2 unmanaged file(s) in resource directories:
-  /home/user/project/.claude/commands/old-script.md
-  /home/user/project/.claude/skills/manual-skill/SKILL.md
+`--prune-package` only cleans invalid references from `ai.package.yaml`.
+It is **separate** from folder reconciliation.
 
-Remove all 2 unmanaged files? [y/N]: y
-  ✓ Removed: /home/user/project/.claude/commands/old-script.md
-  ✓ Removed: /home/user/project/.claude/skills/manual-skill/SKILL.md
-
-✓ Removed 2 unmanaged file(s)
-```
-
-### `--prune-package` — Clean Up `ai.package.yaml`
-
-Validates every resource reference in `ai.package.yaml` against the repository. Removes references to resources or packages that no longer exist.
+- Reconciliation aligns owned directories to declared resources
+- `--prune-package` edits the manifest by removing invalid references
 
 ```bash
-# Interactive — offers escalation choices per invalid reference
+# Reconcile folders + prune invalid manifest references
 aimgr repair --prune-package
 
-# Preview what would be removed
+# Preview both phases
 aimgr repair --prune-package --dry-run
-
-# Remove all invalid references without prompting
-aimgr repair --prune-package --force
 ```
 
-**Interactive mode** offers a smart escalation flow for each invalid reference:
-
-```
-⚠ skill/code-review not found in repo
-
-? How to resolve:
-  [1] Run repo sync first (repo sources may be outdated)
-  [2] Run repo repair first (repo metadata may be broken)
-  [3] Remove from ai.package.yaml
-  [4] Skip (do nothing)
-Choice [1-4]:
-```
-
-This helps you try less destructive options before removing entries. If a sync or repair resolves the issue, the reference is kept.
-
-**Package validation:** For package references (`package/foo`), repair checks both that the package exists AND that all its member resources exist. If some members are missing, you'll see a warning directing you to `aimgr repo repair`.
-
-### `--dry-run` — Preview Without Changes
-
-Shows what would happen without modifying anything. Works with all other flags.
-
-```bash
-aimgr repair --dry-run                          # Preview standard repair
-aimgr repair --reset --dry-run                  # Preview file removal
-aimgr repair --prune-package --dry-run          # Preview manifest cleanup
-aimgr repair --reset --prune-package --dry-run  # Preview everything
-```
-
-### `--force` — Skip Confirmation Prompts
-
-Skips all interactive confirmation prompts. Use in scripts or CI/CD.
-
-```bash
-aimgr repair --reset --force
-aimgr repair --prune-package --force
-aimgr repair --reset --prune-package --force  # Full cleanup, no prompts
-```
-
-### `--project-path` — Target a Different Directory
-
-Repair a project other than the current directory.
+### `--project-path` — Target Another Project
 
 ```bash
 aimgr repair --project-path ~/other-project
@@ -143,119 +94,73 @@ aimgr repair --project-path ~/other-project
 
 ### `--format` — Output Format
 
-Control output format. Supports `table` (default) and `json`.
+Supported: `table` (default), `json`
 
 ```bash
 aimgr repair --format json
 ```
 
-JSON output structure:
-```json
-{
-  "fixed": [
-    {
-      "resource": "skill/pdf-processing",
-      "tool": "claude",
-      "issue_type": "broken",
-      "description": "Reinstalled skill/pdf-processing"
-    }
-  ],
-  "failed": [],
-  "hints": [
-    {
-      "resource": "skill/old-skill",
-      "tool": "claude",
-      "issue_type": "orphaned",
-      "description": "Run 'aimgr uninstall skill/old-skill' to remove..."
-    }
-  ],
-  "summary": {
-    "fixed": 1,
-    "failed": 0,
-    "hints": 1
-  }
-}
-```
+JSON output includes `dry_run`, `planned`, `applied`, `failed`, and `summary` sections.
 
 ---
 
-## Combining Flags
+## `clean` + `repair` Workflow
 
-Flags compose naturally. Use them together for a complete cleanup:
+For "wipe then restore" behavior:
 
 ```bash
-# Full repair: fix symlinks + remove unmanaged files + clean manifest
-aimgr repair --reset --prune-package --force
-
-# Same but preview first
-aimgr repair --reset --prune-package --dry-run
+aimgr clean && aimgr repair
 ```
 
-Execution order:
-1. Standard symlink repair (always runs)
-2. `--reset` removes unmanaged files
-3. `--prune-package` cleans manifest references
+Use this when you want a deterministic reset of owned resource directories,
+then restore exactly what `ai.package.yaml` declares.
 
 ---
 
-## Repository Repair
+## Migration / Upgrade Notes
 
-`aimgr repo repair` is a separate command for fixing repository-level metadata issues (not project installations).
+CLI behavior changed for project cleanup/repair commands.
 
-```bash
-# Fix repository metadata
-aimgr repo repair
+| Old usage | New usage |
+|---|---|
+| `aimgr repair --reset` | `aimgr repair` |
+| `aimgr repair --force` | `aimgr repair` |
+| `aimgr clean --yes` | `aimgr clean` |
+| `aimgr repair --reset --force` | `aimgr clean && aimgr repair` |
 
-# Preview changes
-aimgr repo repair --dry-run
+Notes:
 
-# JSON output
-aimgr repo repair --format json
-```
-
-### What It Fixes
-
-| Issue | What Repair Does |
-|-------|------------------|
-| **Resources without metadata** | Creates missing `.metadata.yaml` files |
-| **Orphaned metadata** | Removes `.metadata.yaml` for resources that no longer exist |
-
-### What It Reports (Cannot Auto-Fix)
-
-| Issue | Guidance |
-|-------|----------|
-| **Type mismatches** | Resource type differs from metadata — manual fix needed |
-| **Packages with missing refs** | Package references resources that don't exist — update package definition |
-
-Example output:
-```bash
-$ aimgr repo repair
-
-Repository Repair
-=================
-
-✓ Created metadata for 2 resource(s):
-  • command/deploy
-  • skill/testing
-
-✓ Removed 1 orphaned metadata file(s):
-  • /home/user/.local/share/ai-config/repo/skills/.metadata/old-skill.yaml
-
-Summary: 3 fixed, 0 unfixable
-```
+- `--reset` and `--force` are removed from `aimgr repair`
+- `--yes` is removed from `aimgr clean`
+- `--dry-run` remains the safety preview mechanism
+- `--prune-package` remains available for manifest cleanup
 
 ---
 
-## Migrating from `verify --fix`
+## `verify --fix` Deprecation
 
-The `--fix` flag on `verify` is deprecated. Replace it with `repair`:
+`aimgr verify --fix` is deprecated.
+
+Use:
 
 | Old Command | New Command |
-|-------------|-------------|
+|---|---|
 | `aimgr verify --fix` | `aimgr repair` |
 | `aimgr repo verify --fix` | `aimgr repo repair` |
 
-The `repair` command provides the same fixes plus additional capabilities (`--reset`, `--prune-package`, `--dry-run`, `--force`).
+The deprecated wrapper follows repair reconciliation behavior and emits a deprecation warning.
+
+---
+
+## Repository Repair (Different Scope)
+
+`aimgr repo repair` is for repository metadata integrity, not project directory reconciliation.
+
+```bash
+aimgr repo repair
+aimgr repo repair --dry-run
+aimgr repo repair --format json
+```
 
 ---
 
@@ -263,48 +168,37 @@ The `repair` command provides the same fixes plus additional capabilities (`--re
 
 ### After Cloning a Project
 
-When you clone a project that has an `ai.package.yaml` manifest, resources need to be installed:
-
 ```bash
 cd newly-cloned-project/
-aimgr verify                  # See what's missing
-aimgr repair                  # Install everything from manifest
+aimgr verify
+aimgr repair
 ```
 
-### After Updating Repository Sources
-
-When you sync new versions of resources, some project symlinks may become stale:
+### After Manual Deletions in Tool Folders
 
 ```bash
-aimgr repo sync               # Update resources from sources
-aimgr repair                  # Fix any broken symlinks in project
+# repair restores what manifest still declares
+aimgr repair
+
+# if you intended permanent removal, uninstall and save manifest change first
+aimgr uninstall skill/some-skill
 ```
 
-### Cleaning Up a Messy Project
-
-When a project has accumulated manual files and stale manifest entries:
+### Clean Rebuild of Owned Dirs
 
 ```bash
-# Preview the full cleanup
-aimgr repair --reset --prune-package --dry-run
+# optional preview first
+aimgr repair --dry-run
 
-# Execute it
-aimgr repair --reset --prune-package --force
+# wipe + restore from manifest
+aimgr clean && aimgr repair
 ```
 
-### CI/CD Verification
-
-In automated pipelines, verify and repair with JSON output:
+### Preview Before Applying
 
 ```bash
-# Check health
-output=$(aimgr repair --format json)
-failed=$(echo "$output" | jq '.summary.failed')
-if [ "$failed" -gt 0 ]; then
-  echo "Repair failed for $failed resources"
-  echo "$output" | jq '.failed[]'
-  exit 1
-fi
+aimgr repair --prune-package --dry-run
+aimgr repair --format json --dry-run
 ```
 
 ---

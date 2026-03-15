@@ -183,11 +183,17 @@ aimgr install package/web-dev-tools
 Check your project for installation issues:
 ```bash
 aimgr verify                              # Diagnose issues (read-only)
-aimgr repair                              # Fix broken symlinks, install missing resources
-aimgr repair --reset                      # Also remove unmanaged files
-aimgr repair --prune-package              # Also clean stale manifest entries
-aimgr repair --reset --prune-package --force  # Full cleanup, no prompts
+aimgr repair                              # Reconcile owned dirs to ai.package.yaml
+aimgr repair --prune-package              # Also clean invalid manifest references
+aimgr repair --dry-run                    # Preview planned reconcile actions
+aimgr clean && aimgr repair               # Wipe owned dirs, then restore from manifest
 ```
+
+Notes:
+- `aimgr clean` now empties owned resource directories without confirmation flags.
+- `aimgr repair` reinstalls declared resources that were manually removed.
+- Use `aimgr uninstall <resource>` (without `--no-save`) for permanent removal.
+- Use `--dry-run` to preview repair actions.
 
 Fix repository metadata:
 ```bash

@@ -8,51 +8,35 @@ import (
 	"testing"
 )
 
-// TestRepairIntegration_BrokenSymlink verifies that repair fixes a broken symlink
-// by reinstalling the resource from the repository.
-func TestRepairIntegration_BrokenSymlink(t *testing.T) {
+func TestRepairIntegration_MissingManifestFailsWithoutChanges(t *testing.T) {
 	p := setupRepairTestProject(t)
-	p.addSkillToRepo(t, "broken-skill", "A skill with a broken symlink")
+	if err := os.MkdirAll(filepath.Join(p.projectDir, ".claude", "skills"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	undeclared := filepath.Join(p.projectDir, ".claude", "skills", "manual.md")
+	if err := os.WriteFile(undeclared, []byte("manual"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
 
-	// Create a broken symlink in the project
+	output, err := runAimgr(t, "repair", "--project-path", p.projectDir)
+	if err == nil {
+		t.Fatalf("expected missing manifest error, got success with output: %s", output)
+	}
+	assertFileExists(t, undeclared)
+}
+
+func TestRepairIntegration_ReconcileInstallsAndRemovesUndeclared(t *testing.T) {
+	p := setupRepairTestProject(t)
+	p.addSkillToRepo(t, "declared-skill", "declared")
+	p.writeManifest(t, "skill/declared-skill")
+
 	skillsDir := filepath.Join(p.projectDir, ".claude", "skills")
 	if err := os.MkdirAll(skillsDir, 0755); err != nil {
-		t.Fatalf("Failed to create skills dir: %v", err)
+		t.Fatalf("mkdir: %v", err)
 	}
-	brokenLink := filepath.Join(skillsDir, "broken-skill")
-	createBrokenSymlink(t, brokenLink)
-
-	// Add the resource to the manifest so repair has context
-	p.writeManifest(t, "skill/broken-skill")
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir)
-	if err != nil {
-		t.Fatalf("repair failed: %v\nOutput: %s", err, output)
-	}
-
-	// The symlink should now be valid and point to the repo
-	target, err := os.Readlink(brokenLink)
-	if err != nil {
-		t.Fatalf("Symlink does not exist after repair: %v", err)
-	}
-	expectedTarget := filepath.Join(p.repoDir, "skills", "broken-skill")
-	if target != expectedTarget {
-		t.Errorf("Symlink points to wrong target: got %s, want %s", target, expectedTarget)
-	}
-}
-
-// TestRepairIntegration_MissingFromManifest verifies that repair installs resources
-// that are listed in the manifest but not present on disk.
-func TestRepairIntegration_MissingFromManifest(t *testing.T) {
-	p := setupRepairTestProject(t)
-	p.addSkillToRepo(t, "missing-skill", "A skill missing from disk")
-
-	// Create a manifest referencing the skill — but don't install it
-	p.writeManifest(t, "skill/missing-skill")
-
-	// Ensure skills dir exists so installer has somewhere to put it
-	if err := os.MkdirAll(filepath.Join(p.projectDir, ".claude", "skills"), 0755); err != nil {
-		t.Fatalf("Failed to create skills dir: %v", err)
+	undeclared := filepath.Join(skillsDir, "undeclared.md")
+	if err := os.WriteFile(undeclared, []byte("manual"), 0644); err != nil {
+		t.Fatalf("write undeclared: %v", err)
 	}
 
 	output, err := runAimgr(t, "repair", "--project-path", p.projectDir)
@@ -60,146 +44,60 @@ func TestRepairIntegration_MissingFromManifest(t *testing.T) {
 		t.Fatalf("repair failed: %v\nOutput: %s", err, output)
 	}
 
-	// The skill should now be installed
-	installedPath := filepath.Join(p.projectDir, ".claude", "skills", "missing-skill")
-	assertFileExists(t, installedPath)
+	assertFileExists(t, filepath.Join(skillsDir, "declared-skill"))
+	assertFileRemoved(t, undeclared)
 }
 
-// TestRepairIntegration_CleanProject verifies that a project with no issues
-// reports "nothing to repair".
-func TestRepairIntegration_CleanProject(t *testing.T) {
+func TestRepairIntegration_DryRunShowsPlanAndChangesNothing(t *testing.T) {
 	p := setupRepairTestProject(t)
-	p.addSkillToRepo(t, "clean-skill", "A clean, healthy skill")
+	p.addSkillToRepo(t, "declared-skill", "declared")
+	p.writeManifest(t, "skill/declared-skill")
 
-	// Install the skill properly
-	p.installSkillSymlink(t, "clean-skill")
-
-	// Add it to the manifest
-	p.writeManifest(t, "skill/clean-skill")
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir)
-	if err != nil {
-		t.Fatalf("repair failed: %v\nOutput: %s", err, output)
+	skillsDir := filepath.Join(p.projectDir, ".claude", "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	undeclared := filepath.Join(skillsDir, "undeclared.md")
+	if err := os.WriteFile(undeclared, []byte("manual"), 0644); err != nil {
+		t.Fatalf("write undeclared: %v", err)
 	}
 
-	assertOutputContains(t, output, "nothing to repair")
-}
-
-// TestRepairIntegration_OrphanedResources verifies that symlinks on disk that are
-// NOT in the manifest are reported as hints (not auto-removed).
-func TestRepairIntegration_OrphanedResources(t *testing.T) {
-	p := setupRepairTestProject(t)
-	p.addSkillToRepo(t, "orphan-skill", "An orphaned skill")
-
-	// Install the skill (so the symlink exists) but do NOT add it to the manifest
-	p.installSkillSymlink(t, "orphan-skill")
-
-	// Write an empty manifest (or no manifest at all)
-	p.writeManifest(t) // empty resources list
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir)
+	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--dry-run")
 	if err != nil {
-		t.Fatalf("repair failed: %v\nOutput: %s", err, output)
+		t.Fatalf("repair --dry-run failed: %v\nOutput: %s", err, output)
 	}
 
-	// Hint should be printed mentioning uninstall
-	assertOutputContains(t, output, "uninstall")
-
-	// Symlink should NOT have been removed
-	assertFileExists(t, filepath.Join(p.projectDir, ".claude", "skills", "orphan-skill"))
+	assertFileExists(t, undeclared)
+	assertFileRemoved(t, filepath.Join(skillsDir, "declared-skill"))
+	assertOutputContains(t, output, "dry-run")
+	assertOutputContains(t, output, "Removals")
+	assertOutputContains(t, output, "Installs")
 }
 
-// TestRepairIntegration_PackageMembers verifies that repair installs missing
-// package members when the manifest references a package.
-func TestRepairIntegration_PackageMembers(t *testing.T) {
+func TestRepairIntegration_PackageExpansionInstallsMembers(t *testing.T) {
 	p := setupRepairTestProject(t)
-	p.addSkillToRepo(t, "pkg-skill", "A skill that is a package member")
-	p.addPackageToRepo(t, "my-pkg", []string{"skill/pkg-skill"})
-
-	// Manifest references the package
+	p.addSkillToRepo(t, "pkg-member", "member")
+	p.addPackageToRepo(t, "my-pkg", []string{"skill/pkg-member"})
 	p.writeManifest(t, "package/my-pkg")
 
-	// Ensure skills dir exists
-	if err := os.MkdirAll(filepath.Join(p.projectDir, ".claude", "skills"), 0755); err != nil {
-		t.Fatalf("Failed to create skills dir: %v", err)
-	}
-
 	output, err := runAimgr(t, "repair", "--project-path", p.projectDir)
 	if err != nil {
 		t.Fatalf("repair failed: %v\nOutput: %s", err, output)
 	}
-	t.Logf("repair output for package members: %s", output)
-
-	assertOutputContains(t, output, "package/my-pkg")
-	assertOutputNotContains(t, output, `invalid resource type: "package"`)
-	assertFileExists(t, filepath.Join(p.projectDir, ".claude", "skills", "pkg-skill"))
+	assertFileExists(t, filepath.Join(p.projectDir, ".claude", "skills", "pkg-member"))
 }
 
-// TestRepairIntegration_PackageNotInRepo verifies that when a manifest references
-// a package that doesn't exist in the repo, repair handles it gracefully.
-func TestRepairIntegration_PackageNotInRepo(t *testing.T) {
+func TestRepairIntegration_ConflictingPathIsReplaced(t *testing.T) {
 	p := setupRepairTestProject(t)
+	p.addSkillToRepo(t, "conflict-skill", "member")
+	p.writeManifest(t, "skill/conflict-skill")
 
-	// Manifest references a package that doesn't exist in the repo
-	p.writeManifest(t, "package/nonexistent-pkg")
-
-	// Ensure skills dir exists
-	if err := os.MkdirAll(filepath.Join(p.projectDir, ".claude", "skills"), 0755); err != nil {
-		t.Fatalf("Failed to create skills dir: %v", err)
+	skillPath := filepath.Join(p.projectDir, ".claude", "skills", "conflict-skill")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
 	}
-
-	// repair should not crash — it may report warnings or failures but exit 0
-	output, _ := runAimgr(t, "repair", "--project-path", p.projectDir)
-	assertOutputContains(t, output, "package 'nonexistent-pkg' not found in repository")
-	assertOutputNotContains(t, output, `invalid resource type: "package"`)
-	t.Logf("repair output for missing package: %s", output)
-}
-
-// TestRepairIntegration_NestedBrokenSymlink verifies that a broken symlink
-// for a namespaced command (namespace/cmd) is repaired correctly.
-func TestRepairIntegration_NestedBrokenSymlink(t *testing.T) {
-	p := setupRepairTestProject(t)
-	p.createNestedCommandInRepo(t, "api", "deploy", "Deploy command")
-
-	// Create a broken symlink at .claude/commands/api/deploy.md
-	nsDir := filepath.Join(p.projectDir, ".claude", "commands", "api")
-	if err := os.MkdirAll(nsDir, 0755); err != nil {
-		t.Fatalf("Failed to create namespace dir: %v", err)
-	}
-	brokenLink := filepath.Join(nsDir, "deploy.md")
-	createBrokenSymlink(t, brokenLink)
-
-	// Add it to the manifest
-	p.writeManifest(t, "command/api/deploy")
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir)
-	if err != nil {
-		t.Fatalf("repair failed: %v\nOutput: %s", err, output)
-	}
-
-	// The nested symlink should be fixed
-	target, err := os.Readlink(brokenLink)
-	if err != nil {
-		t.Fatalf("Nested command symlink does not exist after repair: %v", err)
-	}
-	expectedTarget := filepath.Join(p.repoDir, "commands", "api", "deploy.md")
-	if target != expectedTarget {
-		t.Errorf("Nested symlink points to wrong target: got %s, want %s", target, expectedTarget)
-	}
-}
-
-// TestRepairIntegration_NestedMissingCommand verifies that a nested/namespaced command
-// listed in the manifest but not on disk is installed by repair.
-func TestRepairIntegration_NestedMissingCommand(t *testing.T) {
-	p := setupRepairTestProject(t)
-	p.createNestedCommandInRepo(t, "tools", "lint", "Lint command")
-
-	// Manifest references the nested command but it is not installed
-	p.writeManifest(t, "command/tools/lint")
-
-	// Create the commands directory
-	if err := os.MkdirAll(filepath.Join(p.projectDir, ".claude", "commands"), 0755); err != nil {
-		t.Fatalf("Failed to create commands dir: %v", err)
+	if err := os.WriteFile(skillPath, []byte("manual file"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
 	}
 
 	output, err := runAimgr(t, "repair", "--project-path", p.projectDir)
@@ -207,270 +105,86 @@ func TestRepairIntegration_NestedMissingCommand(t *testing.T) {
 		t.Fatalf("repair failed: %v\nOutput: %s", err, output)
 	}
 
-	// The nested command should now be installed
-	installedPath := filepath.Join(p.projectDir, ".claude", "commands", "tools", "lint.md")
-	assertFileExists(t, installedPath)
-}
-
-// TestRepairIntegration_ResetForceRemovesUnmanaged verifies that --reset --force
-// removes unmanaged files from resource directories.
-func TestRepairIntegration_ResetForceRemovesUnmanaged(t *testing.T) {
-	p := setupRepairTestProject(t)
-
-	// Create an unmanaged regular file in the skills dir
-	skillsDir := filepath.Join(p.projectDir, ".claude", "skills")
-	if err := os.MkdirAll(skillsDir, 0755); err != nil {
-		t.Fatalf("Failed to create skills dir: %v", err)
-	}
-	unmanagedFile := filepath.Join(skillsDir, "manual-skill.md")
-	if err := os.WriteFile(unmanagedFile, []byte("manually added"), 0644); err != nil {
-		t.Fatalf("Failed to create unmanaged file: %v", err)
-	}
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--reset", "--force")
+	info, err := os.Lstat(skillPath)
 	if err != nil {
-		t.Fatalf("repair --reset --force failed: %v\nOutput: %s", err, output)
+		t.Fatalf("lstat: %v", err)
 	}
-
-	// The unmanaged file should be removed
-	assertFileRemoved(t, unmanagedFile)
-	assertOutputContains(t, output, "Removed")
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("expected conflicting file to be replaced by symlink")
+	}
 }
 
-// TestRepairIntegration_ResetDryRunPreservesFiles verifies that --reset --dry-run
-// reports what would be removed but does NOT remove anything.
-func TestRepairIntegration_ResetDryRunPreservesFiles(t *testing.T) {
+func TestRepairIntegration_PrunePackageDryRunAndApply(t *testing.T) {
 	p := setupRepairTestProject(t)
-
-	// Create an unmanaged file
-	skillsDir := filepath.Join(p.projectDir, ".claude", "skills")
-	if err := os.MkdirAll(skillsDir, 0755); err != nil {
-		t.Fatalf("Failed to create skills dir: %v", err)
-	}
-	unmanagedFile := filepath.Join(skillsDir, "dry-run-skill.md")
-	if err := os.WriteFile(unmanagedFile, []byte("manual content"), 0644); err != nil {
-		t.Fatalf("Failed to create unmanaged file: %v", err)
-	}
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--reset", "--dry-run")
-	if err != nil {
-		t.Fatalf("repair --reset --dry-run failed: %v\nOutput: %s", err, output)
-	}
-
-	// File should still exist
-	assertFileExists(t, unmanagedFile)
-	assertOutputContains(t, output, "Would remove")
-}
-
-// TestRepairIntegration_ResetMixedManaged verifies that --reset --force removes only
-// unmanaged files while leaving managed symlinks in place.
-func TestRepairIntegration_ResetMixedManaged(t *testing.T) {
-	p := setupRepairTestProject(t)
-	p.addSkillToRepo(t, "managed-skill", "A managed skill")
-
-	// Install a managed symlink
-	managedLink := p.installSkillSymlink(t, "managed-skill")
-	p.writeManifest(t, "skill/managed-skill")
-
-	// Also create an unmanaged regular file
-	skillsDir := filepath.Join(p.projectDir, ".claude", "skills")
-	unmanagedFile := filepath.Join(skillsDir, "unmanaged.txt")
-	if err := os.WriteFile(unmanagedFile, []byte("junk"), 0644); err != nil {
-		t.Fatalf("Failed to create unmanaged file: %v", err)
-	}
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--reset", "--force")
-	if err != nil {
-		t.Fatalf("repair --reset --force failed: %v\nOutput: %s", err, output)
-	}
-	t.Logf("Output: %s", output)
-
-	// Managed symlink should still exist
-	assertFileExists(t, managedLink)
-	// Unmanaged file should be removed
-	assertFileRemoved(t, unmanagedFile)
-}
-
-// TestRepairIntegration_ResetNestedNamespace verifies that unmanaged files inside
-// namespace subdirectories of commands/ are removed by --reset --force.
-func TestRepairIntegration_ResetNestedNamespace(t *testing.T) {
-	p := setupRepairTestProject(t)
-
-	// Create an unmanaged file in a namespace subdir
-	nsDir := filepath.Join(p.projectDir, ".claude", "commands", "myns")
-	if err := os.MkdirAll(nsDir, 0755); err != nil {
-		t.Fatalf("Failed to create namespace dir: %v", err)
-	}
-	unmanagedFile := filepath.Join(nsDir, "manual-cmd.md")
-	if err := os.WriteFile(unmanagedFile, []byte("manual"), 0644); err != nil {
-		t.Fatalf("Failed to create unmanaged file: %v", err)
-	}
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--reset", "--force")
-	if err != nil {
-		t.Fatalf("repair --reset --force failed: %v\nOutput: %s", err, output)
-	}
-
-	// The unmanaged file in the namespace dir should be removed
-	assertFileRemoved(t, unmanagedFile)
-}
-
-// TestRepairIntegration_PrunePackageForceRemovesInvalid verifies that --prune-package --force
-// removes a manifest reference to a package that doesn't exist in the repo.
-func TestRepairIntegration_PrunePackageForceRemovesInvalid(t *testing.T) {
-	p := setupRepairTestProject(t)
-
-	// Write manifest referencing a non-existent package
-	p.writeManifest(t, "package/ghost-pkg")
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--prune-package", "--force")
-	if err != nil {
-		t.Fatalf("repair --prune-package --force failed: %v\nOutput: %s", err, output)
-	}
-
-	// The invalid ref should be removed from the manifest
-	assertManifestNotContains(t, p.manifestPath, "package/ghost-pkg")
-}
-
-// TestRepairIntegration_PrunePackageDryRunPreservesManifest verifies that
-// --prune-package --dry-run prints what would be removed but does not modify the manifest.
-func TestRepairIntegration_PrunePackageDryRunPreservesManifest(t *testing.T) {
-	p := setupRepairTestProject(t)
-
-	// Write manifest with an invalid ref
-	p.writeManifest(t, "skill/nonexistent-skill")
+	p.writeManifest(t, "skill/missing", "skill/missing2")
 
 	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--prune-package", "--dry-run")
 	if err != nil {
-		t.Fatalf("repair --prune-package --dry-run failed: %v\nOutput: %s", err, output)
+		t.Fatalf("dry-run prune failed: %v\nOutput: %s", err, output)
 	}
+	assertManifestContains(t, p.manifestPath, "skill/missing")
+	assertManifestContains(t, p.manifestPath, "skill/missing2")
 
-	// Manifest should be unchanged
-	assertManifestContains(t, p.manifestPath, "skill/nonexistent-skill")
-	assertOutputContains(t, output, "Would remove")
+	output, err = runAimgr(t, "repair", "--project-path", p.projectDir, "--prune-package")
+	if err != nil {
+		t.Fatalf("apply prune failed: %v\nOutput: %s", err, output)
+	}
+	assertManifestNotContains(t, p.manifestPath, "skill/missing")
+	assertManifestNotContains(t, p.manifestPath, "skill/missing2")
 }
 
-// TestRepairIntegration_PrunePackagePartialPackage verifies that when a package exists
-// in the repo but a member is missing, repair only warns (does not remove the manifest ref).
-func TestRepairIntegration_PrunePackagePartialPackage(t *testing.T) {
+func TestRepairIntegration_JSONOutputIncludesPlanSchema(t *testing.T) {
 	p := setupRepairTestProject(t)
+	p.addSkillToRepo(t, "declared-skill", "declared")
+	p.writeManifest(t, "skill/declared-skill")
 
-	// Create a package whose member skill doesn't exist in the repo
-	p.addPackageToRepo(t, "partial-pkg", []string{"skill/ghost-skill"})
-	p.writeManifest(t, "package/partial-pkg")
+	if err := os.MkdirAll(filepath.Join(p.projectDir, ".claude", "skills"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
 
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--prune-package", "--force")
+	out, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--format=json", "--dry-run")
 	if err != nil {
-		t.Fatalf("repair --prune-package --force failed: %v\nOutput: %s", err, output)
+		t.Fatalf("repair json failed: %v\nOutput: %s", err, out)
 	}
 
-	// The package ref should still be in the manifest (it's a partial/warning, not invalid)
-	assertManifestContains(t, p.manifestPath, "package/partial-pkg")
-	// Output should warn about the partial package
-	assertOutputContains(t, output, "partial-pkg")
-}
-
-// TestRepairIntegration_ResetAndPrunePackageForce verifies that combining --reset and
-// --prune-package with --force handles both cleanup operations.
-func TestRepairIntegration_ResetAndPrunePackageForce(t *testing.T) {
-	p := setupRepairTestProject(t)
-
-	// Create an unmanaged file in skills dir
-	skillsDir := filepath.Join(p.projectDir, ".claude", "skills")
-	if err := os.MkdirAll(skillsDir, 0755); err != nil {
-		t.Fatalf("Failed to create skills dir: %v", err)
+	var parsed struct {
+		DryRun  bool `json:"dry_run"`
+		Planned struct {
+			Installs []any `json:"installs"`
+			Fixes    []any `json:"fixes"`
+			Removals []any `json:"removals"`
+		} `json:"planned"`
+		Applied any `json:"applied"`
+		Summary any `json:"summary"`
 	}
-	unmanagedFile := filepath.Join(skillsDir, "junk.md")
-	if err := os.WriteFile(unmanagedFile, []byte("junk"), 0644); err != nil {
-		t.Fatalf("Failed to create unmanaged file: %v", err)
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("invalid json output: %v\n%s", err, out)
 	}
-
-	// Also write a manifest with an invalid ref
-	p.writeManifest(t, "command/ghost-cmd")
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir,
-		"--reset", "--prune-package", "--force")
-	if err != nil {
-		t.Fatalf("repair --reset --prune-package --force failed: %v\nOutput: %s", err, output)
+	if !parsed.DryRun {
+		t.Fatalf("expected dry_run=true")
 	}
-	t.Logf("Output: %s", output)
-
-	// Unmanaged file should be removed
-	assertFileRemoved(t, unmanagedFile)
-	// Invalid ref should be removed from manifest
-	assertManifestNotContains(t, p.manifestPath, "command/ghost-cmd")
-}
-
-// TestRepairIntegration_AllFlagsDryRun verifies that --reset --prune-package --dry-run
-// makes no changes at all.
-func TestRepairIntegration_AllFlagsDryRun(t *testing.T) {
-	p := setupRepairTestProject(t)
-
-	// Create unmanaged file
-	skillsDir := filepath.Join(p.projectDir, ".claude", "skills")
-	if err := os.MkdirAll(skillsDir, 0755); err != nil {
-		t.Fatalf("Failed to create skills dir: %v", err)
-	}
-	unmanagedFile := filepath.Join(skillsDir, "preserve-me.md")
-	if err := os.WriteFile(unmanagedFile, []byte("keep this"), 0644); err != nil {
-		t.Fatalf("Failed to create unmanaged file: %v", err)
-	}
-
-	// Write manifest with an invalid ref
-	p.writeManifest(t, "skill/does-not-exist")
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir,
-		"--reset", "--prune-package", "--dry-run")
-	if err != nil {
-		t.Fatalf("repair all-flags dry-run failed: %v\nOutput: %s", err, output)
-	}
-
-	// Nothing should be changed
-	assertFileExists(t, unmanagedFile)
-	assertManifestContains(t, p.manifestPath, "skill/does-not-exist")
-
-	// Output should indicate dry-run actions
-	if !strings.Contains(output, "Would remove") && !strings.Contains(output, "nothing") {
-		t.Logf("Output (no 'Would remove' or 'nothing'): %s", output)
+	if parsed.Applied == nil || parsed.Summary == nil {
+		t.Fatalf("expected applied and summary in json output")
 	}
 }
 
-// TestRepairIntegration_JSONOutput verifies that --format=json produces valid JSON output.
-func TestRepairIntegration_JSONOutput(t *testing.T) {
+func TestRepairIntegration_RemovedFlagsUnavailable(t *testing.T) {
 	p := setupRepairTestProject(t)
+	p.writeManifest(t)
 
-	// Clean project with no issues
-	p.addSkillToRepo(t, "json-skill", "Skill for JSON output test")
-	p.installSkillSymlink(t, "json-skill")
-	p.writeManifest(t, "skill/json-skill")
-
-	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--format=json")
-	if err != nil {
-		t.Fatalf("repair --format=json failed: %v\nOutput: %s", err, output)
+	output, err := runAimgr(t, "repair", "--project-path", p.projectDir, "--reset")
+	if err == nil {
+		t.Fatalf("expected --reset to fail, got success: %s", output)
 	}
-
-	// Parse the JSON output
-	var result struct {
-		Fixed   interface{} `json:"fixed"`
-		Failed  interface{} `json:"failed"`
-		Hints   interface{} `json:"hints"`
-		Summary interface{} `json:"summary"`
-	}
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		t.Fatalf("Failed to parse JSON output: %v\nOutput: %s", err, output)
+	if !strings.Contains(output, "unknown flag") || !strings.Contains(output, "--reset") {
+		t.Fatalf("expected unknown flag error for --reset, got: %s", output)
 	}
 
-	// Verify required JSON fields are present
-	if result.Fixed == nil {
-		t.Error("JSON output missing 'fixed' field")
+	output, err = runAimgr(t, "repair", "--project-path", p.projectDir, "--force")
+	if err == nil {
+		t.Fatalf("expected --force to fail, got success: %s", output)
 	}
-	if result.Failed == nil {
-		t.Error("JSON output missing 'failed' field")
-	}
-	if result.Hints == nil {
-		t.Error("JSON output missing 'hints' field")
-	}
-	if result.Summary == nil {
-		t.Error("JSON output missing 'summary' field")
+	if !strings.Contains(output, "unknown flag") || !strings.Contains(output, "--force") {
+		t.Fatalf("expected unknown flag error for --force, got: %s", output)
 	}
 }

@@ -39,12 +39,14 @@ Complete guide to configuring aimgr, including repository path, installation tar
 
 ### [Repairing Resources](repair.md)
 
-Diagnose and fix broken installations, clean up unmanaged files, and prune stale manifest entries.
+Reconcile owned resource directories with `ai.package.yaml`, clean project resource folders safely, and migrate from deprecated workflows.
 
 **Key Topics:**
-- `aimgr repair` — fix broken symlinks, reinstall missing resources
-- `--reset` — remove unmanaged files from resource directories
-- `--prune-package` — clean invalid references from `ai.package.yaml`
+- `aimgr repair` — reconcile owned directories to `ai.package.yaml`
+- `aimgr clean` — empty owned resource directories
+- `--prune-package` — clean invalid references from `ai.package.yaml` (manifest cleanup)
+- `--dry-run` — preview reconcile actions safely
+- Migration: `aimgr clean && aimgr repair` replaces old reset/force workflows
 - `aimgr repo repair` — fix repository metadata issues
 - Migrating from deprecated `verify --fix`
 

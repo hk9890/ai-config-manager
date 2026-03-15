@@ -22,6 +22,14 @@ Manage AI resources via `aimgr`. Resources live in `~/.local/share/ai-config/rep
 **UC1 — Install / Uninstall:** Install, verify, repair resources in a project. Covers `install`, `uninstall`, `list`, `verify`, `repair`, `clean`, `init`, `ai.package.yaml`.
 → [references/install-uninstall.md](references/install-uninstall.md)
 
+Project repair/cleanup semantics to follow in guidance:
+
+- `aimgr clean` empties owned resource directories (no confirmation flags)
+- `aimgr repair` reconciles owned directories to `ai.package.yaml`
+- `aimgr clean && aimgr repair` replaces old `repair --reset --force` workflows
+- `repair --dry-run` previews actions; `--prune-package` is separate manifest cleanup
+- Declared resources removed manually are reinstalled on `repair` until manifest is updated
+
 **UC2 — Manage Repository:** Add sources, inspect or apply `ai.repo.yaml`, sync, remove, validate, maintain the global repo. Covers all `repo` subcommands.
 → [references/manage-repository.md](references/manage-repository.md)
 

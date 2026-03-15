@@ -33,9 +33,95 @@ aimgr repo describe <pattern> --format=<format>
 aimgr repo info --format=<format>           # NEW
 aimgr repo verify --format=<format>         # NEW (replaces --json)
 aimgr repo prune --format=<format>          # NEW
+aimgr clean --format=<format>               # NEW
+aimgr verify --format=<format>              # NEW
 aimgr repair --format=<format>              # NEW
 aimgr repo repair --format=<format>         # NEW
 aimgr list --format=<format>
+```
+
+## Project Repair/Clean Output (Owned-Folder Model)
+
+`aimgr repair` and `aimgr clean` now use owned-folder semantics for project directories.
+
+- `clean` empties owned resource directories
+- `repair` reconciles owned directories to `ai.package.yaml`
+
+### `aimgr repair --format=json`
+
+```json
+{
+  "dry_run": false,
+  "planned": {
+    "installs": [],
+    "fixes": [],
+    "removals": [
+      {
+        "resource": "/home/user/project/.claude/skills/manual-skill",
+        "path": "/home/user/project/.claude/skills/manual-skill",
+        "issue_type": "undeclared",
+        "description": "Remove undeclared content from owned directory"
+      }
+    ],
+    "prune_package": []
+  },
+  "applied": {
+    "installs": [],
+    "fixes": [],
+    "removals": [
+      {
+        "resource": "/home/user/project/.claude/skills/manual-skill",
+        "path": "/home/user/project/.claude/skills/manual-skill",
+        "issue_type": "undeclared",
+        "description": "Remove undeclared content from owned directory"
+      }
+    ],
+    "prune_package": []
+  },
+  "failed": [],
+  "summary": {
+    "planned_installs": 0,
+    "planned_fixes": 0,
+    "planned_removals": 1,
+    "planned_prune_package": 0,
+    "applied_installs": 0,
+    "applied_fixes": 0,
+    "applied_removals": 1,
+    "applied_prune_package": 0,
+    "failures": 0
+  }
+}
+```
+
+Notes:
+- `issue_type: "undeclared"` replaces old orphan terminology for project drift
+- `--dry-run` keeps the same schema while leaving `applied` empty
+- `--prune-package` adds/removes entries under `prune_package` (manifest cleanup)
+
+### `aimgr clean --format=json`
+
+```json
+{
+  "warnings": [],
+  "removed": [
+    {
+      "tool": "claude",
+      "resource_type": "skill",
+      "path": "/home/user/project/.claude/skills/manual-skill",
+      "entry_type": "directory"
+    }
+  ],
+  "failed": [],
+  "summary": {
+    "owned_dirs_detected": 3,
+    "owned_dirs_existing": 3,
+    "removed": 1,
+    "removed_files": 0,
+    "removed_symlinks": 0,
+    "removed_directories": 1,
+    "failed": 0
+  }
+}
 ```
 
 ## Table Format (Default)
@@ -1181,6 +1267,8 @@ echo "$(date): Resource sync successful ($added added)" >> "$LOG_FILE"
 | `repo info` | table, json, yaml | Repository statistics |
 | `repo verify` | table, json, yaml | Repository integrity checks |
 | `repo prune` | table, json, yaml | Workspace cleanup |
+| `clean` | table, json | Empty owned project resource dirs |
+| `verify` | table, json, yaml | Check project install drift |
 | `repair` | table, json | Fix project installations |
 | `repo repair` | text, json | Fix repository metadata |
 | `list` | table, json, yaml | Installed resources (simple) |

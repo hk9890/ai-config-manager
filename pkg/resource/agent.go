@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const copilotAgentSuffix = ".agent.md"
+
 // AgentResource represents an agent resource
 type AgentResource struct {
 	Resource
@@ -29,8 +31,16 @@ func LoadAgent(filePath string) (*Resource, error) {
 		return nil, WrapLoadError(filePath, Agent, fmt.Errorf("file does not exist: %w", err))
 	}
 
-	// Extract name from filename (without .md extension)
-	name := strings.TrimSuffix(filepath.Base(filePath), ".md")
+	// Extract canonical agent name from filename.
+	// Copilot-installed artifacts use <name>.agent.md, but the repository keeps the
+	// logical agent name as <name> so reinstalling for Copilot does not produce
+	// <name>.agent.agent.md.
+	name := filepath.Base(filePath)
+	if strings.HasSuffix(name, copilotAgentSuffix) {
+		name = strings.TrimSuffix(name, copilotAgentSuffix)
+	} else {
+		name = strings.TrimSuffix(name, ".md")
+	}
 
 	// Parse frontmatter
 	frontmatter, _, err := ParseFrontmatter(filePath)

@@ -1,44 +1,39 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/manifest"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/output"
-	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/tools"
 	"github.com/spf13/cobra"
 )
 
 var cleanCmd = &cobra.Command{
 	Use:   "clean",
-	Short: "Remove all installed resources from the current project",
-	Long: `Remove all installed resources (commands, skills, agents) from the current project.
+	Short: "Remove all content from owned project resource directories",
+	Long: `Remove all entries inside aimgr-owned project resource directories.
 
-This command removes ALL symlinks in tool directories (.claude, .opencode, etc.)
-that point to the aimgr repository. It does NOT modify ai.package.yaml, so you
-can reinstall everything with 'aimgr install'.
+For detected tools (for example .claude, .opencode), aimgr owns the contents of
+commands/skills/agents directories. This command removes every entry inside
+those owned directories, including symlinks, broken symlinks, regular files,
+and nested subdirectories. Owned root directories are kept in place.
 
-This is useful for:
-  - Starting fresh after repository path changes
-  - Cleaning up orphaned or broken symlinks
-  - Troubleshooting installation issues
-  - Resetting CI/CD environments
-
-WARNING: This will remove all aimgr-managed resources from the project.
-You will be prompted to confirm before removal.
+This command does not modify ai.package.yaml or non-resource tool config files.
 
 Examples:
-  aimgr clean                    # Remove all resources (with confirmation)
-  aimgr clean --yes              # Skip confirmation prompt
+  aimgr clean
   aimgr clean --project-path ~/myproject
-  
-  # Common workflow: clean and reinstall
-  aimgr clean --yes && aimgr install
+  aimgr clean --format json
+
+  # Common workflow: wipe and restore from manifest
+  aimgr clean && aimgr repair
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get project path
 		projectPath := cleanProjectPath
 		if projectPath == "" {
 			var err error
@@ -48,268 +43,264 @@ Examples:
 			}
 		}
 
-		// Get repo manager
-		manager, err := NewManagerWithLogLevel()
+		parsedFormat, err := parseCleanFormat(cleanFormatFlag)
 		if err != nil {
 			return err
 		}
 
-		// Detect tools
-		detectedTools, err := tools.DetectExistingTools(projectPath)
+		warnings := collectCleanWarnings(projectPath)
+		printCleanWarnings(warnings)
+
+		ownedDirs, err := detectOwnedResourceDirs(projectPath)
 		if err != nil {
-			return fmt.Errorf("failed to detect tools: %w", err)
+			return fmt.Errorf("failed to detect owned resource directories: %w", err)
 		}
 
-		if len(detectedTools) == 0 {
-			fmt.Println("No tool directories found in this project.")
-			return nil
+		result := CleanResult{
+			Warnings: warnings,
+			Removed:  make([]CleanRemovedEntry, 0),
+			Failed:   make([]CleanFailedEntry, 0),
+			Summary: CleanSummary{
+				OwnedDirsDetected: len(ownedDirs),
+			},
 		}
 
-		// Preview what will be removed
-		resources, err := previewClean(projectPath, detectedTools, manager.GetRepoPath())
-		if err != nil {
-			return fmt.Errorf("failed to scan resources: %w", err)
+		if len(ownedDirs) == 0 {
+			return displayCleanResult(result, parsedFormat)
 		}
 
-		if len(resources) == 0 {
-			fmt.Println("No aimgr-managed resources found to clean.")
-			return nil
-		}
+		result.Removed, result.Failed = cleanOwnedResourceDirs(ownedDirs)
+		result.Summary = summarizeCleanResult(ownedDirs, result.Removed, result.Failed)
 
-		// Show what will be removed
-		fmt.Printf("Found %d aimgr-managed resource(s) to remove:\n\n", len(resources))
-		displayCleanPreview(resources)
-		fmt.Println()
-
-		// Confirm unless --yes flag
-		if !cleanYesFlag {
-			fmt.Print("Remove all these resources? [y/N]: ")
-			var response string
-			_, _ = fmt.Scanln(&response)
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
-				fmt.Println("Clean cancelled.")
-				return nil
-			}
-		}
-
-		// Remove all resources
-		removed, failed := cleanAll(projectPath, detectedTools, manager.GetRepoPath())
-
-		// Report results
-		fmt.Printf("\n✓ Removed %d resource(s)\n", removed)
-		if failed > 0 {
-			fmt.Printf("✗ Failed to remove %d resource(s)\n", failed)
-		}
-		fmt.Println("\nTo reinstall resources from ai.package.yaml, run:")
-		fmt.Println("  aimgr install")
-
-		return nil
+		return displayCleanResult(result, parsedFormat)
 	},
 }
 
-type CleanResource struct {
-	Name string
-	Type string
-	Tool string
-	Path string
+type CleanResult struct {
+	Warnings []string            `json:"warnings"`
+	Removed  []CleanRemovedEntry `json:"removed"`
+	Failed   []CleanFailedEntry  `json:"failed"`
+	Summary  CleanSummary        `json:"summary"`
 }
 
-func previewClean(projectPath string, detectedTools []tools.Tool, repoPath string) ([]CleanResource, error) {
-	var resources []CleanResource
-
-	for _, tool := range detectedTools {
-		toolInfo := tools.GetToolInfo(tool)
-		toolName := tool.String()
-
-		// Scan commands
-		if toolInfo.SupportsCommands {
-			commandsDir := filepath.Join(projectPath, toolInfo.CommandsDir)
-			found, err := scanDirectory(commandsDir, "command", toolName, repoPath)
-			if err != nil {
-				return nil, err
-			}
-			resources = append(resources, found...)
-		}
-
-		// Scan skills
-		if toolInfo.SupportsSkills {
-			skillsDir := filepath.Join(projectPath, toolInfo.SkillsDir)
-			found, err := scanDirectory(skillsDir, "skill", toolName, repoPath)
-			if err != nil {
-				return nil, err
-			}
-			resources = append(resources, found...)
-		}
-
-		// Scan agents
-		if toolInfo.SupportsAgents {
-			agentsDir := filepath.Join(projectPath, toolInfo.AgentsDir)
-			found, err := scanDirectory(agentsDir, "agent", toolName, repoPath)
-			if err != nil {
-				return nil, err
-			}
-			resources = append(resources, found...)
-		}
-	}
-
-	return resources, nil
+type CleanRemovedEntry struct {
+	Tool         string `json:"tool"`
+	ResourceType string `json:"resource_type"`
+	Path         string `json:"path"`
+	EntryType    string `json:"entry_type"`
 }
 
-func scanDirectory(dir, resType, tool, repoPath string) ([]CleanResource, error) {
-	// Check if directory exists
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return nil, nil
+type CleanFailedEntry struct {
+	Tool         string `json:"tool"`
+	ResourceType string `json:"resource_type"`
+	Path         string `json:"path"`
+	EntryType    string `json:"entry_type"`
+	Error        string `json:"error"`
+}
+
+type CleanSummary struct {
+	OwnedDirsDetected int `json:"owned_dirs_detected"`
+	OwnedDirsExisting int `json:"owned_dirs_existing"`
+	Removed           int `json:"removed"`
+	RemovedFiles      int `json:"removed_files"`
+	RemovedSymlinks   int `json:"removed_symlinks"`
+	RemovedDirs       int `json:"removed_directories"`
+	Failed            int `json:"failed"`
+}
+
+func parseCleanFormat(raw string) (output.Format, error) {
+	switch strings.ToLower(raw) {
+	case "", "table":
+		return output.Table, nil
+	case "json":
+		return output.JSON, nil
+	default:
+		return "", fmt.Errorf("invalid format: %s (valid: table, json)", raw)
 	}
+}
 
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read directory %s: %w", dir, err)
+func collectCleanWarnings(projectPath string) []string {
+	manifestPath := filepath.Join(projectPath, manifest.ManifestFileName)
+	if _, err := os.Stat(manifestPath); err != nil {
+		if os.IsNotExist(err) {
+			return []string{fmt.Sprintf("Warning: %s not found — 'aimgr repair' will not be able to restore resources.", manifest.ManifestFileName)}
+		}
+		return []string{fmt.Sprintf("Warning: failed to check %s: %v", manifest.ManifestFileName, err)}
 	}
+	return nil
+}
 
-	var resources []CleanResource
-	for _, entry := range entries {
-		symlinkPath := filepath.Join(dir, entry.Name())
+func cleanOwnedResourceDirs(ownedDirs []OwnedResourceDir) ([]CleanRemovedEntry, []CleanFailedEntry) {
+	removed := make([]CleanRemovedEntry, 0)
+	failed := make([]CleanFailedEntry, 0)
 
-		// Check if it's a symlink
-		linkInfo, err := os.Lstat(symlinkPath)
+	for _, owned := range ownedDirs {
+		if _, err := os.Stat(owned.Path); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			failed = append(failed, CleanFailedEntry{
+				Tool:         owned.Tool.String(),
+				ResourceType: string(owned.ResourceType),
+				Path:         owned.Path,
+				EntryType:    "directory",
+				Error:        err.Error(),
+			})
+			continue
+		}
+
+		entries, err := os.ReadDir(owned.Path)
 		if err != nil {
+			failed = append(failed, CleanFailedEntry{
+				Tool:         owned.Tool.String(),
+				ResourceType: string(owned.ResourceType),
+				Path:         owned.Path,
+				EntryType:    "directory",
+				Error:        err.Error(),
+			})
 			continue
 		}
 
-		if linkInfo.Mode()&os.ModeSymlink == 0 {
-			continue // Not a symlink
-		}
+		for _, entry := range entries {
+			entryPath := filepath.Join(owned.Path, entry.Name())
+			entryType := cleanEntryTypeFromDirEntry(entry)
 
-		// Read target
-		target, err := os.Readlink(symlinkPath)
-		if err != nil {
-			continue
-		}
+			if err := os.RemoveAll(entryPath); err != nil {
+				failed = append(failed, CleanFailedEntry{
+					Tool:         owned.Tool.String(),
+					ResourceType: string(owned.ResourceType),
+					Path:         entryPath,
+					EntryType:    entryType,
+					Error:        err.Error(),
+				})
+				continue
+			}
 
-		// Only include if points to repo
-		if !strings.HasPrefix(target, repoPath) {
-			continue
-		}
-
-		resources = append(resources, CleanResource{
-			Name: entry.Name(),
-			Type: resType,
-			Tool: tool,
-			Path: symlinkPath,
-		})
-	}
-
-	return resources, nil
-}
-
-func displayCleanPreview(resources []CleanResource) {
-	table := output.NewTable("Resource", "Type", "Tool", "Path")
-	table.WithResponsive().
-		WithDynamicColumn(3).
-		WithMinColumnWidths(20, 10, 12, 40)
-
-	for _, res := range resources {
-		table.AddRow(res.Name, res.Type, res.Tool, res.Path)
-	}
-
-	_ = table.Format(output.Table)
-}
-
-func cleanAll(projectPath string, detectedTools []tools.Tool, repoPath string) (int, int) {
-	removed := 0
-	failed := 0
-
-	for _, tool := range detectedTools {
-		toolInfo := tools.GetToolInfo(tool)
-
-		// Clean commands
-		if toolInfo.SupportsCommands {
-			commandsDir := filepath.Join(projectPath, toolInfo.CommandsDir)
-			r, f := cleanDirectory(commandsDir, repoPath)
-			removed += r
-			failed += f
-		}
-
-		// Clean skills
-		if toolInfo.SupportsSkills {
-			skillsDir := filepath.Join(projectPath, toolInfo.SkillsDir)
-			r, f := cleanDirectory(skillsDir, repoPath)
-			removed += r
-			failed += f
-		}
-
-		// Clean agents
-		if toolInfo.SupportsAgents {
-			agentsDir := filepath.Join(projectPath, toolInfo.AgentsDir)
-			r, f := cleanDirectory(agentsDir, repoPath)
-			removed += r
-			failed += f
+			removed = append(removed, CleanRemovedEntry{
+				Tool:         owned.Tool.String(),
+				ResourceType: string(owned.ResourceType),
+				Path:         entryPath,
+				EntryType:    entryType,
+			})
 		}
 	}
+
+	sort.Slice(removed, func(i, j int) bool { return removed[i].Path < removed[j].Path })
+	sort.Slice(failed, func(i, j int) bool { return failed[i].Path < failed[j].Path })
 
 	return removed, failed
 }
 
-func cleanDirectory(dir, repoPath string) (int, int) {
-	// Check if directory exists
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return 0, 0
+func cleanEntryTypeFromDirEntry(entry os.DirEntry) string {
+	if entry.Type()&os.ModeSymlink != 0 {
+		return "symlink"
+	}
+	if entry.IsDir() {
+		return "directory"
+	}
+	return "file"
+}
+
+func summarizeCleanResult(ownedDirs []OwnedResourceDir, removed []CleanRemovedEntry, failed []CleanFailedEntry) CleanSummary {
+	summary := CleanSummary{
+		OwnedDirsDetected: len(ownedDirs),
+		Removed:           len(removed),
+		Failed:            len(failed),
 	}
 
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return 0, 0
-	}
-
-	removed := 0
-	failed := 0
-
-	for _, entry := range entries {
-		symlinkPath := filepath.Join(dir, entry.Name())
-
-		// Check if it's a symlink
-		linkInfo, err := os.Lstat(symlinkPath)
-		if err != nil {
-			failed++
-			continue
-		}
-
-		if linkInfo.Mode()&os.ModeSymlink == 0 {
-			continue // Not a symlink
-		}
-
-		// Read target
-		target, err := os.Readlink(symlinkPath)
-		if err != nil {
-			failed++
-			continue
-		}
-
-		// Only remove if points to repo
-		if !strings.HasPrefix(target, repoPath) {
-			continue
-		}
-
-		// Remove symlink
-		if err := os.Remove(symlinkPath); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to remove %s: %v\n", symlinkPath, err)
-			failed++
-		} else {
-			removed++
+	for _, owned := range ownedDirs {
+		if info, err := os.Stat(owned.Path); err == nil && info.IsDir() {
+			summary.OwnedDirsExisting++
 		}
 	}
 
-	return removed, failed
+	for _, entry := range removed {
+		switch entry.EntryType {
+		case "symlink":
+			summary.RemovedSymlinks++
+		case "directory":
+			summary.RemovedDirs++
+		default:
+			summary.RemovedFiles++
+		}
+	}
+
+	return summary
+}
+
+func displayCleanResult(result CleanResult, format output.Format) error {
+	switch format {
+	case output.JSON:
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(result)
+	case output.Table:
+		return displayCleanTable(result)
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+}
+
+func displayCleanTable(result CleanResult) error {
+	if len(result.Removed) > 0 {
+		table := output.NewTable("Path", "Type", "Tool", "Resource")
+		table.WithResponsive().
+			WithDynamicColumn(0).
+			WithMinColumnWidths(40, 10, 12, 10)
+		for _, entry := range result.Removed {
+			table.AddRow(entry.Path, entry.EntryType, entry.Tool, entry.ResourceType)
+		}
+		if err := table.Format(output.Table); err != nil {
+			return err
+		}
+	} else if result.Summary.OwnedDirsDetected == 0 {
+		fmt.Println("No tool directories found in this project. Nothing to clean.")
+	} else {
+		fmt.Println("No entries found in owned resource directories. Nothing to clean.")
+	}
+
+	if len(result.Failed) > 0 {
+		fmt.Println("\nFailed removals:")
+		for _, failure := range result.Failed {
+			fmt.Printf("  - %s (%s): %s\n", failure.Path, failure.EntryType, failure.Error)
+		}
+	}
+
+	fmt.Printf("\nSummary: owned dirs detected=%d, existing=%d, removed=%d (files=%d, symlinks=%d, directories=%d), failures=%d\n",
+		result.Summary.OwnedDirsDetected,
+		result.Summary.OwnedDirsExisting,
+		result.Summary.Removed,
+		result.Summary.RemovedFiles,
+		result.Summary.RemovedSymlinks,
+		result.Summary.RemovedDirs,
+		result.Summary.Failed,
+	)
+
+	if result.Summary.OwnedDirsDetected > 0 {
+		fmt.Println("To restore declared resources from ai.package.yaml, run: aimgr repair")
+	}
+
+	return nil
+}
+
+func printCleanWarnings(warnings []string) {
+	for _, warning := range warnings {
+		fmt.Fprintln(os.Stderr, warning)
+	}
 }
 
 var (
 	cleanProjectPath string
-	cleanYesFlag     bool
+	cleanFormatFlag  string
 )
 
 func init() {
 	rootCmd.AddCommand(cleanCmd)
 	cleanCmd.Flags().StringVar(&cleanProjectPath, "project-path", "", "Project directory path (default: current directory)")
-	cleanCmd.Flags().BoolVarP(&cleanYesFlag, "yes", "y", false, "Skip confirmation prompt")
+	cleanCmd.Flags().StringVar(&cleanFormatFlag, "format", "table", "Output format (table|json)")
+	_ = cleanCmd.RegisterFlagCompletionFunc("format", completeTableJSONFormat)
+}
+
+func completeTableJSONFormat(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return []string{"table", "json"}, cobra.ShellCompDirectiveNoFileComp
 }

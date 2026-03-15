@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Breaking Changes
+- **Owned-folder project cleanup model** — Project repair/clean workflows now use owned resource directory semantics. `aimgr repair --reset`, `aimgr repair --force`, and `aimgr clean --yes` are removed. Migration mapping:
+  - `aimgr repair --reset` → `aimgr repair`
+  - `aimgr repair --force` → `aimgr repair`
+  - `aimgr clean --yes` → `aimgr clean`
+  - `aimgr repair --reset --force` → `aimgr clean && aimgr repair`
+
+### Changed
+- **Repair/Clean docs and AI guidance updated** — User docs, troubleshooting, and ai-resource-manager skill references now explain:
+  - `aimgr clean` empties owned resource directories
+  - `aimgr repair` reconciles owned directories to `ai.package.yaml`
+  - `--dry-run` previews repair plans
+  - `--prune-package` is separate manifest cleanup
+  - resources still declared in `ai.package.yaml` are reinstalled during repair
+
+
 ## [3.3.0] - 2026-03-12
 
 ### Added

@@ -149,6 +149,38 @@ Use **`ai.package.yaml`** when you want to:
 
 ---
 
+## Owned folders and reconciliation
+
+For detected tools, aimgr treats project resource directories as **owned state**:
+
+- commands directories
+- skills directories
+- agents directories
+
+Examples include `.claude/commands`, `.opencode/skills`, or `.github/skills`.
+
+Two commands define cleanup and recovery behavior:
+
+- `aimgr clean` empties owned resource directories
+- `aimgr repair` reconciles owned directories to `ai.package.yaml`
+
+In practice:
+
+- If a resource is declared in `ai.package.yaml`, `repair` ensures it is installed
+- If undeclared content exists in owned directories, `repair` removes it
+- If you manually delete a declared resource, `repair` reinstalls it
+
+If you want to remove a resource permanently, update `ai.package.yaml`
+(for example with `aimgr uninstall <resource>` without `--no-save`).
+
+For a full reset-and-restore flow:
+
+```bash
+aimgr clean && aimgr repair
+```
+
+---
+
 ## See also
 
 - [Getting Started](getting-started.md)

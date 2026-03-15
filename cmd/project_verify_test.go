@@ -576,7 +576,7 @@ func TestDisplayVerifyIssues(t *testing.T) {
 }
 
 func TestVerifyIssueTypes(t *testing.T) {
-	issueTypes := []string{"broken", "wrong-repo", "not-installed", "orphaned", "unreadable"}
+	issueTypes := []string{"broken", "wrong-repo", "not-installed", "undeclared", "unreadable"}
 
 	for _, issueType := range issueTypes {
 		t.Run(issueType, func(t *testing.T) {
@@ -1236,9 +1236,9 @@ func TestDeduplicateIssues(t *testing.T) {
 				{Resource: "my-skill", Tool: "claude", IssueType: "broken", Severity: "error"},
 			},
 			manifestIssues: []VerifyIssue{
-				{Resource: "skill/my-skill", Tool: "any", IssueType: "orphaned", Severity: "warning"},
+				{Resource: "skill/my-skill", Tool: "any", IssueType: "undeclared", Severity: "warning"},
 			},
-			expectedCount: 2, // Both kept (orphaned is not filtered)
+			expectedCount: 2, // Both kept (undeclared is not filtered)
 		},
 		{
 			name: "no manifest issues means no change",
@@ -1325,9 +1325,9 @@ func TestBrokenSymlinkNoDuplicatesBetweenPhases(t *testing.T) {
 	}
 }
 
-// TestCheckManifestSync_DetectsOrphanedSkill verifies that checkManifestSync
+// TestCheckManifestSync_DetectsUndeclaredSkill verifies that checkManifestSync
 // reports a skill installed on disk but not listed in ai.package.yaml.
-func TestCheckManifestSync_DetectsOrphanedSkill(t *testing.T) {
+func TestCheckManifestSync_DetectsUndeclaredSkill(t *testing.T) {
 	projectDir := t.TempDir()
 	repoDir := t.TempDir()
 
@@ -1345,14 +1345,14 @@ func TestCheckManifestSync_DetectsOrphanedSkill(t *testing.T) {
 	if err := os.MkdirAll(skillsDir, 0755); err != nil {
 		t.Fatalf("Failed to create skills dir: %v", err)
 	}
-	repoSkillDir := filepath.Join(repoDir, "skills", "orphan-skill")
+	repoSkillDir := filepath.Join(repoDir, "skills", "undeclared-skill")
 	if err := os.MkdirAll(repoSkillDir, 0755); err != nil {
 		t.Fatalf("Failed to create repo skill dir: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(repoSkillDir, "SKILL.md"), []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to write SKILL.md: %v", err)
 	}
-	if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "orphan-skill")); err != nil {
+	if err := os.Symlink(repoSkillDir, filepath.Join(skillsDir, "undeclared-skill")); err != nil {
 		t.Fatalf("Failed to create symlink: %v", err)
 	}
 
@@ -1367,22 +1367,22 @@ func TestCheckManifestSync_DetectsOrphanedSkill(t *testing.T) {
 	}
 
 	if len(issues) != 1 {
-		t.Fatalf("Expected 1 orphaned issue, got %d: %+v", len(issues), issues)
+		t.Fatalf("Expected 1 undeclared issue, got %d: %+v", len(issues), issues)
 	}
-	if issues[0].IssueType != "orphaned" {
-		t.Errorf("Expected issue type 'orphaned', got %q", issues[0].IssueType)
+	if issues[0].IssueType != "undeclared" {
+		t.Errorf("Expected issue type 'undeclared', got %q", issues[0].IssueType)
 	}
-	if issues[0].Resource != "orphan-skill" {
-		t.Errorf("Expected resource 'orphan-skill', got %q", issues[0].Resource)
+	if issues[0].Resource != "undeclared-skill" {
+		t.Errorf("Expected resource 'undeclared-skill', got %q", issues[0].Resource)
 	}
 	if issues[0].Severity != "warning" {
 		t.Errorf("Expected severity 'warning', got %q", issues[0].Severity)
 	}
 }
 
-// TestCheckManifestSync_DetectsOrphanedCommand verifies that checkManifestSync
+// TestCheckManifestSync_DetectsUndeclaredCommand verifies that checkManifestSync
 // reports a command installed on disk but not listed in ai.package.yaml.
-func TestCheckManifestSync_DetectsOrphanedCommand(t *testing.T) {
+func TestCheckManifestSync_DetectsUndeclaredCommand(t *testing.T) {
 	projectDir := t.TempDir()
 	repoDir := t.TempDir()
 
@@ -1399,14 +1399,14 @@ func TestCheckManifestSync_DetectsOrphanedCommand(t *testing.T) {
 	if err := os.MkdirAll(commandsDir, 0755); err != nil {
 		t.Fatalf("Failed to create commands dir: %v", err)
 	}
-	repoCmd := filepath.Join(repoDir, "commands", "orphan-cmd.md")
+	repoCmd := filepath.Join(repoDir, "commands", "undeclared-cmd.md")
 	if err := os.MkdirAll(filepath.Dir(repoCmd), 0755); err != nil {
 		t.Fatalf("Failed to create repo cmd dir: %v", err)
 	}
 	if err := os.WriteFile(repoCmd, []byte("test"), 0644); err != nil {
 		t.Fatalf("Failed to write command: %v", err)
 	}
-	if err := os.Symlink(repoCmd, filepath.Join(commandsDir, "orphan-cmd.md")); err != nil {
+	if err := os.Symlink(repoCmd, filepath.Join(commandsDir, "undeclared-cmd.md")); err != nil {
 		t.Fatalf("Failed to create symlink: %v", err)
 	}
 
@@ -1421,19 +1421,19 @@ func TestCheckManifestSync_DetectsOrphanedCommand(t *testing.T) {
 	}
 
 	if len(issues) != 1 {
-		t.Fatalf("Expected 1 orphaned issue, got %d: %+v", len(issues), issues)
+		t.Fatalf("Expected 1 undeclared issue, got %d: %+v", len(issues), issues)
 	}
-	if issues[0].IssueType != "orphaned" {
-		t.Errorf("Expected issue type 'orphaned', got %q", issues[0].IssueType)
+	if issues[0].IssueType != "undeclared" {
+		t.Errorf("Expected issue type 'undeclared', got %q", issues[0].IssueType)
 	}
-	if issues[0].Resource != "orphan-cmd" {
-		t.Errorf("Expected resource 'orphan-cmd', got %q", issues[0].Resource)
+	if issues[0].Resource != "undeclared-cmd.md" {
+		t.Errorf("Expected resource 'undeclared-cmd.md', got %q", issues[0].Resource)
 	}
 }
 
-// TestCheckManifestSync_DetectsOrphanedNestedCommand verifies that orphan detection
+// TestCheckManifestSync_DetectsUndeclaredNestedCommand verifies that undeclared detection
 // works for namespaced commands in subdirectories (e.g., api/deploy).
-func TestCheckManifestSync_DetectsOrphanedNestedCommand(t *testing.T) {
+func TestCheckManifestSync_DetectsUndeclaredNestedCommand(t *testing.T) {
 	projectDir := t.TempDir()
 	repoDir := t.TempDir()
 
@@ -1471,20 +1471,28 @@ func TestCheckManifestSync_DetectsOrphanedNestedCommand(t *testing.T) {
 		t.Fatalf("checkManifestSync failed: %v", err)
 	}
 
-	if len(issues) != 1 {
-		t.Fatalf("Expected 1 orphaned issue, got %d: %+v", len(issues), issues)
+	if len(issues) != 2 {
+		t.Fatalf("Expected 2 undeclared issues (nested file + parent dir), got %d: %+v", len(issues), issues)
 	}
-	if issues[0].IssueType != "orphaned" {
-		t.Errorf("Expected issue type 'orphaned', got %q", issues[0].IssueType)
+
+	found := map[string]bool{}
+	for _, issue := range issues {
+		if issue.IssueType != "undeclared" {
+			t.Errorf("Expected issue type 'undeclared', got %q", issue.IssueType)
+		}
+		found[issue.Resource] = true
 	}
-	if issues[0].Resource != "api/deploy" {
-		t.Errorf("Expected resource 'api/deploy', got %q", issues[0].Resource)
+	if !found[filepath.ToSlash(filepath.Join("api", "deploy.md"))] {
+		t.Errorf("Expected resource 'api/deploy.md' in issues, got %+v", issues)
+	}
+	if !found["api"] {
+		t.Errorf("Expected resource 'api' in issues, got %+v", issues)
 	}
 }
 
-// TestCheckManifestSync_NoOrphansWhenInManifest verifies that installed resources
-// that ARE in the manifest are not reported as orphaned.
-func TestCheckManifestSync_NoOrphansWhenInManifest(t *testing.T) {
+// TestCheckManifestSync_NoUndeclaredWhenInManifest verifies that installed resources
+// that ARE in the manifest are not reported as undeclared.
+func TestCheckManifestSync_NoUndeclaredWhenInManifest(t *testing.T) {
 	projectDir := t.TempDir()
 	repoDir := t.TempDir()
 
@@ -1527,9 +1535,9 @@ func TestCheckManifestSync_NoOrphansWhenInManifest(t *testing.T) {
 	}
 }
 
-// TestCheckManifestSync_NoOrphansWithoutManifest verifies no false positives
-// when no ai.package.yaml exists (returns nil, no orphan scanning).
-func TestCheckManifestSync_NoOrphansWithoutManifest(t *testing.T) {
+// TestCheckManifestSync_NoUndeclaredWithoutManifest verifies no false positives
+// when no ai.package.yaml exists (returns nil, no undeclared scanning).
+func TestCheckManifestSync_NoUndeclaredWithoutManifest(t *testing.T) {
 	projectDir := t.TempDir()
 	repoDir := t.TempDir()
 
@@ -1564,9 +1572,9 @@ func TestCheckManifestSync_NoOrphansWithoutManifest(t *testing.T) {
 	}
 }
 
-// TestCheckManifestSync_OrphanedIgnoresNonSymlinks verifies that regular files
-// and directories in tool dirs are not reported as orphans.
-func TestCheckManifestSync_OrphanedIgnoresNonSymlinks(t *testing.T) {
+// TestCheckManifestSync_UndeclaredIncludesNonSymlinks verifies that regular files
+// and directories in owned tool dirs are treated as undeclared content.
+func TestCheckManifestSync_UndeclaredIncludesNonSymlinks(t *testing.T) {
 	projectDir := t.TempDir()
 	repoDir := t.TempDir()
 
@@ -1600,15 +1608,28 @@ func TestCheckManifestSync_OrphanedIgnoresNonSymlinks(t *testing.T) {
 		t.Fatalf("checkManifestSync failed: %v", err)
 	}
 
-	// Should have 0 issues — regular files and empty dirs are not orphans
-	if len(issues) != 0 {
-		t.Errorf("Expected 0 issues for non-symlinks, got %d: %+v", len(issues), issues)
+	if len(issues) != 2 {
+		t.Fatalf("Expected 2 undeclared issues for non-symlinks, got %d: %+v", len(issues), issues)
+	}
+
+	found := map[string]bool{}
+	for _, issue := range issues {
+		if issue.IssueType != "undeclared" {
+			t.Errorf("Expected issue type undeclared, got %q", issue.IssueType)
+		}
+		found[issue.Resource] = true
+	}
+	if !found["regular-file.md"] {
+		t.Errorf("Expected undeclared regular-file.md issue, got: %+v", issues)
+	}
+	if !found["regular-dir"] {
+		t.Errorf("Expected undeclared regular-dir issue, got: %+v", issues)
 	}
 }
 
-// TestCheckManifestSync_OrphanedDeduplicatesAcrossTools verifies that an orphan
-// installed in multiple tool directories is only reported once.
-func TestCheckManifestSync_OrphanedDeduplicatesAcrossTools(t *testing.T) {
+// TestCheckManifestSync_UndeclaredReportedPerOwnedDir verifies that undeclared content
+// installed in multiple tool directories is reported per owned directory.
+func TestCheckManifestSync_UndeclaredReportedPerOwnedDir(t *testing.T) {
 	projectDir := t.TempDir()
 	repoDir := t.TempDir()
 
@@ -1649,22 +1670,22 @@ func TestCheckManifestSync_OrphanedDeduplicatesAcrossTools(t *testing.T) {
 		t.Fatalf("checkManifestSync failed: %v", err)
 	}
 
-	// Count orphaned issues — should be exactly 1, not duplicated
-	orphanCount := 0
+	// Count undeclared issues — should be reported for each owned directory
+	undeclaredCount := 0
 	for _, issue := range issues {
-		if issue.IssueType == "orphaned" {
-			orphanCount++
+		if issue.IssueType == "undeclared" {
+			undeclaredCount++
 		}
 	}
-	if orphanCount != 1 {
-		t.Errorf("Expected 1 orphaned issue (deduplicated), got %d: %+v", orphanCount, issues)
+	if undeclaredCount != 2 {
+		t.Errorf("Expected 2 undeclared issues (one per owned dir), got %d: %+v", undeclaredCount, issues)
 	}
 }
 
-// TestCheckManifestSync_OrphanedPackageMembersNotReported verifies that resources
-// installed as part of a package are not reported as orphaned when the package
+// TestCheckManifestSync_UndeclaredPackageMembersNotReported verifies that resources
+// installed as part of a package are not reported as undeclared when the package
 // is declared in the manifest.
-func TestCheckManifestSync_OrphanedPackageMembersNotReported(t *testing.T) {
+func TestCheckManifestSync_UndeclaredPackageMembersNotReported(t *testing.T) {
 	projectDir := t.TempDir()
 	repoDir := t.TempDir()
 
@@ -1712,10 +1733,10 @@ func TestCheckManifestSync_OrphanedPackageMembersNotReported(t *testing.T) {
 		t.Fatalf("checkManifestSync failed: %v", err)
 	}
 
-	// The skill is a member of the declared package — it should NOT be orphaned
+	// The skill is a member of the declared package — it should NOT be undeclared
 	for _, issue := range issues {
-		if issue.IssueType == "orphaned" {
-			t.Errorf("Package member should not be reported as orphaned: %+v", issue)
+		if issue.IssueType == "undeclared" {
+			t.Errorf("Package member should not be reported as undeclared: %+v", issue)
 		}
 	}
 }
@@ -1784,13 +1805,13 @@ func TestVerifyFixDeprecationWarning(t *testing.T) {
 	stderrOutput := string(captured[:n])
 
 	// Verify deprecation warning was printed
-	if !strings.Contains(stderrOutput, "Warning: --fix is deprecated. Use 'aimgr repair' instead.") {
+	if !strings.Contains(stderrOutput, "Warning: --fix is deprecated. Running 'aimgr repair' reconciliation.") {
 		t.Errorf("Expected deprecation warning on stderr, got: %q", stderrOutput)
 	}
 }
 
-// TestFindOrphanedResources tests the findOrphanedResources helper directly.
-func TestFindOrphanedResources(t *testing.T) {
+// TestFindUndeclaredResources tests the findUndeclaredResources helper directly.
+func TestFindUndeclaredResources(t *testing.T) {
 	tests := []struct {
 		name          string
 		resType       string
@@ -1800,7 +1821,7 @@ func TestFindOrphanedResources(t *testing.T) {
 		expectedName  string
 	}{
 		{
-			name:     "detects orphaned command symlink",
+			name:     "detects undeclared command symlink",
 			resType:  "command",
 			manifest: map[string]bool{},
 			setupFunc: func(dir string) error {
@@ -1817,7 +1838,7 @@ func TestFindOrphanedResources(t *testing.T) {
 			expectedName:  "orphan-cmd",
 		},
 		{
-			name:     "detects orphaned copilot agent symlink with .agent.md",
+			name:     "detects undeclared copilot agent symlink with .agent.md",
 			resType:  "agent",
 			manifest: map[string]bool{},
 			setupFunc: func(dir string) error {
@@ -1850,7 +1871,7 @@ func TestFindOrphanedResources(t *testing.T) {
 			expectedCount: 0,
 		},
 		{
-			name:     "detects orphaned nested command",
+			name:     "detects undeclared nested command",
 			resType:  "command",
 			manifest: map[string]bool{},
 			setupFunc: func(dir string) error {
@@ -1908,7 +1929,7 @@ func TestFindOrphanedResources(t *testing.T) {
 			if tt.resType == "agent" && strings.Contains(tt.name, "copilot") {
 				targetTool = tools.Copilot
 			}
-			issues := findOrphanedResources(testDir, tt.resType, targetTool, tt.manifest, seen)
+			issues := findUndeclaredResources(testDir, tt.resType, targetTool, tt.manifest, seen)
 
 			if len(issues) != tt.expectedCount {
 				t.Errorf("Expected %d issues, got %d: %+v", tt.expectedCount, len(issues), issues)

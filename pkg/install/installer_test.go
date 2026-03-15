@@ -671,6 +671,50 @@ func TestInstallSkillMultipleToolsIncludingCopilot(t *testing.T) {
 	}
 }
 
+func TestInstallAgentToCopilotFromCopilotArtifactSource(t *testing.T) {
+	tmpRepo := t.TempDir()
+	manager := repo.NewManagerWithPath(tmpRepo)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	agentFile := filepath.Join(tmpRepo, "test-agent.agent.md")
+	agentContent := `---
+description: Copilot agent suffix regression test
+---
+
+# Test Agent
+`
+	if err := os.WriteFile(agentFile, []byte(agentContent), 0644); err != nil {
+		t.Fatalf("Failed to create test agent: %v", err)
+	}
+	if err := manager.AddAgent(agentFile, "file://"+agentFile, "file"); err != nil {
+		t.Fatalf("AddAgent() error = %v", err)
+	}
+
+	projectDir := t.TempDir()
+	installer, err := NewInstallerWithTargets(projectDir, []tools.Tool{tools.Copilot})
+	if err != nil {
+		t.Fatalf("NewInstallerWithTargets() error = %v", err)
+	}
+
+	if err := installer.InstallAgent("test-agent", manager); err != nil {
+		t.Fatalf("InstallAgent() error = %v", err)
+	}
+
+	installedPath := filepath.Join(projectDir, ".github", "agents", "test-agent.agent.md")
+	if _, err := os.Lstat(installedPath); err != nil {
+		t.Fatalf("expected Copilot agent symlink at %s: %v", installedPath, err)
+	}
+
+	duplicatePath := filepath.Join(projectDir, ".github", "agents", "test-agent.agent.agent.md")
+	if _, err := os.Lstat(duplicatePath); err == nil {
+		t.Fatalf("unexpected duplicated Copilot agent suffix at %s", duplicatePath)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("unexpected error checking duplicate Copilot path: %v", err)
+	}
+}
+
 func TestInstallCommandCopilotReturnsUnsupportedError(t *testing.T) {
 	manager := setupTestRepo(t)
 	projectDir := t.TempDir()
