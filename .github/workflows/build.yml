@@ -39,15 +39,8 @@ jobs:
       - name: Build binary
         run: make build
 
-      - name: Run tests with coverage
-        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage.out
-          flags: unittests
-          fail_ci_if_error: false
+      - name: Run tests
+        run: go test -race ./...
 
   e2e-test:
     name: E2E Tests
