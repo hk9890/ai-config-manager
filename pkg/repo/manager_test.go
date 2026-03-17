@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -347,6 +348,109 @@ description: A test skill
 	}
 	if skills[0].Type != resource.Skill {
 		t.Errorf("List(Skill) returned non-skill resource")
+	}
+}
+
+func TestList_SortsByTypeAndName(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := NewManagerWithPath(tmpDir)
+
+	writeCommand := func(name, description string) {
+		t.Helper()
+		path := filepath.Join(tmpDir, name+".md")
+		content := fmt.Sprintf("---\ndescription: %s\n---\n\n# %s\n", description, name)
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to create command %s: %v", name, err)
+		}
+		if err := manager.AddCommand(path, "file://"+path, "file"); err != nil {
+			t.Fatalf("failed to add command %s: %v", name, err)
+		}
+	}
+
+	writeSkill := func(name, description string) {
+		t.Helper()
+		dir := filepath.Join(tmpDir, name)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("failed to create skill dir %s: %v", name, err)
+		}
+		content := fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n# %s\n", name, description, name)
+		if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(content), 0644); err != nil {
+			t.Fatalf("failed to create skill file %s: %v", name, err)
+		}
+		if err := manager.AddSkill(dir, "file://"+dir, "file"); err != nil {
+			t.Fatalf("failed to add skill %s: %v", name, err)
+		}
+	}
+
+	writeAgent := func(name, description string) {
+		t.Helper()
+		path := filepath.Join(tmpDir, name+".md")
+		content := fmt.Sprintf("---\ndescription: %s\n---\n\n# %s\n", description, name)
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to create agent %s: %v", name, err)
+		}
+		if err := manager.AddAgent(path, "file://"+path, "file"); err != nil {
+			t.Fatalf("failed to add agent %s: %v", name, err)
+		}
+	}
+
+	writePackage := func(name, description string, resources []string) {
+		t.Helper()
+		path := filepath.Join(tmpDir, name+".package.json")
+		content := fmt.Sprintf("{\n  \"name\": %q,\n  \"description\": %q,\n  \"resources\": [", name, description)
+		for i, ref := range resources {
+			if i > 0 {
+				content += ", "
+			}
+			content += fmt.Sprintf("%q", ref)
+		}
+		content += "]\n}\n"
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to create package %s: %v", name, err)
+		}
+		if err := manager.AddPackage(path, "file://"+path, "file"); err != nil {
+			t.Fatalf("failed to add package %s: %v", name, err)
+		}
+	}
+
+	writeCommand("z-command", "Z command")
+	writeCommand("a-command", "A command")
+	writeSkill("b-skill", "B skill")
+	writeSkill("a-skill", "A skill")
+	writeAgent("z-agent", "Z agent")
+	writeAgent("a-agent", "A agent")
+	writePackage("z-package", "Z package", []string{"command/z-command"})
+	writePackage("a-package", "A package", []string{"command/a-command"})
+
+	resources, err := manager.List(nil)
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	got := make([]string, len(resources))
+	for i, res := range resources {
+		got[i] = string(res.Type) + "/" + res.Name
+	}
+
+	want := []string{
+		"command/a-command",
+		"command/z-command",
+		"skill/a-skill",
+		"skill/b-skill",
+		"agent/a-agent",
+		"agent/z-agent",
+		"package/a-package",
+		"package/z-package",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("expected %d resources, got %d", len(want), len(got))
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected sorted resource %d to be %q, got %q", i, want[i], got[i])
+		}
 	}
 }
 

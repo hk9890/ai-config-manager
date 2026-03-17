@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/install"
@@ -400,6 +401,8 @@ func buildResourceInfo(resources []resource.Resource, projectPath string, detect
 			}
 		}
 
+		sort.Strings(info.Targets)
+
 		// Determine if resource is installed (has at least one target)
 		// Packages have no symlinks, so their Targets will always be empty.
 		// They are considered "installed" by virtue of being in the manifest.
@@ -418,7 +421,36 @@ func buildResourceInfo(resources []resource.Resource, projectPath string, detect
 		infos = append(infos, info)
 	}
 
+	sortResourceInfos(infos)
+
 	return infos
+}
+
+func sortResourceInfos(infos []ResourceInfo) {
+	sort.Slice(infos, func(i, j int) bool {
+		leftOrder := resourceTypeOrder(infos[i].Type)
+		rightOrder := resourceTypeOrder(infos[j].Type)
+		if leftOrder != rightOrder {
+			return leftOrder < rightOrder
+		}
+
+		return infos[i].Name < infos[j].Name
+	})
+}
+
+func resourceTypeOrder(resType resource.ResourceType) int {
+	switch resType {
+	case resource.Command:
+		return 0
+	case resource.Skill:
+		return 1
+	case resource.Agent:
+		return 2
+	case resource.PackageType:
+		return 3
+	default:
+		return 4
+	}
 }
 
 // isInstalledInTool checks if a resource is installed in a specific tool directory

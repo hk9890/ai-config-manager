@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/resource"
@@ -163,6 +164,8 @@ func (m *Manager) List(resourceType *resource.ResourceType) ([]resource.Resource
 	}
 
 	// Log the result count
+	sortResources(resources)
+
 	if m.logger != nil {
 		if resourceType != nil {
 			m.logger.Debug("repo list result",
@@ -226,6 +229,10 @@ func (m *Manager) ListPackages() ([]PackageInfo, error) {
 		})
 	}
 
+	sort.Slice(packages, func(i, j int) bool {
+		return packages[i].Name < packages[j].Name
+	})
+
 	// Log the result count
 	if m.logger != nil {
 		m.logger.Debug("repo list packages result",
@@ -234,6 +241,33 @@ func (m *Manager) ListPackages() ([]PackageInfo, error) {
 	}
 
 	return packages, nil
+}
+
+func sortResources(resources []resource.Resource) {
+	sort.Slice(resources, func(i, j int) bool {
+		leftOrder := resourceTypeOrder(resources[i].Type)
+		rightOrder := resourceTypeOrder(resources[j].Type)
+		if leftOrder != rightOrder {
+			return leftOrder < rightOrder
+		}
+
+		return resources[i].Name < resources[j].Name
+	})
+}
+
+func resourceTypeOrder(resType resource.ResourceType) int {
+	switch resType {
+	case resource.Command:
+		return 0
+	case resource.Skill:
+		return 1
+	case resource.Agent:
+		return 2
+	case resource.PackageType:
+		return 3
+	default:
+		return 4
+	}
 }
 
 // Get retrieves a specific resource by name and type

@@ -479,3 +479,45 @@ func TestListPackages(t *testing.T) {
 		t.Error("Package 2 not found in list")
 	}
 }
+
+func TestListPackages_SortsAlphabetically(t *testing.T) {
+	tmpDir := t.TempDir()
+	manager := NewManagerWithPath(tmpDir)
+
+	createPackage := func(name, description string, resources []string) {
+		t.Helper()
+		path := filepath.Join(tmpDir, name+".package.json")
+		content := map[string]interface{}{
+			"name":        name,
+			"description": description,
+			"resources":   resources,
+		}
+		data, _ := json.MarshalIndent(content, "", "  ")
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			t.Fatalf("failed to create package %s: %v", name, err)
+		}
+		if err := manager.AddPackage(path, "file://"+path, "file"); err != nil {
+			t.Fatalf("failed to add package %s: %v", name, err)
+		}
+	}
+
+	createPackage("z-package", "Z package", []string{"command/cmd-z"})
+	createPackage("a-package", "A package", []string{"command/cmd-a"})
+	createPackage("m-package", "M package", []string{"command/cmd-m"})
+
+	packages, err := manager.ListPackages()
+	if err != nil {
+		t.Fatalf("ListPackages() error = %v", err)
+	}
+
+	if len(packages) != 3 {
+		t.Fatalf("expected 3 packages, got %d", len(packages))
+	}
+
+	want := []string{"a-package", "m-package", "z-package"}
+	for i := range want {
+		if packages[i].Name != want[i] {
+			t.Fatalf("expected package %d to be %q, got %q", i, want[i], packages[i].Name)
+		}
+	}
+}

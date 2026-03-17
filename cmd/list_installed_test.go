@@ -432,6 +432,49 @@ func TestBuildResourceInfo_MixedHealthStatus(t *testing.T) {
 	}
 }
 
+func TestBuildResourceInfo_SortsByTypeAndName(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	resources := []resource.Resource{
+		{Type: resource.PackageType, Name: "z-package"},
+		{Type: resource.Agent, Name: "z-agent"},
+		{Type: resource.Command, Name: "z-command"},
+		{Type: resource.Skill, Name: "b-skill"},
+		{Type: resource.Agent, Name: "a-agent"},
+		{Type: resource.Command, Name: "a-command"},
+		{Type: resource.Skill, Name: "a-skill"},
+		{Type: resource.PackageType, Name: "a-package"},
+	}
+
+	infos := buildResourceInfo(resources, tmpDir, []tools.Tool{tools.OpenCode})
+
+	if len(infos) != len(resources) {
+		t.Fatalf("expected %d resource infos, got %d", len(resources), len(infos))
+	}
+
+	got := make([]string, len(infos))
+	for i, info := range infos {
+		got[i] = string(info.Type) + "/" + info.Name
+	}
+
+	want := []string{
+		"command/a-command",
+		"command/z-command",
+		"skill/a-skill",
+		"skill/b-skill",
+		"agent/a-agent",
+		"agent/z-agent",
+		"package/a-package",
+		"package/z-package",
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected sorted entry %d to be %q, got %q", i, want[i], got[i])
+		}
+	}
+}
+
 // TestIsInstalledInTool_BrokenSymlinkDetected tests that isInstalledInTool()
 // detects broken symlinks (returns true because the symlink exists via Lstat).
 func TestIsInstalledInTool_BrokenSymlinkDetected(t *testing.T) {
