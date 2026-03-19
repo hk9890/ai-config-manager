@@ -168,93 +168,33 @@ func (m *Manager) CacheLockPath(cacheHash string) string {
 //
 //nolint:gocyclo // Sequential initialization of directory structure, git repo, gitignore, and initial commit; must remain atomic for idempotency.
 func (m *Manager) Init() error {
-	// Create main repo directory
-	if m.logger != nil {
-		m.logger.Debug("creating repo directory",
-			"path", m.repoPath,
-			"permissions", "0755",
-		)
+	// Create repo directory and standard subdirectories
+	dirs := []struct {
+		path  string
+		label string
+	}{
+		{m.repoPath, "repo"},
+		{filepath.Join(m.repoPath, "commands"), "commands"},
+		{filepath.Join(m.repoPath, "skills"), "skills"},
+		{filepath.Join(m.repoPath, "agents"), "agents"},
+		{filepath.Join(m.repoPath, "packages"), "packages"},
 	}
-	if err := os.MkdirAll(m.repoPath, 0755); err != nil {
+	for _, d := range dirs {
 		if m.logger != nil {
-			m.logger.Error("failed to create repo directory",
-				"path", m.repoPath,
-				"error", err.Error(),
+			m.logger.Debug("creating "+d.label+" directory",
+				"path", d.path,
+				"permissions", "0755",
 			)
 		}
-		return fmt.Errorf("failed to create repo directory: %w", err)
-	}
-
-	// Create commands subdirectory
-	commandsPath := filepath.Join(m.repoPath, "commands")
-	if m.logger != nil {
-		m.logger.Debug("creating commands directory",
-			"path", commandsPath,
-			"permissions", "0755",
-		)
-	}
-	if err := os.MkdirAll(commandsPath, 0755); err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to create commands directory",
-				"path", commandsPath,
-				"error", err.Error(),
-			)
+		if err := os.MkdirAll(d.path, 0755); err != nil {
+			if m.logger != nil {
+				m.logger.Error("failed to create "+d.label+" directory",
+					"path", d.path,
+					"error", err.Error(),
+				)
+			}
+			return fmt.Errorf("failed to create %s directory: %w", d.label, err)
 		}
-		return fmt.Errorf("failed to create commands directory: %w", err)
-	}
-
-	// Create skills subdirectory
-	skillsPath := filepath.Join(m.repoPath, "skills")
-	if m.logger != nil {
-		m.logger.Debug("creating skills directory",
-			"path", skillsPath,
-			"permissions", "0755",
-		)
-	}
-	if err := os.MkdirAll(skillsPath, 0755); err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to create skills directory",
-				"path", skillsPath,
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to create skills directory: %w", err)
-	}
-
-	// Create agents subdirectory
-	agentsPath := filepath.Join(m.repoPath, "agents")
-	if m.logger != nil {
-		m.logger.Debug("creating agents directory",
-			"path", agentsPath,
-			"permissions", "0755",
-		)
-	}
-	if err := os.MkdirAll(agentsPath, 0755); err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to create agents directory",
-				"path", agentsPath,
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to create agents directory: %w", err)
-	}
-
-	// Create packages subdirectory
-	packagesPath := filepath.Join(m.repoPath, "packages")
-	if m.logger != nil {
-		m.logger.Debug("creating packages directory",
-			"path", packagesPath,
-			"permissions", "0755",
-		)
-	}
-	if err := os.MkdirAll(packagesPath, 0755); err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to create packages directory",
-				"path", packagesPath,
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to create packages directory: %w", err)
 	}
 
 	// Initialize git repository if not already initialized

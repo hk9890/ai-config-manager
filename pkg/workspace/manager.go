@@ -898,14 +898,9 @@ func (m *Manager) isValidCache(cachePath string) bool {
 }
 
 // loadMetadata loads the cache metadata from .cache-metadata.json.
-// Returns nil if the file doesn't exist (not an error).
+// Returns empty metadata if the file doesn't exist (not an error).
+// Callers performing read-modify-write must hold the workspace metadata lock.
 func (m *Manager) loadMetadata() (*CacheMetadata, error) {
-	return m.loadMetadataUnlocked()
-}
-
-// loadMetadataUnlocked loads cache metadata without taking workspace metadata lock.
-// Callers must provide any required synchronization.
-func (m *Manager) loadMetadataUnlocked() (*CacheMetadata, error) {
 	metadataPath := filepath.Join(m.workspaceDir, ".cache-metadata.json")
 
 	data, err := os.ReadFile(metadataPath)
@@ -929,13 +924,8 @@ func (m *Manager) loadMetadataUnlocked() (*CacheMetadata, error) {
 }
 
 // saveMetadata saves the cache metadata to .cache-metadata.json.
+// Callers performing read-modify-write must hold the workspace metadata lock.
 func (m *Manager) saveMetadata(metadata *CacheMetadata) error {
-	return m.saveMetadataUnlocked(metadata)
-}
-
-// saveMetadataUnlocked writes metadata without taking workspace metadata lock.
-// Callers must provide any required synchronization.
-func (m *Manager) saveMetadataUnlocked(metadata *CacheMetadata) error {
 	metadataPath := filepath.Join(m.workspaceDir, ".cache-metadata.json")
 
 	data, err := json.MarshalIndent(metadata, "", "  ")
@@ -964,7 +954,7 @@ func (m *Manager) updateMetadataEntry(url string, ref string, updateType string)
 		return err
 	}
 
-	metadata, err := m.loadMetadataUnlocked()
+	metadata, err := m.loadMetadata()
 	if err != nil {
 		return err
 	}
@@ -989,7 +979,7 @@ func (m *Manager) updateMetadataEntry(url string, ref string, updateType string)
 
 	metadata.Caches[hash] = entry
 
-	return m.saveMetadataUnlocked(metadata)
+	return m.saveMetadata(metadata)
 }
 
 func (m *Manager) removeMetadataEntry(url string) error {
@@ -1001,14 +991,14 @@ func (m *Manager) removeMetadataEntry(url string) error {
 		_ = metadataLock.Unlock()
 	}()
 
-	metadata, err := m.loadMetadataUnlocked()
+	metadata, err := m.loadMetadata()
 	if err != nil {
 		return err
 	}
 
 	delete(metadata.Caches, computeHash(url))
 
-	return m.saveMetadataUnlocked(metadata)
+	return m.saveMetadata(metadata)
 }
 
 // cloneRepo clones a Git repository to the specified cache path.

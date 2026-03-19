@@ -115,24 +115,25 @@ func (m *Manager) Remove(name string, resourceType resource.ResourceType) error 
 func (m *Manager) HasSource(name string, resourceType resource.ResourceType, sourceName string) bool {
 	// Load metadata to check source
 	meta, err := metadata.Load(name, resourceType, m.repoPath)
-
-	// DEBUG: Log each metadata check
-	if m.logger != nil {
-		if err != nil {
+	if err != nil {
+		if m.logger != nil {
 			m.logger.Debug("checking metadata - load failed",
 				"resource", name,
 				"type", string(resourceType),
 				"expected_source", sourceName,
 				"error", err.Error(),
 			)
-			return false
 		}
+		return false
+	}
 
-		// Check SourceID first, then fall back to SourceName
-		matchByID := meta.SourceID != "" && meta.SourceID == sourceName
-		matchByName := meta.SourceName != "" && meta.SourceName == sourceName
-		match := matchByID || matchByName
+	// Check SourceID first, then fall back to SourceName
+	matchByID := meta.SourceID != "" && meta.SourceID == sourceName
+	matchByName := meta.SourceName != "" && meta.SourceName == sourceName
+	match := matchByID || matchByName
 
+	// DEBUG: Log each metadata check
+	if m.logger != nil {
 		m.logger.Debug("checking metadata",
 			"resource", name,
 			"type", string(resourceType),
@@ -176,15 +177,9 @@ func (m *Manager) HasSource(name string, resourceType resource.ResourceType, sou
 				}(),
 			)
 		}
-
-		return match
 	}
 
-	// Fallback to simple check without logging
-	if meta.SourceID != "" && meta.SourceID == sourceName {
-		return true
-	}
-	return meta.SourceName != "" && meta.SourceName == sourceName
+	return match
 }
 
 // GetPath returns the full path to a resource in the repository

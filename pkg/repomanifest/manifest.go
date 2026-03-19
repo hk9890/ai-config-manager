@@ -15,6 +15,12 @@ import (
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/sourcemetadata"
 )
 
+// Pre-compiled regexps for source name validation and generation.
+var (
+	validSourceNameRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+	invalidNameCharRe = regexp.MustCompile(`[^a-z0-9-]`)
+)
+
 const (
 	// ManifestFileName is the default name for repository manifest files
 	ManifestFileName = "ai.repo.yaml"
@@ -347,9 +353,7 @@ func isValidSourceName(name string) bool {
 	// Must be lowercase alphanumeric + hyphens only
 	// Cannot start/end with hyphen
 	// No consecutive hyphens
-	pattern := `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`
-	matched, _ := regexp.MatchString(pattern, name)
-	if !matched {
+	if !validSourceNameRe.MatchString(name) {
 		return false
 	}
 
@@ -397,8 +401,7 @@ func generateSourceName(source *Source) string {
 	base = strings.ToLower(base)
 
 	// Replace invalid characters with hyphens
-	reg := regexp.MustCompile(`[^a-z0-9-]`)
-	name := reg.ReplaceAllString(base, "-")
+	name := invalidNameCharRe.ReplaceAllString(base, "-")
 
 	// Remove leading/trailing hyphens
 	name = strings.Trim(name, "-")
