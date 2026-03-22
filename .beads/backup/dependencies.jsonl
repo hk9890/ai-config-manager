@@ -3,6 +3,8 @@
 {"created_at":"2026-03-19T17:18:50Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-q8zf","issue_id":"ai-config-manager-1av1","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-19T17:18:50Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-rqo9","issue_id":"ai-config-manager-1av1","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-19T17:18:49Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-sfrx","issue_id":"ai-config-manager-1av1","metadata":"{}","type":"blocks"}
+{"created_at":"2026-03-22T22:41:10Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-3p52","issue_id":"ai-config-manager-27k8","metadata":"{}","type":"discovered-from"}
+{"created_at":"2026-03-22T22:42:08Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-bhwd","issue_id":"ai-config-manager-27k8","metadata":"{}","type":"parent-child"}
 {"created_at":"2026-03-08T14:05:15Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-efi","issue_id":"ai-config-manager-292","metadata":"{}","type":"discovered-from"}
 {"created_at":"2026-03-15T11:45:27Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-bhiq","issue_id":"ai-config-manager-2kkq","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-15T11:45:27Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-k209","issue_id":"ai-config-manager-2kkq","metadata":"{}","type":"blocks"}
@@ -10,12 +12,15 @@
 {"created_at":"2026-03-15T11:45:27Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-z2en","issue_id":"ai-config-manager-2kkq","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-15T11:45:27Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-zqso","issue_id":"ai-config-manager-2kkq","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-12T11:43:48Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4a5.4","issue_id":"ai-config-manager-2xj","metadata":"{}","type":"discovered-from"}
+{"created_at":"2026-03-22T22:42:08Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-27k8","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-22T18:58:02Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-45t6.2","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-22T18:58:02Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-45t6.3","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-22T18:58:02Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-45t6.5","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-22T18:58:02Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-45t6.6","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-22T18:58:03Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-45t6.9","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-22T18:58:03Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-bhwd","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"parent-child"}
+{"created_at":"2026-03-22T22:42:08Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-peke","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"blocks"}
+{"created_at":"2026-03-22T22:48:53Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-y15m","issue_id":"ai-config-manager-3p52","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-22T18:58:03Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-8ogz","issue_id":"ai-config-manager-45t6.1","metadata":"{}","type":"parent-child"}
 {"created_at":"2026-03-22T18:48:00Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-45t6.8","issue_id":"ai-config-manager-45t6.10","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-22T18:58:04Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-8ogz","issue_id":"ai-config-manager-45t6.10","metadata":"{}","type":"parent-child"}
@@ -154,6 +159,7 @@
 {"created_at":"2026-03-22T11:28:07Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-o98c.2","issue_id":"ai-config-manager-o98c.5","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-08T00:52:03Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao.8","issue_id":"ai-config-manager-pci","metadata":"{}","type":"discovered-from"}
 {"created_at":"2026-03-22T22:38:57Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-3p52","issue_id":"ai-config-manager-peke","metadata":"{}","type":"discovered-from"}
+{"created_at":"2026-03-22T22:42:08Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-bhwd","issue_id":"ai-config-manager-peke","metadata":"{}","type":"parent-child"}
 {"created_at":"2026-03-19T17:18:46Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-g5ky","issue_id":"ai-config-manager-q8zf","metadata":"{}","type":"parent-child"}
 {"created_at":"2026-03-19T17:18:48Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-ryty","issue_id":"ai-config-manager-q8zf","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-19T17:18:52Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-1av1","issue_id":"ai-config-manager-r25t","metadata":"{}","type":"blocks"}
@@ -209,6 +215,8 @@
 {"created_at":"2026-03-22T19:51:14Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-45t6.8","issue_id":"ai-config-manager-vk2q","metadata":"{}","type":"discovered-from"}
 {"created_at":"2026-03-22T19:55:46Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-8ogz","issue_id":"ai-config-manager-vk2q","metadata":"{}","type":"parent-child"}
 {"created_at":"2026-03-22T16:19:37Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-o98c","issue_id":"ai-config-manager-x01l","metadata":"{}","type":"discovered-from"}
+{"created_at":"2026-03-22T22:46:36Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-3p52","issue_id":"ai-config-manager-y15m","metadata":"{}","type":"discovered-from"}
+{"created_at":"2026-03-22T22:48:52Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-bhwd","issue_id":"ai-config-manager-y15m","metadata":"{}","type":"parent-child"}
 {"created_at":"2026-03-08T13:04:12Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-v2a.5","issue_id":"ai-config-manager-y1o","metadata":"{}","type":"discovered-from"}
 {"created_at":"2026-03-12T12:52:40Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-y1y","issue_id":"ai-config-manager-y1y.1","metadata":"{}","type":"parent-child"}
 {"created_at":"2026-03-12T16:53:05Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-y1y.8","issue_id":"ai-config-manager-y1y.1","metadata":"{}","type":"blocks"}
