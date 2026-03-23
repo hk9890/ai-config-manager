@@ -111,6 +111,7 @@
 {"created_at":"2026-03-17T09:14:09Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-fnhb","issue_id":"ai-config-manager-fnhb.1","metadata":"{}","type":"parent-child"}
 {"created_at":"2026-03-17T09:15:58Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-t4s","issue_id":"ai-config-manager-fnhb.1","metadata":"{}","type":"blocks"}
 {"created_at":"2026-03-08T16:11:55Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-efi","issue_id":"ai-config-manager-g7o","metadata":"{}","type":"discovered-from"}
+{"created_at":"2026-03-23T00:51:03Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-tnsr","issue_id":"ai-config-manager-i67k","metadata":"{}","type":"discovered-from"}
 {"created_at":"2026-03-17T09:21:00Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-cbt","issue_id":"ai-config-manager-iasz","metadata":"{}","type":"discovered-from"}
 {"created_at":"2026-03-08T00:49:38Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-4ao.8","issue_id":"ai-config-manager-jhd","metadata":"{}","type":"discovered-from"}
 {"created_at":"2026-03-15T11:45:27Z","created_by":"Hans Kohlreiter","depends_on_id":"ai-config-manager-bhiq","issue_id":"ai-config-manager-k209","metadata":"{}","type":"blocks"}
