@@ -181,3 +181,35 @@ func TestRepoInitCreatesGitRepository(t *testing.T) {
 		t.Error(".gitignore is empty")
 	}
 }
+
+func TestRepoInitWithNonExistentRepoPathDoesNotWarnAboutLogger(t *testing.T) {
+	baseDir := t.TempDir()
+	repoDir := filepath.Join(baseDir, "new-repo")
+
+	if _, err := os.Stat(repoDir); !os.IsNotExist(err) {
+		t.Fatalf("expected repo path to not exist before init, got err=%v", err)
+	}
+
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	var runErr error
+	stdoutOutput, stderrOutput := captureOutput(t, func() {
+		runErr = repoInitCmd.RunE(repoInitCmd, []string{})
+	})
+
+	if runErr != nil {
+		t.Fatalf("Unexpected error: %v", runErr)
+	}
+
+	if stderrOutput != "" {
+		t.Fatalf("expected no stderr output for successful repo init, got: %q", stderrOutput)
+	}
+
+	if !strings.Contains(stdoutOutput, "✓ Repository initialized at:") {
+		t.Fatalf("expected stdout success message, got: %q", stdoutOutput)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(repoDir, "commands")); os.IsNotExist(statErr) {
+		t.Fatal("expected repository initialization to succeed for non-existent path")
+	}
+}

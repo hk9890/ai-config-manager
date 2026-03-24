@@ -488,6 +488,95 @@ sources:
 	}
 }
 
+func TestRepoApply_OverriddenSourceMatchesIncomingRemote_NoConflict(t *testing.T) {
+	repoDir := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	baseline := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{{
+		Name:                "team-tools",
+		Path:                "/tmp/local/tools",
+		OverrideOriginalURL: "https://github.com/example/tools.git",
+		Include:             []string{"skill/local-*"},
+	}}}
+	if err := baseline.Save(repoDir); err != nil {
+		t.Fatalf("failed to save baseline manifest: %v", err)
+	}
+
+	incomingPath := filepath.Join(t.TempDir(), repomanifest.ManifestFileName)
+	incoming := `version: 1
+sources:
+  - name: team-tools
+    url: https://github.com/example/tools
+    include:
+      - skill/team-*
+`
+	if err := os.WriteFile(incomingPath, []byte(incoming), 0644); err != nil {
+		t.Fatalf("failed to write incoming manifest: %v", err)
+	}
+
+	withApplyFlags(false, string(repomanifest.IncludeMergeReplace), func() {
+		if err := runApplyManifest(repoApplyManifestCmd, []string{incomingPath}); err != nil {
+			t.Fatalf("apply-manifest failed: %v", err)
+		}
+	})
+
+	after, err := repomanifest.Load(repoDir)
+	if err != nil {
+		t.Fatalf("failed to load manifest after apply: %v", err)
+	}
+	src, found := after.GetSource("team-tools")
+	if !found {
+		t.Fatalf("expected team-tools source")
+	}
+	if src.Path != "/tmp/local/tools" {
+		t.Fatalf("expected overridden local path to remain active, got %q", src.Path)
+	}
+	if src.OverrideOriginalURL != "https://github.com/example/tools.git" {
+		t.Fatalf("expected override breadcrumbs to be preserved, got %+v", src)
+	}
+}
+
+func TestRepoApply_OverriddenSourceIncomingSameRemote_NoOp(t *testing.T) {
+	repoDir := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	baseline := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{{
+		Name:                "team-tools",
+		Path:                "/tmp/local/tools",
+		OverrideOriginalURL: "https://github.com/example/tools",
+		Include:             []string{"skill/*"},
+	}}}
+	if err := baseline.Save(repoDir); err != nil {
+		t.Fatalf("failed to save baseline manifest: %v", err)
+	}
+
+	incomingPath := filepath.Join(t.TempDir(), repomanifest.ManifestFileName)
+	incoming := `version: 1
+sources:
+  - name: team-tools
+    url: https://github.com/example/tools.git
+    include:
+      - skill/*
+`
+	if err := os.WriteFile(incomingPath, []byte(incoming), 0644); err != nil {
+		t.Fatalf("failed to write incoming manifest: %v", err)
+	}
+
+	output := captureStdout(t, func() {
+		withApplyFlags(false, string(repomanifest.IncludeMergeReplace), func() {
+			if err := runApplyManifest(repoApplyManifestCmd, []string{incomingPath}); err != nil {
+				t.Fatalf("apply-manifest failed: %v", err)
+			}
+		})
+	})
+
+	for _, expected := range []string{"noop", "added=0", "updated=0", "noop=1", "No changes to apply"} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("expected output to contain %q, got:\n%s", expected, output)
+		}
+	}
+}
+
 func withApplyFlags(dryRun bool, includeMode string, fn func()) {
 	oldDryRun := repoApplyDryRunFlag
 	oldIncludeMode := repoApplyIncludeModeFlag

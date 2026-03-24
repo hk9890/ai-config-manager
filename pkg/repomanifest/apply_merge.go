@@ -246,11 +246,16 @@ func canonicalSourceIdentity(source *Source) string {
 		return ""
 	}
 
-	if source.ID != "" {
+	idSource := sourceIdentitySource(source)
+	if idSource == nil {
+		return ""
+	}
+
+	if source.ID != "" && source.OverrideOriginalURL == "" {
 		return source.ID
 	}
 
-	return GenerateSourceID(source)
+	return GenerateSourceID(idSource)
 }
 
 func describeSourceLocation(source *Source) string {
@@ -304,6 +309,10 @@ func cloneSource(s *Source) *Source {
 		Ref:     s.Ref,
 		Subpath: s.Subpath,
 		Include: copyStringSlice(s.Include),
+
+		OverrideOriginalURL:     s.OverrideOriginalURL,
+		OverrideOriginalRef:     s.OverrideOriginalRef,
+		OverrideOriginalSubpath: s.OverrideOriginalSubpath,
 	}
 }
 

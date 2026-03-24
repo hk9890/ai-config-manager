@@ -80,13 +80,11 @@ func (m *Manager) SetLogLevel(level slog.Level) {
 }
 
 // initLogger initializes the logger for this Manager.
-// If logger creation fails, logs a warning to stderr but continues.
+// If logger creation fails, it falls back to nil logger and continues.
 // Manager can operate without logging (graceful degradation).
 func (m *Manager) initLogger() {
 	logger, err := logging.NewRepoLogger(m.repoPath, m.logLevel)
 	if err != nil {
-		// Log warning to stderr but don't fail
-		fmt.Fprintf(os.Stderr, "Warning: failed to initialize logger: %v\n", err)
 		m.logger = nil
 		return
 	}
@@ -237,8 +235,7 @@ func (m *Manager) Init() error {
 			}
 			return fmt.Errorf("failed to create ai.repo.yaml: %w", err)
 		}
-		// Log that manifest was created (helpful for upgrades from pre-manifest versions)
-		fmt.Fprintf(os.Stderr, "Created ai.repo.yaml\n")
+		// Keep CLI success messaging on stdout; avoid stderr output during successful init.
 	} else if err != nil {
 		return fmt.Errorf("failed to check ai.repo.yaml: %w", err)
 	}

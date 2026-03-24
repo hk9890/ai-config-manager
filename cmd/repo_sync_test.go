@@ -2088,3 +2088,92 @@ func TestRunSync_RejectsConflictingResourceNamesAcrossDifferentSources(t *testin
 		t.Fatalf("rejected sync must not import conflicting resource, stat err: %v", statErr)
 	}
 }
+
+func TestCanonicalSourceID_UsesOriginalRemoteForOverriddenSource(t *testing.T) {
+	overridden := &repomanifest.Source{
+		Name:                "team-tools",
+		Path:                "/tmp/local/tools",
+		OverrideOriginalURL: "https://github.com/example/tools.git",
+	}
+
+	remote := &repomanifest.Source{
+		Name: "team-tools",
+		URL:  "https://github.com/example/tools",
+	}
+
+	if got, want := canonicalSourceID(overridden), canonicalSourceID(remote); got != want {
+		t.Fatalf("canonicalSourceID mismatch for override vs remote: got %q want %q", got, want)
+	}
+}
+
+func TestDetectRemovedForSource_OverrideKeepsCanonicalSourceKey(t *testing.T) {
+	repoPath := t.TempDir()
+	sourceDir := t.TempDir()
+	cmdDir := filepath.Join(sourceDir, "commands")
+	if err := os.MkdirAll(cmdDir, 0755); err != nil {
+		t.Fatalf("failed to create commands dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cmdDir, "shared-cmd.md"), []byte("---\ndescription: shared\n---\n# shared-cmd"), 0644); err != nil {
+		t.Fatalf("failed to create command file: %v", err)
+	}
+
+	src := &repomanifest.Source{
+		Name:                "team-tools",
+		Path:                sourceDir,
+		OverrideOriginalURL: "https://github.com/example/tools",
+	}
+
+	canonicalID := canonicalSourceID(src)
+	if canonicalID == "" {
+		t.Fatalf("expected canonical source ID")
+	}
+
+	preSync := map[string][]resourceInfo{
+		canonicalID: {{Name: "shared-cmd", Type: resource.Command}},
+	}
+
+	removed, warnings := detectRemovedForSource(src, sourceDir, repoPath, preSync)
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(removed) != 0 {
+		t.Fatalf("expected no removed resources; canonical source key should match override identity, got %#v", removed)
+	}
+}
+
+func TestDetectRemovedForSource_OverrideSubpathUsesStableCanonicalKey(t *testing.T) {
+	repoPath := t.TempDir()
+	sourceDir := t.TempDir()
+	cmdDir := filepath.Join(sourceDir, "commands")
+	if err := os.MkdirAll(cmdDir, 0755); err != nil {
+		t.Fatalf("failed to create commands dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cmdDir, "subpath-cmd.md"), []byte("---\ndescription: subpath\n---\n# subpath-cmd"), 0644); err != nil {
+		t.Fatalf("failed to create command file: %v", err)
+	}
+
+	src := &repomanifest.Source{
+		Name:                    "team-tools",
+		Path:                    sourceDir,
+		OverrideOriginalURL:     "https://github.com/example/tools",
+		OverrideOriginalRef:     "main",
+		OverrideOriginalSubpath: "resources",
+	}
+
+	canonicalID := canonicalSourceID(src)
+	if canonicalID == "" {
+		t.Fatalf("expected canonical source ID")
+	}
+
+	preSync := map[string][]resourceInfo{
+		canonicalID: {{Name: "subpath-cmd", Type: resource.Command}},
+	}
+
+	removed, warnings := detectRemovedForSource(src, sourceDir, repoPath, preSync)
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(removed) != 0 {
+		t.Fatalf("expected no removals with stable canonical key, got %#v", removed)
+	}
+}

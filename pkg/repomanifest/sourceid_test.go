@@ -261,3 +261,28 @@ func TestGenerateSourceID_Deterministic(t *testing.T) {
 		t.Errorf("expected exactly 1 unique ID across 100 calls, got %d", len(ids))
 	}
 }
+
+func TestGenerateSourceID_OverrideUsesOriginalRemoteIdentity(t *testing.T) {
+	overridden := &Source{
+		Name:                    "team-tools",
+		Path:                    "/tmp/local/tools",
+		OverrideOriginalURL:     "https://github.com/example/tools.git",
+		OverrideOriginalRef:     "main",
+		OverrideOriginalSubpath: "resources",
+	}
+
+	originalRemote := &Source{
+		Name: "team-tools",
+		URL:  "https://github.com/example/tools",
+		Ref:  "main",
+	}
+
+	overriddenID := GenerateSourceID(overridden)
+	originalID := GenerateSourceID(originalRemote)
+	if overriddenID == "" || originalID == "" {
+		t.Fatalf("expected non-empty IDs, got override=%q original=%q", overriddenID, originalID)
+	}
+	if overriddenID != originalID {
+		t.Fatalf("expected override to keep original remote identity, got override=%q original=%q", overriddenID, originalID)
+	}
+}

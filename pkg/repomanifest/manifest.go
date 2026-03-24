@@ -41,6 +41,12 @@ type Source struct {
 	Ref     string   `yaml:"ref,omitempty"`
 	Subpath string   `yaml:"subpath,omitempty"`
 	Include []string `yaml:"include,omitempty"`
+
+	// Override breadcrumbs are runtime-only on Source and persisted locally in
+	// .metadata/sources.json (not in shareable ai.repo.yaml output).
+	OverrideOriginalURL     string `yaml:"-"`
+	OverrideOriginalRef     string `yaml:"-"`
+	OverrideOriginalSubpath string `yaml:"-"`
 }
 
 // MarshalYAML writes shareable source config to ai.repo.yaml.
@@ -106,6 +112,10 @@ func Load(repoPath string) (*Manifest, error) {
 		return nil, fmt.Errorf("failed to parse manifest YAML: %w", err)
 	}
 
+	if err := m.hydrateOverrideBreadcrumbs(repoPath); err != nil {
+		return nil, fmt.Errorf("failed to load override breadcrumbs: %w", err)
+	}
+
 	// Ensure every source has an in-memory runtime ID. IDs are local-only state
 	// derived from URL/path and are intentionally not persisted in ai.repo.yaml.
 	m.migrateSourceIDs()
@@ -162,6 +172,10 @@ func (m *Manifest) Save(repoPath string) error {
 	path := filepath.Join(repoPath, ManifestFileName)
 	if err := fileutil.AtomicWrite(path, data, 0644); err != nil {
 		return fmt.Errorf("failed to write manifest: %w", err)
+	}
+
+	if err := m.persistOverrideBreadcrumbs(repoPath); err != nil {
+		return fmt.Errorf("failed to persist override breadcrumbs: %w", err)
 	}
 
 	return nil
@@ -324,14 +338,28 @@ func validateSource(source *Source) error {
 		return fmt.Errorf("invalid source name '%s': must be lowercase alphanumeric with hyphens, 1-64 chars", source.Name)
 	}
 
-	// Must have either path or URL
-	if source.Path == "" && source.URL == "" {
-		return fmt.Errorf("source must have either path or url")
-	}
+	hasOverrideBreadcrumbs := source.OverrideOriginalURL != "" || source.OverrideOriginalRef != "" || source.OverrideOriginalSubpath != ""
 
-	// Cannot have both path and URL
-	if source.Path != "" && source.URL != "" {
-		return fmt.Errorf("source cannot have both path and url")
+	if hasOverrideBreadcrumbs {
+		if source.Path == "" {
+			return fmt.Errorf("override breadcrumbs require an active local path source")
+		}
+		if source.URL != "" {
+			return fmt.Errorf("override breadcrumbs require local path source; url must be empty")
+		}
+		if source.OverrideOriginalURL == "" {
+			return fmt.Errorf("override breadcrumbs require original remote url")
+		}
+	} else {
+		// Must have either path or URL
+		if source.Path == "" && source.URL == "" {
+			return fmt.Errorf("source must have either path or url")
+		}
+
+		// Cannot have both path and URL
+		if source.Path != "" && source.URL != "" {
+			return fmt.Errorf("source cannot have both path and url")
+		}
 	}
 
 	// Validate include patterns
@@ -528,4 +556,68 @@ func migrateIfNeeded(repoPath string, m *Manifest) error {
 	}
 
 	return nil
+}
+
+func (m *Manifest) hydrateOverrideBreadcrumbs(repoPath string) error {
+	metadata, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		return err
+	}
+
+	for _, src := range m.Sources {
+		if src == nil {
+			continue
+		}
+
+		state := metadata.Get(src.Name)
+		if state == nil {
+			continue
+		}
+
+		src.OverrideOriginalURL = state.OverrideOriginalURL
+		src.OverrideOriginalRef = state.OverrideOriginalRef
+		src.OverrideOriginalSubpath = state.OverrideOriginalSubpath
+	}
+
+	return nil
+}
+
+func (m *Manifest) persistOverrideBreadcrumbs(repoPath string) error {
+	metadata, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		return err
+	}
+
+	sourceNames := make(map[string]struct{}, len(m.Sources))
+	for _, src := range m.Sources {
+		if src == nil || src.Name == "" {
+			continue
+		}
+
+		sourceNames[src.Name] = struct{}{}
+		state := metadata.Get(src.Name)
+		if state == nil {
+			state = &sourcemetadata.SourceState{}
+			metadata.Sources[src.Name] = state
+		}
+
+		state.OverrideOriginalURL = src.OverrideOriginalURL
+		state.OverrideOriginalRef = src.OverrideOriginalRef
+		state.OverrideOriginalSubpath = src.OverrideOriginalSubpath
+	}
+
+	for sourceName, state := range metadata.Sources {
+		if _, exists := sourceNames[sourceName]; exists {
+			continue
+		}
+		if state == nil {
+			continue
+		}
+
+		state.OverrideOriginalURL = ""
+		state.OverrideOriginalRef = ""
+		state.OverrideOriginalSubpath = ""
+	}
+
+	return metadata.Save(repoPath)
 }

@@ -1345,3 +1345,111 @@ func TestValidateSource_Include_ErrorContainsPattern(t *testing.T) {
 		t.Errorf("expected error to contain the bad pattern, got: %s", err.Error())
 	}
 }
+
+func TestValidateSource_OverrideBreadcrumbs(t *testing.T) {
+	t.Run("valid overridden local source", func(t *testing.T) {
+		s := &Source{
+			Name:                    "team-tools",
+			Path:                    "/tmp/local/tools",
+			OverrideOriginalURL:     "https://github.com/example/tools",
+			OverrideOriginalRef:     "main",
+			OverrideOriginalSubpath: "resources",
+		}
+		if err := validateSource(s); err != nil {
+			t.Fatalf("validateSource() unexpected error: %v", err)
+		}
+	})
+
+	t.Run("override breadcrumbs require local path", func(t *testing.T) {
+		s := &Source{
+			Name:                "team-tools",
+			URL:                 "https://github.com/example/tools",
+			OverrideOriginalURL: "https://github.com/example/tools",
+		}
+		err := validateSource(s)
+		if err == nil || !strings.Contains(err.Error(), "active local path source") {
+			t.Fatalf("expected local path validation error, got: %v", err)
+		}
+	})
+
+	t.Run("override breadcrumbs require original URL", func(t *testing.T) {
+		s := &Source{
+			Name:                "team-tools",
+			Path:                "/tmp/local/tools",
+			OverrideOriginalRef: "main",
+		}
+		err := validateSource(s)
+		if err == nil || !strings.Contains(err.Error(), "original remote url") {
+			t.Fatalf("expected original url validation error, got: %v", err)
+		}
+	})
+
+	t.Run("path xor url unchanged without override", func(t *testing.T) {
+		s := &Source{
+			Name: "team-tools",
+			Path: "/tmp/local/tools",
+			URL:  "https://github.com/example/tools",
+		}
+		err := validateSource(s)
+		if err == nil || !strings.Contains(err.Error(), "both path and url") {
+			t.Fatalf("expected path/url xor validation error, got: %v", err)
+		}
+	})
+}
+
+func TestManifestSaveLoad_OverrideBreadcrumbsPersistInSourceMetadataOnly(t *testing.T) {
+	repoPath := t.TempDir()
+
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{{
+			Name:                    "team-tools",
+			Path:                    "/tmp/local/tools",
+			Include:                 []string{"skill/*"},
+			OverrideOriginalURL:     "https://github.com/example/tools",
+			OverrideOriginalRef:     "main",
+			OverrideOriginalSubpath: "resources",
+		}},
+	}
+
+	if err := m.Save(repoPath); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	rawManifest, err := os.ReadFile(filepath.Join(repoPath, ManifestFileName))
+	if err != nil {
+		t.Fatalf("failed to read manifest: %v", err)
+	}
+	manifestText := string(rawManifest)
+	for _, forbidden := range []string{"override_original_url", "override_original_ref", "override_original_subpath"} {
+		if strings.Contains(manifestText, forbidden) {
+			t.Fatalf("shareable manifest must not contain %q:\n%s", forbidden, manifestText)
+		}
+	}
+
+	rawMeta, err := os.ReadFile(filepath.Join(repoPath, ".metadata", "sources.json"))
+	if err != nil {
+		t.Fatalf("failed to read source metadata: %v", err)
+	}
+	metaText := string(rawMeta)
+	for _, expected := range []string{"override_original_url", "override_original_ref", "override_original_subpath"} {
+		if !strings.Contains(metaText, expected) {
+			t.Fatalf("source metadata must contain %q:\n%s", expected, metaText)
+		}
+	}
+
+	loaded, err := Load(repoPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	src, found := loaded.GetSource("team-tools")
+	if !found {
+		t.Fatalf("expected team-tools source")
+	}
+	if src.OverrideOriginalURL != "https://github.com/example/tools" || src.OverrideOriginalRef != "main" || src.OverrideOriginalSubpath != "resources" {
+		t.Fatalf("override breadcrumbs did not round-trip: %+v", src)
+	}
+	if len(src.Include) != 1 || src.Include[0] != "skill/*" {
+		t.Fatalf("include filters changed unexpectedly: %v", src.Include)
+	}
+}

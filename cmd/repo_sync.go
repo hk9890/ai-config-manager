@@ -105,6 +105,9 @@ func buildSourceDisplayNames(sources []*repomanifest.Source) map[string]string {
 		if src.ID != "" {
 			displayNames[src.ID] = src.Name
 		}
+		if canonicalID := canonicalSourceID(src); canonicalID != "" {
+			displayNames[canonicalID] = src.Name
+		}
 	}
 	return displayNames
 }
@@ -420,7 +423,7 @@ func canonicalSourceID(src *repomanifest.Source) string {
 		return ""
 	}
 
-	if src.ID != "" {
+	if src.ID != "" && src.OverrideOriginalURL == "" {
 		return src.ID
 	}
 
@@ -587,7 +590,7 @@ type syncResult struct {
 func detectRemovedForSource(src *repomanifest.Source, sourcePath, repoPath string,
 	preSyncResources map[string][]resourceInfo) ([]resourceInfo, []string) {
 
-	sourceKey := src.ID
+	sourceKey := canonicalSourceID(src)
 	if sourceKey == "" {
 		sourceKey = src.Name
 	}
@@ -987,7 +990,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		}
 
 		// Detect removed resources (bmz1.2)
-		sourceKey := src.ID
+		sourceKey := canonicalSourceID(src)
 		if sourceKey == "" {
 			sourceKey = src.Name
 		}
@@ -1000,14 +1003,15 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 		// Update last_synced timestamp in metadata after successful sync
 		if !syncDryRunFlag {
+			canonicalID := canonicalSourceID(src)
 			if state, ok := metadata.Sources[src.Name]; ok {
 				state.LastSynced = time.Now()
-				if src.ID != "" {
-					state.SourceID = src.ID
+				if canonicalID != "" {
+					state.SourceID = canonicalID
 				}
 			} else {
 				metadata.Sources[src.Name] = &sourcemetadata.SourceState{
-					SourceID:   src.ID,
+					SourceID:   canonicalID,
 					Added:      time.Now(),
 					LastSynced: time.Now(),
 				}

@@ -15,6 +15,12 @@ type SourceState struct {
 	SourceID   string    `json:"source_id,omitempty"`
 	Added      time.Time `json:"added"`
 	LastSynced time.Time `json:"last_synced,omitempty"`
+
+	// Override breadcrumb state for local source overrides.
+	// Persisted in local .metadata/sources.json only (not shareable manifest YAML).
+	OverrideOriginalURL     string `json:"override_original_url,omitempty"`
+	OverrideOriginalRef     string `json:"override_original_ref,omitempty"`
+	OverrideOriginalSubpath string `json:"override_original_subpath,omitempty"`
 }
 
 // SourceMetadata tracks state for all sources in a repository

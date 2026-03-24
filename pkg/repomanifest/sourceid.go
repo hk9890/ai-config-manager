@@ -23,12 +23,14 @@ func GenerateSourceID(source *Source) string {
 		return ""
 	}
 
+	idSource := sourceIdentitySource(source)
+
 	var canonical string
 
-	if source.URL != "" {
-		canonical = normalizeURL(source.URL)
-	} else if source.Path != "" {
-		canonical = normalizePath(source.Path)
+	if idSource.URL != "" {
+		canonical = normalizeURL(idSource.URL)
+	} else if idSource.Path != "" {
+		canonical = normalizePath(idSource.Path)
 	} else {
 		return ""
 	}
@@ -37,6 +39,21 @@ func GenerateSourceID(source *Source) string {
 	hexStr := hex.EncodeToString(hash[:])
 
 	return "src-" + hexStr[:12]
+}
+
+// sourceIdentitySource returns the effective source transport used for canonical
+// source identity. For overridden local sources, this maps identity back to the
+// stored original remote URL to keep IDs stable across override/clear.
+func sourceIdentitySource(source *Source) *Source {
+	if source == nil {
+		return nil
+	}
+
+	if source.OverrideOriginalURL != "" {
+		return &Source{URL: source.OverrideOriginalURL}
+	}
+
+	return source
 }
 
 // normalizeURL normalizes a URL for consistent hashing by lowercasing,

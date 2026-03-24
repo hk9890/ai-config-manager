@@ -218,3 +218,86 @@ func TestMergeForApply_ConflictOnSameCanonicalPathDifferentName(t *testing.T) {
 		t.Fatalf("expected existing source to be preserved, got %+v", merged.Sources)
 	}
 }
+
+func TestMergeForApply_OverrideSourceMatchesIncomingOriginalRemote_NoConflict(t *testing.T) {
+	current := &Manifest{Version: 1, Sources: []*Source{{
+		Name:                    "team-tools",
+		Path:                    "/tmp/local/tools",
+		Ref:                     "local-dev",
+		OverrideOriginalURL:     "https://github.com/example/tools.git",
+		OverrideOriginalRef:     "v1.2.0",
+		OverrideOriginalSubpath: "resources",
+		Include:                 []string{"skill/local-*"},
+	}}}
+	incoming := &Manifest{Version: 1, Sources: []*Source{{
+		Name:    "team-tools",
+		URL:     "https://github.com/example/tools",
+		Ref:     "v1.3.0",
+		Subpath: "resources",
+		Include: []string{"skill/team-*"},
+	}}}
+
+	merged, report, err := MergeForApply(current, incoming, ApplyMergeOptions{})
+	if err != nil {
+		t.Fatalf("MergeForApply() error = %v", err)
+	}
+	if report.Conflicts() != 0 {
+		t.Fatalf("expected no conflicts, got %d", report.Conflicts())
+	}
+	if report.Updated() != 1 {
+		t.Fatalf("expected update, got %+v", report)
+	}
+
+	src := merged.Sources[0]
+	if src.Path != "/tmp/local/tools" {
+		t.Fatalf("expected override local path to be preserved, got %q", src.Path)
+	}
+	if src.OverrideOriginalURL != "https://github.com/example/tools.git" || src.OverrideOriginalRef != "v1.2.0" || src.OverrideOriginalSubpath != "resources" {
+		t.Fatalf("override breadcrumbs were not preserved: %+v", src)
+	}
+}
+
+func TestCloneSource_PreservesOverrideBreadcrumbs(t *testing.T) {
+	original := &Source{
+		ID:                      "src-abc123def456",
+		Name:                    "team-tools",
+		Path:                    "/tmp/local/tools",
+		Include:                 []string{"skill/*"},
+		OverrideOriginalURL:     "https://github.com/example/tools",
+		OverrideOriginalRef:     "main",
+		OverrideOriginalSubpath: "resources",
+	}
+
+	cloned := cloneSource(original)
+	if cloned == original {
+		t.Fatalf("expected cloneSource to return a distinct pointer")
+	}
+	if cloned.OverrideOriginalURL != original.OverrideOriginalURL || cloned.OverrideOriginalRef != original.OverrideOriginalRef || cloned.OverrideOriginalSubpath != original.OverrideOriginalSubpath {
+		t.Fatalf("cloneSource lost override breadcrumbs: original=%+v cloned=%+v", original, cloned)
+	}
+}
+
+func TestMergeForApply_OverrideSourceIncomingMatches_NoOp(t *testing.T) {
+	current := &Manifest{Version: 1, Sources: []*Source{{
+		Name:                "team-tools",
+		Path:                "/tmp/local/tools",
+		OverrideOriginalURL: "https://github.com/example/tools",
+		Include:             []string{"skill/*"},
+	}}}
+	incoming := &Manifest{Version: 1, Sources: []*Source{{
+		Name:    "team-tools",
+		URL:     "https://github.com/example/tools.git",
+		Include: []string{"skill/*"},
+	}}}
+
+	merged, report, err := MergeForApply(current, incoming, ApplyMergeOptions{})
+	if err != nil {
+		t.Fatalf("MergeForApply() error = %v", err)
+	}
+	if report.Conflicts() != 0 || report.NoOp() != 1 || report.Updated() != 0 {
+		t.Fatalf("unexpected report counts: add=%d update=%d noop=%d conflict=%d", report.Added(), report.Updated(), report.NoOp(), report.Conflicts())
+	}
+	if len(merged.Sources) != 1 || merged.Sources[0].Path != "/tmp/local/tools" {
+		t.Fatalf("expected overridden local source to remain unchanged, got %+v", merged.Sources)
+	}
+}

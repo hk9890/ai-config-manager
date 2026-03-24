@@ -37,7 +37,12 @@ func TestRepoAdd_ManifestCommitted(t *testing.T) {
 	}
 
 	if status := gitStatus(); status != "" {
-		t.Fatalf("Expected clean working tree after init, got: %s", status)
+		// repo init may persist source metadata as .metadata/sources.json before
+		// repo add tracks it in a dedicated manifest commit. Allow this known
+		// pre-add state while still failing on any unrelated dirty entries.
+		if status != "?? .metadata/" && status != "?? .metadata/sources.json" {
+			t.Fatalf("Expected clean working tree (or only untracked source metadata) after init, got: %s", status)
+		}
 	}
 
 	// Create test resource

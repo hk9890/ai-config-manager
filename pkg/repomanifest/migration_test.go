@@ -366,3 +366,26 @@ sources:
 		t.Fatalf("expected legacy fields removed after migration, got:\n%s", string(raw))
 	}
 }
+
+func TestMigrateSourceIDs_OverrideSourceUsesOriginalRemoteIdentity(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{{
+			Name:                    "team-tools",
+			Path:                    "/tmp/local/tools",
+			OverrideOriginalURL:     "https://github.com/example/tools.git",
+			OverrideOriginalRef:     "main",
+			OverrideOriginalSubpath: "resources",
+		}},
+	}
+
+	if !m.migrateSourceIDs() {
+		t.Fatalf("expected migrateSourceIDs() to generate ID")
+	}
+
+	got := m.Sources[0].ID
+	want := GenerateSourceID(&Source{URL: "https://github.com/example/tools"})
+	if got != want {
+		t.Fatalf("expected override source ID to use original remote identity, got %q want %q", got, want)
+	}
+}

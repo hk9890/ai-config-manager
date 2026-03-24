@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/sourcemetadata"
 )
@@ -272,5 +274,101 @@ func TestFormatSource(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBuildRepoInfoOutput_OverriddenSourceIncludesRestoreFields(t *testing.T) {
+	manifest := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{{
+		Name:                "team-tools",
+		Path:                "/tmp/local/team-tools",
+		OverrideOriginalURL: "https://github.com/example/tools",
+		OverrideOriginalRef: "main",
+	}}}
+
+	metadata := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{}}
+
+	out := buildRepoInfoOutput("/tmp/repo", 0, 0, 0, 0, 0, manifest, metadata)
+	if len(out.Sources) != 1 {
+		t.Fatalf("expected one source, got %d", len(out.Sources))
+	}
+
+	got := out.Sources[0]
+	if !got.Overridden {
+		t.Fatalf("expected overridden=true")
+	}
+	if got.RestoreTo == "" || !strings.Contains(got.RestoreTo, "https://github.com/example/tools") {
+		t.Fatalf("expected restore target in structured output, got %q", got.RestoreTo)
+	}
+}
+
+func TestRenderSourcesTable_ShowsOverrideRestoreTarget(t *testing.T) {
+	sources := []*repomanifest.Source{{
+		Name:                    "team-tools",
+		Path:                    "/tmp/local/team-tools",
+		OverrideOriginalURL:     "https://github.com/example/tools",
+		OverrideOriginalRef:     "main",
+		OverrideOriginalSubpath: "resources",
+	}}
+	metadata := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{}}
+
+	stdout, _ := captureOutput(t, func() {
+		if err := renderSourcesTable(sources, metadata); err != nil {
+			t.Fatalf("renderSourcesTable() failed: %v", err)
+		}
+	})
+
+	for _, expected := range []string{"OVERRIDE", "url \"https://github.com/example/tools\"", "ref \"main\"", "subpath \"resources\""} {
+		if !strings.Contains(stdout, expected) {
+			t.Fatalf("expected table output to contain %q, got:\n%s", expected, stdout)
+		}
+	}
+}
+
+func TestRepoInfo_JSON_IncludesOverrideState(t *testing.T) {
+	repoDir := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	mgr := repo.NewManagerWithPath(repoDir)
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("failed to init repo: %v", err)
+	}
+
+	manifest := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{{
+		Name:                "team-tools",
+		Path:                "/tmp/local/team-tools",
+		OverrideOriginalURL: "https://github.com/example/tools",
+		OverrideOriginalRef: "main",
+	}}}
+	if err := manifest.Save(repoDir); err != nil {
+		t.Fatalf("failed to save manifest: %v", err)
+	}
+
+	originalFormat := repoInfoFormatFlag
+	repoInfoFormatFlag = "json"
+	defer func() { repoInfoFormatFlag = originalFormat }()
+	stdout, _ := captureOutput(t, func() {
+		if err := repoInfoCmd.RunE(repoInfoCmd, nil); err != nil {
+			t.Fatalf("repo info failed: %v", err)
+		}
+	})
+
+	var parsed struct {
+		Sources []struct {
+			Name       string `json:"name"`
+			Overridden bool   `json:"overridden"`
+			RestoreTo  string `json:"restore_to"`
+		} `json:"sources"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &parsed); err != nil {
+		t.Fatalf("failed to parse repo info json: %v\n%s", err, stdout)
+	}
+	if len(parsed.Sources) != 1 {
+		t.Fatalf("expected one source, got %d", len(parsed.Sources))
+	}
+	if !parsed.Sources[0].Overridden {
+		t.Fatalf("expected overridden source in json output")
+	}
+	if !strings.Contains(parsed.Sources[0].RestoreTo, "https://github.com/example/tools") {
+		t.Fatalf("expected restore_to to include remote url, got %q", parsed.Sources[0].RestoreTo)
 	}
 }

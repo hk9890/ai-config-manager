@@ -132,3 +132,36 @@ func TestDelete(t *testing.T) {
 		t.Error("Source should have been deleted")
 	}
 }
+
+func TestSaveAndLoad_OverrideBreadcrumbs(t *testing.T) {
+	tempDir := t.TempDir()
+
+	metadata := &SourceMetadata{
+		Version: 1,
+		Sources: map[string]*SourceState{
+			"team-tools": {
+				SourceID:                "src-abc123def456",
+				OverrideOriginalURL:     "https://github.com/example/tools",
+				OverrideOriginalRef:     "main",
+				OverrideOriginalSubpath: "resources",
+			},
+		},
+	}
+
+	if err := metadata.Save(tempDir); err != nil {
+		t.Fatalf("Save() failed: %v", err)
+	}
+
+	loaded, err := Load(tempDir)
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+
+	state := loaded.Get("team-tools")
+	if state == nil {
+		t.Fatalf("expected team-tools state")
+	}
+	if state.OverrideOriginalURL != "https://github.com/example/tools" || state.OverrideOriginalRef != "main" || state.OverrideOriginalSubpath != "resources" {
+		t.Fatalf("override breadcrumbs did not round-trip: %+v", state)
+	}
+}

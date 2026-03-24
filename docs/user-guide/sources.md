@@ -275,7 +275,7 @@ In merge mode:
 
 Important for re-apply workflows:
 - `repo apply-manifest` is **additive**. Re-applying an updated shared manifest does not remove local sources that are missing from the new incoming file.
-- If a shared source is intentionally removed upstream, remove stale local entries explicitly with `aimgr repo drop-source <name|path|url>`.
+- If a shared source is intentionally removed upstream, remove stale local entries explicitly with `aimgr repo remove <name|path|url>`.
 
 Example stale-source cleanup after a shared manifest update:
 
@@ -284,7 +284,7 @@ Example stale-source cleanup after a shared manifest update:
 aimgr repo apply-manifest https://example.com/team/project-a/ai.repo.yaml
 
 # Remove a source that was intentionally dropped from the shared manifest
-aimgr repo drop-source source-a
+aimgr repo remove source-a
 
 # Refresh resources and install
 aimgr repo sync
@@ -643,25 +643,25 @@ If a source becomes unavailable:
 2. Remaining sources continue syncing
 3. Command exits with error status
 
-The failed source remains in `ai.repo.yaml` for future retries. Remove it with `repo drop-source` if no longer needed.
+The failed source remains in `ai.repo.yaml` for future retries. Remove it with `repo remove` if no longer needed.
 
 ---
 
 ## Removing Sources
 
-Use `repo drop-source` to remove a source and optionally clean up its resources.
+Use `repo remove` to remove a source and optionally clean up its resources.
 
 ### Basic Usage
 
 ```bash
 # Remove by name
-aimgr repo drop-source my-source
+aimgr repo remove my-source
 
 # Remove by path (local sources)
-aimgr repo drop-source ~/my-resources/
+aimgr repo remove ~/my-resources/
 
 # Remove by URL (remote sources)
-aimgr repo drop-source https://github.com/owner/repo
+aimgr repo remove https://github.com/owner/repo
 ```
 
 ### Options
@@ -673,7 +673,7 @@ aimgr repo drop-source https://github.com/owner/repo
 
 ### Behavior
 
-By default, `drop-source`:
+By default, `remove`:
 1. Removes the source entry from `ai.repo.yaml`
 2. Deletes resources that came from that source (orphan cleanup)
 
@@ -683,13 +683,13 @@ Use `--keep-resources` to preserve resources (they become "untracked").
 
 ```bash
 # Preview removal
-aimgr repo drop-source my-source --dry-run
+aimgr repo remove my-source --dry-run
 
 # Remove source and its resources
-aimgr repo drop-source my-source
+aimgr repo remove my-source
 
 # Remove source but keep resources
-aimgr repo drop-source my-source --keep-resources
+aimgr repo remove my-source --keep-resources
 ```
 
 ---
@@ -723,12 +723,12 @@ Re-import resources from all configured sources.
 aimgr repo sync [flags]
 ```
 
-### repo drop-source
+### repo remove
 
 Remove a source and optionally clean up orphaned resources.
 
 ```bash
-aimgr repo drop-source <name|path|url> [flags]
+aimgr repo remove <name|path|url> [flags]
 ```
 
 ### repo info
@@ -831,7 +831,7 @@ git push -u origin main
 git tag v1.0.0 && git push origin v1.0.0
 
 # Remove local source, add remote
-aimgr repo drop-source my-skills --keep-resources
+aimgr repo remove my-skills --keep-resources
 aimgr repo add gh:myuser/my-skills@v1.0.0 --name=my-skills --force
 ```
 
@@ -844,12 +844,63 @@ For active development on an upstream repository:
 git clone https://github.com/owner/repo ~/dev/upstream-repo
 
 # Remove remote source
-aimgr repo drop-source upstream-repo
+aimgr repo remove upstream-repo
 
 # Add as local source (symlink mode)
 aimgr repo add local:~/dev/upstream-repo --name=upstream-repo
 
 # Now changes reflect immediately via symlinks
+```
+
+### Temporary local override (supported dev-testing workflow)
+
+When you want to test local changes for a source that is normally remote, use `repo override-source` instead of editing manifests or swapping source entries manually.
+
+```bash
+# Baseline source points to a remote
+aimgr repo info
+
+# Temporarily switch that source to a local checkout and auto-sync
+aimgr repo override-source team-tools local:~/dev/team-tools
+
+# See active override and restore target
+aimgr repo info
+
+# Restore the original remote definition and auto-sync
+aimgr repo override-source team-tools --clear
+```
+
+Behavior and constraints:
+
+- `repo info` is the user-facing read path for active override state.
+- `repo show-manifest` intentionally prints a shareable baseline view and does **not** leak local override paths or override breadcrumb fields.
+- Local override breadcrumbs are stored in `.metadata/sources.json` (local runtime state), not in shareable `ai.repo.yaml` output.
+- `repo apply-manifest` is for baseline sharing/merge, not overlay transport switching.
+- A second override attempt on an already-overridden source is rejected. Clear the active override first: `aimgr repo override-source <name> --clear`.
+- Overriding a source that is already a local `path` source is not supported; `repo override-source` is for temporarily switching remote-backed sources to a local checkout.
+
+Why overlay manifests are not supported for this:
+
+- overlaying local `path:` entries into shared manifests is easy to leak or commit accidentally
+- override state is intentionally local-only so baseline manifests stay reproducible for teams and CI
+
+Removing an overridden source:
+
+- `aimgr repo remove <source>` removes the source entry and cleanup metadata
+- for overridden sources, this permanently removes both active override and stored restore target
+- if you only want to get back to the remote, use `aimgr repo override-source <name> --clear` first
+
+Sharing/committing while override is active:
+
+- safe sharing path: `aimgr repo show-manifest` (shareable baseline output)
+- local active state visibility: `aimgr repo info`
+
+Recovery steps if state looks unexpected:
+
+```bash
+aimgr repo info
+aimgr repo override-source <name> --clear
+aimgr repo sync
 ```
 
 ---
@@ -872,7 +923,7 @@ vim ~/.local/share/ai-config/repo/ai.repo.yaml
 # Change path: /old/path/my-skills to /new/path/my-skills
 
 # Option 2: Remove and re-add
-aimgr repo drop-source my-skills --keep-resources
+aimgr repo remove my-skills --keep-resources
 aimgr repo add local:/new/path/my-skills --name=my-skills --force
 ```
 
@@ -891,7 +942,7 @@ Error syncing source 'company-resources': failed to clone: repository not found
 # Sync will continue and report the error
 
 # If permanently unavailable
-aimgr repo drop-source company-resources --keep-resources
+aimgr repo remove company-resources --keep-resources
 
 # If URL changed - edit ai.repo.yaml
 vim ~/.local/share/ai-config/repo/ai.repo.yaml
@@ -962,7 +1013,7 @@ Error: source with name 'my-source' already exists
 aimgr repo add local:~/new-resources --name=my-source-v2
 
 # Or remove old source first
-aimgr repo drop-source my-source
+aimgr repo remove my-source
 aimgr repo add local:~/new-resources
 ```
 
@@ -1001,7 +1052,7 @@ aimgr repo add gh:owner/repo --name=source1
 
 # Option 2: Use remote source instead (copy mode)
 # Push local source to Git, then add as URL source
-aimgr repo drop-source my-source --keep-resources
+aimgr repo remove my-source --keep-resources
 aimgr repo add https://github.com/myuser/my-resources --name=my-source --force
 ```
 
@@ -1054,7 +1105,7 @@ sources:
 ### 5. Preview Before Destructive Operations
 
 ```bash
-aimgr repo drop-source old-source --dry-run
+aimgr repo remove old-source --dry-run
 aimgr repo sync --dry-run
 ```
 

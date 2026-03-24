@@ -87,6 +87,47 @@ aimgr install $(aimgr repo list --format=json | jq -r '.resources[] | select(.sy
    aimgr repo add local:~/my-resources/
    ```
 
+### Override state confusion (local dev override vs shared manifest)
+
+**Problem:** You overrode a remote source to a local path and now behavior seems inconsistent between `repo info` and `repo show-manifest`.
+
+**What it means:**
+
+- `repo info` shows the active local override and restore target.
+- `repo show-manifest` intentionally emits a shareable baseline view and hides local-only override breadcrumb state.
+
+**Recovery workflow:**
+
+```bash
+# Inspect active state
+aimgr repo info
+
+# Restore original remote definition
+aimgr repo override-source <name> --clear
+
+# Re-sync baseline state
+aimgr repo sync
+```
+
+If you remove an overridden source (`aimgr repo remove <name>`), both the active override and restore target are removed permanently.
+
+### `repo override-source` edge-case rejections
+
+**Problem 1:** You ran `repo override-source` on a source that is already overridden.
+
+**What it means:** Chained overrides are not supported. You must clear the active override before applying a new one.
+
+**Recovery:**
+
+```bash
+aimgr repo override-source <name> --clear
+aimgr repo override-source <name> local:/path/to/checkout
+```
+
+**Problem 2:** You ran `repo override-source` on a source that is already a local path source.
+
+**What it means:** This operation is unsupported. `repo override-source` is only for temporarily switching remote-backed sources to a local checkout.
+
 ---
 
 ## Common Errors

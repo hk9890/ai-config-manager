@@ -359,7 +359,7 @@ func TestRepoRemove_GitCommit(t *testing.T) {
 	tempDir, mgr := setupRemoveTestRepo(t, source)
 
 	// Commit the initial state
-	if err := mgr.CommitChangesForPaths("test: add source", []string{repomanifest.ManifestFileName}); err != nil {
+	if err := mgr.CommitChangesForPaths("test: add source", []string{repomanifest.ManifestFileName, filepath.Join(".metadata", "sources.json")}); err != nil {
 		t.Fatalf("Failed to commit initial state: %v", err)
 	}
 
@@ -939,5 +939,81 @@ func TestRepoRemove_NoWarningWhenKeepResources(t *testing.T) {
 	// Resource should still exist
 	if _, err := os.Stat(commandPath); err != nil {
 		t.Error("Resource should still exist with --keep-resources")
+	}
+}
+
+func TestRepoRemove_OverriddenSourceRemovesOverrideAndRestoreOwnedResources(t *testing.T) {
+	overridePath := t.TempDir()
+	source := &repomanifest.Source{
+		Name:                    "team-tools",
+		Path:                    overridePath,
+		OverrideOriginalURL:     "https://github.com/example/tools.git",
+		OverrideOriginalRef:     "main",
+		OverrideOriginalSubpath: "resources",
+	}
+
+	tempDir, mgr := setupRemoveTestRepo(t, source)
+
+	canonicalRemoteID := repomanifest.GenerateSourceID(&repomanifest.Source{
+		URL:     source.OverrideOriginalURL,
+		Ref:     source.OverrideOriginalRef,
+		Subpath: source.OverrideOriginalSubpath,
+	})
+	currentLocalID := repomanifest.GenerateSourceID(&repomanifest.Source{Path: overridePath})
+
+	// Resource owned by original remote identity.
+	remoteOwnedPath := filepath.Join(tempDir, "commands", "remote-owned.md")
+	if err := os.WriteFile(remoteOwnedPath, []byte("---\ndescription: remote-owned\n---\n# remote-owned"), 0644); err != nil {
+		t.Fatalf("failed to write remote-owned command: %v", err)
+	}
+	remoteMeta := &metadata.ResourceMetadata{
+		Name:           "remote-owned",
+		Type:           resource.Command,
+		SourceType:     "github",
+		SourceURL:      source.OverrideOriginalURL,
+		SourceName:     source.Name,
+		SourceID:       canonicalRemoteID,
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(remoteMeta, tempDir, source.Name); err != nil {
+		t.Fatalf("failed to save remote-owned metadata: %v", err)
+	}
+
+	// Resource owned by active local override identity.
+	localOwnedPath := filepath.Join(tempDir, "commands", "local-owned.md")
+	if err := os.WriteFile(localOwnedPath, []byte("---\ndescription: local-owned\n---\n# local-owned"), 0644); err != nil {
+		t.Fatalf("failed to write local-owned command: %v", err)
+	}
+	localMeta := &metadata.ResourceMetadata{
+		Name:           "local-owned",
+		Type:           resource.Command,
+		SourceType:     "local",
+		SourceURL:      overridePath,
+		SourceName:     source.Name,
+		SourceID:       currentLocalID,
+		FirstInstalled: time.Now(),
+		LastUpdated:    time.Now(),
+	}
+	if err := metadata.Save(localMeta, tempDir, source.Name); err != nil {
+		t.Fatalf("failed to save local-owned metadata: %v", err)
+	}
+
+	if err := performRemove(mgr, source.Name, false, false); err != nil {
+		t.Fatalf("failed to remove overridden source: %v", err)
+	}
+
+	manifestAfter, err := repomanifest.Load(tempDir)
+	if err != nil {
+		t.Fatalf("failed to load manifest after removal: %v", err)
+	}
+	if manifestAfter.HasSource(source.Name) {
+		t.Fatalf("expected source %q to be removed from manifest", source.Name)
+	}
+
+	for _, path := range []string{remoteOwnedPath, localOwnedPath} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("expected orphaned resource to be removed: %s", path)
+		}
 	}
 }

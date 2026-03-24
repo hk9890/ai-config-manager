@@ -165,6 +165,11 @@ aimgr repo apply-manifest https://example.com/platform/ai.repo.yaml
 # Show the current local ai.repo.yaml
 aimgr repo show-manifest
 
+# Temporarily override a remote source with a local checkout for dev/testing
+aimgr repo override-source team-tools local:~/dev/team-tools
+aimgr repo info
+aimgr repo override-source team-tools --clear
+
 # Update from sources
 aimgr repo sync
 
@@ -172,8 +177,15 @@ aimgr repo sync
 aimgr repo info
 
 # Remove a source
-aimgr repo drop-source source-name
+aimgr repo remove source-name
 ```
+
+Notes for override workflows:
+
+- `repo info` shows whether a source is currently overridden and where it restores to.
+- `repo show-manifest` prints shareable baseline source definitions (safe to commit/share) and does not include local override breadcrumb state.
+- If a source is already overridden, a second `repo override-source` attempt is rejected; run `aimgr repo override-source <name> --clear` first.
+- `repo override-source` does not support overriding sources that are already local path sources.
 
 See [sources.md](sources.md) for detailed source management.
 

@@ -101,6 +101,18 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 			nameOrPathOrURL, formatSourcesList(manifest))
 	}
 
+	isOverridden := source.OverrideOriginalURL != ""
+	if isOverridden {
+		fmt.Printf("⚠ Source %q is currently overridden (%s).\n", source.Name, sourceLocationSummary(source))
+		fmt.Printf("  Removing this source permanently removes both the active override and restore target (%s).\n", sourceLocationSummary(&repomanifest.Source{
+			URL:     source.OverrideOriginalURL,
+			Ref:     source.OverrideOriginalRef,
+			Subpath: source.OverrideOriginalSubpath,
+		}))
+	}
+
+	sourceKeys := sourceRemovalKeys(source)
+
 	// Find orphaned resources (resources from this source)
 	orphanedResources := []resource.Resource{}
 	if !keepResources {
@@ -111,14 +123,14 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 
 		for _, res := range resources {
 			// Check if resource came from this source (uses Manager.HasSource for DEBUG logging).
-			// Try source ID first for precise matching (handles renamed sources),
-			// then fall back to source name for backward compatibility.
+			// For overridden sources, match both current and restore identities so
+			// orphan cleanup remains correct across transport changes.
 			matched := false
-			if source.ID != "" {
-				matched = mgr.HasSource(res.Name, res.Type, source.ID)
-			}
-			if !matched {
-				matched = mgr.HasSource(res.Name, res.Type, source.Name)
+			for _, key := range sourceKeys {
+				if mgr.HasSource(res.Name, res.Type, key) {
+					matched = true
+					break
+				}
 			}
 			if matched {
 				orphanedResources = append(orphanedResources, res)
@@ -165,15 +177,10 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 	// Clean up source metadata (regardless of --keep-resources)
 	sourceMetadata, err := sourcemetadata.Load(repoPath)
 	if err == nil {
-		removed := false
+		// Primary key is source name. Also remove any stale ID-keyed entries.
+		sourceMetadata.Delete(source.Name)
 		if source.ID != "" {
-			if _, exists := sourceMetadata.Sources[source.ID]; exists {
-				sourceMetadata.Delete(source.ID)
-				removed = true
-			}
-		}
-		if !removed {
-			sourceMetadata.Delete(source.Name)
+			sourceMetadata.Delete(source.ID)
 		}
 		if err := sourceMetadata.Save(repoPath); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to update source metadata: %v\n", err)
@@ -212,6 +219,43 @@ func performRemove(mgr *repo.Manager, nameOrPathOrURL string, dryRun bool, keepR
 	}
 
 	return nil
+}
+
+func sourceRemovalKeys(source *repomanifest.Source) []string {
+	if source == nil {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	keys := make([]string, 0, 5)
+	appendKey := func(key string) {
+		if key == "" {
+			return
+		}
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+
+	appendKey(source.Name)
+	appendKey(source.ID)
+	appendKey(canonicalSourceID(source))
+
+	if source.Path != "" {
+		appendKey(repomanifest.GenerateSourceID(&repomanifest.Source{Path: source.Path}))
+	}
+
+	if source.OverrideOriginalURL != "" {
+		appendKey(repomanifest.GenerateSourceID(&repomanifest.Source{
+			URL:     source.OverrideOriginalURL,
+			Ref:     source.OverrideOriginalRef,
+			Subpath: source.OverrideOriginalSubpath,
+		}))
+	}
+
+	return keys
 }
 
 // getSourceType returns a human-readable source type

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/sourcemetadata"
 )
 
 func TestRepoShowManifestHelpText(t *testing.T) {
@@ -20,6 +21,8 @@ func TestRepoShowManifestHelpText(t *testing.T) {
 		"ai.repo.yaml",
 		"repo apply-manifest <path-or-url>",
 		"aimgr repo show-manifest",
+		"Override behavior",
+		"repo info",
 	} {
 		if !strings.Contains(help, expected) {
 			t.Fatalf("expected help text to contain %q", expected)
@@ -45,8 +48,11 @@ func TestRepoShowManifestPrintsCurrentManifest(t *testing.T) {
 		t.Fatalf("runShowManifest() error = %v", err)
 	}
 
-	if got := out.String(); got != content {
-		t.Fatalf("unexpected manifest output:\n%s", got)
+	got := out.String()
+	for _, expected := range []string{"version: 1", "name: team-tools", "url: https://github.com/example/tools"} {
+		if !strings.Contains(got, expected) {
+			t.Fatalf("expected show-manifest output to contain %q, got:\n%s", expected, got)
+		}
 	}
 }
 
@@ -60,5 +66,65 @@ func TestRepoShowManifestErrorsWhenManifestMissing(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "run 'aimgr repo init' or 'aimgr repo apply-manifest <path-or-url>' first") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRepoShowManifest_OverriddenSourcePrintsRestoreRemoteView(t *testing.T) {
+	repoDir := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoDir)
+
+	manifest := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{{
+		Name:    "team-tools",
+		Path:    "/tmp/local/team-tools",
+		Include: []string{"skill/*"},
+	}}}
+	if err := manifest.Save(repoDir); err != nil {
+		t.Fatalf("failed to save manifest: %v", err)
+	}
+
+	meta, err := sourcemetadata.Load(repoDir)
+	if err != nil {
+		t.Fatalf("failed to load source metadata: %v", err)
+	}
+	meta.Sources["team-tools"] = &sourcemetadata.SourceState{
+		OverrideOriginalURL:     "https://github.com/example/tools",
+		OverrideOriginalRef:     "main",
+		OverrideOriginalSubpath: "resources",
+	}
+	if err := meta.Save(repoDir); err != nil {
+		t.Fatalf("failed to save source metadata: %v", err)
+	}
+
+	var out bytes.Buffer
+	repoShowManifestCmd.SetOut(&out)
+	defer repoShowManifestCmd.SetOut(os.Stdout)
+
+	if err := runShowManifest(repoShowManifestCmd, nil); err != nil {
+		t.Fatalf("runShowManifest() error = %v", err)
+	}
+
+	got := out.String()
+	for _, expected := range []string{
+		"name: team-tools",
+		"url: https://github.com/example/tools",
+		"ref: main",
+		"subpath: resources",
+		"include:",
+		"- skill/*",
+	} {
+		if !strings.Contains(got, expected) {
+			t.Fatalf("expected show-manifest output to contain %q, got:\n%s", expected, got)
+		}
+	}
+
+	for _, forbidden := range []string{
+		"path: /tmp/local/team-tools",
+		"override_original_url",
+		"override_original_ref",
+		"override_original_subpath",
+	} {
+		if strings.Contains(got, forbidden) {
+			t.Fatalf("expected show-manifest output to hide %q, got:\n%s", forbidden, got)
+		}
 	}
 }

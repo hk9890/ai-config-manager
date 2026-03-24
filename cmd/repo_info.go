@@ -25,6 +25,9 @@ type repoInfoSourceOutput struct {
 	Mode       string   `json:"mode" yaml:"mode"`
 	LastSynced string   `json:"last_synced" yaml:"last_synced"`
 	Include    []string `json:"include,omitempty" yaml:"include,omitempty"`
+
+	Overridden bool   `json:"overridden,omitempty" yaml:"overridden,omitempty"`
+	RestoreTo  string `json:"restore_to,omitempty" yaml:"restore_to,omitempty"`
 }
 
 // repoInfoOutput is the structured output for JSON/YAML formats.
@@ -213,6 +216,14 @@ func buildRepoInfoOutput(
 				LastSynced: lastSynced,
 				Include:    src.Include,
 			}
+			if src.OverrideOriginalURL != "" {
+				entry.Overridden = true
+				entry.RestoreTo = sourceLocationSummary(&repomanifest.Source{
+					URL:     src.OverrideOriginalURL,
+					Ref:     src.OverrideOriginalRef,
+					Subpath: src.OverrideOriginalSubpath,
+				})
+			}
 			result.Sources = append(result.Sources, entry)
 		}
 	}
@@ -267,11 +278,11 @@ func formatInclude(include []string) string {
 
 // renderSourcesTable renders sources as a table
 func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata.SourceMetadata) error {
-	// Create table with columns: NAME, TYPE, LOCATION, MODE, LAST SYNCED, INCLUDE
-	table := output.NewTable("NAME", "TYPE", "LOCATION", "MODE", "LAST SYNCED", "INCLUDE")
+	// Create table with columns: NAME, TYPE, LOCATION, MODE, LAST SYNCED, INCLUDE, OVERRIDE
+	table := output.NewTable("NAME", "TYPE", "LOCATION", "MODE", "LAST SYNCED", "INCLUDE", "OVERRIDE")
 	table.WithResponsive().
-		WithDynamicColumn(2).                      // LOCATION column stretches
-		WithMinColumnWidths(20, 8, 30, 10, 12, 10) // NAME, TYPE, LOCATION, MODE, LAST SYNCED, INCLUDE
+		WithDynamicColumn(2).                          // LOCATION column stretches
+		WithMinColumnWidths(20, 8, 30, 10, 12, 10, 12) // NAME, TYPE, LOCATION, MODE, LAST SYNCED, INCLUDE, OVERRIDE
 
 	// Add row for each source
 	for _, source := range sources {
@@ -302,6 +313,15 @@ func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata
 		// Format include filters
 		includeDisplay := formatInclude(source.Include)
 
+		overrideDisplay := "-"
+		if source.OverrideOriginalURL != "" {
+			overrideDisplay = sourceLocationSummary(&repomanifest.Source{
+				URL:     source.OverrideOriginalURL,
+				Ref:     source.OverrideOriginalRef,
+				Subpath: source.OverrideOriginalSubpath,
+			})
+		}
+
 		// Add row with health indicator prepended to name
 		table.AddRow(
 			fmt.Sprintf("%s %s", healthIcon, source.Name),
@@ -310,6 +330,7 @@ func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata
 			mode,
 			lastSynced,
 			includeDisplay,
+			overrideDisplay,
 		)
 	}
 
