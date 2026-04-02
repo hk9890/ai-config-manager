@@ -3,7 +3,10 @@
 package e2e
 
 import (
+	"encoding/json"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -11,7 +14,32 @@ import (
 	"testing"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
+	"gopkg.in/yaml.v3"
 )
+
+func requireExitCode(t *testing.T, err error, expected int) {
+	t.Helper()
+
+	if expected == 0 {
+		if err != nil {
+			t.Fatalf("expected success (exit 0), got error: %v", err)
+		}
+		return
+	}
+
+	if err == nil {
+		t.Fatalf("expected exit code %d, got success", expected)
+	}
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected exec.ExitError for non-zero exit, got %T (%v)", err, err)
+	}
+
+	if exitErr.ExitCode() != expected {
+		t.Fatalf("expected exit code %d, got %d (err=%v)", expected, exitErr.ExitCode(), err)
+	}
+}
 
 // TestE2E_SyncIdempotency verifies that sync operations are idempotent.
 // Running sync twice on an empty repo should not cause any updates on the second run.
@@ -375,6 +403,7 @@ sources: []
 	if err == nil {
 		t.Error("Expected sync to fail with empty sources, but it succeeded")
 	}
+	requireExitCode(t, err, 2)
 
 	// Verify helpful error message
 	output := stdout + stderr
@@ -422,14 +451,15 @@ sources:
 	if err == nil {
 		t.Error("Expected sync to fail when all sources are invalid, but it succeeded")
 	}
+	requireExitCode(t, err, 1)
 
 	// Check output mentions the failure
 	output := stdout + stderr
 
-	// Should mention "all sources failed" or similar
-	if !strings.Contains(output, "all sources failed") {
+	// Should mention that source sync failed
+	if !strings.Contains(output, "source(s) failed") {
 		t.Logf("Output: %s", output)
-		t.Error("Expected error to mention 'all sources failed'")
+		t.Error("Expected output to mention source failure summary")
 	}
 
 	// Should mention the invalid source name for debugging
@@ -444,6 +474,92 @@ sources:
 	}
 
 	t.Logf("✓ Invalid source handling verified")
+}
+
+func TestE2E_SyncInvalidSource_JSONOutput_NoUsageOnStderr(t *testing.T) {
+	configPath := loadTestConfig(t, "e2e-test")
+	repoPath := getRepoPathFromConfig(t, configPath)
+
+	cleanTestRepo(t, repoPath)
+	t.Cleanup(func() { cleanTestRepo(t, repoPath) })
+
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		t.Fatalf("Failed to create repo directory: %v", err)
+	}
+
+	invalidManifest := `version: 1
+sources:
+  - name: invalid-local-path
+    path: /this/path/does/not/exist/at/all
+`
+	aiRepoPath := filepath.Join(repoPath, "ai.repo.yaml")
+	if err := os.WriteFile(aiRepoPath, []byte(invalidManifest), 0644); err != nil {
+		t.Fatalf("Failed to write ai.repo.yaml: %v", err)
+	}
+
+	env := map[string]string{"AIMGR_REPO_PATH": repoPath}
+	stdout, stderr, err := runAimgrWithEnv(t, configPath, env, "repo", "sync", "--format=json")
+
+	requireExitCode(t, err, 1)
+
+	if strings.Contains(stderr, "Usage:\n") || strings.Contains(stderr, "aimgr repo sync") {
+		t.Fatalf("expected stderr without Cobra usage/help text, got:\n%s", stderr)
+	}
+
+	var payload struct {
+		Summary struct {
+			SourcesFailed int `json:"sources_failed"`
+		} `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("expected valid JSON on stdout, got error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)
+	}
+	if payload.Summary.SourcesFailed != 1 {
+		t.Fatalf("expected summary.sources_failed=1, got %d", payload.Summary.SourcesFailed)
+	}
+}
+
+func TestE2E_SyncInvalidSource_YAMLOutput_NoUsageOnStderr(t *testing.T) {
+	configPath := loadTestConfig(t, "e2e-test")
+	repoPath := getRepoPathFromConfig(t, configPath)
+
+	cleanTestRepo(t, repoPath)
+	t.Cleanup(func() { cleanTestRepo(t, repoPath) })
+
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		t.Fatalf("Failed to create repo directory: %v", err)
+	}
+
+	invalidManifest := `version: 1
+sources:
+  - name: invalid-local-path
+    path: /this/path/does/not/exist/at/all
+`
+	aiRepoPath := filepath.Join(repoPath, "ai.repo.yaml")
+	if err := os.WriteFile(aiRepoPath, []byte(invalidManifest), 0644); err != nil {
+		t.Fatalf("Failed to write ai.repo.yaml: %v", err)
+	}
+
+	env := map[string]string{"AIMGR_REPO_PATH": repoPath}
+	stdout, stderr, err := runAimgrWithEnv(t, configPath, env, "repo", "sync", "--format=yaml")
+
+	requireExitCode(t, err, 1)
+
+	if strings.Contains(stderr, "Usage:\n") || strings.Contains(stderr, "aimgr repo sync") {
+		t.Fatalf("expected stderr without Cobra usage/help text, got:\n%s", stderr)
+	}
+
+	var payload struct {
+		Summary map[string]any `yaml:"summary"`
+	}
+	if err := yaml.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("expected valid YAML on stdout, got error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)
+	}
+	if got, ok := payload.Summary["sourcesfailed"]; !ok {
+		t.Fatalf("expected summary.sourcesfailed key in YAML output, got keys: %#v", payload.Summary)
+	} else if gotNum, ok := got.(int); !ok || gotNum != 1 {
+		t.Fatalf("expected summary.sourcesfailed=1, got %#v", got)
+	}
 }
 
 // Example of how to add more sync tests:

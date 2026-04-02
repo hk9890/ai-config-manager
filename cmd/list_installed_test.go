@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/manifest"
@@ -318,7 +319,55 @@ func TestListInstalled_OutputFormats(t *testing.T) {
 		t.Errorf("expected version '1.0.0', got '%s'", infos[0].Version)
 	}
 
-	_ = bytes.Buffer{} // Avoid unused import error
+}
+
+func TestOutputInstalledEmpty_JSONPatternNoMatches(t *testing.T) {
+	output := captureListInstalledStdout(t, func() {
+		if err := outputInstalledEmpty("json", "agent/*"); err != nil {
+			t.Fatalf("outputInstalledEmpty returned error: %v", err)
+		}
+	})
+
+	if strings.TrimSpace(output) != "[]" {
+		t.Fatalf("expected JSON empty output to be [], got %q", output)
+	}
+}
+
+func TestOutputInstalledEmpty_YAMLPatternNoMatches(t *testing.T) {
+	output := captureListInstalledStdout(t, func() {
+		if err := outputInstalledEmpty("yaml", "agent/*"); err != nil {
+			t.Fatalf("outputInstalledEmpty returned error: %v", err)
+		}
+	})
+
+	if strings.TrimSpace(output) != "[]" {
+		t.Fatalf("expected YAML empty output to be [], got %q", output)
+	}
+}
+
+func captureListInstalledStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdout pipe: %v", err)
+	}
+	os.Stdout = w
+
+	outChan := make(chan string)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = buf.ReadFrom(r)
+		outChan <- buf.String()
+	}()
+
+	fn()
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	return <-outChan
 }
 
 // TestBuildResourceInfo_BrokenHealthStatus tests that buildResourceInfo correctly

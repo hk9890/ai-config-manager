@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -608,6 +609,13 @@ func TestRunSync_NoSources(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when no sources configured, got nil")
 	}
+	if got := getCommandExitCode(err); got != commandExitCodeOperationalFailure {
+		t.Fatalf("exit code=%d want %d", got, commandExitCodeOperationalFailure)
+	}
+	var cmdErr *commandExitError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("expected commandExitError, got %T", err)
+	}
 
 	// Check error message
 	expectedMsg := "no sync sources configured"
@@ -631,9 +639,16 @@ func TestRunSync_InvalidSource(t *testing.T) {
 	// Run sync command
 	err := runSync(syncCmd, []string{})
 
-	// Should return error since all sources failed
+	// Should return completed-with-findings error since all sources failed
 	if err == nil {
 		t.Fatal("expected error for invalid source, got nil")
+	}
+	if got := getCommandExitCode(err); got != commandExitCodeCompletedWithFindings {
+		t.Fatalf("exit code=%d want %d", got, commandExitCodeCompletedWithFindings)
+	}
+	var cmdErr *commandExitError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("expected commandExitError, got %T", err)
 	}
 
 	// Check error message indicates failure
@@ -663,9 +678,16 @@ func TestRunSync_MixedValidInvalidSources(t *testing.T) {
 	// Run sync command
 	err := runSync(syncCmd, []string{})
 
-	// Should succeed since at least one source worked
-	if err != nil {
-		t.Fatalf("sync command should succeed with partial success, got: %v", err)
+	// Should return completed-with-findings error on partial source failure
+	if err == nil {
+		t.Fatal("expected completed-with-findings error for partial source failure, got nil")
+	}
+	if got := getCommandExitCode(err); got != commandExitCodeCompletedWithFindings {
+		t.Fatalf("exit code=%d want %d", got, commandExitCodeCompletedWithFindings)
+	}
+	var cmdErr *commandExitError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("expected commandExitError, got %T", err)
 	}
 
 	// Verify resources from valid source were imported
@@ -1259,8 +1281,11 @@ func TestRunSync_FailedSourceExcludedFromRemovalDetection(t *testing.T) {
 
 	// First sync: only valid source succeeds
 	err := runSync(syncCmd, []string{})
-	if err != nil {
-		t.Fatalf("first sync failed (should succeed with partial): %v", err)
+	if err == nil {
+		t.Fatal("expected completed-with-findings error for partial source failure, got nil")
+	}
+	if got := getCommandExitCode(err); got != commandExitCodeCompletedWithFindings {
+		t.Fatalf("first sync exit code=%d want %d", got, commandExitCodeCompletedWithFindings)
 	}
 
 	// Verify resources from valid source are imported
@@ -1274,8 +1299,11 @@ func TestRunSync_FailedSourceExcludedFromRemovalDetection(t *testing.T) {
 	// Second sync: should succeed without errors about the failed source
 	// The failed source should NOT trigger removal detection
 	err = runSync(syncCmd, []string{})
-	if err != nil {
-		t.Fatalf("second sync failed (should succeed with partial): %v", err)
+	if err == nil {
+		t.Fatal("expected completed-with-findings error for partial source failure, got nil")
+	}
+	if got := getCommandExitCode(err); got != commandExitCodeCompletedWithFindings {
+		t.Fatalf("second sync exit code=%d want %d", got, commandExitCodeCompletedWithFindings)
 	}
 
 	// Resources from valid source that still exist should be present
@@ -1950,8 +1978,11 @@ func TestRunSync_RemovalOnlyForSuccessfulSources(t *testing.T) {
 	// Second sync: source A succeeds, source B fails
 	// Source B's resources should NOT be removed because source B failed
 	err = runSync(syncCmd, []string{})
-	if err != nil {
-		t.Fatalf("second sync failed (should succeed with partial): %v", err)
+	if err == nil {
+		t.Fatal("expected completed-with-findings error for partial source failure, got nil")
+	}
+	if got := getCommandExitCode(err); got != commandExitCodeCompletedWithFindings {
+		t.Fatalf("second sync exit code=%d want %d", got, commandExitCodeCompletedWithFindings)
 	}
 
 	// Source B's resource should still exist (not removed because source failed)

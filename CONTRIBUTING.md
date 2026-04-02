@@ -118,6 +118,7 @@ git push origin feature/your-feature-name
 ```
 
 Then open a Pull Request on GitHub.
+See [docs/PULL-REQUESTS.md](docs/PULL-REQUESTS.md) for branch and PR expectations.
 
 ## Submitting Changes
 
@@ -168,17 +169,9 @@ fix(install): handle symlink creation on Windows
 Use junction points instead of symlinks for Windows compatibility.
 ```
 
-### Pull Request Checklist
+### Pull Requests
 
-1. **Create PR** from your feature branch to `main`
-2. **Fill out description** with:
-   - What changes were made
-   - Why the changes were necessary
-   - How to test the changes
-3. **Link related issues** using keywords (e.g., "Fixes #42")
-4. **Wait for CI to pass** - All checks must pass
-5. **Address review feedback** promptly and respectfully
-6. **Maintainer will merge** when approved
+Read **[docs/PULL-REQUESTS.md](docs/PULL-REQUESTS.md)** for branch workflow, PR description requirements, CI expectations, and review follow-up.
 
 ## Detailed Guides
 
@@ -223,6 +216,13 @@ For in-depth information, see the comprehensive guides in `docs/contributor-guid
 - Version management
 - Release workflow
 - See [docs/contributor-guide/release-process.md](docs/contributor-guide/release-process.md) for complete guide
+
+### Pull Requests
+
+→ **[Pull Request Guide](docs/PULL-REQUESTS.md)**
+- Branch workflow and PR expectations
+- Required PR description fields
+- Review and CI follow-up
 
 ### Documentation Overview
 

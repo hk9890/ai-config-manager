@@ -35,6 +35,7 @@ For detailed setup, see [Development Environment](development-environment.md).
 ### Additional Resources
 
 - **[CONTRIBUTING.md](../../CONTRIBUTING.md)** - Quick start and workflow guide
+- **[Pull Request Guide](../PULL-REQUESTS.md)** - Branch workflow, PR descriptions, and review expectations
 - **[AGENTS.md](../../AGENTS.md)** - Quick reference for AI agents
 
 ## Essential Commands

@@ -225,8 +225,9 @@ var (
 
 // syncCmd represents the sync command
 var syncCmd = &cobra.Command{
-	Use:   "sync",
-	Short: "Sync resources from configured sources",
+	Use:          "sync",
+	Short:        "Sync resources from configured sources",
+	SilenceUsage: true,
 	Long: `Sync resources from configured sources in ai.repo.yaml.
 
 This command reads sources from the repository's ai.repo.yaml manifest file
@@ -867,12 +868,12 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// Create manager
 	manager, err := NewManagerWithLogLevel()
 	if err != nil {
-		return fmt.Errorf("failed to create repo manager: %w", err)
+		return newOperationalFailureError(fmt.Errorf("failed to create repo manager: %w", err))
 	}
 
 	repoLock, err := manager.AcquireRepoWriteLock(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to acquire repository lock at %s: %w", manager.RepoLockPath(), err)
+		return wrapLockAcquireError(manager.RepoLockPath(), err)
 	}
 	defer func() {
 		_ = repoLock.Unlock()
@@ -885,16 +886,16 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// Load manifest from ai.repo.yaml
 	manifest, err := repomanifest.LoadForMutation(manager.GetRepoPath())
 	if err != nil {
-		return fmt.Errorf("failed to load manifest: %w", err)
+		return newOperationalFailureError(fmt.Errorf("failed to load manifest: %w", err))
 	}
 
 	if err := detectSyncResourceCollisions(manifest, manager); err != nil {
-		return err
+		return newOperationalFailureError(err)
 	}
 
 	// Check if any sources configured
 	if len(manifest.Sources) == 0 {
-		return fmt.Errorf("no sync sources configured\n\nAdd sources using:\n  aimgr repo add <source>\n\nSources are automatically tracked in ai.repo.yaml")
+		return newOperationalFailureError(fmt.Errorf("no sync sources configured\n\nAdd sources using:\n  aimgr repo add <source>\n\nSources are automatically tracked in ai.repo.yaml"))
 	}
 
 	// Load source metadata for timestamps
@@ -910,7 +911,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// Determine output format
 	format, formatErr := output.ParseFormat(syncFormatFlag)
 	if formatErr != nil {
-		return formatErr
+		return newOperationalFailureError(formatErr)
 	}
 	mode := syncOutputMode{format: format, verbose: syncVerboseFlag}
 	if mode.human() {
@@ -1058,7 +1059,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	// Format and print output
 	if err := renderSyncOutput(so, format, syncVerboseFlag); err != nil {
-		return err
+		return newOperationalFailureError(err)
 	}
 
 	// Regenerate modifications (skip in dry-run mode)
@@ -1066,10 +1067,13 @@ func runSync(cmd *cobra.Command, args []string) error {
 		syncRegenerateModifications(manager, repoPath)
 	}
 
-	// Return error if all sources failed
-	if internalResult.sourcesFailed == len(manifest.Sources) {
-		return fmt.Errorf("all sources failed to sync")
+	if internalResult.sourcesFailed == 0 {
+		return nil
 	}
 
-	return nil
+	if internalResult.sourcesFailed == len(manifest.Sources) {
+		return newCompletedWithFindingsError("repository sync completed: all sources failed")
+	}
+
+	return newCompletedWithFindingsError("repository sync completed with source failures")
 }

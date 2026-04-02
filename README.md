@@ -133,6 +133,7 @@ Complete documentation is available in the `docs/` directory:
 ### For Contributors
 
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to aimgr
+- **[Pull Requests](docs/PULL-REQUESTS.md)** - Branch workflow, PR expectations, and review follow-up
 - **[Architecture](docs/contributor-guide/architecture.md)** - System design and components
 - **[Code Style](docs/contributor-guide/code-style.md)** - Coding standards and conventions
 - **[Testing](docs/contributor-guide/testing.md)** - Test guidelines and patterns

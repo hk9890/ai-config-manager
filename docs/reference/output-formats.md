@@ -620,6 +620,91 @@ $ aimgr repo list --format=json | jq '[.resources[] | select(.sync_status != "in
 
 The following commands support structured output for automation and monitoring.
 
+### repo sync - Source-Level Results and Exit Codes
+
+`repo sync --format=json` returns per-source outcomes under `sources[]` and
+aggregated counters under `summary`.
+
+Example:
+
+```bash
+$ aimgr repo sync --format=json
+{
+  "sources": [
+    {
+      "name": "stable-local",
+      "path": "/home/user/resources",
+      "mode": "local",
+      "result": {
+        "added": [],
+        "updated": [
+          {
+            "name": "test",
+            "type": "command",
+            "path": "/home/user/.local/share/ai-config/repo/commands/test.md"
+          }
+        ],
+        "skipped": [],
+        "failed": []
+      },
+      "removed_count": 0,
+      "failed": false
+    },
+    {
+      "name": "broken-local",
+      "path": "/missing/path",
+      "mode": "local",
+      "result": null,
+      "removed_count": 0,
+      "error": "source path does not exist: /missing/path",
+      "failed": true
+    }
+  ],
+  "removed": [],
+  "summary": {
+    "sources_total": 2,
+    "sources_synced": 1,
+    "sources_failed": 1,
+    "resources_added": 0,
+    "resources_updated": 1,
+    "resources_removed": 0,
+    "resources_failed": 0
+  }
+}
+```
+
+`repo sync` exit-code contract:
+
+- Exit `0`: full success (`summary.sources_failed == 0`)
+- Exit `1`: completed with findings (one or more sources failed; partial or total source failure)
+- Exit `2`: operational/pre-flight failure prevented completion (for example lock/config/manifest/format errors)
+
+Automation guidance:
+
+- Do **not** parse a top-level `.failed[]` array for `repo sync`.
+- Use `summary.sources_failed` and/or `sources[] | select(.failed == true)`.
+- Parse structured stdout only for exit `0` and exit `1`.
+- Do **not** combine `2>&1` and assume the result is always JSON/YAML: exit `2`
+  writes a human-readable operational error to stderr instead of structured output.
+
+Examples:
+
+```bash
+# Count failed sources
+output=$(aimgr repo sync --format=json)
+status=$?
+
+if [ "$status" -eq 2 ]; then
+  echo "repo sync could not run" >&2
+  exit 2
+fi
+
+echo "$output" | jq '.summary.sources_failed'
+
+# List failed source names and errors
+echo "$output" | jq -r '.sources[] | select(.failed == true) | "\(.name): \(.error)"'
+```
+
 ### repo info - Repository Statistics
 
 Display repository information in various formats:
@@ -1235,19 +1320,37 @@ echo "Import completed successfully!"
 
 LOG_FILE="/var/log/aimgr-sync.log"
 
-output=$(aimgr repo sync --format=json 2>&1)
-failed=$(echo "$output" | jq '.failed | length')
+stdout_file=$(mktemp)
+stderr_file=$(mktemp)
 
-if [ "$failed" -gt 0 ]; then
-  echo "$(date): Resource sync failed" >> "$LOG_FILE"
-  echo "$output" | jq '.failed[]' >> "$LOG_FILE"
+if aimgr repo sync --format=json >"$stdout_file" 2>"$stderr_file"; then
+  status=0
+else
+  status=$?
+fi
+
+if [ "$status" -eq 2 ]; then
+  echo "$(date): Resource sync could not run" >> "$LOG_FILE"
+  cat "$stderr_file" >> "$LOG_FILE"
+  rm -f "$stdout_file" "$stderr_file"
+  exit 2
+fi
+
+output=$(cat "$stdout_file")
+failed_sources=$(echo "$output" | jq '.summary.sources_failed')
+
+if [ "$status" -eq 1 ] || [ "$failed_sources" -gt 0 ]; then
+  echo "$(date): Resource sync completed with source failures" >> "$LOG_FILE"
+  echo "$output" | jq '.sources[] | select(.failed == true)' >> "$LOG_FILE"
   
   # Send alert (example using mail)
-  echo "$output" | jq '.failed[]' | mail -s "aimgr sync failed" admin@example.com
+  echo "$output" | jq '.sources[] | select(.failed == true)' | mail -s "aimgr sync source failures" admin@example.com
+  rm -f "$stdout_file" "$stderr_file"
   exit 1
 fi
 
-echo "$(date): Resource sync successful ($added added)" >> "$LOG_FILE"
+rm -f "$stdout_file" "$stderr_file"
+echo "$(date): Resource sync successful" >> "$LOG_FILE"
 ```
 
 ## Best Practices

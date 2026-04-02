@@ -24,6 +24,25 @@ var (
 	listInstalledPathFlag   string
 )
 
+func outputInstalledEmpty(format string, pattern string) error {
+	switch format {
+	case "json":
+		return outputInstalledJSON([]ResourceInfo{})
+	case "yaml":
+		return outputInstalledYAML([]ResourceInfo{})
+	case "table":
+		if pattern != "" {
+			fmt.Printf("No installed resources match pattern '%s'.\n", pattern)
+		} else {
+			fmt.Println("No resources installed in this project.")
+		}
+		fmt.Println("\nInstall resources with: aimgr install <resource>")
+		return nil
+	default:
+		return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", format)
+	}
+}
+
 // listInstalledState holds shared state for a single `aimgr list` invocation.
 // It is threaded through the pipeline so manifest/repo/package lookups happen once.
 type listInstalledState struct {
@@ -211,10 +230,19 @@ Examples:
 		}
 
 		if len(detectedTools) == 0 {
-			fmt.Println("No tool directories found in this project.")
-			fmt.Println("\nExpected directories: .claude, .opencode, .github/skills, or .github/agents")
-			fmt.Println("Install resources with: aimgr install <resource>")
-			return nil
+			switch listInstalledFormatFlag {
+			case "json":
+				return outputInstalledJSON([]ResourceInfo{})
+			case "yaml":
+				return outputInstalledYAML([]ResourceInfo{})
+			case "table":
+				fmt.Println("No tool directories found in this project.")
+				fmt.Println("\nExpected directories: .claude, .opencode, .github/skills, or .github/agents")
+				fmt.Println("Install resources with: aimgr install <resource>")
+				return nil
+			default:
+				return fmt.Errorf("invalid format: %s (must be 'table', 'json', or 'yaml')", listInstalledFormatFlag)
+			}
 		}
 
 		// Create installer to list resources
@@ -257,17 +285,13 @@ Examples:
 
 			// Handle no matches
 			if len(resources) == 0 {
-				fmt.Printf("No installed resources match pattern '%s'.\n", patternArg)
-				fmt.Println("\nInstall resources with: aimgr install <resource>")
-				return nil
+				return outputInstalledEmpty(listInstalledFormatFlag, patternArg)
 			}
 		}
 
 		// Handle empty results (no pattern specified)
 		if len(resources) == 0 {
-			fmt.Println("No resources installed in this project.")
-			fmt.Println("\nInstall resources with: aimgr install <resource>")
-			return nil
+			return outputInstalledEmpty(listInstalledFormatFlag, "")
 		}
 
 		// Get tool installation info for each resource
