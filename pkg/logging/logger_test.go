@@ -23,6 +23,8 @@ func TestNewRepoLogger_Success(t *testing.T) {
 		t.Fatal("NewRepoLogger() returned nil logger")
 	}
 
+	logger.Info("trigger lazy writer")
+
 	// Verify logs directory was created
 	logsDir := filepath.Join(tmpDir, "logs")
 	info, err := os.Stat(logsDir)
@@ -54,6 +56,28 @@ func TestNewRepoLogger_Success(t *testing.T) {
 	}
 }
 
+func TestNewRepoLogger_DoesNotCreateLogsUntilFirstWrite(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	logger, err := NewRepoLogger(tmpDir, slog.LevelDebug)
+	if err != nil {
+		t.Fatalf("NewRepoLogger() error = %v, want nil", err)
+	}
+	if logger == nil {
+		t.Fatal("NewRepoLogger() returned nil logger")
+	}
+
+	if _, statErr := os.Stat(filepath.Join(tmpDir, "logs")); !os.IsNotExist(statErr) {
+		t.Fatalf("logs dir should not exist before first write, statErr=%v", statErr)
+	}
+
+	logger.Info("first write")
+
+	if _, statErr := os.Stat(filepath.Join(tmpDir, "logs", "operations.log")); statErr != nil {
+		t.Fatalf("expected operations.log after first write: %v", statErr)
+	}
+}
+
 func TestNewRepoLogger_DirectoryAlreadyExists(t *testing.T) {
 	// Create isolated temp directory
 	tmpDir := t.TempDir()
@@ -73,6 +97,8 @@ func TestNewRepoLogger_DirectoryAlreadyExists(t *testing.T) {
 	if logger == nil {
 		t.Fatal("NewRepoLogger() returned nil logger")
 	}
+
+	logger.Info("trigger lazy writer")
 
 	// Verify log file was created
 	logFile := filepath.Join(logsDir, "operations.log")
@@ -122,13 +148,15 @@ func TestNewRepoLogger_PermissionDenied(t *testing.T) {
 	// Ensure cleanup can work by restoring permissions
 	defer os.Chmod(readOnlyDir, 0755)
 
-	// Try to create logger in read-only directory
-	_, err := NewRepoLogger(readOnlyDir, slog.LevelDebug)
-	if err == nil {
-		t.Error("NewRepoLogger() expected error for permission denied, got nil")
+	// Logger creation is side-effect-free; write should fail when logs dir cannot be created.
+	logger, err := NewRepoLogger(readOnlyDir, slog.LevelDebug)
+	if err != nil {
+		t.Fatalf("NewRepoLogger() unexpected error = %v", err)
 	}
-	if err != nil && !strings.Contains(err.Error(), "failed to create logs directory") {
-		t.Errorf("NewRepoLogger() error = %v, want error about creating logs directory", err)
+	logger.Info("should fail to create logs dir")
+
+	if _, statErr := os.Stat(filepath.Join(readOnlyDir, "logs")); !os.IsNotExist(statErr) && !os.IsPermission(statErr) {
+		t.Errorf("logs directory should not exist when write fails, statErr=%v", statErr)
 	}
 }
 
@@ -307,6 +335,8 @@ func TestNewRepoLogger_NestedPath(t *testing.T) {
 		t.Fatal("NewRepoLogger() returned nil logger")
 	}
 
+	logger.Info("test message")
+
 	// Verify nested logs directory was created
 	logsDir := filepath.Join(nestedPath, "logs")
 	if _, err := os.Stat(logsDir); err != nil {
@@ -314,7 +344,6 @@ func TestNewRepoLogger_NestedPath(t *testing.T) {
 	}
 
 	// Verify log file works
-	logger.Info("test message")
 	logFile := filepath.Join(logsDir, "operations.log")
 	if _, err := os.Stat(logFile); err != nil {
 		t.Errorf("log file not created in nested path: %v", err)

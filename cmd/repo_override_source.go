@@ -83,7 +83,7 @@ func runRepoOverrideSource(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := ensureRepoInitialized(mgr); err != nil {
-		return err
+		return operationalMissingManifestError(cmd, err)
 	}
 
 	repoLock, err := mgr.AcquireRepoWriteLock(cmd.Context())

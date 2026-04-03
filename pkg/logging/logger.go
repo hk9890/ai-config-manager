@@ -15,43 +15,73 @@ package logging
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 )
+
+// lazyLogWriter defers log directory/file creation until first write.
+// This keeps manager construction read-only for commands that fail validation
+// before any log event is emitted.
+type lazyLogWriter struct {
+	repoPath string
+
+	mu   sync.Mutex
+	file io.Writer
+}
+
+func newLazyLogWriter(repoPath string) *lazyLogWriter {
+	return &lazyLogWriter{repoPath: repoPath}
+}
+
+func (w *lazyLogWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.file == nil {
+		logsDir := filepath.Join(w.repoPath, "logs")
+		if err := os.MkdirAll(logsDir, 0755); err != nil {
+			return 0, fmt.Errorf("failed to create logs directory: %w", err)
+		}
+
+		logFilePath := filepath.Join(logsDir, "operations.log")
+		logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return 0, fmt.Errorf("failed to open log file: %w", err)
+		}
+
+		w.file = logFile
+	}
+
+	return w.file.Write(p)
+}
 
 // NewRepoLogger creates a new structured JSON logger that writes to {repoPath}/logs/operations.log.
 //
 // The logger:
 //   - Writes JSON formatted log entries (one per line)
-//   - Creates the logs directory if it doesn't exist (permissions: 0755)
-//   - Opens/creates the log file in append mode (permissions: 0644)
+//   - Lazily creates the logs directory and file on first write
 //   - Uses the specified level as minimum logging level
 //   - Writes to file only (no console output)
 //
-// Returns an error if the log directory cannot be created or the log file
-// cannot be opened for writing.
+// Returns an error if the repo path is inaccessible.
 func NewRepoLogger(repoPath string, level slog.Level) (*slog.Logger, error) {
 	// Verify the repo path exists before creating subdirectories
-	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+	info, err := os.Stat(repoPath)
+	if os.IsNotExist(err) {
 		return nil, fmt.Errorf("repo path does not exist: %s", repoPath)
 	}
-
-	// Create logs directory if it doesn't exist
-	logsDir := filepath.Join(repoPath, "logs")
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create logs directory: %w", err)
-	}
-
-	// Open/create log file in append mode
-	logFilePath := filepath.Join(logsDir, "operations.log")
-	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
+		return nil, fmt.Errorf("failed to access repo path: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("repo path is not a directory: %s", repoPath)
 	}
 
 	// Create JSON handler with specified level
-	handler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{
+	handler := slog.NewJSONHandler(newLazyLogWriter(repoPath), &slog.HandlerOptions{
 		Level: level,
 	})
 

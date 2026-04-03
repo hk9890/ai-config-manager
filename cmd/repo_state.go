@@ -9,6 +9,7 @@ import (
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repolock"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
+	"github.com/spf13/cobra"
 )
 
 func repoManifestPath(repoPath string) string {
@@ -57,6 +58,14 @@ func missingRepoInitializationError(repoPath string) error {
 
 func missingRepoPathError(repoPath string) error {
 	return fmt.Errorf("repository does not exist at: %s", repoPath)
+}
+
+func operationalMissingManifestError(cmd *cobra.Command, err error) error {
+	if cmd != nil {
+		cmd.SilenceUsage = true
+	}
+
+	return newOperationalFailureError(err)
 }
 
 func acquireRepoReadLockIfRepoExists(ctx context.Context, manager *repo.Manager) (*repolock.Lock, bool, error) {

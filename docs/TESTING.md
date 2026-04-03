@@ -5,8 +5,8 @@ Quick reference for testing ai-config-manager.
 ## Commands
 
 ```bash
-make test             # All tests (vet -> unit -> integration)
-make unit-test        # Fast unit tests (<5s)
+make test             # All tests (vet -> unit [cmd+pkg] -> integration)
+make unit-test        # Fast unit tests for ./cmd/... and ./pkg/...
 make integration-test # Network-dependent tests (~30s)
 make e2e-test         # Full CLI tests (~1-2min)
 ```

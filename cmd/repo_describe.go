@@ -81,7 +81,7 @@ Note: 'repo show' is deprecated, use 'repo describe' instead.`,
 		}
 
 		if err := ensureRepoInitialized(manager); err != nil {
-			return err
+			return operationalMissingManifestError(cmd, err)
 		}
 
 		repoLock, err := manager.AcquireRepoReadLock(cmd.Context())

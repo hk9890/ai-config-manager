@@ -146,7 +146,7 @@ make build      # Build binary to ./aimgr
 make install    # Build and install to ~/bin
 
 # Test
-make test             # All tests (vet -> unit -> integration)
+make test             # All tests (vet -> unit [cmd+pkg] -> integration)
 make unit-test        # Fast unit tests only
 make integration-test # Integration tests
 

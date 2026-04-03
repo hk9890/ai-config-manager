@@ -79,6 +79,7 @@ test: vet unit-test integration-test ## Run all tests (matches CI order)
 
 unit-test: ## Run only unit tests (fast, no external dependencies)
 	@echo "Running unit tests..."
+	$(GOTEST) -v -short ./cmd/...
 	$(GOTEST) -v -short ./pkg/...
 
 integration-test: ## Run only integration tests (slower, requires git/network)
