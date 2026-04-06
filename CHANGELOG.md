@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-04-06
+
+### Added
+- **Stable remote-source local testing workflow** — Added the `aimgr repo override-source` workflow so teams can temporarily switch a remote source to a local checkout for development and testing without changing the shared baseline manifest.
+
+### Changed
+- **Release and contributor workflow guidance** — Refreshed contributor and release documentation routing, command examples, and workflow guidance to better match current CLI behavior.
+
+### Fixed
+- **Windows repository locking** — Implemented Windows file locking with `LockFileEx` to align repository lock behavior across platforms.
+- **Concurrent repo reads and status reporting** — Stabilized concurrent repository reads and improved verify/sync status handling for repository operations.
+- **Uninitialized repo behavior and tests** — Avoided creating lock state for uninitialized repositories, aligned uninstall/verify tests with current repo-initialization requirements, and resolved release-blocking CI lint/test regressions found during the v3.7.0 release process.
+
 ## [3.6.0] - 2026-03-23
 
 ### Added
