@@ -58,15 +58,39 @@ if ([string]::IsNullOrWhiteSpace($InstallDir)) {
     $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\aimgr\bin'
 }
 
-if ([string]::IsNullOrWhiteSpace($Version)) {
-    $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'aimgr-install-script' }
-    $Version = $latestRelease.tag_name
+function Get-PlainVersion {
+    param([string]$VersionString)
+
+    if ([string]::IsNullOrWhiteSpace($VersionString)) {
+        throw 'Version cannot be empty'
+    }
+
+    if ($VersionString.StartsWith('v', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $VersionString.Substring(1)
+    }
+
+    return $VersionString
 }
 
+function Get-ReleaseTag {
+    param([string]$VersionString)
+
+    return 'v' + (Get-PlainVersion -VersionString $VersionString)
+}
+
+$releaseTag = if ([string]::IsNullOrWhiteSpace($Version)) {
+    $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'aimgr-install-script' }
+    Get-ReleaseTag -VersionString $latestRelease.tag_name
+} else {
+    Get-ReleaseTag -VersionString $Version
+}
+
+$plainVersion = Get-PlainVersion -VersionString $releaseTag
+
 $architecture = Get-Architecture
-$asset = "aimgr_${Version}_windows_${architecture}.zip"
+$asset = "aimgr_${plainVersion}_windows_${architecture}.zip"
 $checksumsAsset = 'checksums.txt'
-$releaseBaseUrl = "https://github.com/$Repo/releases/download/$Version"
+$releaseBaseUrl = "https://github.com/$Repo/releases/download/$releaseTag"
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("aimgr-install-" + [System.Guid]::NewGuid().ToString())
 
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
@@ -77,7 +101,7 @@ try {
     $extractDir = Join-Path $tempDir 'extract'
     $binaryPath = Join-Path $extractDir 'aimgr.exe'
 
-    Write-Info "Downloading aimgr $Version for windows/$architecture..."
+    Write-Info "Downloading aimgr $plainVersion for windows/$architecture..."
     Invoke-WebRequest -Uri "$releaseBaseUrl/$asset" -OutFile $zipPath
     Invoke-WebRequest -Uri "$releaseBaseUrl/$checksumsAsset" -OutFile $checksumsPath
 

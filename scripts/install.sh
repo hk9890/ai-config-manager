@@ -3,7 +3,7 @@
 set -eu
 
 REPO="${AIMGR_GITHUB_REPO:-dynatrace-oss/ai-config-manager}"
-VERSION="${AIMGR_VERSION:-}"
+REQUESTED_VERSION="${AIMGR_VERSION:-}"
 INSTALL_DIR="${AIMGR_INSTALL_DIR:-}"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 
@@ -85,20 +85,34 @@ detect_arch() {
     esac
 }
 
-resolve_version() {
-    if [ -n "$VERSION" ]; then
-        printf '%s' "$VERSION"
+normalize_version() {
+    version=$1
+
+    case "$version" in
+        [vV]*) printf '%s' "${version#?}" ;;
+        *) printf '%s' "$version" ;;
+    esac
+}
+
+normalize_release_tag() {
+    version=$(normalize_version "$1")
+    printf 'v%s' "$version"
+}
+
+resolve_release_tag() {
+    if [ -n "$REQUESTED_VERSION" ]; then
+        normalize_release_tag "$REQUESTED_VERSION"
         return
     fi
 
     metadata_file=$(mktemp)
     download "$API_URL" "$metadata_file"
 
-    resolved_version=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$metadata_file" | head -n 1)
+    resolved_tag=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$metadata_file" | head -n 1)
     rm -f "$metadata_file"
 
-    [ -n "$resolved_version" ] || fail "failed to determine the latest release version"
-    printf '%s' "$resolved_version"
+    [ -n "$resolved_tag" ] || fail "failed to determine the latest release version"
+    normalize_release_tag "$resolved_tag"
 }
 
 resolve_install_dir() {
@@ -143,11 +157,12 @@ extract_expected_checksum() {
 
 OS=$(detect_os)
 ARCH=$(detect_arch)
-VERSION=$(resolve_version)
+RELEASE_TAG=$(resolve_release_tag)
+VERSION=$(normalize_version "$RELEASE_TAG")
 INSTALL_DIR=$(resolve_install_dir)
 ASSET="aimgr_${VERSION}_${OS}_${ARCH}.tar.gz"
 CHECKSUMS_ASSET="checksums.txt"
-RELEASE_BASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
+RELEASE_BASE_URL="https://github.com/${REPO}/releases/download/${RELEASE_TAG}"
 
 have_cmd tar || fail "tar is required"
 have_cmd mktemp || fail "mktemp is required"
