@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/giturl"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,6 +38,8 @@ type ProjectManifests struct {
 	Local     *Manifest
 	Effective *Manifest
 }
+
+var windowsDrivePathPattern = regexp.MustCompile(`^[a-zA-Z]:[/\\]`)
 
 // HasAny reports whether at least one project manifest file is present.
 func (p *ProjectManifests) HasAny() bool {
@@ -79,24 +84,29 @@ func LoadProjectManifests(projectPath string) (*ProjectManifests, error) {
 }
 
 // Merge builds an effective manifest using additive overlay semantics:
-// - resources: base order preserved, local-only entries appended, exact duplicates removed
-// - install.targets: base order preserved, local-only entries appended, exact duplicates removed
+//   - resources: base order preserved, local-only entries appended, exact duplicates removed
+//   - install.targets: base order preserved, local-only entries appended, exact duplicates removed
+//   - sources: base order preserved, local-only entries appended, canonical duplicates
+//     (normalized url+subpath) removed while retaining first-declared name/ref
 func Merge(base, local *Manifest) *Manifest {
 	merged := &Manifest{
 		Resources: []string{},
 		Install: InstallConfig{
 			Targets: []string{},
 		},
+		Sources: []ManifestSource{},
 	}
 
 	if base != nil {
 		merged.Resources = append(merged.Resources, base.Resources...)
 		merged.Install.Targets = append(merged.Install.Targets, base.Install.Targets...)
+		merged.Sources = append(merged.Sources, base.Sources...)
 	}
 
 	if local != nil {
 		merged.Resources = appendUniqueStrings(merged.Resources, local.Resources...)
 		merged.Install.Targets = appendUniqueStrings(merged.Install.Targets, local.Install.Targets...)
+		merged.Sources = appendUniqueSources(merged.Sources, local.Sources...)
 	}
 
 	return merged
@@ -119,6 +129,63 @@ func appendUniqueStrings(existing []string, candidates ...string) []string {
 	return existing
 }
 
+func appendUniqueSources(existing []ManifestSource, candidates ...ManifestSource) []ManifestSource {
+	seen := make(map[string]struct{}, len(existing))
+	for _, item := range existing {
+		seen[canonicalSourceKey(item)] = struct{}{}
+	}
+
+	for _, candidate := range candidates {
+		key := canonicalSourceKey(candidate)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+
+		existing = append(existing, candidate)
+		seen[key] = struct{}{}
+	}
+
+	return existing
+}
+
+func canonicalSourceKey(source ManifestSource) string {
+	return giturl.NormalizeURL(strings.TrimSpace(source.URL)) + "|" + normalizeSourceSubpath(source.Subpath)
+}
+
+func normalizeSourceSubpath(subpathValue string) string {
+	trimmed := strings.TrimSpace(subpathValue)
+	if trimmed == "" {
+		return ""
+	}
+
+	cleaned := path.Clean("/" + strings.Trim(trimmed, "/"))
+	if cleaned == "/" || cleaned == "/." {
+		return ""
+	}
+
+	return strings.TrimPrefix(cleaned, "/")
+}
+
+func isLocalPathLikeSourceURL(url string) bool {
+	trimmed := strings.TrimSpace(url)
+	if trimmed == "" {
+		return false
+	}
+
+	lowerTrimmed := strings.ToLower(trimmed)
+	if strings.HasPrefix(trimmed, "./") ||
+		strings.HasPrefix(trimmed, "../") ||
+		strings.HasPrefix(trimmed, "/") ||
+		strings.HasPrefix(trimmed, "~/") ||
+		strings.HasPrefix(trimmed, "\\") ||
+		strings.HasPrefix(lowerTrimmed, "file://") ||
+		windowsDrivePathPattern.MatchString(trimmed) {
+		return true
+	}
+
+	return false
+}
+
 // Manifest represents a project's AI resource dependencies
 // Similar to npm's package.json, it declares which resources should be installed
 // InstallConfig holds installation-related configuration
@@ -128,6 +195,42 @@ type InstallConfig struct {
 	Targets []string `yaml:"targets"`
 }
 
+// ManifestSource declares a remote source dependency for a project manifest.
+// Only remote URL declarations are supported in ai.package.yaml.
+type ManifestSource struct {
+	URL     string `yaml:"url"`
+	Ref     string `yaml:"ref,omitempty"`
+	Subpath string `yaml:"subpath,omitempty"`
+	Name    string `yaml:"name,omitempty"`
+}
+
+// UnmarshalYAML enforces the ai.package.yaml source schema.
+// Local/path-style declarations are intentionally rejected.
+func (s *ManifestSource) UnmarshalYAML(value *yaml.Node) error {
+	type manifestSourceAlias ManifestSource
+
+	var keys map[string]interface{}
+	if err := value.Decode(&keys); err != nil {
+		return err
+	}
+
+	for key := range keys {
+		switch key {
+		case "url", "ref", "subpath", "name":
+		default:
+			return fmt.Errorf("invalid sources entry field %q: only url, ref, subpath, and name are allowed", key)
+		}
+	}
+
+	var alias manifestSourceAlias
+	if err := value.Decode(&alias); err != nil {
+		return err
+	}
+
+	*s = ManifestSource(alias)
+	return nil
+}
+
 type Manifest struct {
 	// Resources is an array of resource references in "type/name" format
 	// Examples: "skill/pdf-processing", "command/test", "agent/code-reviewer"
@@ -135,6 +238,10 @@ type Manifest struct {
 
 	// Install configuration for installation targets
 	Install InstallConfig `yaml:"install,omitempty"`
+
+	// Sources declares optional remote catalogs used by this project.
+	// Canonical identity for merge/dedup is normalized url+subpath.
+	Sources []ManifestSource `yaml:"sources,omitempty"`
 
 	// Deprecated: Use Install.Targets instead
 	// Kept for backward compatibility when reading old manifests
@@ -240,6 +347,22 @@ func (m *Manifest) Validate() error {
 	for _, target := range m.Targets {
 		if !isValidTarget(target) {
 			return fmt.Errorf("invalid targets '%s': must be 'claude', 'opencode', or 'copilot'", target)
+		}
+	}
+
+	for i := range m.Sources {
+		source := &m.Sources[i]
+		source.URL = strings.TrimSpace(source.URL)
+		source.Ref = strings.TrimSpace(source.Ref)
+		source.Subpath = normalizeSourceSubpath(source.Subpath)
+		source.Name = strings.TrimSpace(source.Name)
+
+		if source.URL == "" {
+			return fmt.Errorf("invalid sources[%d]: url is required", i)
+		}
+
+		if isLocalPathLikeSourceURL(source.URL) {
+			return fmt.Errorf("invalid sources[%d]: local/path sources are not supported in ai.package.yaml", i)
 		}
 	}
 

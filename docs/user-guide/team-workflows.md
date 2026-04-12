@@ -23,6 +23,9 @@ In a larger setup, think in layers:
 3. **Project sources** — only needed when a project ships its own resources
 4. **Project package manifest** — the actual resources that project wants installed
 
+`ai.package.yaml` can now also declare remote bootstrap sources in a `sources:` block.
+That lets `aimgr install` bootstrap missing remote sources as part of project install.
+
 ## Workflow 1: Central Shared Team Manifest (Recommended Default)
 
 Start by agreeing on the shared sources for a project, then publish that decision as a central `ai.repo.yaml`.
@@ -234,9 +237,105 @@ aimgr install
 
 This scales well as long as teams treat the local repo as a **shared catalog** and use stable source names.
 
+## Workflow 5: Project-manifest bootstrap with `sources:`
+
+If you want onboarding from a single file, declare remote sources directly in `ai.package.yaml`.
+
+Example (`project-a/ai.package.yaml`):
+
+```yaml
+sources:
+  - name: platform-default
+    url: https://github.com/acme/platform-ai
+    ref: v1.4.0
+    subpath: resources
+
+resources:
+  - package/platform-dev
+```
+
+First install in a fresh environment:
+
+```bash
+# no prior repo init needed
+cd ~/work/project-a
+aimgr install
+```
+
+Behavior:
+
+- If no local aimgr repo exists, install bootstraps it automatically.
+- Install then bootstraps manifest-declared remote sources into local `ai.repo.yaml`.
+- Resources from `resources:` are installed into the project.
+
+Repeated install with unchanged manifest is idempotent:
+
+```bash
+aimgr install   # source bootstrap is a no-op when already satisfied
+```
+
+### Shared-catalog identity rules for manifest-declared sources
+
+For `ai.package.yaml` `sources:` entries, canonical source reuse is based on normalized `url + subpath`.
+
+Implications:
+
+- `name` is a first-install hint/display alias only
+- `ref` is a bootstrap hint only
+- `ref` is not an isolation boundary in the shared local catalog
+
+If an existing canonical source already matches `url + subpath`, install reuses it even if another project uses a different `name` or requests a different `ref`.
+
+For project-manifest bootstrap entries (`ai.package.yaml` `sources:`), only `url`, `ref`, `subpath`, and optional `name` are supported. Use `include` filters only in repo-managed source workflows (`ai.repo.yaml`, `repo add --filter`, `repo apply-manifest`).
+
+### Two projects sharing one upstream with different aliases/refs
+
+`project-a/ai.package.yaml`:
+
+```yaml
+sources:
+  - name: team-catalog
+    url: https://github.com/acme/platform-ai
+    ref: v1.4.0
+    subpath: resources
+resources:
+  - package/platform-dev
+```
+
+`project-b/ai.package.yaml`:
+
+```yaml
+sources:
+  - name: platform-tools
+    url: https://github.com/acme/platform-ai
+    ref: v2.0.0
+    subpath: resources
+resources:
+  - package/platform-ops
+```
+
+With the same user-local repo:
+
+1. `project-a` install bootstraps the canonical source
+2. `project-b` install reuses that same canonical source (`url + subpath`)
+3. install warns that requested `ref` differs and keeps existing source unchanged
+
+To intentionally change the shared source ref, update the source via repo workflow (`aimgr repo add <url>@<new-ref> ...` or `aimgr repo sync` after explicit repo-source update), then re-run project install.
+
+### Warning and failure behavior to expect
+
+When reusing an existing canonical source for manifest bootstrap:
+
+- **Ref mismatch warning**: existing source is reused under its current ref; requested manifest ref is advisory only.
+- **Too-narrow filter failure**: if existing source include filters cannot satisfy required manifest resources, install fails with guidance to broaden filters or adjust source configuration before retrying.
+
+This is intentional shared-catalog behavior: source definitions are reused across projects instead of silently forking per-project clones.
+
 ## Source Naming Rules for Multi-Project Setups
 
 Source naming discipline matters.
+
+For shared baseline manifests consumed through `repo apply-manifest`, source naming remains the primary merge key.
 
 When `repo apply-manifest` merges manifests:
 
@@ -245,10 +344,10 @@ When `repo apply-manifest` merges manifests:
 - **same source name + same canonical source (`path`/`url`/`subpath`) but updated `ref`** → ref is updated (supported)
 - **same source name + different canonical source definition** → explicit failure
 
-Important consequence:
+Important consequence for `repo apply-manifest`:
 
-- if two projects reference the **same upstream repo** but use **different source names**, aimgr treats them as **different sources**
-- if two projects use the **same source name** for different definitions, apply fails with a conflict (no silent overwrite)
+- if two manifests reference the same upstream repo with different names, they are treated as separate source entries during apply/merge
+- if two manifests use the same source name for different definitions, apply fails with a conflict (no silent overwrite)
 
 ### Canonical naming guidance
 
@@ -319,16 +418,10 @@ aimgr repo sync
 aimgr install
 ```
 
-## What Is Still Missing
+Alternative (single-file onboarding): if the project commits remote `sources:` in `ai.package.yaml`, use `aimgr install` directly and let install bootstrap missing remote sources automatically.
 
-For bigger setups, one notable remaining gap is:
+## Choosing the right bootstrap workflow
 
-1. **bootstrap UX** — a guided command or flow that prepares the local repo and then installs project manifests
-
-Current recommended approach:
-
-- commit `ai.package.yaml`
-- use optional `ai.package.local.yaml` for private per-developer overlays
-- publish shared `ai.repo.yaml` manifests
-- optionally commit a project `aimgr/ai.repo.yaml`
-- use `repo apply-manifest` + `repo sync` + `install` as the onboarding flow
+- Use **`ai.package.yaml` `sources:` + `aimgr install`** when a project wants self-contained install/bootstrap behavior in one manifest.
+- Use **`repo apply-manifest`** when a team publishes one shared `ai.repo.yaml` baseline (often reused by many projects and CI setups).
+- Use **`repo add`** for ad-hoc/manual source administration outside committed project manifests.

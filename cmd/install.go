@@ -6,14 +6,19 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/config"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/install"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/manifest"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/pattern"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/source"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/sourcemetadata"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/tools"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +31,9 @@ var (
 	installNoSaveFlag      bool
 	installingFromManifest bool
 )
+
+// resolveSourcePathForInstallBootstrap is overridable in tests.
+var resolveSourcePathForInstallBootstrap = resolveSourcePathForSync
 
 // installResult tracks the result of installing a single resource
 type installResult struct {
@@ -293,23 +301,9 @@ func installFromManifest() error {
 		return fmt.Errorf("failed to create repository manager: %w", err)
 	}
 
-	repoExists, err := repoPathExists(manager.GetRepoPath())
-	if err != nil {
-		return fmt.Errorf("failed to inspect repository state: %w", err)
-	}
-	if !repoExists {
-		return fmt.Errorf("repository is not initialized at %s; run 'aimgr repo init' or 'aimgr repo apply-manifest <path-or-url>' first", manager.GetRepoPath())
-	}
-
-	repoLock, err := manager.AcquireRepoReadLock(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to acquire repository read lock at %s: %w", manager.RepoLockPath(), err)
-	}
-	defer func() {
-		_ = repoLock.Unlock()
-	}()
-
-	// Load effective project manifest (base + optional local overlay)
+	// Load effective project manifest (base + optional local overlay) before any
+	// repository lock or initialization checks so we can choose the correct lock
+	// mode for source bootstrap flows.
 	m, view, err := loadEffectiveProjectManifest(projectPath)
 	if err != nil {
 		return err
@@ -318,10 +312,62 @@ func installFromManifest() error {
 		return fmt.Errorf("no resources specified and neither %s nor %s found\n\nTo install resources, either:\n  1. Specify resources: aimgr install skill/pdf-processing\n  2. Create %s in current directory", manifest.ManifestFileName, manifest.LocalManifestFileName, manifest.ManifestFileName)
 	}
 
+	hasManifestSources := len(m.Sources) > 0
+
+	repoExists, err := repoPathExists(manager.GetRepoPath())
+	if err != nil {
+		return fmt.Errorf("failed to inspect repository state: %w", err)
+	}
+	if !repoExists && !hasManifestSources {
+		return fmt.Errorf("repository is not initialized at %s; run 'aimgr repo init' or 'aimgr repo apply-manifest <path-or-url>' first", manager.GetRepoPath())
+	}
+
 	if view.Local != nil {
 		fmt.Printf("Reading %s + %s...\n", manifest.ManifestFileName, manifest.LocalManifestFileName)
 	} else {
 		fmt.Printf("Reading %s...\n", manifest.ManifestFileName)
+	}
+
+	// Acquire a write lock when install may bootstrap/sync sources.
+	var repoLock unlocker
+	if hasManifestSources {
+		repoLock, err = manager.AcquireRepoWriteLock(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to acquire repository lock at %s: %w", manager.RepoLockPath(), err)
+		}
+	} else {
+		repoLock, err = manager.AcquireRepoReadLock(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to acquire repository read lock at %s: %w", manager.RepoLockPath(), err)
+		}
+	}
+	defer func() {
+		_ = repoLock.Unlock()
+	}()
+
+	if err := maybeHoldAfterRepoLock(context.Background(), "install"); err != nil {
+		return err
+	}
+
+	if !repoExists {
+		if !hasManifestSources {
+			return fmt.Errorf("repository is not initialized at %s; run 'aimgr repo init' or 'aimgr repo apply-manifest <path-or-url>' first", manager.GetRepoPath())
+		}
+
+		if err := manager.Init(); err != nil {
+			return fmt.Errorf("failed to initialize repository for install source bootstrap: %w", err)
+		}
+	}
+
+	if hasManifestSources {
+		bootstrapResult, bootstrapErr := bootstrapManifestSourcesForInstall(manager, m)
+		if bootstrapErr != nil {
+			return bootstrapErr
+		}
+
+		if err := failIfReusedSourceIncludeMismatch(manager, m, bootstrapResult.reusedSources); err != nil {
+			return err
+		}
 	}
 
 	// Check if manifest has any resources
@@ -423,6 +469,293 @@ func installFromManifest() error {
 	}
 
 	return nil
+}
+
+type unlocker interface {
+	Unlock() error
+}
+
+type installSourceBootstrapResult struct {
+	reusedSources []*repomanifest.Source
+}
+
+func bootstrapManifestSourcesForInstall(manager *repo.Manager, m *manifest.Manifest) (*installSourceBootstrapResult, error) {
+	if manager == nil || m == nil || len(m.Sources) == 0 {
+		return &installSourceBootstrapResult{}, nil
+	}
+
+	repoManifest, err := repomanifest.LoadForMutation(manager.GetRepoPath())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load repository source manifest: %w", err)
+	}
+
+	metadata, err := sourcemetadata.Load(manager.GetRepoPath())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load source metadata: %w", err)
+	}
+
+	reused := make(map[string]*repomanifest.Source)
+
+	for _, declared := range m.Sources {
+		existing, found := repoManifest.FindRemoteSourceByCanonical(declared.URL, declared.Subpath)
+		if found {
+			reused[existing.Name] = existing
+			if strings.TrimSpace(declared.Ref) != strings.TrimSpace(existing.Ref) {
+				existingRef := existing.Ref
+				if existingRef == "" {
+					existingRef = "<none>"
+				}
+				requestedRef := strings.TrimSpace(declared.Ref)
+				if requestedRef == "" {
+					requestedRef = "<none>"
+				}
+				fmt.Fprintf(os.Stderr, "Warning: reused existing source '%s' for %s; requested ref '%s' was not applied (existing ref: '%s')\n", existing.Name, describeManifestRemoteSource(declared.URL, declared.Subpath), requestedRef, existingRef)
+			}
+			continue
+		}
+
+		src := &repomanifest.Source{
+			Name:      strings.TrimSpace(declared.Name),
+			URL:       declared.URL,
+			Ref:       strings.TrimSpace(declared.Ref),
+			Subpath:   declared.Subpath,
+			Discovery: repomanifest.DiscoveryModeAuto,
+		}
+
+		if err := repoManifest.AddSource(src); err != nil {
+			return nil, fmt.Errorf("failed to track manifest source %s: %w", describeManifestRemoteSource(declared.URL, declared.Subpath), err)
+		}
+		if err := repoManifest.Save(manager.GetRepoPath()); err != nil {
+			return nil, fmt.Errorf("failed to save repository source manifest: %w", err)
+		}
+
+		if state := metadata.Get(src.Name); state == nil {
+			metadata.Sources[src.Name] = &sourcemetadata.SourceState{Added: time.Now(), SourceID: src.ID}
+		} else {
+			state.Added = time.Now()
+			state.SourceID = src.ID
+		}
+		if err := metadata.Save(manager.GetRepoPath()); err != nil {
+			return nil, fmt.Errorf("failed to persist source metadata for '%s': %w", src.Name, err)
+		}
+
+		if err := syncManifestSourceForInstall(manager, src); err != nil {
+			return nil, err
+		}
+
+		if state := metadata.Get(src.Name); state == nil {
+			metadata.Sources[src.Name] = &sourcemetadata.SourceState{Added: time.Now(), LastSynced: time.Now(), SourceID: src.ID}
+		} else {
+			if state.Added.IsZero() {
+				state.Added = time.Now()
+			}
+			state.LastSynced = time.Now()
+			state.SourceID = src.ID
+		}
+		if err := metadata.Save(manager.GetRepoPath()); err != nil {
+			return nil, fmt.Errorf("failed to persist source sync metadata for '%s': %w", src.Name, err)
+		}
+	}
+
+	reusedSources := make([]*repomanifest.Source, 0, len(reused))
+	for _, src := range reused {
+		reusedSources = append(reusedSources, src)
+	}
+
+	return &installSourceBootstrapResult{reusedSources: reusedSources}, nil
+}
+
+func syncManifestSourceForInstall(manager *repo.Manager, src *repomanifest.Source) error {
+	sourcePath, err := resolveSourcePathForInstallBootstrap(src, manager)
+	if err != nil {
+		return fmt.Errorf("failed to prepare source '%s' (%s): %w", src.Name, sourceLocationSummary(src), err)
+	}
+
+	discovered, err := discoverImportResourcesByMode(sourcePath, src.Discovery)
+	if err != nil {
+		return fmt.Errorf("failed to discover resources for source '%s': %w", src.Name, err)
+	}
+
+	commands, skills, agents, packages, err := applyFilter(src.Include, discovered.commands, discovered.skills, discovered.agents, discovered.packages)
+	if err != nil {
+		return fmt.Errorf("invalid include filter for source '%s': %w", src.Name, err)
+	}
+
+	allPaths := make([]string, 0, len(commands)+len(skills)+len(agents)+len(packages)+len(discovered.marketplacePackages))
+	for _, cmdRes := range commands {
+		allPaths = append(allPaths, cmdRes.Path)
+	}
+	for _, skillRes := range skills {
+		allPaths = append(allPaths, skillRes.Path)
+	}
+	for _, agentRes := range agents {
+		allPaths = append(allPaths, agentRes.Path)
+	}
+	for _, pkg := range packages {
+		pkgPath, findErr := findPackageFile(sourcePath, pkg.Name)
+		if findErr == nil {
+			allPaths = append(allPaths, pkgPath)
+		}
+	}
+	for _, pkgInfo := range discovered.marketplacePackages {
+		for _, resRef := range pkgInfo.Package.Resources {
+			resType, resName, parseErr := resource.ParseResourceReference(resRef)
+			if parseErr != nil {
+				continue
+			}
+			resPath, findErr := findResourceInPath(pkgInfo.SourcePath, resType, resName)
+			if findErr == nil {
+				allPaths = append(allPaths, resPath)
+			}
+		}
+	}
+
+	if len(allPaths) == 0 && len(discovered.marketplacePackages) == 0 {
+		return fmt.Errorf("source '%s' produced no importable resources", src.Name)
+	}
+
+	parsed, err := parsedRemoteSourceForManifestEntry(src)
+	if err != nil {
+		return fmt.Errorf("invalid source '%s': %w", src.Name, err)
+	}
+
+	sourceType := sourceTypeGitHub
+	if parsed.Type == source.GitURL || parsed.Type == source.GitLab {
+		sourceType = "git-url"
+	}
+
+	bulkResult, err := manager.AddBulk(allPaths, repo.BulkImportOptions{
+		SourceName:   src.Name,
+		SourceID:     src.ID,
+		ImportMode:   "copy",
+		Force:        false,
+		SkipExisting: false,
+		DryRun:       false,
+		SourceURL:    src.URL,
+		SourceType:   sourceType,
+		Ref:          src.Ref,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to sync source '%s': %w", src.Name, err)
+	}
+	if len(bulkResult.Failed) > 0 {
+		return fmt.Errorf("failed to sync source '%s': %d resource(s) could not be imported", src.Name, len(bulkResult.Failed))
+	}
+
+	for _, pkgInfo := range discovered.marketplacePackages {
+		if saveErr := resource.SavePackage(pkgInfo.Package, manager.GetRepoPath()); saveErr != nil {
+			return fmt.Errorf("failed to persist generated package %q from source '%s': %w", pkgInfo.Package.Name, src.Name, saveErr)
+		}
+	}
+
+	return nil
+}
+
+func failIfReusedSourceIncludeMismatch(manager *repo.Manager, m *manifest.Manifest, reusedSources []*repomanifest.Source) error {
+	if manager == nil || m == nil || len(reusedSources) == 0 {
+		return nil
+	}
+
+	missingRequired := collectMissingRequiredResources(manager, m.Resources)
+	if len(missingRequired) == 0 {
+		return nil
+	}
+
+	var mismatchMessages []string
+
+	for _, src := range reusedSources {
+		if src == nil || len(src.Include) == 0 {
+			continue
+		}
+
+		sourcePath, err := resolveSourcePathForInstallBootstrap(src, manager)
+		if err != nil {
+			continue
+		}
+
+		allResources, err := scanSourceResources(sourcePath, src.Discovery)
+		if err != nil {
+			continue
+		}
+
+		filteredResources, err := scanSourceResources(sourcePath, src.Discovery)
+		if err != nil {
+			continue
+		}
+		if err := applyIncludeFilterToDiscovered(filteredResources, src.Include); err != nil {
+			continue
+		}
+
+		sourceMissing := make([]string, 0)
+		for _, ref := range missingRequired {
+			resType, resName, parseErr := resource.ParseResourceReference(ref)
+			if parseErr != nil {
+				continue
+			}
+			if !resourceSetContains(allResources, resType, resName) {
+				continue
+			}
+			if resourceSetContains(filteredResources, resType, resName) {
+				continue
+			}
+			sourceMissing = append(sourceMissing, ref)
+		}
+
+		if len(sourceMissing) == 0 {
+			continue
+		}
+
+		sort.Strings(sourceMissing)
+		mismatchMessages = append(mismatchMessages, fmt.Sprintf("source '%s' reused with include filters [%s] excludes required resources: %s", src.Name, strings.Join(src.Include, ", "), strings.Join(sourceMissing, ", ")))
+	}
+
+	if len(mismatchMessages) == 0 {
+		return nil
+	}
+
+	sort.Strings(mismatchMessages)
+	return fmt.Errorf("install cannot continue because reused source filters are too narrow:\n  - %s\nUpdate include filters for the reused source in ai.repo.yaml (or via 'aimgr repo add --filter ...') and retry", strings.Join(mismatchMessages, "\n  - "))
+}
+
+func collectMissingRequiredResources(manager *repo.Manager, requiredRefs []string) []string {
+	missing := make([]string, 0)
+	seen := make(map[string]struct{})
+
+	for _, ref := range requiredRefs {
+		if _, exists := seen[ref]; exists {
+			continue
+		}
+		seen[ref] = struct{}{}
+
+		resType, resName, err := resource.ParseResourceReference(ref)
+		if err != nil {
+			continue
+		}
+		if _, err := manager.Get(resName, resType); err != nil {
+			missing = append(missing, ref)
+		}
+	}
+
+	sort.Strings(missing)
+	return missing
+}
+
+func resourceSetContains(resources map[resource.ResourceType]map[string]bool, resourceType resource.ResourceType, name string) bool {
+	if resources == nil {
+		return false
+	}
+	typeSet, ok := resources[resourceType]
+	if !ok {
+		return false
+	}
+	return typeSet[name]
+}
+
+func describeManifestRemoteSource(url, subpath string) string {
+	if strings.TrimSpace(subpath) == "" {
+		return fmt.Sprintf("url %q", url)
+	}
+	return fmt.Sprintf("url %q (subpath %q)", url, subpath)
 }
 
 // processInstall processes installing a single resource

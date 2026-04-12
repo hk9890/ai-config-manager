@@ -165,6 +165,84 @@ sources:
 	}
 }
 
+func TestMigrateSourceIDs_UpgradesLegacyURLOnlyIDWhenSubpathConfigured(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{{
+			Name:    "remote-subpath",
+			URL:     "https://github.com/example/tools",
+			Subpath: "skills",
+		}},
+	}
+
+	legacyID := GenerateSourceID(&Source{URL: m.Sources[0].URL})
+	m.Sources[0].ID = legacyID
+
+	if !m.migrateSourceIDs() {
+		t.Fatalf("expected migrateSourceIDs() to upgrade legacy URL-only ID")
+	}
+
+	if m.Sources[0].ID == legacyID {
+		t.Fatalf("expected source ID to change from legacy URL-only ID %q", legacyID)
+	}
+
+	want := GenerateSourceID(&Source{URL: m.Sources[0].URL, Subpath: m.Sources[0].Subpath})
+	if m.Sources[0].ID != want {
+		t.Fatalf("unexpected migrated ID: got %q want %q", m.Sources[0].ID, want)
+	}
+}
+
+func TestLoad_MigratesPersistedLegacyURLOnlyIDForRemoteSubpathSource(t *testing.T) {
+	tmpDir := t.TempDir()
+	legacyID := GenerateSourceID(&Source{URL: "https://github.com/example/tools"})
+
+	content := `version: 1
+sources:
+  - name: remote-subpath
+    id: ` + legacyID + `
+    url: https://github.com/example/tools
+    subpath: resources
+`
+	path := filepath.Join(tmpDir, ManifestFileName)
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test manifest: %v", err)
+	}
+
+	m, err := Load(tmpDir)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if len(m.Sources) != 1 {
+		t.Fatalf("expected one source, got %d", len(m.Sources))
+	}
+
+	want := GenerateSourceID(&Source{URL: "https://github.com/example/tools", Subpath: "resources"})
+	if m.Sources[0].ID != want {
+		t.Fatalf("expected legacy ID to be migrated in memory, got %q want %q", m.Sources[0].ID, want)
+	}
+}
+
+func TestMigrateSourceIDs_DoesNotUpgradeLegacyURLOnlyIDWhenSubpathEmpty(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{{
+			Name:    "remote-root",
+			URL:     "https://github.com/example/tools",
+			Subpath: "./",
+		}},
+	}
+
+	legacyID := GenerateSourceID(&Source{URL: m.Sources[0].URL})
+	m.Sources[0].ID = legacyID
+
+	if m.migrateSourceIDs() {
+		t.Fatalf("did not expect migration when normalized subpath is empty")
+	}
+	if m.Sources[0].ID != legacyID {
+		t.Fatalf("expected ID to stay legacy URL-only ID, got %q want %q", m.Sources[0].ID, legacyID)
+	}
+}
+
 func TestMigrateSourceIDs_ReadOnlyManifest(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -384,7 +462,7 @@ func TestMigrateSourceIDs_OverrideSourceUsesOriginalRemoteIdentity(t *testing.T)
 	}
 
 	got := m.Sources[0].ID
-	want := GenerateSourceID(&Source{URL: "https://github.com/example/tools"})
+	want := GenerateSourceID(&Source{URL: "https://github.com/example/tools", Subpath: "resources"})
 	if got != want {
 		t.Fatalf("expected override source ID to use original remote identity, got %q want %q", got, want)
 	}

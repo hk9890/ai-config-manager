@@ -3,6 +3,7 @@ package manifest
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -72,6 +73,29 @@ targets:
 				}
 			},
 		},
+		{
+			name: "manifest with remote sources",
+			content: `resources:
+  - skill/test
+sources:
+  - url: https://github.com/example/catalog.git
+    ref: main
+    subpath: //skills/../skills/core//
+    name: primary`,
+			wantErr: false,
+			checkFn: func(t *testing.T, m *Manifest) {
+				if len(m.Sources) != 1 {
+					t.Fatalf("expected 1 source, got %d", len(m.Sources))
+				}
+				s := m.Sources[0]
+				if s.URL != "https://github.com/example/catalog.git" {
+					t.Fatalf("source url = %q", s.URL)
+				}
+				if s.Ref != "main" || s.Name != "primary" || s.Subpath != "skills/core" {
+					t.Fatalf("unexpected source: %+v", s)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -132,6 +156,32 @@ func TestLoad_InvalidManifest(t *testing.T) {
   - skill/test
 targets:
   - invalid-tool`,
+		},
+		{
+			name: "source missing url",
+			content: `sources:
+  - name: missing-url`,
+		},
+		{
+			name: "source with disallowed path field",
+			content: `sources:
+  - url: https://github.com/example/catalog.git
+    path: ./local/catalog`,
+		},
+		{
+			name: "source with local path style url",
+			content: `sources:
+  - url: ./relative/path`,
+		},
+		{
+			name: "source with absolute path style url",
+			content: `sources:
+  - url: /tmp/catalog`,
+		},
+		{
+			name: "source with file scheme url",
+			content: `sources:
+  - url: file:///tmp/catalog`,
 		},
 	}
 
@@ -203,6 +253,12 @@ func TestSave(t *testing.T) {
 		Install: InstallConfig{
 			Targets: []string{"claude"},
 		},
+		Sources: []ManifestSource{{
+			URL:     "https://github.com/example/catalog.git",
+			Ref:     "main",
+			Subpath: "skills/core",
+			Name:    "primary",
+		}},
 	}
 
 	// Save manifest
@@ -227,6 +283,10 @@ func TestSave(t *testing.T) {
 
 	if len(loaded.Install.Targets) != len(m.Install.Targets) {
 		t.Errorf("install.targets count mismatch: got %d, want %d", len(loaded.Install.Targets), len(m.Install.Targets))
+	}
+
+	if !reflect.DeepEqual(loaded.Sources, m.Sources) {
+		t.Errorf("sources mismatch: got %+v, want %+v", loaded.Sources, m.Sources)
 	}
 }
 
@@ -273,6 +333,12 @@ func TestValidate(t *testing.T) {
 				Install: InstallConfig{
 					Targets: []string{"claude"},
 				},
+				Sources: []ManifestSource{{
+					URL:     "https://github.com/example/catalog.git",
+					Ref:     "main",
+					Subpath: "skills",
+					Name:    "primary",
+				}},
 			},
 			wantErr: false,
 		},
@@ -306,6 +372,30 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "invalid source missing url",
+			m: &Manifest{
+				Sources: []ManifestSource{{Name: "missing-url"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid source local path style url",
+			m: &Manifest{
+				Sources: []ManifestSource{{URL: "./catalog"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "subpath is normalized",
+			m: &Manifest{
+				Sources: []ManifestSource{{
+					URL:     "https://github.com/example/catalog.git",
+					Subpath: "//skills/../skills/core//",
+				}},
+			},
+			wantErr: false,
 		},
 		{
 			name:    "nil manifest",
@@ -500,10 +590,19 @@ func TestMerge_OverlaySemantics(t *testing.T) {
 	base := &Manifest{
 		Resources: []string{"skill/base", "command/shared", "agent/base"},
 		Install:   InstallConfig{Targets: []string{"claude", "opencode"}},
+		Sources: []ManifestSource{
+			{URL: "https://github.com/example/catalog.git", Name: "base-name", Ref: "main", Subpath: "skills/core"},
+			{URL: "https://github.com/example/tools", Name: "tools", Ref: "stable", Subpath: "commands"},
+		},
 	}
 	local := &Manifest{
 		Resources: []string{"command/shared", "skill/local", "agent/local"},
 		Install:   InstallConfig{Targets: []string{"opencode", "copilot"}},
+		Sources: []ManifestSource{
+			{URL: "https://github.com/example/catalog", Name: "local-alias", Ref: "dev", Subpath: "//skills/core//"},
+			{URL: "https://github.com/example/tools.git", Name: "tools-other", Ref: "other", Subpath: "//commands//"},
+			{URL: "https://github.com/example/local-only.git", Name: "local-only", Ref: "feature", Subpath: "extras"},
+		},
 	}
 
 	merged := Merge(base, local)
@@ -526,6 +625,15 @@ func TestMerge_OverlaySemantics(t *testing.T) {
 		if merged.Install.Targets[i] != want {
 			t.Fatalf("targets[%d] = %q, want %q (all=%v)", i, merged.Install.Targets[i], want, merged.Install.Targets)
 		}
+	}
+
+	wantSources := []ManifestSource{
+		{URL: "https://github.com/example/catalog.git", Name: "base-name", Ref: "main", Subpath: "skills/core"},
+		{URL: "https://github.com/example/tools", Name: "tools", Ref: "stable", Subpath: "commands"},
+		{URL: "https://github.com/example/local-only.git", Name: "local-only", Ref: "feature", Subpath: "extras"},
+	}
+	if !reflect.DeepEqual(merged.Sources, wantSources) {
+		t.Fatalf("sources mismatch:\n got: %+v\nwant: %+v", merged.Sources, wantSources)
 	}
 }
 
@@ -560,6 +668,11 @@ func TestLoadProjectManifests(t *testing.T) {
 install:
   targets:
     - claude
+sources:
+  - url: https://github.com/example/catalog.git
+    ref: main
+    subpath: skills/core
+    name: base-name
 `
 		localContent := `resources:
   - command/shared
@@ -567,6 +680,15 @@ install:
 install:
   targets:
     - opencode
+sources:
+  - url: https://github.com/example/catalog
+    ref: dev
+    subpath: //skills/core//
+    name: local-alias
+  - url: https://github.com/example/local-only.git
+    ref: feature
+    subpath: extras
+    name: local-only
 `
 
 		if err := os.WriteFile(basePath, []byte(baseContent), 0644); err != nil {
@@ -599,6 +721,14 @@ install:
 			if loaded.Effective.Install.Targets[i] != want {
 				t.Fatalf("effective targets[%d] = %q, want %q", i, loaded.Effective.Install.Targets[i], want)
 			}
+		}
+
+		wantSources := []ManifestSource{
+			{URL: "https://github.com/example/catalog.git", Ref: "main", Subpath: "skills/core", Name: "base-name"},
+			{URL: "https://github.com/example/local-only.git", Ref: "feature", Subpath: "extras", Name: "local-only"},
+		}
+		if !reflect.DeepEqual(loaded.Effective.Sources, wantSources) {
+			t.Fatalf("effective sources mismatch:\n got: %+v\nwant: %+v", loaded.Effective.Sources, wantSources)
 		}
 	})
 

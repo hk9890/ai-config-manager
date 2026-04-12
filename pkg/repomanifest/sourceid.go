@@ -3,7 +3,9 @@ package repomanifest
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/giturl"
 )
@@ -12,8 +14,16 @@ import (
 // canonical location (URL or absolute path). The returned ID has the format
 // "src-" followed by 12 hex characters derived from a SHA-256 hash.
 //
-// For URL sources, the URL is normalized by lowercasing, stripping trailing
-// slashes, and removing .git suffixes before hashing.
+// For URL sources, canonical identity is normalized URL + normalized subpath.
+// Ref is intentionally excluded so manifest-declared sources can update ref
+// without changing canonical source identity.
+//
+// Subpath normalization rules:
+//   - "", ".", "./", and "/" normalize to empty subpath
+//   - leading slash is removed (subpath is repo-relative)
+//   - trailing slash is removed
+//   - repeated separators are collapsed
+//   - nested paths are cleaned (e.g. "a/../b//" -> "b")
 //
 // For path sources, the path is resolved to an absolute path before hashing.
 //
@@ -28,7 +38,7 @@ func GenerateSourceID(source *Source) string {
 	var canonical string
 
 	if idSource.URL != "" {
-		canonical = normalizeURL(idSource.URL)
+		canonical = canonicalRemoteIdentity(idSource.URL, idSource.Subpath)
 	} else if idSource.Path != "" {
 		canonical = normalizePath(idSource.Path)
 	} else {
@@ -43,14 +53,17 @@ func GenerateSourceID(source *Source) string {
 
 // sourceIdentitySource returns the effective source transport used for canonical
 // source identity. For overridden local sources, this maps identity back to the
-// stored original remote URL to keep IDs stable across override/clear.
+// stored original remote URL/subpath to keep IDs stable across override/clear.
 func sourceIdentitySource(source *Source) *Source {
 	if source == nil {
 		return nil
 	}
 
 	if source.OverrideOriginalURL != "" {
-		return &Source{URL: source.OverrideOriginalURL}
+		return &Source{
+			URL:     source.OverrideOriginalURL,
+			Subpath: source.OverrideOriginalSubpath,
+		}
 	}
 
 	return source
@@ -71,4 +84,29 @@ func normalizePath(path string) string {
 	}
 
 	return abs
+}
+
+func canonicalRemoteIdentity(url, subpath string) string {
+	canonicalURL := normalizeURL(url)
+	canonicalSubpath := normalizeSubpath(subpath)
+	if canonicalSubpath == "" {
+		// Preserve legacy URL-only identity for empty subpath.
+		return canonicalURL
+	}
+	return canonicalURL + "#" + canonicalSubpath
+}
+
+func normalizeSubpath(subpath string) string {
+	cleaned := strings.TrimSpace(strings.ReplaceAll(subpath, "\\", "/"))
+	if cleaned == "" {
+		return ""
+	}
+
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	cleaned = path.Clean(cleaned)
+	if cleaned == "." || cleaned == "/" {
+		return ""
+	}
+
+	return strings.TrimPrefix(cleaned, "/")
 }

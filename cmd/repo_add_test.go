@@ -158,6 +158,127 @@ func TestAddSourceToManifest_StoresNormalizedRepoBackedMarketplaceSource(t *test
 	}
 }
 
+func TestAddSourceToManifest_RemoteCanonicalReuseKeepsExistingName(t *testing.T) {
+	repoPath := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	manager := repo.NewManagerWithPath(repoPath)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("failed to init repo: %v", err)
+	}
+
+	firstParsed, err := source.ParseSource("https://GitHub.com/Example/Tools.git/")
+	if err != nil {
+		t.Fatalf("failed to parse first source: %v", err)
+	}
+
+	withRepoAddFlagsReset(t, func() {
+		nameFlag = "primary-alias"
+		if err := addSourceToManifest(manager, firstParsed, []string{"skill/*"}, repomanifest.DiscoveryModeAuto); err != nil {
+			t.Fatalf("first addSourceToManifest failed: %v", err)
+		}
+	})
+
+	// Capture stderr warning for alias/ref mismatch reuse path.
+	originalStderr := os.Stderr
+	r, w, pipeErr := os.Pipe()
+	if pipeErr != nil {
+		t.Fatalf("failed to create stderr pipe: %v", pipeErr)
+	}
+	os.Stderr = w
+
+	secondParsed, err := source.ParseSource("https://github.com/example/tools")
+	if err != nil {
+		t.Fatalf("failed to parse second source: %v", err)
+	}
+	secondParsed.Ref = "release/v2"
+
+	withRepoAddFlagsReset(t, func() {
+		nameFlag = "second-alias"
+		if err := addSourceToManifest(manager, secondParsed, []string{"command/*"}, repomanifest.DiscoveryModeGeneric); err != nil {
+			t.Fatalf("second addSourceToManifest failed: %v", err)
+		}
+	})
+
+	_ = w.Close()
+	os.Stderr = originalStderr
+
+	var errBuf bytes.Buffer
+	if _, err := io.Copy(&errBuf, r); err != nil {
+		t.Fatalf("failed reading captured stderr: %v", err)
+	}
+	stderrText := errBuf.String()
+	if !strings.Contains(stderrText, "already exists as 'primary-alias'") {
+		t.Fatalf("expected alias reuse warning, got stderr: %s", stderrText)
+	}
+	if !strings.Contains(stderrText, "ignoring requested ref 'release/v2'") {
+		t.Fatalf("expected ref mismatch reuse warning, got stderr: %s", stderrText)
+	}
+
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+	if len(manifest.Sources) != 1 {
+		t.Fatalf("expected one canonical remote source, got %d", len(manifest.Sources))
+	}
+
+	src := manifest.Sources[0]
+	if src.Name != "primary-alias" {
+		t.Fatalf("expected existing source name to be preserved, got %q", src.Name)
+	}
+	if src.Ref != "" {
+		t.Fatalf("expected existing ref to remain unchanged (empty), got %q", src.Ref)
+	}
+	if got := strings.Join(src.Include, ","); got != "command/*" {
+		t.Fatalf("expected include to be replaced on reuse, got %q", got)
+	}
+	if src.Discovery != repomanifest.DiscoveryModeGeneric {
+		t.Fatalf("expected discovery mode update on reuse, got %q", src.Discovery)
+	}
+}
+
+func TestAddSourceToManifest_RemoteCanonicalReuseDistinctSubpaths(t *testing.T) {
+	repoPath := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	manager := repo.NewManagerWithPath(repoPath)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("failed to init repo: %v", err)
+	}
+
+	firstParsed, err := source.ParseSource("gh:example/tools/skills")
+	if err != nil {
+		t.Fatalf("failed to parse first source: %v", err)
+	}
+	secondParsed, err := source.ParseSource("gh:example/tools/agents")
+	if err != nil {
+		t.Fatalf("failed to parse second source: %v", err)
+	}
+
+	withRepoAddFlagsReset(t, func() {
+		nameFlag = "skills-source"
+		if err := addSourceToManifest(manager, firstParsed, nil, repomanifest.DiscoveryModeAuto); err != nil {
+			t.Fatalf("failed adding first subpath source: %v", err)
+		}
+	})
+
+	withRepoAddFlagsReset(t, func() {
+		nameFlag = "agents-source"
+		if err := addSourceToManifest(manager, secondParsed, nil, repomanifest.DiscoveryModeAuto); err != nil {
+			t.Fatalf("failed adding second subpath source: %v", err)
+		}
+	})
+
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+	if len(manifest.Sources) != 2 {
+		t.Fatalf("expected distinct subpaths to remain separate sources, got %d", len(manifest.Sources))
+	}
+}
+
 // TestPrintDiscoveryErrors_Deduplication verifies that duplicate errors for the same path are deduplicated
 func TestPrintDiscoveryErrors_Deduplication(t *testing.T) {
 	tests := []struct {

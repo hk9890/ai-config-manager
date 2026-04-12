@@ -123,6 +123,32 @@ func TestMergeForApply_UpdatesRefWhenCanonicalSourceMatches(t *testing.T) {
 	}
 }
 
+func TestMergeForApply_SameCanonicalURLAndSubpathDifferentRefDifferentNameConflicts(t *testing.T) {
+	current := &Manifest{Version: 1, Sources: []*Source{{
+		Name:    "team-tools",
+		URL:     "https://github.com/example/tools",
+		Ref:     "main",
+		Subpath: "catalog/resources",
+	}}}
+	incoming := &Manifest{Version: 1, Sources: []*Source{{
+		Name:    "platform-tools",
+		URL:     "https://github.com/example/tools",
+		Ref:     "release/v2",
+		Subpath: "catalog/resources",
+	}}}
+
+	merged, report, err := MergeForApply(current, incoming, ApplyMergeOptions{})
+	if err != nil {
+		t.Fatalf("MergeForApply() error = %v", err)
+	}
+	if report.Conflicts() != 1 {
+		t.Fatalf("expected 1 conflict, got %d", report.Conflicts())
+	}
+	if len(merged.Sources) != 1 || merged.Sources[0].Name != "team-tools" {
+		t.Fatalf("expected existing source to be preserved, got %+v", merged.Sources)
+	}
+}
+
 func TestMergeForApply_UpdatesRefAndPreservesIncludeInPreserveMode(t *testing.T) {
 	current := &Manifest{Version: 1, Sources: []*Source{{
 		Name:    "team-tools",

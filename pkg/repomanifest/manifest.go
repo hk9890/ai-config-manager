@@ -339,6 +339,37 @@ func (m *Manifest) GetSource(identifier string) (*Source, bool) {
 	return nil, false
 }
 
+// FindRemoteSourceByCanonical finds a remote source by canonical URL+subpath
+// identity (normalized URL + normalized subpath). Name and ref are not part of
+// canonical identity and are intentionally ignored.
+func (m *Manifest) FindRemoteSourceByCanonical(url, subpath string) (*Source, bool) {
+	if m == nil || strings.TrimSpace(url) == "" {
+		return nil, false
+	}
+
+	lookupID := GenerateSourceID(&Source{URL: url, Subpath: subpath})
+	if lookupID == "" {
+		return nil, false
+	}
+
+	for _, existing := range m.Sources {
+		if existing == nil {
+			continue
+		}
+
+		// Keep remote canonical lookup remote-only.
+		if existing.URL == "" {
+			continue
+		}
+
+		if GenerateSourceID(existing) == lookupID {
+			return existing, true
+		}
+	}
+
+	return nil, false
+}
+
 // HasSource checks if a source exists by name, path, or URL
 func (m *Manifest) HasSource(nameOrPath string) bool {
 	_, found := m.GetSource(nameOrPath)
@@ -502,14 +533,45 @@ func generateSourceName(source *Source) string {
 func (m *Manifest) migrateSourceIDs() bool {
 	migrated := false
 	for i := range m.Sources {
-		if m.Sources[i].ID == "" {
-			m.Sources[i].ID = GenerateSourceID(m.Sources[i])
-			if m.Sources[i].ID != "" {
-				migrated = true
-			}
+		src := m.Sources[i]
+		if src == nil {
+			continue
+		}
+
+		newID := GenerateSourceID(src)
+		if newID == "" {
+			continue
+		}
+
+		if src.ID == "" {
+			src.ID = newID
+			migrated = true
+			continue
+		}
+
+		if shouldMigrateLegacyRemoteID(src, newID) {
+			src.ID = newID
+			migrated = true
 		}
 	}
 	return migrated
+}
+
+func shouldMigrateLegacyRemoteID(src *Source, newID string) bool {
+	if src == nil || src.URL == "" || src.ID == "" {
+		return false
+	}
+
+	if normalizeSubpath(src.Subpath) == "" {
+		return false
+	}
+
+	legacyID := GenerateSourceID(&Source{URL: src.URL})
+	if legacyID == "" {
+		return false
+	}
+
+	return src.ID == legacyID && src.ID != newID
 }
 
 func (m *Manifest) migrateDiscoveryDefaults() {

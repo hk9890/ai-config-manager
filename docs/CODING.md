@@ -116,8 +116,8 @@ Use this matrix when adding or changing commands that touch shared repo state.
 | `aimgr repo list` | read | Reads resource/package/metadata listings. |
 | `aimgr repo describe` / `repo show` | read | Reads resource/package definitions + metadata. |
 | `aimgr repo show-manifest` | read | Reads repo manifest snapshot. |
-| `aimgr install` | read | Expands repo patterns/packages and validates resources during install planning. |
-| `installFromManifest` (internal) | read | Reads repo package/resource definitions while expanding manifest refs. |
+| `aimgr install` | read or write | Uses read lock for explicit resource installs; zero-arg manifest install takes write lock when effective `sources:` may bootstrap/sync shared repo sources. |
+| `installFromManifest` (internal) | read or write | Uses write lock when manifest-declared sources can mutate `ai.repo.yaml`/repo content during bootstrap; otherwise read-only install path remains read lock. |
 | package install expansion (`installPackage`) | read (via `install`) | Reads package definitions and member resources from shared repo state. |
 | `aimgr repair` (project) | read | Expands package refs and validates repo-backed declared resources before reconcile. |
 | `aimgr verify` (project) | read | Resolves package refs and repo-backed membership during manifest checks/reconcile wrapper. |

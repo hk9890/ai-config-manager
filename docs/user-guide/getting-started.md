@@ -75,6 +75,58 @@ aimgr repo show-manifest > ai.repo.yaml
 
 Stdin support exists as a convenience for advanced workflows, but it is not the primary sharing model.
 
+### Bootstrap directly from `ai.package.yaml` (`sources:` block)
+
+Projects can also declare remote bootstrap sources directly in `ai.package.yaml`.
+This is useful when you want a single project manifest to describe both:
+
+- what the project installs (`resources:`)
+- where missing remote resources can be bootstrapped from (`sources:`)
+
+Example:
+
+```yaml
+sources:
+  - name: company-catalog
+    url: https://github.com/acme/ai-resources
+    ref: v1.4.0
+    subpath: catalog
+
+resources:
+  - package/company-base-dev
+  - skill/project-review
+
+install:
+  targets:
+    - claude
+```
+
+Install behavior with manifest-declared sources:
+
+- On first use, `aimgr install` can initialize the local aimgr repo automatically if it does not exist yet.
+- The same install run then bootstraps required remote sources into local `ai.repo.yaml` and proceeds with resource installation.
+- Re-running `aimgr install` with no effective changes is idempotent (no-op source bootstrap).
+- When manifest `sources:` are present, install may take a repo write lock because it can mutate shared repo state.
+
+Important identity and hint rules:
+
+- Canonical source reuse is based on normalized `url + subpath`.
+- `name` in `ai.package.yaml` is a first-install hint/display alias only.
+- `ref` in `ai.package.yaml` is a bootstrap hint only, not an isolation boundary in the shared local catalog.
+
+Supported fields for manifest `sources[]` entries are `url`, `ref`, `subpath`, and optional `name`. `include` filters are not supported in `ai.package.yaml`; use repo-managed sources in `ai.repo.yaml` for filtering behavior.
+
+If install finds an existing canonical source (`url + subpath`) with a different ref:
+
+- install reuses the existing source
+- emits a warning about the ref mismatch
+- keeps the existing source unchanged
+
+If install reuses a canonical source but its existing `include` filters are too narrow to provide required manifest resources, install fails with actionable guidance so you can broaden filters or adjust source config.
+
+Use this `sources:` workflow when you want project-local bootstrap built into `aimgr install`.
+Use `repo apply-manifest` when a team publishes one shared baseline `ai.repo.yaml` for many projects, and use `repo add` for interactive/manual source management outside project manifests.
+
 ---
 
 ## Installation

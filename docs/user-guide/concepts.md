@@ -57,7 +57,8 @@ Think of `ai.repo.yaml` as:
 
 `ai.package.yaml` belongs to a specific project.
 
-It defines which resources that project wants installed.
+It defines which resources that project wants installed and can optionally declare
+remote bootstrap hints in `sources:`.
 
 Typical project commands:
 
@@ -78,9 +79,17 @@ aimgr install
 
 installs everything declared in that manifest.
 
+If `sources:` is present, install can also bootstrap missing remote sources into
+the local repo as part of the same run (including first-run repo initialization
+when needed).
+
 Think of `ai.package.yaml` as:
 
 > “What does this project want to use?”
+
+With optional `sources:`, it can also answer:
+
+> “Where should missing project resources be bootstrapped from?”
 
 ---
 
@@ -137,7 +146,7 @@ The two manifests have different jobs:
 | File | Purpose |
 |------|---------|
 | `ai.repo.yaml` | Tracks resource sources for your local aimgr repository |
-| `ai.package.yaml` | Tracks committed project dependencies |
+| `ai.package.yaml` | Tracks committed project dependencies and optional source-bootstrap hints |
 | `ai.package.local.yaml` | Optional local-only overlay for private project additions |
 
 In short:

@@ -2,16 +2,20 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/manifest"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/resource"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/sourcemetadata"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/tools"
 )
 
@@ -1157,5 +1161,434 @@ func TestInstallFromManifest_EmptyManifestRepoPathExists(t *testing.T) {
 
 	if !strings.Contains(stdout, "No resources defined") {
 		t.Fatalf("expected no-resources output, got:\n%s", stdout)
+	}
+}
+
+func createRemoteSkillSource(t *testing.T, skillName string) string {
+	t.Helper()
+
+	sourceDir := t.TempDir()
+	skillDir := filepath.Join(sourceDir, "skills", skillName)
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		t.Fatalf("mkdir skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\ndescription: test\n---\n"), 0644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+
+	return sourceDir
+}
+
+func withInstallBootstrapResolver(t *testing.T, resolver func(src *repomanifest.Source, manager *repo.Manager) (string, error)) {
+	t.Helper()
+	original := resolveSourcePathForInstallBootstrap
+	resolveSourcePathForInstallBootstrap = resolver
+	t.Cleanup(func() {
+		resolveSourcePathForInstallBootstrap = original
+	})
+}
+
+func TestInstallFromManifest_BootstrapsRepoAndSourceFromManifest(t *testing.T) {
+	repoPath := t.TempDir()
+	if err := os.RemoveAll(repoPath); err != nil {
+		t.Fatalf("remove temp repo path: %v", err)
+	}
+	projectPath := t.TempDir()
+	sourceDir := createRemoteSkillSource(t, "bootstrap-skill")
+
+	withInstallBootstrapResolver(t, func(src *repomanifest.Source, manager *repo.Manager) (string, error) {
+		if src.URL != "https://example.com/org/bootstrap-repo" {
+			t.Fatalf("unexpected source URL: %s", src.URL)
+		}
+		return sourceDir, nil
+	})
+
+	manifestBody := `resources:
+  - skill/bootstrap-skill
+install:
+  targets:
+    - claude
+sources:
+  - name: bootstrap-source
+    url: https://example.com/org/bootstrap-repo
+`
+	if err := os.WriteFile(filepath.Join(projectPath, manifest.ManifestFileName), []byte(manifestBody), 0644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	oldRepoEnv := os.Getenv("AIMGR_REPO_PATH")
+	oldProjectPathFlag := projectPathFlag
+	t.Cleanup(func() {
+		projectPathFlag = oldProjectPathFlag
+		if oldRepoEnv != "" {
+			_ = os.Setenv("AIMGR_REPO_PATH", oldRepoEnv)
+		} else {
+			_ = os.Unsetenv("AIMGR_REPO_PATH")
+		}
+	})
+
+	projectPathFlag = projectPath
+	_ = os.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	if err := installFromManifest(); err != nil {
+		t.Fatalf("installFromManifest failed: %v", err)
+	}
+
+	mgr := repo.NewManagerWithPath(repoPath)
+	if _, err := mgr.Get("bootstrap-skill", resource.Skill); err != nil {
+		t.Fatalf("expected bootstrapped skill in repo: %v", err)
+	}
+
+	repoManifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("load repo manifest: %v", err)
+	}
+	if len(repoManifest.Sources) != 1 {
+		t.Fatalf("expected exactly one source, got %d", len(repoManifest.Sources))
+	}
+	if repoManifest.Sources[0].Name != "bootstrap-source" {
+		t.Fatalf("unexpected source name: %s", repoManifest.Sources[0].Name)
+	}
+
+	if _, err := os.Stat(filepath.Join(repoPath, ".workspace")); err != nil {
+		t.Fatalf("expected repo workspace to exist: %v", err)
+	}
+
+	if _, err := os.Lstat(filepath.Join(projectPath, ".claude", "skills", "bootstrap-skill")); err != nil {
+		t.Fatalf("expected installed skill symlink: %v", err)
+	}
+}
+
+func TestInstallFromManifest_SecondRunNoOpForSourceBootstrap(t *testing.T) {
+	repoPath := t.TempDir()
+	projectPath := t.TempDir()
+	sourceDir := createRemoteSkillSource(t, "idempotent-skill")
+
+	resolverCalls := 0
+	withInstallBootstrapResolver(t, func(src *repomanifest.Source, manager *repo.Manager) (string, error) {
+		resolverCalls++
+		return sourceDir, nil
+	})
+
+	manifestBody := `resources:
+  - skill/idempotent-skill
+sources:
+  - name: primary-source
+    url: https://example.com/org/idempotent-repo
+`
+	if err := os.WriteFile(filepath.Join(projectPath, manifest.ManifestFileName), []byte(manifestBody), 0644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	oldRepoEnv := os.Getenv("AIMGR_REPO_PATH")
+	oldProjectPathFlag := projectPathFlag
+	t.Cleanup(func() {
+		projectPathFlag = oldProjectPathFlag
+		if oldRepoEnv != "" {
+			_ = os.Setenv("AIMGR_REPO_PATH", oldRepoEnv)
+		} else {
+			_ = os.Unsetenv("AIMGR_REPO_PATH")
+		}
+	})
+
+	projectPathFlag = projectPath
+	_ = os.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	if err := installFromManifest(); err != nil {
+		t.Fatalf("first install failed: %v", err)
+	}
+
+	if err := installFromManifest(); err != nil {
+		t.Fatalf("second install failed: %v", err)
+	}
+
+	if resolverCalls != 1 {
+		t.Fatalf("expected one bootstrap resolver call across repeated installs, got %d", resolverCalls)
+	}
+
+	repoManifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("load repo manifest: %v", err)
+	}
+	if len(repoManifest.Sources) != 1 {
+		t.Fatalf("expected one source after repeated installs, got %d", len(repoManifest.Sources))
+	}
+}
+
+func TestInstallFromManifest_AliasReuseAcrossProjectsDoesNotDuplicateSource(t *testing.T) {
+	repoPath := t.TempDir()
+	projectA := t.TempDir()
+	projectB := t.TempDir()
+	sourceDir := createRemoteSkillSource(t, "alias-reuse-skill")
+
+	withInstallBootstrapResolver(t, func(src *repomanifest.Source, manager *repo.Manager) (string, error) {
+		return sourceDir, nil
+	})
+
+	if err := os.WriteFile(filepath.Join(projectA, manifest.ManifestFileName), []byte(`resources:
+  - skill/alias-reuse-skill
+sources:
+  - name: alpha
+    url: https://example.com/org/shared-repo
+`), 0644); err != nil {
+		t.Fatalf("write project A manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectB, manifest.ManifestFileName), []byte(`resources:
+  - skill/alias-reuse-skill
+sources:
+  - name: beta
+    url: https://example.com/org/shared-repo
+`), 0644); err != nil {
+		t.Fatalf("write project B manifest: %v", err)
+	}
+
+	oldRepoEnv := os.Getenv("AIMGR_REPO_PATH")
+	oldProjectPathFlag := projectPathFlag
+	t.Cleanup(func() {
+		projectPathFlag = oldProjectPathFlag
+		if oldRepoEnv != "" {
+			_ = os.Setenv("AIMGR_REPO_PATH", oldRepoEnv)
+		} else {
+			_ = os.Unsetenv("AIMGR_REPO_PATH")
+		}
+	})
+
+	_ = os.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	projectPathFlag = projectA
+	if err := installFromManifest(); err != nil {
+		t.Fatalf("project A install failed: %v", err)
+	}
+
+	projectPathFlag = projectB
+	if err := installFromManifest(); err != nil {
+		t.Fatalf("project B install failed: %v", err)
+	}
+
+	repoManifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("load repo manifest: %v", err)
+	}
+	if len(repoManifest.Sources) != 1 {
+		t.Fatalf("expected single canonical source, got %d", len(repoManifest.Sources))
+	}
+	if repoManifest.Sources[0].Name != "alpha" {
+		t.Fatalf("expected original source name to be preserved, got %q", repoManifest.Sources[0].Name)
+	}
+}
+
+func TestInstallFromManifest_RefMismatchWarnsAndKeepsExistingRef(t *testing.T) {
+	repoPath := t.TempDir()
+	projectA := t.TempDir()
+	projectB := t.TempDir()
+	sourceDir := createRemoteSkillSource(t, "ref-mismatch-skill")
+
+	withInstallBootstrapResolver(t, func(src *repomanifest.Source, manager *repo.Manager) (string, error) {
+		return sourceDir, nil
+	})
+
+	if err := os.WriteFile(filepath.Join(projectA, manifest.ManifestFileName), []byte(`resources:
+  - skill/ref-mismatch-skill
+sources:
+  - name: shared
+    url: https://example.com/org/ref-repo
+    ref: main
+`), 0644); err != nil {
+		t.Fatalf("write project A manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectB, manifest.ManifestFileName), []byte(`resources:
+  - skill/ref-mismatch-skill
+sources:
+  - name: alias
+    url: https://example.com/org/ref-repo
+    ref: develop
+`), 0644); err != nil {
+		t.Fatalf("write project B manifest: %v", err)
+	}
+
+	oldRepoEnv := os.Getenv("AIMGR_REPO_PATH")
+	oldProjectPathFlag := projectPathFlag
+	t.Cleanup(func() {
+		projectPathFlag = oldProjectPathFlag
+		if oldRepoEnv != "" {
+			_ = os.Setenv("AIMGR_REPO_PATH", oldRepoEnv)
+		} else {
+			_ = os.Unsetenv("AIMGR_REPO_PATH")
+		}
+	})
+
+	_ = os.Setenv("AIMGR_REPO_PATH", repoPath)
+	projectPathFlag = projectA
+	if err := installFromManifest(); err != nil {
+		t.Fatalf("project A install failed: %v", err)
+	}
+
+	projectPathFlag = projectB
+	_, stderr := captureOutput(t, func() {
+		if err := installFromManifest(); err != nil {
+			t.Fatalf("project B install failed: %v", err)
+		}
+	})
+
+	if !strings.Contains(stderr, "requested ref 'develop' was not applied") {
+		t.Fatalf("expected ref mismatch warning, stderr:\n%s", stderr)
+	}
+
+	repoManifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("load repo manifest: %v", err)
+	}
+	if len(repoManifest.Sources) != 1 {
+		t.Fatalf("expected one source, got %d", len(repoManifest.Sources))
+	}
+	if repoManifest.Sources[0].Ref != "main" {
+		t.Fatalf("expected existing ref to remain main, got %q", repoManifest.Sources[0].Ref)
+	}
+}
+
+func TestInstallFromManifest_FilteredReuseFailsWithActionableError(t *testing.T) {
+	repoPath := t.TempDir()
+	projectPath := t.TempDir()
+	sourceDir := createRemoteSkillSource(t, "needs-filter")
+
+	manager := repo.NewManagerWithPath(repoPath)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("init repo: %v", err)
+	}
+
+	repoManifest, err := repomanifest.LoadForMutation(repoPath)
+	if err != nil {
+		t.Fatalf("load mutable repo manifest: %v", err)
+	}
+	if err := repoManifest.AddSource(&repomanifest.Source{
+		Name:      "shared-filtered",
+		URL:       "https://example.com/org/filter-repo",
+		Include:   []string{"command/*"},
+		Discovery: repomanifest.DiscoveryModeGeneric,
+	}); err != nil {
+		t.Fatalf("add source: %v", err)
+	}
+	if err := repoManifest.Save(repoPath); err != nil {
+		t.Fatalf("save repo manifest: %v", err)
+	}
+
+	meta := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{
+		"shared-filtered": {Added: time.Now()},
+	}}
+	if err := meta.Save(repoPath); err != nil {
+		t.Fatalf("save source metadata: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(projectPath, manifest.ManifestFileName), []byte(`resources:
+  - skill/needs-filter
+sources:
+  - url: https://example.com/org/filter-repo
+`), 0644); err != nil {
+		t.Fatalf("write project manifest: %v", err)
+	}
+
+	withInstallBootstrapResolver(t, func(src *repomanifest.Source, manager *repo.Manager) (string, error) {
+		return sourceDir, nil
+	})
+
+	oldRepoEnv := os.Getenv("AIMGR_REPO_PATH")
+	oldProjectPathFlag := projectPathFlag
+	t.Cleanup(func() {
+		projectPathFlag = oldProjectPathFlag
+		if oldRepoEnv != "" {
+			_ = os.Setenv("AIMGR_REPO_PATH", oldRepoEnv)
+		} else {
+			_ = os.Unsetenv("AIMGR_REPO_PATH")
+		}
+	})
+
+	projectPathFlag = projectPath
+	_ = os.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	err = installFromManifest()
+	if err == nil {
+		t.Fatal("expected filtered-source mismatch error")
+	}
+	if !strings.Contains(err.Error(), "reused source filters are too narrow") {
+		t.Fatalf("expected actionable filter mismatch error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "shared-filtered") {
+		t.Fatalf("expected reused source name in error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "command/*") {
+		t.Fatalf("expected include filters in error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "skill/needs-filter") {
+		t.Fatalf("expected missing resource in error, got: %v", err)
+	}
+}
+
+func TestInstallFromManifest_UsesWriteLockWhenManifestDeclaresSources(t *testing.T) {
+	repoPath := t.TempDir()
+	projectPath := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(projectPath, manifest.ManifestFileName), []byte(`resources:
+  - skill/lock-skill
+sources:
+  - url: https://example.com/org/lock-repo
+`), 0644); err != nil {
+		t.Fatalf("write project manifest: %v", err)
+	}
+
+	withInstallBootstrapResolver(t, func(src *repomanifest.Source, manager *repo.Manager) (string, error) {
+		return "", fmt.Errorf("simulated bootstrap stop")
+	})
+
+	oldRepoEnv := os.Getenv("AIMGR_REPO_PATH")
+	oldProjectPathFlag := projectPathFlag
+	t.Cleanup(func() {
+		projectPathFlag = oldProjectPathFlag
+		if oldRepoEnv != "" {
+			_ = os.Setenv("AIMGR_REPO_PATH", oldRepoEnv)
+		} else {
+			_ = os.Unsetenv("AIMGR_REPO_PATH")
+		}
+		_ = os.Unsetenv("AIMGR_TEST_REPO_HOLD_OP")
+		_ = os.Unsetenv("AIMGR_TEST_REPO_SIGNAL_DIR")
+	})
+
+	projectPathFlag = projectPath
+	_ = os.Setenv("AIMGR_REPO_PATH", repoPath)
+	signalDir := t.TempDir()
+	_ = os.Setenv("AIMGR_TEST_REPO_HOLD_OP", "install")
+	_ = os.Setenv("AIMGR_TEST_REPO_SIGNAL_DIR", signalDir)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- installFromManifest()
+	}()
+
+	readyPath := filepath.Join(signalDir, "install.ready")
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if _, statErr := os.Stat(readyPath); statErr == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for install lock hold marker")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	manager := repo.NewManagerWithPath(repoPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if _, err := manager.AcquireRepoReadLockWithTimeout(ctx, 100*time.Millisecond); err == nil {
+		t.Fatal("expected read lock acquisition to block behind install write lock")
+	}
+
+	releasePath := filepath.Join(signalDir, "install.release")
+	if writeErr := os.WriteFile(releasePath, []byte("release"), 0644); writeErr != nil {
+		t.Fatalf("write release marker: %v", writeErr)
+	}
+
+	err := <-errCh
+	if err == nil || !strings.Contains(err.Error(), "simulated bootstrap stop") {
+		t.Fatalf("expected simulated bootstrap error after release, got: %v", err)
 	}
 }

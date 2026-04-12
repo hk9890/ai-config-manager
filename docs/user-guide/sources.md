@@ -124,6 +124,7 @@ aimgr repo add local:./my-resources
 |---------|-------------|
 | **Source** | A location (local path or remote URL) containing AI resources |
 | **ai.repo.yaml** | Manifest file tracking all configured sources |
+| **`ai.package.yaml` `sources:`** | Optional project-declared remote bootstrap hints used by `aimgr install` |
 | **Import Mode** | How resources are stored - `symlink` for paths, `copy` for URLs |
 | **Sync** | Re-import resources from configured sources to get latest changes |
 
@@ -170,6 +171,113 @@ sources:
 | `include` | array of string | Resource filter patterns (same syntax as `--filter`) | No |
 
 **Note:** Import mode is implicit based on source type. Path sources use `symlink` mode; URL sources use `copy` mode.
+
+### `ai.repo.yaml` vs `ai.package.yaml` `sources:`
+
+`ai.repo.yaml` remains the canonical local source catalog. Project manifests can additionally declare remote source bootstrap hints under `ai.package.yaml` `sources:`.
+
+Important distinction:
+
+- In `ai.repo.yaml`, `name` is part of explicit source management (`repo add`, `repo apply-manifest`, `repo remove`).
+- In `ai.package.yaml` `sources:`, canonical reuse identity is normalized `url + subpath`; `name` is a first-install hint/display alias only.
+
+---
+
+## Project-manifest remote bootstrap (`ai.package.yaml` `sources:`)
+
+Projects can declare remote source bootstrap hints directly in `ai.package.yaml`:
+
+```yaml
+sources:
+  - name: team-catalog
+    url: https://github.com/acme/ai-resources
+    ref: v1.4.0
+    subpath: catalog
+
+resources:
+  - package/team-default
+```
+
+For `ai.package.yaml` manifest bootstrap entries, supported `sources[]` fields are:
+
+- `url` (required)
+- `ref` (optional)
+- `subpath` (optional)
+- `name` (optional first-install/display alias hint)
+
+`include` filters are **not** supported in `ai.package.yaml` `sources:`. Include filters belong to repo-managed source definitions in `ai.repo.yaml` (for example via `aimgr repo add --filter` or `aimgr repo apply-manifest`).
+
+Install behavior:
+
+- `aimgr install` may initialize a missing local aimgr repo on first use when manifest-declared sources require bootstrap.
+- install bootstraps required remote sources into local `ai.repo.yaml` before installing declared resources.
+- repeated install runs are idempotent when no effective source/resource changes are needed.
+
+### Identity, alias, and ref semantics
+
+For manifest-declared remote sources:
+
+- Canonical reuse identity is normalized `url + subpath`.
+- `name` is a first-install/display alias hint only.
+- `ref` is a bootstrap hint only, not an isolation boundary in the shared local catalog.
+
+If install finds an existing canonical source with the same `url + subpath`:
+
+- it reuses the existing source even if manifest `name` differs
+- if manifest `ref` differs, install warns and keeps the existing source unchanged
+
+### Reuse warning and narrow-filter failure
+
+When an existing canonical source is reused:
+
+- **Ref mismatch warning**: emitted when requested manifest ref differs from existing source ref.
+- **Filtered-source failure**: if existing canonical source has include filters too narrow to satisfy required manifest resources, install fails with guidance to broaden filters or adjust source config.
+
+### Example: first install and repeated no-op install
+
+```bash
+# first run in a fresh clone: initializes repo if needed, bootstraps sources, installs resources
+aimgr install
+
+# second run with no effective changes: bootstrap step is no-op
+aimgr install
+```
+
+### Example: two projects, one upstream, different aliases/refs
+
+Project A:
+
+```yaml
+sources:
+  - name: catalog-a
+    url: https://github.com/acme/ai-resources
+    ref: v1.4.0
+    subpath: catalog
+resources:
+  - package/team-default
+```
+
+Project B:
+
+```yaml
+sources:
+  - name: catalog-b
+    url: https://github.com/acme/ai-resources
+    ref: v2.0.0
+    subpath: catalog
+resources:
+  - package/team-ops
+```
+
+With one shared local aimgr repo, install in Project B reuses Project A's canonical source (`url + subpath`) and warns about ref mismatch instead of creating an isolated second source.
+
+To intentionally move the shared source to a new ref, update repo source state through repo workflows (`repo add`/`repo apply-manifest`/`repo sync`) and then rerun install.
+
+### Compatibility with existing source workflows
+
+- `repo apply-manifest`: still the best fit for centrally published, reusable team baselines in `ai.repo.yaml`.
+- `repo add`: still the best fit for interactive/manual source management.
+- `ai.package.yaml` `sources:`: best fit for project-local bootstrap during `aimgr install`.
 
 ---
 

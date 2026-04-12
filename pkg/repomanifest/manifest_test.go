@@ -960,6 +960,67 @@ func TestHasSource(t *testing.T) {
 	}
 }
 
+func TestFindRemoteSourceByCanonical(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{
+			{
+				Name:    "tools-root",
+				URL:     "https://GitHub.com/Example/Tools.git/",
+				Ref:     "main",
+				Subpath: "",
+			},
+			{
+				Name:    "tools-skills",
+				URL:     "https://github.com/example/tools",
+				Ref:     "release/v1",
+				Subpath: "./skills//core/",
+			},
+			{
+				Name: "local-tools",
+				Path: "/tmp/local-tools",
+			},
+		},
+	}
+
+	t.Run("normalizes .git trailing slash case and empty subpath", func(t *testing.T) {
+		src, found := m.FindRemoteSourceByCanonical("https://github.com/example/tools", "/")
+		if !found {
+			t.Fatal("expected canonical remote lookup to find root source")
+		}
+		if src.Name != "tools-root" {
+			t.Fatalf("expected tools-root, got %q", src.Name)
+		}
+	})
+
+	t.Run("normalizes subpath and ignores ref in canonical lookup", func(t *testing.T) {
+		src, found := m.FindRemoteSourceByCanonical("https://GITHUB.com/EXAMPLE/TOOLS.git/", "skills/core/")
+		if !found {
+			t.Fatal("expected canonical remote lookup to find subpath source")
+		}
+		if src.Name != "tools-skills" {
+			t.Fatalf("expected tools-skills, got %q", src.Name)
+		}
+		if src.Ref != "release/v1" {
+			t.Fatalf("expected existing ref to remain unchanged, got %q", src.Ref)
+		}
+	})
+
+	t.Run("distinct subpaths remain distinct", func(t *testing.T) {
+		_, found := m.FindRemoteSourceByCanonical("https://github.com/example/tools", "skills/other")
+		if found {
+			t.Fatal("did not expect canonical lookup match for different subpath")
+		}
+	})
+
+	t.Run("local path entries are ignored", func(t *testing.T) {
+		_, found := m.FindRemoteSourceByCanonical("file:///tmp/local-tools", "")
+		if found {
+			t.Fatal("remote canonical lookup should not match local path entries")
+		}
+	})
+}
+
 func TestValidateSource(t *testing.T) {
 	tests := []struct {
 		name    string

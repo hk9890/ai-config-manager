@@ -459,6 +459,64 @@ func canonicalSourceID(src *repomanifest.Source) string {
 	return repomanifest.GenerateSourceID(src)
 }
 
+func sourceLegacyRemoteIDAlias(src *repomanifest.Source) (legacyID string, canonicalID string) {
+	if src == nil {
+		return "", ""
+	}
+
+	var remoteURL string
+	var remoteSubpath string
+	if src.OverrideOriginalURL != "" {
+		remoteURL = src.OverrideOriginalURL
+		remoteSubpath = src.OverrideOriginalSubpath
+	} else {
+		remoteURL = src.URL
+		remoteSubpath = src.Subpath
+	}
+
+	if remoteURL == "" {
+		return "", ""
+	}
+
+	canonicalID = canonicalSourceID(src)
+	if canonicalID == "" {
+		return "", ""
+	}
+
+	legacyID = repomanifest.GenerateSourceID(&repomanifest.Source{URL: remoteURL})
+	if legacyID == "" || legacyID == canonicalID {
+		return "", ""
+	}
+
+	if repomanifest.GenerateSourceID(&repomanifest.Source{URL: remoteURL, Subpath: remoteSubpath}) == legacyID {
+		// Effective canonical identity has no subpath component; no alias needed.
+		return "", ""
+	}
+
+	return legacyID, canonicalID
+}
+
+func remapLegacyRemoteSourceIDs(preSyncResources map[string][]resourceInfo, manifest *repomanifest.Manifest) {
+	if len(preSyncResources) == 0 || manifest == nil {
+		return
+	}
+
+	for _, src := range manifest.Sources {
+		legacyID, canonicalID := sourceLegacyRemoteIDAlias(src)
+		if legacyID == "" || canonicalID == "" {
+			continue
+		}
+
+		resources, exists := preSyncResources[legacyID]
+		if !exists || len(resources) == 0 {
+			continue
+		}
+
+		preSyncResources[canonicalID] = append(preSyncResources[canonicalID], resources...)
+		delete(preSyncResources, legacyID)
+	}
+}
+
 func sourceLocationSummary(src *repomanifest.Source) string {
 	if src == nil {
 		return "unknown location"
@@ -675,7 +733,13 @@ func detectRemovedForSource(src *repomanifest.Source, sourcePath, repoPath strin
 		// cross-source name collisions (bmz1.7). If another source
 		// overwrote this resource during sync, its metadata now
 		// points to the other source — skip removal in that case.
-		if !resmeta.HasSource(res.Name, res.Type, sourceKey, repoPath) {
+		belongsToSource := resmeta.HasSource(res.Name, res.Type, sourceKey, repoPath)
+		if !belongsToSource && sourceKey != src.Name {
+			// Compatibility path: pre-upgrade metadata may still carry source_name
+			// while sourceKey was remapped to canonical source_id.
+			belongsToSource = resmeta.HasSource(res.Name, res.Type, src.Name, repoPath)
+		}
+		if !belongsToSource {
 			warnings = append(warnings,
 				fmt.Sprintf("skipping removal of %s/%s from %s: metadata now points to a different source", res.Type, res.Name, src.Name),
 			)
@@ -987,6 +1051,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		warnings = append(warnings, fmt.Sprintf("could not collect pre-sync inventory: %v", err))
 		preSyncResources = make(map[string][]resourceInfo)
 	}
+	remapLegacyRemoteSourceIDs(preSyncResources, manifest)
 
 	internalResult := syncResult{
 		failedSources:    make([]string, 0),

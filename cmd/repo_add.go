@@ -1314,8 +1314,35 @@ func addSourceToManifest(manager *repo.Manager, parsed *source.ParsedSource, inc
 	}
 
 	// Check if source already exists — REPLACE semantics
-	identifier := manifestSource.Path + manifestSource.URL
-	if existing, found := manifest.GetSource(identifier); found {
+	var existing *repomanifest.Source
+	var found bool
+
+	if manifestSource.URL != "" {
+		existing, found = manifest.FindRemoteSourceByCanonical(manifestSource.URL, manifestSource.Subpath)
+	} else {
+		identifier := manifestSource.Path + manifestSource.URL
+		existing, found = manifest.GetSource(identifier)
+	}
+
+	if found {
+		if manifestSource.URL != "" {
+			if manifestSource.Name != "" && existing.Name != manifestSource.Name {
+				fmt.Fprintf(os.Stderr, "Warning: source already exists as '%s'; reusing existing canonical source entry (requested name '%s' ignored)\n", existing.Name, manifestSource.Name)
+			}
+
+			if existing.Ref != manifestSource.Ref {
+				existingRef := existing.Ref
+				if existingRef == "" {
+					existingRef = "<none>"
+				}
+				requestedRef := manifestSource.Ref
+				if requestedRef == "" {
+					requestedRef = "<none>"
+				}
+				fmt.Fprintf(os.Stderr, "Warning: source '%s' already tracks ref '%s'; reusing existing canonical source entry and ignoring requested ref '%s'\n", existing.Name, existingRef, requestedRef)
+			}
+		}
+
 		// Update Include with new values (replace, not merge)
 		existing.Include = include
 		existing.Discovery = discoveryMode

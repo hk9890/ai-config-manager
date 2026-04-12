@@ -13,7 +13,7 @@
 
 1. Source definitions are tracked in `ai.repo.yaml`.
 2. Repository import and sync logic lives in `pkg/repo/`, `pkg/source/`, `pkg/workspace/`, and `pkg/sourcemetadata/`.
-3. Project dependency state lives in `ai.package.yaml` plus optional `ai.package.local.yaml` overlays.
+3. Project dependency state lives in `ai.package.yaml` plus optional `ai.package.local.yaml` overlays; `ai.package.yaml` may also declare remote bootstrap hints in `sources:` for install-time source bootstrap.
 4. Install and uninstall flows create or repair project-local resource links through `pkg/install/`, `pkg/tools/`, `cmd/install.go`, and `cmd/uninstall.go`.
 5. Validation and repair flows are exposed through commands such as `cmd/resource_validate.go`, `cmd/project_verify.go`, and `cmd/repair.go`.
 
@@ -30,7 +30,7 @@
 | `pkg/sourcemetadata/` | Persisted source sync state and source metadata tracking |
 | `pkg/workspace/` | Cached Git workspaces and clone/update performance |
 | `pkg/install/` | Project install, uninstall, and symlink/copy behavior |
-| `pkg/manifest/` | Project manifest parsing for `ai.package.yaml` and overlays |
+| `pkg/manifest/` | Project manifest parsing for `ai.package.yaml` (`resources`, optional `sources`) and overlays |
 | `pkg/metadata/` | Resource metadata helpers for repo-managed state |
 | `pkg/pattern/` | Pattern parsing and compiled glob matching for resource selection |
 | `pkg/tools/` | Tool-specific target directories and install conventions |

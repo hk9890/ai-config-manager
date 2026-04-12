@@ -2642,6 +2642,74 @@ func TestDetectRemovedForSource_OverrideSubpathUsesStableCanonicalKey(t *testing
 	}
 }
 
+func TestRemapLegacyRemoteSourceIDs_MigratesPreSyncInventoryKeyForSubpathSource(t *testing.T) {
+	src := &repomanifest.Source{
+		Name:    "remote-subpath",
+		URL:     "https://github.com/example/tools",
+		Subpath: "resources",
+		ID:      repomanifest.GenerateSourceID(&repomanifest.Source{URL: "https://github.com/example/tools", Subpath: "resources"}),
+	}
+	legacyID := repomanifest.GenerateSourceID(&repomanifest.Source{URL: src.URL})
+	canonicalID := canonicalSourceID(src)
+	if legacyID == canonicalID {
+		t.Fatalf("test precondition failed: legacy and canonical IDs must differ for non-empty subpath")
+	}
+
+	preSync := map[string][]resourceInfo{
+		legacyID: {{Name: "legacy-cmd", Type: resource.Command}},
+	}
+
+	manifest := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{src}}
+	remapLegacyRemoteSourceIDs(preSync, manifest)
+
+	if _, exists := preSync[legacyID]; exists {
+		t.Fatalf("expected legacy inventory key %q to be removed", legacyID)
+	}
+	if len(preSync[canonicalID]) != 1 || preSync[canonicalID][0].Name != "legacy-cmd" {
+		t.Fatalf("expected resources to be remapped to canonical key %q, got %#v", canonicalID, preSync)
+	}
+}
+
+func TestDetectRemovedForSource_SyncAfterUpgradeUsesRemappedLegacyRemoteID(t *testing.T) {
+	repoPath := t.TempDir()
+	sourceDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(sourceDir, "commands"), 0755); err != nil {
+		t.Fatalf("failed to create source commands dir: %v", err)
+	}
+
+	src := &repomanifest.Source{
+		Name:    "remote-subpath",
+		URL:     "https://github.com/example/tools",
+		Subpath: "resources",
+		ID:      repomanifest.GenerateSourceID(&repomanifest.Source{URL: "https://github.com/example/tools", Subpath: "resources"}),
+	}
+	legacyID := repomanifest.GenerateSourceID(&repomanifest.Source{URL: src.URL})
+	canonicalID := canonicalSourceID(src)
+
+	if err := resmeta.Save(&resmeta.ResourceMetadata{
+		Name:       "legacy-cmd",
+		Type:       resource.Command,
+		SourceID:   legacyID,
+		SourceName: src.Name,
+	}, repoPath, src.Name); err != nil {
+		t.Fatalf("failed to seed legacy metadata: %v", err)
+	}
+
+	preSync := map[string][]resourceInfo{
+		legacyID: {{Name: "legacy-cmd", Type: resource.Command}},
+	}
+	manifest := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{src}}
+	remapLegacyRemoteSourceIDs(preSync, manifest)
+
+	removed, warnings := detectRemovedForSource(src, sourceDir, repoPath, preSync)
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(removed) != 1 || removed[0].Name != "legacy-cmd" || removed[0].Type != resource.Command {
+		t.Fatalf("expected legacy resource removal after remap under canonical key %q, got %#v", canonicalID, removed)
+	}
+}
+
 func TestDetectSyncResourceCollisions_RespectsDiscoveryMode(t *testing.T) {
 	sourceA := createSourceWithMarketplaceAndLooseResources(t)
 

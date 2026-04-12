@@ -97,6 +97,86 @@ func TestGenerateSourceID_URLNormalization(t *testing.T) {
 	}
 }
 
+func TestGenerateSourceID_RemoteSubpathNormalization(t *testing.T) {
+	tests := []struct {
+		name     string
+		sourceA  *Source
+		sourceB  *Source
+		wantSame bool
+	}{
+		{
+			name:     "empty subpath equals dot",
+			sourceA:  &Source{Name: "a", URL: "https://github.com/user/repo", Subpath: ""},
+			sourceB:  &Source{Name: "b", URL: "https://github.com/user/repo", Subpath: "."},
+			wantSame: true,
+		},
+		{
+			name:     "empty subpath equals dot-slash",
+			sourceA:  &Source{Name: "a", URL: "https://github.com/user/repo", Subpath: ""},
+			sourceB:  &Source{Name: "b", URL: "https://github.com/user/repo", Subpath: "./"},
+			wantSame: true,
+		},
+		{
+			name:     "leading slash normalized",
+			sourceA:  &Source{Name: "a", URL: "https://github.com/user/repo", Subpath: "skills"},
+			sourceB:  &Source{Name: "b", URL: "https://github.com/user/repo", Subpath: "/skills"},
+			wantSame: true,
+		},
+		{
+			name:     "trailing slash normalized",
+			sourceA:  &Source{Name: "a", URL: "https://github.com/user/repo", Subpath: "skills"},
+			sourceB:  &Source{Name: "b", URL: "https://github.com/user/repo", Subpath: "skills/"},
+			wantSame: true,
+		},
+		{
+			name:     "repeated separators normalized",
+			sourceA:  &Source{Name: "a", URL: "https://github.com/user/repo", Subpath: "a/b"},
+			sourceB:  &Source{Name: "b", URL: "https://github.com/user/repo", Subpath: "a//b"},
+			wantSame: true,
+		},
+		{
+			name:     "nested cleaned paths normalized",
+			sourceA:  &Source{Name: "a", URL: "https://github.com/user/repo", Subpath: "a/c"},
+			sourceB:  &Source{Name: "b", URL: "https://github.com/user/repo", Subpath: "a/b/../c"},
+			wantSame: true,
+		},
+		{
+			name:     "distinct subpaths produce different IDs",
+			sourceA:  &Source{Name: "a", URL: "https://github.com/user/repo", Subpath: "skills"},
+			sourceB:  &Source{Name: "b", URL: "https://github.com/user/repo", Subpath: "commands"},
+			wantSame: false,
+		},
+		{
+			name:     "empty and non-empty subpath differ",
+			sourceA:  &Source{Name: "a", URL: "https://github.com/user/repo", Subpath: ""},
+			sourceB:  &Source{Name: "b", URL: "https://github.com/user/repo", Subpath: "skills"},
+			wantSame: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			idA := GenerateSourceID(tt.sourceA)
+			idB := GenerateSourceID(tt.sourceB)
+			if tt.wantSame && idA != idB {
+				t.Fatalf("expected same ID, got %q and %q", idA, idB)
+			}
+			if !tt.wantSame && idA == idB {
+				t.Fatalf("expected different IDs, got %q", idA)
+			}
+		})
+	}
+}
+
+func TestGenerateSourceID_RemoteIdentityIgnoresRef(t *testing.T) {
+	a := &Source{Name: "a", URL: "https://github.com/user/repo", Ref: "main", Subpath: "skills"}
+	b := &Source{Name: "b", URL: "https://github.com/user/repo", Ref: "release/v1", Subpath: "skills"}
+
+	if gotA, gotB := GenerateSourceID(a), GenerateSourceID(b); gotA != gotB {
+		t.Fatalf("expected same canonical ID when only ref differs: %q vs %q", gotA, gotB)
+	}
+}
+
 func TestGenerateSourceID_CompatibilityWithLegacyUntrimmedURLSourceID(t *testing.T) {
 	legacyPersisted := GenerateSourceID(&Source{Name: "legacy", URL: "https://github.com/user/repo.git/"})
 	currentCanonical := GenerateSourceID(&Source{Name: "current", URL: "https://github.com/user/repo"})
@@ -272,9 +352,10 @@ func TestGenerateSourceID_OverrideUsesOriginalRemoteIdentity(t *testing.T) {
 	}
 
 	originalRemote := &Source{
-		Name: "team-tools",
-		URL:  "https://github.com/example/tools",
-		Ref:  "main",
+		Name:    "team-tools",
+		URL:     "https://github.com/example/tools",
+		Ref:     "main",
+		Subpath: "resources",
 	}
 
 	overriddenID := GenerateSourceID(overridden)
