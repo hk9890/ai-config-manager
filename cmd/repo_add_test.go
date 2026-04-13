@@ -11,10 +11,12 @@ import (
 	"testing"
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/discovery"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/metadata"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/resource"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/source"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/workspace"
 )
 
 func gitOutput(t *testing.T, dir string, args ...string) string {
@@ -276,6 +278,77 @@ func TestAddSourceToManifest_RemoteCanonicalReuseDistinctSubpaths(t *testing.T) 
 	}
 	if len(manifest.Sources) != 2 {
 		t.Fatalf("expected distinct subpaths to remain separate sources, got %d", len(manifest.Sources))
+	}
+}
+
+func TestAddBulkFromGitHub_UsesCanonicalSourceIDWithSubpath(t *testing.T) {
+	repoPath := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	manager := repo.NewManagerWithPath(repoPath)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("failed to init repo: %v", err)
+	}
+
+	remoteURL := "https://example.com/team/tools"
+	remoteOrigin, worktreePath := createRemoteGitSource(t)
+	writeAndCommitRemoteCommand(t, worktreePath, "alpha", "Alpha command")
+	writeAndCommitRemoteCommand(t, worktreePath, "beta", "Beta command")
+
+	wsMgr, err := workspace.NewManager(repoPath)
+	if err != nil {
+		t.Fatalf("failed to create workspace manager: %v", err)
+	}
+	cachePath := filepath.Join(repoPath, ".workspace", workspace.ComputeHash(remoteURL))
+	if err := os.MkdirAll(filepath.Dir(cachePath), 0755); err != nil {
+		t.Fatalf("failed to create workspace dir: %v", err)
+	}
+	runGit(t, repoPath, "clone", "-b", "main", remoteOrigin, cachePath)
+	if err := wsMgr.Update(remoteURL, ""); err != nil {
+		t.Fatalf("failed to update workspace cache: %v", err)
+	}
+
+	parsed, err := source.ParseSource(remoteURL + ".git/commands")
+	if err != nil {
+		t.Fatalf("failed to parse remote source with subpath: %v", err)
+	}
+
+	withRepoAddFlagsReset(t, func() {
+		addFormatFlag = "json"
+		if err := addBulkFromGitHub(parsed, manager); err != nil {
+			t.Fatalf("addBulkFromGitHub failed: %v", err)
+		}
+	})
+
+	manifestSource := &repomanifest.Source{URL: parsed.URL, Subpath: parsed.Subpath}
+	expectedID := repomanifest.GenerateSourceID(manifestSource)
+	legacyID := repomanifest.GenerateSourceID(&repomanifest.Source{URL: parsed.URL})
+	if expectedID == legacyID {
+		t.Fatalf("test precondition failed: expected canonical and legacy IDs to differ")
+	}
+
+	for _, cmdName := range []string{"alpha", "beta"} {
+		meta, metaErr := metadata.Load(cmdName, resource.Command, repoPath)
+		if metaErr != nil {
+			t.Fatalf("failed to load metadata for %s: %v", cmdName, metaErr)
+		}
+		if meta.SourceID != expectedID {
+			t.Fatalf("command %s source ID = %q, want canonical %q", cmdName, meta.SourceID, expectedID)
+		}
+	}
+}
+
+func TestFormatGitHubShortURL_PreservesRefBeforeSubpath(t *testing.T) {
+	parsed := &source.ParsedSource{
+		Type:    source.GitHub,
+		URL:     "https://github.com/example/tools",
+		Ref:     "release/v1",
+		Subpath: "skills/core",
+	}
+
+	got := formatGitHubShortURL(parsed)
+	if got != "gh:example/tools@release/v1/skills/core" {
+		t.Fatalf("formatGitHubShortURL() = %q, want %q", got, "gh:example/tools@release/v1/skills/core")
 	}
 }
 

@@ -378,7 +378,16 @@ func TestE2E_ConcurrentDropAndAddSerializeWithConsistentFinalRepo(t *testing.T) 
 	if err != nil {
 		t.Fatalf("failed to load manifest after drop+add: %v", err)
 	}
-	if len(manifest.Sources) != 0 {
-		t.Fatalf("expected zero sources after drop+add, got %d", len(manifest.Sources))
+	if len(manifest.Sources) != 1 {
+		t.Fatalf("expected one preserved source after drop+add, got %d", len(manifest.Sources))
+	}
+	requireManifestHasSourcePath(t, repoPath, newSource)
+
+	meta, err := sourcemetadata.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load source metadata after drop+add: %v", err)
+	}
+	if len(meta.Sources) != 0 {
+		t.Fatalf("expected cleared source metadata after drop+add, got %d entries", len(meta.Sources))
 	}
 }

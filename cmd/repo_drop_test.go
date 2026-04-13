@@ -8,6 +8,8 @@ import (
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/sourcemetadata"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/workspace"
 )
 
 func TestPerformSoftDrop(t *testing.T) {
@@ -20,6 +22,24 @@ func TestPerformSoftDrop(t *testing.T) {
 	// Initialize repo
 	if err := mgr.Init(); err != nil {
 		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	manifestBeforeDrop := &repomanifest.Manifest{
+		Version: 1,
+		Sources: []*repomanifest.Source{{
+			Name: "primary-source",
+			Path: "/tmp/local-source",
+		}},
+	}
+	if err := manifestBeforeDrop.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest before soft drop: %v", err)
+	}
+
+	srcMeta := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{
+		"primary-source": {SourceID: "source-id-1"},
+	}}
+	if err := srcMeta.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save source metadata before soft drop: %v", err)
 	}
 
 	// Add some test resources
@@ -85,7 +105,7 @@ description: Test agent
 		t.Error("Repository directory should still exist after soft drop")
 	}
 
-	// Verify ai.repo.yaml exists (recreated by Init())
+	// Verify ai.repo.yaml exists and preserves sources
 	manifestPath := filepath.Join(tempDir, repomanifest.ManifestFileName)
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
 		t.Error("ai.repo.yaml should exist after soft drop")
@@ -125,13 +145,112 @@ description: Test agent
 		t.Error("Test agent should be removed after soft drop")
 	}
 
-	// Verify ai.repo.yaml is empty (no sources)
+	// Verify ai.repo.yaml source definitions are preserved
 	manifest, err := repomanifest.Load(tempDir)
 	if err != nil {
 		t.Fatalf("Failed to load manifest after soft drop: %v", err)
 	}
-	if len(manifest.Sources) != 0 {
-		t.Errorf("Expected empty sources after soft drop, got %d sources", len(manifest.Sources))
+	if len(manifest.Sources) != 1 {
+		t.Fatalf("Expected 1 preserved source after soft drop, got %d", len(manifest.Sources))
+	}
+	if manifest.Sources[0].Name != "primary-source" || manifest.Sources[0].Path != "/tmp/local-source" {
+		t.Fatalf("Expected preserved source primary-source:/tmp/local-source, got %+v", manifest.Sources[0])
+	}
+
+	// Verify source metadata is cleared and rebuilt empty
+	loadedSourceMeta, err := sourcemetadata.Load(tempDir)
+	if err != nil {
+		t.Fatalf("Failed to load source metadata after soft drop: %v", err)
+	}
+	if len(loadedSourceMeta.Sources) != 0 {
+		t.Errorf("Expected cleared source metadata after soft drop, got %d entries", len(loadedSourceMeta.Sources))
+	}
+}
+
+func TestPerformSoftDrop_PreservesManifestForRepoSync(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := repo.NewManagerWithPath(tempDir)
+
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	sourceDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(sourceDir, "commands"), 0755); err != nil {
+		t.Fatalf("Failed to create source commands directory: %v", err)
+	}
+	sourceCommand := filepath.Join(sourceDir, "commands", "from-source.md")
+	if err := os.WriteFile(sourceCommand, []byte("---\ndescription: from source\n---\n# from-source\n"), 0644); err != nil {
+		t.Fatalf("Failed to create source command: %v", err)
+	}
+
+	manifest := &repomanifest.Manifest{
+		Version: 1,
+		Sources: []*repomanifest.Source{{
+			Name: "local-source",
+			Path: sourceDir,
+		}},
+	}
+	if err := manifest.Save(tempDir); err != nil {
+		t.Fatalf("Failed to save manifest: %v", err)
+	}
+
+	if err := performSoftDrop(mgr); err != nil {
+		t.Fatalf("Soft drop failed: %v", err)
+	}
+
+	t.Setenv("AIMGR_REPO_PATH", tempDir)
+	if err := runSync(syncCmd, []string{}); err != nil {
+		t.Fatalf("repo sync failed after soft drop: %v", err)
+	}
+
+	importedCommand := filepath.Join(tempDir, "commands", "from-source.md")
+	if _, err := os.Stat(importedCommand); err != nil {
+		t.Fatalf("Expected repo sync to import command after soft drop: %v", err)
+	}
+}
+
+func TestPerformSoftDrop_ClearsWorkspaceCachesPreservesLocks(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := repo.NewManagerWithPath(tempDir)
+
+	if err := mgr.Init(); err != nil {
+		t.Fatalf("Failed to initialize repo: %v", err)
+	}
+
+	workspaceDir := filepath.Join(tempDir, ".workspace")
+	cacheDir := filepath.Join(workspaceDir, workspace.ComputeHash("https://github.com/acme/repo"))
+	if err := os.MkdirAll(filepath.Join(cacheDir, ".git"), 0755); err != nil {
+		t.Fatalf("Failed to create workspace cache: %v", err)
+	}
+	cacheMetadata := filepath.Join(workspaceDir, ".cache-metadata.json")
+	if err := os.WriteFile(cacheMetadata, []byte(`{"version":"1.0","caches":{}}`), 0644); err != nil {
+		t.Fatalf("Failed to create cache metadata: %v", err)
+	}
+	locksDir := filepath.Join(workspaceDir, "locks")
+	if err := os.MkdirAll(locksDir, 0755); err != nil {
+		t.Fatalf("Failed to create locks directory: %v", err)
+	}
+	lockFile := filepath.Join(locksDir, "repo.lock")
+	if err := os.WriteFile(lockFile, []byte("lock-marker"), 0644); err != nil {
+		t.Fatalf("Failed to create lock marker file: %v", err)
+	}
+
+	if err := performSoftDrop(mgr); err != nil {
+		t.Fatalf("Soft drop failed: %v", err)
+	}
+
+	if _, err := os.Stat(cacheDir); !os.IsNotExist(err) {
+		t.Fatalf("Expected workspace cache to be removed, stat err: %v", err)
+	}
+	if _, err := os.Stat(cacheMetadata); !os.IsNotExist(err) {
+		t.Fatalf("Expected workspace cache metadata to be removed, stat err: %v", err)
+	}
+	if _, err := os.Stat(locksDir); err != nil {
+		t.Fatalf("Expected locks directory to be preserved: %v", err)
+	}
+	if _, err := os.Stat(lockFile); err != nil {
+		t.Fatalf("Expected lock file to be preserved: %v", err)
 	}
 }
 

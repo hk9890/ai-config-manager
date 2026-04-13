@@ -60,6 +60,10 @@ Source Formats:
     gh:owner/repo@v1.0.0       Specific branch or tag
     gh:owner/repo/subpath       Subdirectory within repo
     gh:owner/repo@ref/subpath   Ref and subdirectory combined
+    (use @ref before /subpath; gh:owner/repo/subpath@ref is rejected)
+
+  GitHub HTTPS with subpath (clone-style):
+    https://github.com/owner/repo.git/subpath
 
   HTTPS / HTTP (any Git host):
     https://github.com/owner/repo        GitHub
@@ -116,6 +120,7 @@ Examples:
   # Add from a repo-backed remote marketplace file URL
   aimgr repo add gh:owner/repo/.claude-plugin/marketplace.json
   aimgr repo add https://github.com/owner/repo.git/.claude-plugin/marketplace.json
+  aimgr repo add https://github.com/owner/repo.git/skills/frontend
 
   # With options
   aimgr repo add gh:owner/repo --force
@@ -872,7 +877,7 @@ func addBulkFromLocalWithMode(localPath string, manager *repo.Manager, filter []
 // addBulkFromGitHub handles bulk add from a GitHub repository
 func addBulkFromGitHub(parsed *source.ParsedSource, manager *repo.Manager) error {
 	// Compute source ID from URL before import
-	tempSource := repomanifest.Source{URL: parsed.URL}
+	tempSource := repomanifest.Source{URL: parsed.URL, Subpath: parsed.Subpath}
 	sourceID := repomanifest.GenerateSourceID(&tempSource)
 
 	return addBulkFromGitHubWithFilter(parsed, manager, filterFlags, sourceID)
@@ -1263,15 +1268,13 @@ func formatGitHubShortURL(parsed *source.ParsedSource) string {
 
 	// Build the gh: format URL
 	result := "gh:" + url
+	if parsed.Ref != "" {
+		result = result + "@" + parsed.Ref
+	}
 
 	// Add subpath if present
 	if parsed.Subpath != "" {
 		result = result + "/" + parsed.Subpath
-	}
-
-	// Add ref if present
-	if parsed.Ref != "" {
-		result = result + "@" + parsed.Ref
 	}
 
 	return result

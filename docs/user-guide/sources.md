@@ -36,6 +36,11 @@ gh:owner/repo/skills/frontend  # Only resources under skills/frontend
 gh:owner/repo@v1.0.0/skills    # Pinned version + subpath
 ```
 
+For `gh:` sources with both `ref` and `subpath`, use `gh:owner/repo@ref/path`.
+The reversed form `gh:owner/repo/path@ref` is ambiguous and rejected.
+Subpaths must stay repository-relative; parent traversal segments like `..` are
+rejected across `gh:`, GitHub `/tree/<ref>/...`, and GitHub `.git/<subpath>` forms.
+
 ### HTTPS / HTTP URLs
 
 Use full URLs for **any Git host** — GitHub, GitLab, Bitbucket, self-hosted Gitea, etc.
@@ -69,6 +74,13 @@ GitHub HTTPS URLs also support `/tree/ref` and `/tree/ref/path` syntax:
 ```bash
 https://github.com/owner/repo/tree/v1.0.0
 https://github.com/owner/repo/tree/main/skills/frontend
+```
+
+GitHub clone-style `.git/<subpath>` URLs are also supported and treated the same as
+other subpath syntaxes:
+
+```bash
+https://github.com/owner/repo.git/skills/frontend
 ```
 
 ### SSH URLs (`git@`)
@@ -908,7 +920,7 @@ Configured Sources (2):
 
 ### repo drop
 
-Delete the entire repository.
+Drop imported repository state.
 
 ```bash
 aimgr repo drop [flags]
@@ -916,7 +928,7 @@ aimgr repo drop [flags]
 
 | Flag | Description |
 |------|-------------|
-| `--force` | Required confirmation |
+| `--force` | Skip confirmation prompt (with `--full-delete`) |
 | `--full-delete` | Delete everything including `ai.repo.yaml` |
 
 **Recovery after soft drop:**
@@ -924,6 +936,15 @@ aimgr repo drop [flags]
 # ai.repo.yaml is preserved, rebuild from sources
 aimgr repo sync
 ```
+
+Soft drop behavior:
+- Preserves `ai.repo.yaml` and configured `sources`
+- Removes imported resources (`commands/`, `skills/`, `agents/`, `packages/`)
+- Clears derived local state (`.metadata/`, `.modifications/`)
+- Clears `.workspace/` caches for predictable clean re-import
+- Preserves `.workspace/locks/` so lock paths remain stable during command execution
+
+Use `--full-delete` only when you want to remove the entire repository directory.
 
 ---
 
@@ -1181,9 +1202,9 @@ yamllint ~/.local/share/ai-config/repo/ai.repo.yaml
 cp ~/.local/share/ai-config/repo/ai.repo.yaml.backup \
    ~/.local/share/ai-config/repo/ai.repo.yaml
 
-# Or recreate from scratch
-aimgr repo drop --force
-aimgr repo add gh:owner/repo --name=source1
+# Or reset imported state while keeping configured sources
+aimgr repo drop
+aimgr repo sync
 ```
 
 ### Symlinks Not Working on Windows

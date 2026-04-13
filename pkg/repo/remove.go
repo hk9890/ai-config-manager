@@ -229,22 +229,54 @@ func (m *Manager) GetMetadata(name string, resourceType resource.ResourceType) (
 }
 
 func (m *Manager) Drop() error {
-	// Remove entire repo directory
 	if m.logger != nil {
-		m.logger.Debug("removing entire repository directory",
+		m.logger.Debug("performing soft drop",
 			"path", m.repoPath,
 		)
 	}
-	if err := os.RemoveAll(m.repoPath); err != nil {
-		if m.logger != nil {
-			m.logger.Error("failed to remove repository",
-				"path", m.repoPath,
-				"error", err.Error(),
-			)
-		}
-		return fmt.Errorf("failed to remove repository: %w", err)
+
+	pathsToClear := []string{
+		filepath.Join(m.repoPath, "commands"),
+		filepath.Join(m.repoPath, "skills"),
+		filepath.Join(m.repoPath, "agents"),
+		filepath.Join(m.repoPath, "packages"),
+		filepath.Join(m.repoPath, ".metadata"),
+		filepath.Join(m.repoPath, ".modifications"),
 	}
 
-	// Recreate empty structure (including empty ai.repo.yaml)
+	for _, path := range pathsToClear {
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("failed to clear %s: %w", path, err)
+		}
+	}
+
+	if err := m.clearWorkspaceForSoftDrop(); err != nil {
+		return err
+	}
+
 	return m.Init()
+}
+
+func (m *Manager) clearWorkspaceForSoftDrop() error {
+	workspacePath := filepath.Join(m.repoPath, ".workspace")
+	entries, err := os.ReadDir(workspacePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read workspace directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.Name() == "locks" {
+			continue
+		}
+
+		entryPath := filepath.Join(workspacePath, entry.Name())
+		if err := os.RemoveAll(entryPath); err != nil {
+			return fmt.Errorf("failed to clear workspace entry %s: %w", entryPath, err)
+		}
+	}
+
+	return nil
 }

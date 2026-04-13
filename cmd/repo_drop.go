@@ -19,9 +19,10 @@ var repoDropCmd = &cobra.Command{
 or completely delete the repository directory (--full-delete).
 
 Soft Drop (Default):
-  Removes all resource files but keeps ai.repo.yaml, .git/, and directory structure.
-  After soft drop, ai.repo.yaml is recreated as empty (ready for new sources).
-  Use 'repo sync' to rebuild from configured sources.
+	Removes imported resources and derived repository state while preserving
+	ai.repo.yaml and its configured sources.
+	Clears .workspace caches (preserves .workspace/locks for active lock safety).
+	Use 'repo sync' to re-import from configured sources.
 
 Full Delete (--full-delete):
   Completely removes the entire repository directory.
@@ -29,9 +30,9 @@ Full Delete (--full-delete):
   This is permanent and cannot be undone.
 
 When to use soft drop:
-  - Clear resources while keeping sync configuration
-  - Reset repository to clean state
-  - Prepare for 'repo sync' to rebuild
+	- Clear imported resources while keeping source configuration
+	- Reset repository to clean state
+	- Prepare for 'repo sync' to re-import from preserved sources
 
 When to use full delete:
   - Completely remove aimgr from system
@@ -86,15 +87,15 @@ func runDrop(cmd *cobra.Command, args []string) error {
 
 // performSoftDrop removes all resources but keeps ai.repo.yaml, .git/, and directory structure
 func performSoftDrop(mgr *repo.Manager) error {
-	// Soft drop is implemented by the manager's Drop() method
-	// which removes everything and calls Init() to recreate empty structure
 	if err := mgr.Drop(); err != nil {
 		return err
 	}
 
 	fmt.Println("✓ Repository soft drop completed")
-	fmt.Println("  All resources removed, structure preserved")
-	fmt.Println("  Run 'aimgr repo sync' to rebuild from sources")
+	fmt.Println("  Removed imported resources and local sync state")
+	fmt.Println("  Preserved ai.repo.yaml source definitions")
+	fmt.Println("  Cleared workspace caches (.workspace/) except lock files")
+	fmt.Println("  Run 'aimgr repo sync' to re-import from configured sources")
 	return nil
 }
 

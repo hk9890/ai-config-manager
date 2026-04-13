@@ -296,7 +296,8 @@ aimgr repo repair --dry-run           # Preview fixes
 ### Drop All Resources
 
 ```bash
-# Soft drop: remove resources, keep ai.repo.yaml and git history
+# Soft drop: remove imported resources/state, preserve ai.repo.yaml sources
+# (workspace caches are cleared; lock files remain)
 aimgr repo drop
 
 # Rebuild from sources

@@ -101,8 +101,8 @@ func (m *Manager) GetPackage(name string) (*resource.Package, error) {
 	return pkg, nil
 }
 
-// Drop removes the entire repository directory and recreates the empty structure.
+// Drop resets repository state.
 // WARNING: This is a destructive operation that cannot be undone.
-// NOTE: After drop, Init() is called which recreates an empty ai.repo.yaml manifest
-// with no sources. This is the expected behavior for soft drop - the repository
-// is ready to accept new sources via 'repo add' or 'repo sync'.
+// NOTE: Soft drop preserves ai.repo.yaml (including configured sources),
+// clears imported resources and derived local state, and can be recovered
+// with 'repo sync'. Full delete removes the entire repository directory.

@@ -116,60 +116,51 @@ func parseGitHubPrefix(input string) (*ParsedSource, error) {
 		return nil, fmt.Errorf("GitHub source cannot be empty")
 	}
 
-	// Split on @ to extract ref if present
-	var ref string
-	var repoPath string
-
-	atIndex := strings.Index(input, "@")
-	if atIndex != -1 {
-		repoPath = input[:atIndex]
-		// Everything after @ is either just ref or ref/subpath
-		refAndPath := input[atIndex+1:]
-
-		// Find the next slash to separate ref from subpath
-		slashIndex := strings.Index(refAndPath, "/")
-		if slashIndex != -1 {
-			ref = refAndPath[:slashIndex]
-			// Subpath will be extracted later
-		} else {
-			ref = refAndPath
-		}
-	} else {
-		repoPath = input
-	}
-
-	// Extract owner/repo and optional subpath
-	parts := strings.SplitN(repoPath, "/", 3)
-	if len(parts) < 2 {
+	parts := strings.SplitN(input, "/", 3)
+	if len(parts) < 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
 		return nil, fmt.Errorf("invalid GitHub source format: must be owner/repo")
 	}
 
-	owner := parts[0]
-	repo := strings.TrimSuffix(parts[1], ".git")
+	owner := strings.TrimSpace(parts[0])
+	repoAndRef := strings.TrimSpace(parts[1])
+	trailingSubpath := ""
+	if len(parts) == 3 {
+		trailingSubpath = parts[2]
+	}
+
+	repo := repoAndRef
+	ref := ""
+	if atIdx := strings.Index(repoAndRef, "@"); atIdx != -1 {
+		repo = repoAndRef[:atIdx]
+		ref = repoAndRef[atIdx+1:]
+		if ref == "" {
+			return nil, fmt.Errorf("invalid GitHub source format: ref cannot be empty")
+		}
+	}
+	repo = strings.TrimSuffix(repo, ".git")
 
 	if owner == "" || repo == "" {
 		return nil, fmt.Errorf("GitHub owner and repo cannot be empty")
 	}
-
-	var subpath string
-	if len(parts) > 2 {
-		subpath = parts[2]
+	if strings.Contains(owner, "@") {
+		return nil, fmt.Errorf("invalid GitHub source format: owner cannot contain '@'")
+	}
+	if strings.Contains(repo, "@") {
+		return nil, fmt.Errorf("invalid GitHub source format: repo cannot contain '@'")
+	}
+	if strings.Contains(ref, "@") {
+		return nil, fmt.Errorf("invalid GitHub source format: ref cannot contain '@'")
 	}
 
-	// If we have a ref, we need to reconstruct subpath from the original input
-	if ref != "" && atIndex != -1 {
-		// Find subpath after ref
-		refAndPath := input[atIndex+1:]
-		slashIndex := strings.Index(refAndPath, "/")
-		if slashIndex != -1 {
-			subpath = refAndPath[slashIndex+1:]
-		}
+	subpath, err := normalizeGitHubSubpath(trailingSubpath)
+	if err != nil {
+		return nil, err
+	}
+	if ref == "" && strings.Contains(subpath, "@") {
+		return nil, fmt.Errorf("invalid GitHub source format: use gh:owner/repo@ref/path (ref must come before subpath)")
 	}
 
 	githubURL := fmt.Sprintf("https://github.com/%s/%s", owner, repo)
-	if ref != "" {
-		githubURL = fmt.Sprintf("%s/tree/%s", githubURL, ref)
-	}
 
 	return &ParsedSource{
 		Type:    GitHub,
@@ -240,8 +231,8 @@ func parseHTTPURL(input string) (*ParsedSource, error) {
 	urlStr := parsedURL.String()
 	var subpath string
 	if idx := strings.Index(urlStr, ".git/"); idx != -1 {
-		subpath = urlStr[idx+5:] // everything after ".git/"
-		urlStr = urlStr[:idx+4]  // keep up to and including ".git"
+		subpath = normalizeParsedSubpath(urlStr[idx+5:]) // everything after ".git/"
+		urlStr = urlStr[:idx+4]                          // keep up to and including ".git"
 	}
 
 	return &ParsedSource{
@@ -300,12 +291,12 @@ func looksLikeMarketplaceManifestPath(rawPath string) bool {
 //   - https://github.com/owner/repo/tree/branch
 //   - https://github.com/owner/repo/tree/branch/path/to/resource
 func parseGitHubURL(input string) (*ParsedSource, error) {
-	// Remove trailing .git if present
-	input = strings.TrimSuffix(input, ".git")
-
 	parsedURL, err := url.Parse(input)
 	if err != nil {
 		return nil, fmt.Errorf("invalid GitHub URL: %w", err)
+	}
+	if strings.HasSuffix(parsedURL.Path, ".git/") {
+		return nil, fmt.Errorf("invalid GitHub URL: expected subpath after .git/")
 	}
 
 	// Extract owner/repo from path
@@ -315,7 +306,8 @@ func parseGitHubURL(input string) (*ParsedSource, error) {
 	}
 
 	owner := pathParts[0]
-	repo := pathParts[1]
+	repoRaw := pathParts[1]
+	repo := strings.TrimSuffix(repoRaw, ".git")
 
 	if owner == "" || repo == "" {
 		return nil, fmt.Errorf("GitHub owner and repo cannot be empty")
@@ -325,11 +317,26 @@ func parseGitHubURL(input string) (*ParsedSource, error) {
 	var subpath string
 
 	// Check for /tree/branch or /blob/branch format
-	if len(pathParts) >= 4 && (pathParts[2] == "tree" || pathParts[2] == "blob") {
+	if len(pathParts) >= 3 && (pathParts[2] == "tree" || pathParts[2] == "blob") {
+		if len(pathParts) < 4 || strings.TrimSpace(pathParts[3]) == "" {
+			return nil, fmt.Errorf("invalid GitHub URL: /%s requires a ref segment", pathParts[2])
+		}
 		ref = pathParts[3]
 		// Subpath is everything after the ref
 		if len(pathParts) > 4 {
-			subpath = strings.Join(pathParts[4:], "/")
+			subpath, err = normalizeGitHubSubpath(strings.Join(pathParts[4:], "/"))
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else if strings.HasSuffix(repoRaw, ".git") && len(pathParts) > 2 {
+		// Clone-style URL with explicit .git delimiter and repo-relative subpath.
+		subpath, err = normalizeGitHubSubpath(strings.Join(pathParts[2:], "/"))
+		if err != nil {
+			return nil, err
+		}
+		if subpath == "" {
+			return nil, fmt.Errorf("invalid GitHub URL: expected subpath after .git/")
 		}
 	}
 
@@ -341,6 +348,36 @@ func parseGitHubURL(input string) (*ParsedSource, error) {
 		Ref:     ref,
 		Subpath: subpath,
 	}, nil
+}
+
+func normalizeParsedSubpath(subpath string) string {
+	trimmed := strings.TrimSpace(strings.ReplaceAll(subpath, "\\", "/"))
+	if trimmed == "" {
+		return ""
+	}
+
+	cleaned := path.Clean(strings.TrimPrefix(trimmed, "/"))
+	if cleaned == "." || cleaned == "/" {
+		return ""
+	}
+
+	return strings.TrimPrefix(cleaned, "/")
+}
+
+func normalizeGitHubSubpath(subpath string) (string, error) {
+	normalizedSeparators := strings.ReplaceAll(strings.TrimSpace(subpath), "\\", "/")
+	for _, segment := range strings.Split(normalizedSeparators, "/") {
+		if segment == ".." {
+			return "", fmt.Errorf("invalid GitHub subpath %q: parent traversal (..) is not supported", subpath)
+		}
+	}
+
+	normalized := normalizeParsedSubpath(subpath)
+	if normalized == ".." || strings.HasPrefix(normalized, "../") {
+		return "", fmt.Errorf("invalid GitHub subpath %q: parent traversal (..) is not supported", subpath)
+	}
+
+	return normalized, nil
 }
 
 // parseGitLabURL parses a full GitLab URL
@@ -402,14 +439,7 @@ func GetCloneURL(ps *ParsedSource) (string, error) {
 
 	switch ps.Type {
 	case GitHub:
-		// Convert GitHub URL to git clone URL
-		// https://github.com/owner/repo/tree/branch -> https://github.com/owner/repo
-		url := ps.URL
-		// Remove /tree/ref suffix if present
-		if ps.Ref != "" {
-			url = strings.TrimSuffix(url, fmt.Sprintf("/tree/%s", ps.Ref))
-		}
-		return url, nil
+		return ps.URL, nil
 
 	case GitLab:
 		return ps.URL, nil

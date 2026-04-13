@@ -37,7 +37,7 @@ func TestParseSource_GitHubPrefix(t *testing.T) {
 			name:        "with ref",
 			input:       "gh:owner/repo@main",
 			wantType:    GitHub,
-			wantURL:     "https://github.com/owner/repo/tree/main",
+			wantURL:     "https://github.com/owner/repo",
 			wantRef:     "main",
 			wantSubpath: "",
 			wantError:   false,
@@ -46,10 +46,20 @@ func TestParseSource_GitHubPrefix(t *testing.T) {
 			name:        "with ref and subpath",
 			input:       "gh:owner/repo@main/path/to/skill",
 			wantType:    GitHub,
-			wantURL:     "https://github.com/owner/repo/tree/main",
+			wantURL:     "https://github.com/owner/repo",
 			wantRef:     "main",
 			wantSubpath: "path/to/skill",
 			wantError:   false,
+		},
+		{
+			name:      "ambiguous ref-after-subpath not supported",
+			input:     "gh:owner/repo/path/to/skill@main",
+			wantError: true,
+		},
+		{
+			name:      "empty ref rejected",
+			input:     "gh:owner/repo@",
+			wantError: true,
 		},
 		{
 			name:        "with .git suffix",
@@ -205,6 +215,15 @@ func TestParseSource_GitHubURL(t *testing.T) {
 			wantError:   false,
 		},
 		{
+			name:        "GitHub .git delimiter URL with subpath",
+			input:       "https://github.com/owner/repo.git/skills/frontend",
+			wantType:    GitHub,
+			wantURL:     "https://github.com/owner/repo",
+			wantRef:     "",
+			wantSubpath: "skills/frontend",
+			wantError:   false,
+		},
+		{
 			name:        "GitHub blob URL",
 			input:       "https://github.com/owner/repo/blob/main/README.md",
 			wantType:    GitHub,
@@ -269,6 +288,16 @@ func TestParseSource_RepoBackedMarketplaceFailures(t *testing.T) {
 		errContain string
 	}{
 		{
+			name:       "GitHub tree URL without ref rejected",
+			input:      "https://github.com/owner/repo/tree",
+			errContain: "/tree requires a ref segment",
+		},
+		{
+			name:       "GitHub .git delimiter URL without subpath rejected",
+			input:      "https://github.com/owner/repo.git/",
+			errContain: "expected subpath after .git/",
+		},
+		{
 			name:       "github marketplace path without blob ref is rejected",
 			input:      "https://github.com/owner/repo/marketplace.json",
 			errContain: "repo-backed /blob/<ref>/.../marketplace.json",
@@ -303,6 +332,54 @@ func TestParseSource_RepoBackedMarketplaceFailures(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tt.errContain) {
 				t.Fatalf("ParseSource(%q) error = %q, want contain %q", tt.input, err.Error(), tt.errContain)
+			}
+		})
+	}
+}
+
+func TestParseSource_GitHubSubpathRejectsParentTraversal(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "gh shorthand traversal",
+			input: "gh:owner/repo/../outside",
+		},
+		{
+			name:  "gh shorthand with ref traversal",
+			input: "gh:owner/repo@main/../outside",
+		},
+		{
+			name:  "github tree traversal",
+			input: "https://github.com/owner/repo/tree/main/../outside",
+		},
+		{
+			name:  "github git delimiter traversal",
+			input: "https://github.com/owner/repo.git/../outside",
+		},
+		{
+			name:  "gh shorthand embedded traversal segment",
+			input: "gh:owner/repo/path/../outside",
+		},
+		{
+			name:  "github tree embedded traversal segment",
+			input: "https://github.com/owner/repo/tree/main/path/../outside",
+		},
+		{
+			name:  "gh shorthand windows traversal separator",
+			input: "gh:owner/repo@main/..\\outside",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseSource(tt.input)
+			if err == nil {
+				t.Fatalf("ParseSource(%q) expected error, got nil", tt.input)
+			}
+			if !strings.Contains(err.Error(), "parent traversal") {
+				t.Fatalf("ParseSource(%q) error = %q, want parent traversal message", tt.input, err.Error())
 			}
 		})
 	}
