@@ -637,6 +637,32 @@ func TestMerge_OverlaySemantics(t *testing.T) {
 	}
 }
 
+func TestMerge_CanonicalSourceIdentityIgnoresRefButKeepsDistinctSubpaths(t *testing.T) {
+	base := &Manifest{
+		Sources: []ManifestSource{
+			{URL: "https://github.com/example/catalog", Name: "base-a", Ref: "main", Subpath: "resources/a"},
+		},
+	}
+
+	local := &Manifest{
+		Sources: []ManifestSource{
+			{URL: "https://github.com/example/catalog.git", Name: "alias-a", Ref: "release/v2", Subpath: "resources/a"},
+			{URL: "https://github.com/example/catalog", Name: "alias-b", Ref: "release/v2", Subpath: "resources/b"},
+		},
+	}
+
+	merged := Merge(base, local)
+
+	wantSources := []ManifestSource{
+		{URL: "https://github.com/example/catalog", Name: "base-a", Ref: "main", Subpath: "resources/a"},
+		{URL: "https://github.com/example/catalog", Name: "alias-b", Ref: "release/v2", Subpath: "resources/b"},
+	}
+
+	if !reflect.DeepEqual(merged.Sources, wantSources) {
+		t.Fatalf("sources mismatch:\n got: %+v\nwant: %+v", merged.Sources, wantSources)
+	}
+}
+
 func TestLoadProjectManifests(t *testing.T) {
 	t.Run("base only", func(t *testing.T) {
 		projectDir := t.TempDir()

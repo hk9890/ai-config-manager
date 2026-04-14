@@ -13,9 +13,12 @@ Every source requires an **explicit prefix or scheme**. There is no implicit for
 | Format | Example | Type |
 |--------|---------|------|
 | `gh:owner/repo` | `gh:my-org/ai-tools` | GitHub |
+| `gh:owner/repo --ref <ref>` | `gh:my-org/ai-tools --ref v1.0.0` | GitHub (preferred pinned syntax) |
+| `gh:owner/repo --subpath <path>` | `gh:my-org/ai-tools --subpath skills/frontend` | GitHub (preferred subpath syntax) |
+| `gh:owner/repo --ref <ref> --subpath <path>` | `gh:my-org/ai-tools --ref main --subpath skills` | GitHub (preferred ref+subpath syntax) |
 | `gh:owner/repo/path/to/marketplace.json` | `gh:my-org/ai-tools/.claude-plugin/marketplace.json` | GitHub marketplace file |
 | `gh:owner/repo@ref` | `gh:my-org/ai-tools@v1.0.0` | GitHub (pinned) |
-| `gh:owner/repo@ref/path` | `gh:my-org/ai-tools@main/skills` | GitHub (subpath) |
+| `gh:owner/repo@ref/path` | `gh:my-org/ai-tools@main/skills` | GitHub legacy inline compatibility syntax (unambiguous refs only) |
 | `https://host/path` | `https://github.com/owner/repo` | HTTPS Git URL |
 | `https://host/repo.git/path` | `https://git.example.com/scm/proj/repo.git/skills` | HTTPS + subpath |
 | `https://host/repo.git/path/to/marketplace.json` | `https://github.com/owner/repo.git/.claude-plugin/marketplace.json` | HTTPS marketplace file |
@@ -29,15 +32,27 @@ Every source requires an **explicit prefix or scheme**. There is no implicit for
 The `gh:` prefix is a convenience for GitHub repositories. It constructs the full `https://github.com/...` URL automatically.
 
 ```bash
-gh:owner/repo                  # → https://github.com/owner/repo
-gh:owner/repo@v1.0.0           # Pinned to tag v1.0.0
-gh:owner/repo@main             # Pinned to branch main
-gh:owner/repo/skills/frontend  # Only resources under skills/frontend
-gh:owner/repo@v1.0.0/skills    # Pinned version + subpath
+aimgr repo add gh:owner/repo                         # → https://github.com/owner/repo
+aimgr repo add gh:owner/repo --ref v1.0.0           # Preferred pinned ref
+aimgr repo add gh:owner/repo --ref main             # Preferred branch pin
+aimgr repo add gh:owner/repo --subpath skills/frontend
+aimgr repo add gh:owner/repo --ref v1.0.0 --subpath skills
 ```
 
-For `gh:` sources with both `ref` and `subpath`, use `gh:owner/repo@ref/path`.
+For `gh:` sources with both `ref` and `subpath`, explicit `--ref` / `--subpath`
+is the primary UX. Legacy inline `gh:owner/repo@ref/path` remains compatibility
+support only, and only for **unambiguous** refs. When the ref itself contains
+`/` and you also need a subpath, inline parsing is ambiguous and rejected; use
+explicit flags:
+
+```bash
+aimgr repo add gh:owner/repo --ref release/v1 --subpath skills/core
+```
+
 The reversed form `gh:owner/repo/path@ref` is ambiguous and rejected.
+Compatibility note: if you already use inline forms (`@ref`, `/subpath`, or
+`@ref/subpath`) they still work when unambiguous, but new examples and guidance
+use explicit flags.
 Subpaths must stay repository-relative; parent traversal segments like `..` are
 rejected across `gh:`, GitHub `/tree/<ref>/...`, and GitHub `.git/<subpath>` forms.
 
@@ -596,15 +611,17 @@ aimgr repo add git@github.com:owner/repo.git
 
 ### Specifying Refs (Branches/Tags)
 
-Use `@ref` with the `gh:` shorthand:
+Preferred: use `--ref` with the `gh:` shorthand:
 
 ```bash
 # Specific branch
-aimgr repo add gh:owner/repo@develop
+aimgr repo add gh:owner/repo --ref develop
 
 # Specific tag (recommended for stability)
-aimgr repo add gh:owner/repo@v1.2.0
+aimgr repo add gh:owner/repo --ref v1.2.0
 ```
+
+Legacy inline `gh:owner/repo@ref` is still accepted for compatibility.
 
 Or use `/tree/ref` with full GitHub URLs:
 
@@ -615,18 +632,24 @@ aimgr repo add https://github.com/owner/repo/tree/develop
 
 ### Specifying Subpaths
 
-Add a subpath after the repository to target a specific directory:
+Preferred: use `--subpath` to target a specific directory:
 
 ```bash
-# Resources in a subdirectory (shorthand)
-aimgr repo add gh:owner/repo/skills/frontend
+# Resources in a subdirectory
+aimgr repo add gh:owner/repo --subpath skills/frontend
 
-# Subpath with ref (shorthand)
-aimgr repo add gh:owner/repo@v1.0.0/skills
+# Subpath with ref
+aimgr repo add gh:owner/repo --ref v1.0.0 --subpath skills
+
+# Required when ref contains '/'
+aimgr repo add gh:owner/repo --ref release/v1 --subpath skills/core
 
 # Subpath via full URL
 aimgr repo add https://github.com/owner/repo/tree/main/skills/frontend
 ```
+
+Legacy inline compatibility forms (`gh:owner/repo/subpath` and
+`gh:owner/repo@ref/path`) are still accepted when unambiguous.
 
 ### Complete Examples
 
@@ -635,10 +658,13 @@ aimgr repo add https://github.com/owner/repo/tree/main/skills/frontend
 aimgr repo add gh:owner/repo
 
 # Specific version
-aimgr repo add gh:owner/repo@v2.0.0 --name=stable-tools
+aimgr repo add gh:owner/repo --ref v2.0.0 --name=stable-tools
 
 # Specific directory and version
-aimgr repo add gh:owner/mono-repo@v1.0.0/skills/frontend
+aimgr repo add gh:owner/mono-repo --ref v1.0.0 --subpath skills/frontend
+
+# Slash-containing ref + subpath (use explicit flags to avoid ambiguity)
+aimgr repo add gh:owner/mono-repo --ref release/v1 --subpath skills/frontend
 
 # SSH with custom name
 aimgr repo add git@github.com:owner/repo.git --name=my-tools
@@ -999,7 +1025,7 @@ git tag v1.0.0 && git push origin v1.0.0
 
 # Remove local source, add remote
 aimgr repo remove my-skills --keep-resources
-aimgr repo add gh:myuser/my-skills@v1.0.0 --name=my-skills --force
+aimgr repo add gh:myuser/my-skills --ref v1.0.0 --name=my-skills --force
 ```
 
 ### Converting Remote to Local
@@ -1162,7 +1188,7 @@ Error: no resources found in repository
 **Solutions:**
 
 - Check repository structure matches expected locations
-- Use a subpath: `aimgr repo add https://github.com/owner/repo/path/to/resources`
+- Use a subpath: `aimgr repo add https://github.com/owner/repo --subpath path/to/resources`
 - Verify resources have valid frontmatter (SKILL.md with name and description)
 
 ### Duplicate Source Names
@@ -1241,7 +1267,7 @@ aimgr repo add gh:owner/repo  # → "repo"
 
 ```bash
 # Stable - pinned to version
-aimgr repo add gh:owner/repo@v1.2.0
+aimgr repo add gh:owner/repo --ref v1.2.0
 
 # Risky - tracks latest (may break)
 aimgr repo add gh:owner/repo

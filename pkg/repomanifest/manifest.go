@@ -12,6 +12,7 @@ import (
 
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/fileutil"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/pattern"
+	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/source"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/sourcemetadata"
 )
 
@@ -303,9 +304,29 @@ func (m *Manifest) RemoveSource(identifier string) (*Source, error) {
 		}
 	}
 
-	// Second pass: match by name, path, or URL
+	// Second pass: match by name
 	for i, source := range m.Sources {
-		if source.Name == identifier || source.Path == identifier || source.URL == identifier {
+		if source.Name == identifier {
+			m.Sources = append(m.Sources[:i], m.Sources[i+1:]...)
+			return source, nil
+		}
+	}
+
+	// Third pass: canonical remote identifier lookup. This allows manifest-driven
+	// remove flows to use persisted URL/ref/subpath state (identity = URL+subpath)
+	// instead of depending on inline parser semantics in the identifier string.
+	if source, found := m.findRemoteSourceByIdentifier(identifier); found {
+		for i, existing := range m.Sources {
+			if existing == source {
+				m.Sources = append(m.Sources[:i], m.Sources[i+1:]...)
+				return source, nil
+			}
+		}
+	}
+
+	// Fourth pass: legacy exact path/URL matching for backward compatibility.
+	for i, source := range m.Sources {
+		if source.Path == identifier || source.URL == identifier {
 			m.Sources = append(m.Sources[:i], m.Sources[i+1:]...)
 			return source, nil
 		}
@@ -329,14 +350,44 @@ func (m *Manifest) GetSource(identifier string) (*Source, bool) {
 		}
 	}
 
-	// Second pass: match by name, path, or URL
+	// Second pass: match by name
 	for _, source := range m.Sources {
-		if source.Name == identifier || source.Path == identifier || source.URL == identifier {
+		if source.Name == identifier {
+			return source, true
+		}
+	}
+
+	// Third pass: canonical remote identifier lookup (normalized URL+subpath;
+	// ref intentionally ignored).
+	if source, found := m.findRemoteSourceByIdentifier(identifier); found {
+		return source, true
+	}
+
+	// Fourth pass: legacy exact path/URL matching for backward compatibility.
+	for _, source := range m.Sources {
+		if source.Path == identifier || source.URL == identifier {
 			return source, true
 		}
 	}
 
 	return nil, false
+}
+
+func (m *Manifest) findRemoteSourceByIdentifier(identifier string) (*Source, bool) {
+	parsed, err := source.ParseSource(identifier)
+	if err != nil {
+		return nil, false
+	}
+
+	if parsed == nil || parsed.URL == "" {
+		return nil, false
+	}
+
+	if parsed.Type == source.Local {
+		return nil, false
+	}
+
+	return m.FindRemoteSourceByCanonical(parsed.URL, parsed.Subpath)
 }
 
 // FindRemoteSourceByCanonical finds a remote source by canonical URL+subpath

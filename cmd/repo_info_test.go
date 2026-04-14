@@ -11,6 +11,7 @@ import (
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repo"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/repomanifest"
 	"github.com/dynatrace-oss/ai-config-manager/v3/pkg/sourcemetadata"
+	"gopkg.in/yaml.v3"
 )
 
 func TestFormatInclude(t *testing.T) {
@@ -104,9 +105,16 @@ func TestRenderSourcesTableIncludeColumn(t *testing.T) {
 		}
 	}
 
-	// Also confirm renderSourcesTable doesn't return an error
-	if err := renderSourcesTable(sources, metadata); err != nil {
-		t.Errorf("renderSourcesTable() error = %v", err)
+	stdout, _ := captureOutput(t, func() {
+		if err := renderSourcesTable(sources, metadata); err != nil {
+			t.Fatalf("renderSourcesTable() error = %v", err)
+		}
+	})
+
+	for _, expected := range []string{"INCLUDE", "all", "skills/*"} {
+		if !strings.Contains(stdout, expected) {
+			t.Fatalf("expected sources table output to contain %q, got:\n%s", expected, stdout)
+		}
 	}
 }
 
@@ -298,6 +306,181 @@ func TestBuildRepoInfoOutput_OverriddenSourceIncludesRestoreFields(t *testing.T)
 	}
 	if got.RestoreTo == "" || !strings.Contains(got.RestoreTo, "https://github.com/example/tools") {
 		t.Fatalf("expected restore target in structured output, got %q", got.RestoreTo)
+	}
+}
+
+func TestBuildRepoInfoOutput_IncludesSourceIdentityFieldsForStructuredOutput(t *testing.T) {
+	manifest := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{
+		{
+			Name:    "remote-root",
+			URL:     "https://github.com/example/root",
+			Ref:     "main",
+			Subpath: "",
+		},
+		{
+			Name:    "remote-subpath",
+			URL:     "https://github.com/example/tools",
+			Ref:     "release-2026",
+			Subpath: "skills/core",
+		},
+		{
+			Name: "remote-default",
+			URL:  "https://github.com/example/default",
+		},
+	}}
+
+	metadata := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{}}
+	out := buildRepoInfoOutput("/tmp/repo", 0, 0, 0, 0, 0, manifest, metadata)
+
+	if len(out.Sources) != 3 {
+		t.Fatalf("expected 3 sources, got %d", len(out.Sources))
+	}
+
+	root := out.Sources[0]
+	if root.Location != "https://github.com/example/root" {
+		t.Fatalf("expected root source location to stay URL-only, got %q", root.Location)
+	}
+	if root.Ref != "main" {
+		t.Fatalf("expected ref=main, got %q", root.Ref)
+	}
+	if root.Subpath != "" {
+		t.Fatalf("expected empty subpath for repo root source, got %q", root.Subpath)
+	}
+
+	subpath := out.Sources[1]
+	if subpath.Ref != "release-2026" {
+		t.Fatalf("expected ref=release-2026, got %q", subpath.Ref)
+	}
+	if subpath.Subpath != "skills/core" {
+		t.Fatalf("expected subpath=skills/core, got %q", subpath.Subpath)
+	}
+
+	defaultSource := out.Sources[2]
+	if defaultSource.Ref != "" {
+		t.Fatalf("expected empty ref for default source, got %q", defaultSource.Ref)
+	}
+	if defaultSource.Subpath != "" {
+		t.Fatalf("expected empty subpath for default source, got %q", defaultSource.Subpath)
+	}
+}
+
+func TestBuildRepoInfoOutput_JSONAndYAMLOmitUnsetSourceIdentityFields(t *testing.T) {
+	manifest := &repomanifest.Manifest{Version: 1, Sources: []*repomanifest.Source{
+		{
+			Name: "remote-default",
+			URL:  "https://github.com/example/default",
+		},
+		{
+			Name:    "remote-pinned",
+			URL:     "https://github.com/example/pinned",
+			Ref:     "stable",
+			Subpath: "agents",
+		},
+	}}
+
+	metadata := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{}}
+	out := buildRepoInfoOutput("/tmp/repo", 0, 0, 0, 0, 0, manifest, metadata)
+
+	jsonBytes, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("failed to marshal json: %v", err)
+	}
+
+	var jsonParsed map[string]any
+	if err := json.Unmarshal(jsonBytes, &jsonParsed); err != nil {
+		t.Fatalf("failed to unmarshal json: %v", err)
+	}
+
+	jsonSources, ok := jsonParsed["sources"].([]any)
+	if !ok || len(jsonSources) != 2 {
+		t.Fatalf("expected 2 json sources, got %#v", jsonParsed["sources"])
+	}
+
+	jsonDefault, ok := jsonSources[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first json source object, got %#v", jsonSources[0])
+	}
+	if _, exists := jsonDefault["ref"]; exists {
+		t.Fatalf("expected json default source to omit ref, got %#v", jsonDefault["ref"])
+	}
+	if _, exists := jsonDefault["subpath"]; exists {
+		t.Fatalf("expected json default source to omit subpath, got %#v", jsonDefault["subpath"])
+	}
+
+	jsonPinned, ok := jsonSources[1].(map[string]any)
+	if !ok {
+		t.Fatalf("expected second json source object, got %#v", jsonSources[1])
+	}
+	if jsonPinned["ref"] != "stable" {
+		t.Fatalf("expected json ref=stable, got %#v", jsonPinned["ref"])
+	}
+	if jsonPinned["subpath"] != "agents" {
+		t.Fatalf("expected json subpath=agents, got %#v", jsonPinned["subpath"])
+	}
+
+	yamlBytes, err := yaml.Marshal(out)
+	if err != nil {
+		t.Fatalf("failed to marshal yaml: %v", err)
+	}
+
+	var yamlParsed map[string]any
+	if err := yaml.Unmarshal(yamlBytes, &yamlParsed); err != nil {
+		t.Fatalf("failed to unmarshal yaml: %v", err)
+	}
+
+	yamlSources, ok := yamlParsed["sources"].([]any)
+	if !ok || len(yamlSources) != 2 {
+		t.Fatalf("expected 2 yaml sources, got %#v", yamlParsed["sources"])
+	}
+
+	yamlDefault, ok := yamlSources[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first yaml source object, got %#v", yamlSources[0])
+	}
+	if _, exists := yamlDefault["ref"]; exists {
+		t.Fatalf("expected yaml default source to omit ref, got %#v", yamlDefault["ref"])
+	}
+	if _, exists := yamlDefault["subpath"]; exists {
+		t.Fatalf("expected yaml default source to omit subpath, got %#v", yamlDefault["subpath"])
+	}
+
+	yamlPinned, ok := yamlSources[1].(map[string]any)
+	if !ok {
+		t.Fatalf("expected second yaml source object, got %#v", yamlSources[1])
+	}
+	if yamlPinned["ref"] != "stable" {
+		t.Fatalf("expected yaml ref=stable, got %#v", yamlPinned["ref"])
+	}
+	if yamlPinned["subpath"] != "agents" {
+		t.Fatalf("expected yaml subpath=agents, got %#v", yamlPinned["subpath"])
+	}
+}
+
+func TestRenderSourcesTable_ShowsRefAndSubpathIdentity(t *testing.T) {
+	sources := []*repomanifest.Source{
+		{
+			Name: "repo-root",
+			URL:  "https://github.com/example/catalog",
+		},
+		{
+			Name:    "pinned-subpath",
+			URL:     "https://github.com/example/catalog",
+			Ref:     "release-2026",
+			Subpath: "skills/platform",
+		},
+	}
+	metadata := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{}}
+
+	stdout, _ := captureOutput(t, func() {
+		if err := renderSourcesTable(sources, metadata); err != nil {
+			t.Fatalf("renderSourcesTable() failed: %v", err)
+		}
+	})
+
+	for _, expected := range []string{"repo root", "ref \"release-2026\"", "subpath \"skills/platform\""} {
+		if !strings.Contains(stdout, expected) {
+			t.Fatalf("expected table output to contain %q, got:\n%s", expected, stdout)
+		}
 	}
 }
 

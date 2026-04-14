@@ -320,7 +320,7 @@ With the same user-local repo:
 2. `project-b` install reuses that same canonical source (`url + subpath`)
 3. install warns that requested `ref` differs and keeps existing source unchanged
 
-To intentionally change the shared source ref, update the source via repo workflow (`aimgr repo add <url>@<new-ref> ...` or `aimgr repo sync` after explicit repo-source update), then re-run project install.
+To intentionally change the shared source ref, update the source via repo workflow (`aimgr repo add <url> --ref <new-ref> ...` or `aimgr repo sync` after explicit repo-source update), then re-run project install.
 
 ### Warning and failure behavior to expect
 

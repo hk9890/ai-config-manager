@@ -1899,6 +1899,50 @@ func TestParsedRemoteSourceForManifestEntry_UsesManifestRefAndSubpath(t *testing
 	}
 }
 
+func TestParsedRemoteSourceForManifestEntry_StoredFieldsOverrideInlineURLCoordinates(t *testing.T) {
+	src := &repomanifest.Source{
+		URL:     "https://github.com/example/tools/tree/main/legacy-path",
+		Ref:     "release/v2",
+		Subpath: "explicit/resources",
+	}
+
+	parsed, err := parsedRemoteSourceForManifestEntry(src)
+	if err != nil {
+		t.Fatalf("parsedRemoteSourceForManifestEntry failed: %v", err)
+	}
+
+	if parsed.URL != "https://github.com/example/tools" {
+		t.Fatalf("parsed URL = %q, want %q", parsed.URL, "https://github.com/example/tools")
+	}
+	if parsed.Ref != "release/v2" {
+		t.Fatalf("parsed ref = %q, want %q", parsed.Ref, "release/v2")
+	}
+	if parsed.Subpath != "explicit/resources" {
+		t.Fatalf("parsed subpath = %q, want %q", parsed.Subpath, "explicit/resources")
+	}
+}
+
+func TestParsedRemoteSourceForManifestEntry_LegacyInlineCoordinatesRemainSupportedWhenManifestFieldsEmpty(t *testing.T) {
+	src := &repomanifest.Source{
+		URL: "https://github.com/example/tools/tree/main/resources",
+	}
+
+	parsed, err := parsedRemoteSourceForManifestEntry(src)
+	if err != nil {
+		t.Fatalf("parsedRemoteSourceForManifestEntry failed: %v", err)
+	}
+
+	if parsed.URL != "https://github.com/example/tools" {
+		t.Fatalf("parsed URL = %q, want %q", parsed.URL, "https://github.com/example/tools")
+	}
+	if parsed.Ref != "main" {
+		t.Fatalf("parsed ref = %q, want %q", parsed.Ref, "main")
+	}
+	if parsed.Subpath != "resources" {
+		t.Fatalf("parsed subpath = %q, want %q", parsed.Subpath, "resources")
+	}
+}
+
 func TestParsedRemoteSourceForManifestEntry_RejectsUnsupportedStandaloneManifestURL(t *testing.T) {
 	src := &repomanifest.Source{
 		URL: "https://example.com/marketplace.json",

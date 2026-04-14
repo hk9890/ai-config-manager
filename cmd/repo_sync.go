@@ -379,13 +379,13 @@ func resolveSourcePathForSync(src *repomanifest.Source, manager *repo.Manager) (
 			return "", fmt.Errorf("failed to get clone URL: %w", err)
 		}
 
-		sourcePath, err := prepareRemoteSourcePath(wsMgr, cloneURL, src.Ref)
+		sourcePath, err := prepareRemoteSourcePath(wsMgr, cloneURL, parsed.Ref)
 		if err != nil {
 			return "", err
 		}
 
-		if src.Subpath != "" {
-			sourcePath = filepath.Join(sourcePath, src.Subpath)
+		if parsed.Subpath != "" {
+			sourcePath = filepath.Join(sourcePath, parsed.Subpath)
 		}
 
 		return sourcePath, nil
@@ -412,10 +412,12 @@ func parsedRemoteSourceForManifestEntry(src *repomanifest.Source) (*source.Parse
 		return nil, err
 	}
 
-	if src.Ref != "" {
+	// Manifest-driven operations should use the persisted ref/subpath fields.
+	// Compatibility fallback: when BOTH fields are empty, keep parser-derived
+	// inline values so legacy manifests with inline URL coordinates continue to
+	// function until explicitly migrated.
+	if strings.TrimSpace(src.Ref) != "" || strings.TrimSpace(src.Subpath) != "" {
 		parsed.Ref = src.Ref
-	}
-	if src.Subpath != "" {
 		parsed.Subpath = src.Subpath
 	}
 

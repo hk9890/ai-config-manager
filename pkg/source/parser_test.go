@@ -44,11 +44,11 @@ func TestParseSource_GitHubPrefix(t *testing.T) {
 		},
 		{
 			name:        "with ref and subpath",
-			input:       "gh:owner/repo@main/path/to/skill",
+			input:       "gh:owner/repo@main/skills",
 			wantType:    GitHub,
 			wantURL:     "https://github.com/owner/repo",
 			wantRef:     "main",
-			wantSubpath: "path/to/skill",
+			wantSubpath: "skills",
 			wantError:   false,
 		},
 		{
@@ -111,6 +111,118 @@ func TestParseSource_GitHubPrefix(t *testing.T) {
 			}
 			if got.Subpath != tt.wantSubpath {
 				t.Errorf("ParseSource(%q).Subpath = %v, want %v", tt.input, got.Subpath, tt.wantSubpath)
+			}
+		})
+	}
+}
+
+func TestParseSource_GitHubPrefix_AmbiguousInlineRefSubpathRejectedWithGuidance(t *testing.T) {
+	_, err := ParseSource("gh:owner/repo@release/v1/skills")
+	if err == nil {
+		t.Fatal("expected ambiguous inline @ref/subpath form to fail")
+	}
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "inline @ref/subpath forms cannot safely represent refs containing '/'") {
+		t.Fatalf("unexpected error guidance: %v", err)
+	}
+	if !strings.Contains(errMsg, "--ref <ref> --subpath <path>") {
+		t.Fatalf("expected explicit flag guidance, got: %v", err)
+	}
+}
+
+func TestParseSource_GitHubPrefix_AmbiguousSlashRefWithSubpathRejectedWithGuidance(t *testing.T) {
+	_, err := ParseSource("gh:owner/repo@release/v1/skills/core")
+	if err == nil {
+		t.Fatal("expected ambiguous slash-containing ref + subpath shorthand to fail")
+	}
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "ambiguous GitHub shorthand") {
+		t.Fatalf("expected ambiguity error, got: %v", err)
+	}
+	if !strings.Contains(errMsg, "--ref <ref> --subpath <path>") {
+		t.Fatalf("expected explicit flag guidance, got: %v", err)
+	}
+}
+
+func TestParseSource_GitHubPrefix_AmbiguousSlashRefWithNonAnchorSubpathRejectedWithGuidance(t *testing.T) {
+	_, err := ParseSource("gh:owner/repo@release/v1/docs/OVERVIEW.md")
+	if err == nil {
+		t.Fatal("expected ambiguous slash-containing ref + non-anchor subpath shorthand to fail")
+	}
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "ambiguous GitHub shorthand") {
+		t.Fatalf("expected ambiguity error, got: %v", err)
+	}
+	if !strings.Contains(errMsg, "--ref <ref> --subpath <path>") {
+		t.Fatalf("expected explicit flag guidance, got: %v", err)
+	}
+}
+
+func TestParseSource_GitHubPrefix_NonAmbiguousInlineRefSubpathCompatibility(t *testing.T) {
+	parsed, err := ParseSource("gh:owner/repo@main/skills")
+	if err != nil {
+		t.Fatalf("expected legacy non-ambiguous shorthand to parse, got: %v", err)
+	}
+	if parsed.Ref != "main" {
+		t.Fatalf("Ref = %q, want %q", parsed.Ref, "main")
+	}
+	if parsed.Subpath != "skills" {
+		t.Fatalf("Subpath = %q, want %q", parsed.Subpath, "skills")
+	}
+}
+
+func TestNormalizeExplicitSubpath(t *testing.T) {
+	tests := []struct {
+		name       string
+		sourceType SourceType
+		input      string
+		want       string
+		wantErr    string
+	}{
+		{
+			name:       "github subpath normalizes separators",
+			sourceType: GitHub,
+			input:      "skills\\core",
+			want:       "skills/core",
+		},
+		{
+			name:       "git url subpath trims and cleans",
+			sourceType: GitURL,
+			input:      " /skills/core/ ",
+			want:       "skills/core",
+		},
+		{
+			name:       "empty subpath rejected",
+			sourceType: GitHub,
+			input:      "   ",
+			wantErr:    "subpath cannot be empty",
+		},
+		{
+			name:       "parent traversal rejected",
+			sourceType: GitURL,
+			input:      "../outside",
+			wantErr:    "parent traversal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NormalizeExplicitSubpath(tt.sourceType, tt.input)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("NormalizeExplicitSubpath(%q) expected error containing %q", tt.input, tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("NormalizeExplicitSubpath(%q) error = %q, want contain %q", tt.input, err.Error(), tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("NormalizeExplicitSubpath(%q) unexpected error: %v", tt.input, err)
+			}
+			if got != tt.want {
+				t.Fatalf("NormalizeExplicitSubpath(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -365,6 +477,10 @@ func TestParseSource_GitHubSubpathRejectsParentTraversal(t *testing.T) {
 		{
 			name:  "github tree embedded traversal segment",
 			input: "https://github.com/owner/repo/tree/main/path/../outside",
+		},
+		{
+			name:  "raw github marketplace traversal",
+			input: "https://raw.githubusercontent.com/owner/repo/main/path/../marketplace.json",
 		},
 		{
 			name:  "gh shorthand windows traversal separator",

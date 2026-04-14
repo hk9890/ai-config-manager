@@ -41,6 +41,8 @@ func withRepoAddFlagsReset(t *testing.T, fn func()) {
 	originalFormat := addFormatFlag
 	originalName := nameFlag
 	originalDiscovery := discoveryFlag
+	originalRef := refFlag
+	originalSubpath := subpathFlag
 	originalSilent := syncSilentMode
 
 	forceFlag = false
@@ -50,6 +52,8 @@ func withRepoAddFlagsReset(t *testing.T, fn func()) {
 	addFormatFlag = "table"
 	nameFlag = ""
 	discoveryFlag = repomanifest.DiscoveryModeAuto
+	refFlag = ""
+	subpathFlag = ""
 	syncSilentMode = false
 
 	defer func() {
@@ -60,10 +64,183 @@ func withRepoAddFlagsReset(t *testing.T, fn func()) {
 		addFormatFlag = originalFormat
 		nameFlag = originalName
 		discoveryFlag = originalDiscovery
+		refFlag = originalRef
+		subpathFlag = originalSubpath
 		syncSilentMode = originalSilent
 	}()
 
 	fn()
+}
+
+func TestApplyExplicitRemoteSourceFlags_AppliesToGitHubSource(t *testing.T) {
+	parsed, err := source.ParseSource("gh:owner/repo")
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+
+	err = applyExplicitRemoteSourceFlags(parsed, "gh:owner/repo", "main", "skills/core")
+	if err != nil {
+		t.Fatalf("expected explicit flags to be applied, got error: %v", err)
+	}
+
+	if parsed.Ref != "main" {
+		t.Fatalf("parsed.Ref = %q, want %q", parsed.Ref, "main")
+	}
+	if parsed.Subpath != "skills/core" {
+		t.Fatalf("parsed.Subpath = %q, want %q", parsed.Subpath, "skills/core")
+	}
+}
+
+func TestApplyExplicitRemoteSourceFlags_RejectsMixedInlineRefAndExplicitRef(t *testing.T) {
+	parsed, err := source.ParseSource("gh:owner/repo@main")
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+
+	err = applyExplicitRemoteSourceFlags(parsed, "gh:owner/repo@main", "release", "")
+	if err == nil {
+		t.Fatal("expected mixed inline+explicit ref to fail")
+	}
+	if !strings.Contains(err.Error(), "do not mix inline ref/subpath syntax with --ref/--subpath") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestApplyExplicitRemoteSourceFlags_RejectsMixedInlineSubpathAndExplicitSubpath(t *testing.T) {
+	parsed, err := source.ParseSource("https://example.com/team/repo.git/skills")
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+
+	err = applyExplicitRemoteSourceFlags(parsed, "https://example.com/team/repo.git/skills", "", "agents")
+	if err == nil {
+		t.Fatal("expected mixed inline+explicit subpath to fail")
+	}
+	if !strings.Contains(err.Error(), "do not mix inline ref/subpath syntax with --ref/--subpath") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestApplyExplicitRemoteSourceFlags_RejectsMixedInlineSubpathAndExplicitRef(t *testing.T) {
+	parsed, err := source.ParseSource("https://github.com/dynatrace-oss/ai-config-manager.git/ai-resources/skills/ai-resource-manager")
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+
+	err = applyExplicitRemoteSourceFlags(parsed, "https://github.com/dynatrace-oss/ai-config-manager.git/ai-resources/skills/ai-resource-manager", "main", "")
+	if err == nil {
+		t.Fatal("expected inline subpath + explicit --ref to fail")
+	}
+	if !strings.Contains(err.Error(), "do not mix inline ref/subpath syntax with --ref/--subpath") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestApplyExplicitRemoteSourceFlags_RejectsMixedInlineRefAndExplicitSubpath(t *testing.T) {
+	parsed, err := source.ParseSource("gh:dynatrace-oss/ai-config-manager@main")
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+
+	err = applyExplicitRemoteSourceFlags(parsed, "gh:dynatrace-oss/ai-config-manager@main", "", "ai-resources/skills/ai-resource-manager")
+	if err == nil {
+		t.Fatal("expected inline ref + explicit --subpath to fail")
+	}
+	if !strings.Contains(err.Error(), "do not mix inline ref/subpath syntax with --ref/--subpath") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestApplyExplicitRemoteSourceFlags_RejectsMixedLegacyInlineRefSubpathAndExplicitFlags(t *testing.T) {
+	parsed, err := source.ParseSource("gh:dynatrace-oss/ai-config-manager@main/skills")
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+
+	err = applyExplicitRemoteSourceFlags(parsed, "gh:dynatrace-oss/ai-config-manager@main/skills", "", "skills/core")
+	if err == nil {
+		t.Fatal("expected inline legacy @ref/subpath + explicit --subpath to fail")
+	}
+	if !strings.Contains(err.Error(), "do not mix inline ref/subpath syntax with --ref/--subpath") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestApplyExplicitRemoteSourceFlags_RejectsLocalSources(t *testing.T) {
+	parsed, err := source.ParseSource("local:./resources")
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+
+	err = applyExplicitRemoteSourceFlags(parsed, "local:./resources", "main", "skills")
+	if err == nil {
+		t.Fatal("expected explicit flags on local source to fail")
+	}
+	if !strings.Contains(err.Error(), "only supported for remote sources") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRepoAddHelpText_PrefersExplicitRefSubpathAndDocumentsLegacyCompatibility(t *testing.T) {
+	longHelp := repoAddCmd.Long
+
+	checks := []string{
+		"Preferred explicit ref syntax",
+		"Preferred explicit subpath syntax",
+		"Preferred explicit ref+subpath syntax",
+		"Legacy compatibility forms still parse",
+		"Ambiguous slash-containing refs + subpaths are rejected inline",
+		"use --ref/--subpath",
+	}
+
+	for _, check := range checks {
+		if !strings.Contains(longHelp, check) {
+			t.Fatalf("expected repo add help text to contain %q", check)
+		}
+	}
+}
+
+func TestAddSourceToManifest_StoresExplicitRefAndSubpathForRemote(t *testing.T) {
+	repoPath := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	manager := repo.NewManagerWithPath(repoPath)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("failed to init repo: %v", err)
+	}
+
+	parsed, err := source.ParseSource("gh:owner/repo")
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+	if err := applyExplicitRemoteSourceFlags(parsed, "gh:owner/repo", "main", "skills/core"); err != nil {
+		t.Fatalf("failed to apply explicit source flags: %v", err)
+	}
+
+	withRepoAddFlagsReset(t, func() {
+		if err := addSourceToManifest(manager, parsed, nil, repomanifest.DiscoveryModeAuto); err != nil {
+			t.Fatalf("addSourceToManifest failed: %v", err)
+		}
+	})
+
+	manifest, err := repomanifest.Load(repoPath)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+	if len(manifest.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(manifest.Sources))
+	}
+
+	src := manifest.Sources[0]
+	if src.URL != "https://github.com/owner/repo" {
+		t.Fatalf("source URL = %q, want %q", src.URL, "https://github.com/owner/repo")
+	}
+	if src.Ref != "main" {
+		t.Fatalf("source ref = %q, want %q", src.Ref, "main")
+	}
+	if src.Subpath != "skills/core" {
+		t.Fatalf("source subpath = %q, want %q", src.Subpath, "skills/core")
+	}
 }
 
 func TestRepoAdd_DiscoveryFlagValidation(t *testing.T) {
@@ -85,6 +262,133 @@ func TestRepoAdd_DiscoveryFlagValidation(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestRepoAdd_AmbiguousInlineGitHubRefSubpathRejectedBeforeRepoWork(t *testing.T) {
+	withRepoAddFlagsReset(t, func() {
+		err := repoAddCmd.RunE(repoAddCmd, []string{"gh:owner/repo@feature/x/skills"})
+		if err == nil {
+			t.Fatal("expected ambiguous inline slash-ref shorthand to fail")
+		}
+
+		errMsg := err.Error()
+		if !strings.Contains(errMsg, "ambiguous GitHub shorthand") {
+			t.Fatalf("expected ambiguous shorthand error, got: %v", err)
+		}
+		if !strings.Contains(errMsg, "--ref <ref> --subpath <path>") {
+			t.Fatalf("expected explicit --ref/--subpath guidance, got: %v", err)
+		}
+	})
+}
+
+func TestAddBulkFromGitHub_NonAmbiguousLegacyInlineRefSubpathWorksInDryRun(t *testing.T) {
+	repoPath := t.TempDir()
+	t.Setenv("AIMGR_REPO_PATH", repoPath)
+
+	manager := repo.NewManagerWithPath(repoPath)
+	if err := manager.Init(); err != nil {
+		t.Fatalf("failed to init repo: %v", err)
+	}
+
+	remoteOrigin, worktreePath := createRemoteGitSource(t)
+	if err := os.MkdirAll(filepath.Join(worktreePath, "skills", "example-skill"), 0755); err != nil {
+		t.Fatalf("failed to create skill dir: %v", err)
+	}
+	skillContent := "---\nname: example-skill\ndescription: example\n---\n# Example\n"
+	if err := os.WriteFile(filepath.Join(worktreePath, "skills", "example-skill", "SKILL.md"), []byte(skillContent), 0644); err != nil {
+		t.Fatalf("failed to write SKILL.md: %v", err)
+	}
+	runGit(t, worktreePath, "add", ".")
+	runGit(t, worktreePath, "-c", "user.name=Test User", "-c", "user.email=test@example.com", "commit", "-m", "add example skill")
+	runGit(t, worktreePath, "push", "origin", "main")
+
+	parsed, err := source.ParseSource("gh:owner/repo@main/skills")
+	if err != nil {
+		t.Fatalf("expected non-ambiguous legacy shorthand to parse, got: %v", err)
+	}
+	// Redirect clone target to local test remote while preserving parsed ref/subpath.
+	parsed.URL = remoteOrigin
+
+	withRepoAddFlagsReset(t, func() {
+		dryRunFlag = true
+		if err := addBulkFromGitHub(parsed, manager); err != nil {
+			t.Fatalf("expected addBulkFromGitHub dry-run to succeed for legacy non-ambiguous shorthand, got: %v", err)
+		}
+	})
+}
+
+func TestAddBulkFromGitHub_GenericRemoteExplicitSubpathGenericDiscovery_SkillLayouts(t *testing.T) {
+	layouts := []struct {
+		name       string
+		skillPath  string
+		sourceName string
+	}{
+		{
+			name:       "catalog/skills/example-skill/SKILL.md",
+			skillPath:  filepath.Join("catalog", "skills", "example-skill", "SKILL.md"),
+			sourceName: "generic-layout-priority",
+		},
+		{
+			name:       "catalog/example-skill/SKILL.md",
+			skillPath:  filepath.Join("catalog", "example-skill", "SKILL.md"),
+			sourceName: "generic-layout-recursive",
+		},
+		{
+			name:       "catalog/.claude/skills/example-skill/SKILL.md",
+			skillPath:  filepath.Join("catalog", ".claude", "skills", "example-skill", "SKILL.md"),
+			sourceName: "generic-layout-claude",
+		},
+	}
+
+	for _, tt := range layouts {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			repoPath := t.TempDir()
+			t.Setenv("AIMGR_REPO_PATH", repoPath)
+
+			manager := repo.NewManagerWithPath(repoPath)
+			if err := manager.Init(); err != nil {
+				t.Fatalf("failed to init repo: %v", err)
+			}
+
+			remoteOrigin, worktreePath := createRemoteGitSource(t)
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(worktreePath, tt.skillPath)), 0755); err != nil {
+				t.Fatalf("failed to create skill dir: %v", err)
+			}
+
+			skillContent := "---\nname: example-skill\ndescription: example\n---\n# Example\n"
+			if err := os.WriteFile(filepath.Join(worktreePath, tt.skillPath), []byte(skillContent), 0644); err != nil {
+				t.Fatalf("failed to write SKILL.md: %v", err)
+			}
+
+			runGit(t, worktreePath, "add", ".")
+			runGit(t, worktreePath, "-c", "user.name=Test User", "-c", "user.email=test@example.com", "commit", "-m", "add layout")
+			runGit(t, worktreePath, "push", "origin", "main")
+
+			parsed := &source.ParsedSource{
+				Type:    source.GitURL,
+				URL:     remoteOrigin,
+				Ref:     "main",
+				Subpath: "catalog",
+			}
+
+			withRepoAddFlagsReset(t, func() {
+				discoveryFlag = repomanifest.DiscoveryModeGeneric
+				nameFlag = tt.sourceName
+				if err := addBulkFromGitHub(parsed, manager); err != nil {
+					t.Fatalf("addBulkFromGitHub failed: %v", err)
+				}
+			})
+
+			skill, err := manager.Get("example-skill", resource.Skill)
+			if err != nil {
+				t.Fatalf("failed to get imported skill %q: %v", "example-skill", err)
+			}
+			if skill == nil {
+				t.Fatalf("expected skill %q to be imported", "example-skill")
+			}
+		})
+	}
 }
 
 func TestAddSourceToManifest_PersistsDiscoveryMode(t *testing.T) {

@@ -1322,6 +1322,9 @@ func TestInstallFromManifest_AliasReuseAcrossProjectsDoesNotDuplicateSource(t *t
 	sourceDir := createRemoteSkillSource(t, "alias-reuse-skill")
 
 	withInstallBootstrapResolver(t, func(src *repomanifest.Source, manager *repo.Manager) (string, error) {
+		if strings.TrimSpace(src.Subpath) != "" {
+			return filepath.Join(sourceDir, src.Subpath), nil
+		}
 		return sourceDir, nil
 	})
 
@@ -1384,6 +1387,9 @@ func TestInstallFromManifest_RefMismatchWarnsAndKeepsExistingRef(t *testing.T) {
 	sourceDir := createRemoteSkillSource(t, "ref-mismatch-skill")
 
 	withInstallBootstrapResolver(t, func(src *repomanifest.Source, manager *repo.Manager) (string, error) {
+		if strings.TrimSpace(src.Subpath) != "" {
+			return filepath.Join(sourceDir, src.Subpath), nil
+		}
 		return sourceDir, nil
 	})
 

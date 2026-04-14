@@ -153,6 +153,27 @@ func TestRepoRemove_ByURL(t *testing.T) {
 	}
 }
 
+func TestRepoRemove_ByCanonicalRemoteIdentifier_IgnoresRefIdentity(t *testing.T) {
+	source := &repomanifest.Source{
+		Name:    "owner-repo",
+		URL:     "https://github.com/owner/repo",
+		Ref:     "main",
+		Subpath: "resources",
+	}
+
+	tempDir, mgr := setupRemoveTestRepo(t, source)
+
+	// Remove using an equivalent canonical URL+subpath identifier with different ref.
+	if err := performRemove(mgr, "https://github.com/owner/repo/tree/release-v2/resources", false, true); err != nil {
+		t.Fatalf("Failed to remove source by canonical remote identifier: %v", err)
+	}
+
+	manifest, _ := repomanifest.Load(tempDir)
+	if manifest.HasSource("owner-repo") {
+		t.Error("Source should not exist after canonical remove")
+	}
+}
+
 func TestRepoRemove_DryRun(t *testing.T) {
 	source := &repomanifest.Source{
 		Name: "test-source",

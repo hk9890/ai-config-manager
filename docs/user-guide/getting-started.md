@@ -186,8 +186,11 @@ Add from GitHub:
 ```bash
 aimgr repo add gh:your-org/ai-tools
 aimgr repo add gh:your-org/ai-tools --filter "skill/*"  # Filtered
-aimgr repo add gh:your-org/ai-tools@v1.0.0          # Specific version
+aimgr repo add gh:your-org/ai-tools --ref v1.0.0    # Specific version
+aimgr repo add gh:your-org/ai-tools --subpath skills # Subdirectory in repo
 ```
+
+Legacy `gh:owner/repo@ref` source syntax is still accepted for compatibility, but explicit `--ref` / `--subpath` flags are the preferred UX.
 
 **Note:** Local sources are symlinked (live editing). GitHub sources are copied.
 
@@ -209,7 +212,8 @@ aimgr repo list skill        # List only skills
 # Add sources
 aimgr repo add local:~/my-resources/          # Local (symlinked)
 aimgr repo add gh:owner/repo            # GitHub (copied)
-aimgr repo add gh:owner/repo@v1.0.0     # Specific version
+aimgr repo add gh:owner/repo --ref v1.0.0     # Specific version
+aimgr repo add gh:owner/repo --subpath skills # Subdirectory in repo
 
 # Import one or more shared manifests into local ai.repo.yaml
 aimgr repo apply-manifest ./ai.repo.yaml

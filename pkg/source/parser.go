@@ -51,7 +51,7 @@ const marketplaceManifestFileName = "marketplace.json"
 //   - gh:owner/repo                    GitHub shorthand
 //   - gh:owner/repo@ref                GitHub with branch/tag
 //   - gh:owner/repo/path               GitHub with subpath
-//   - gh:owner/repo@ref/path           GitHub with ref and subpath
+//   - gh:owner/repo@ref/path           Legacy inline ref+subpath form (compatibility path for non-slash refs)
 //   - local:./relative/path            Local directory (relative)
 //   - local:/absolute/path             Local directory (absolute)
 //   - https://host/owner/repo          HTTPS Git URL (any host)
@@ -156,6 +156,9 @@ func parseGitHubPrefix(input string) (*ParsedSource, error) {
 	if err != nil {
 		return nil, err
 	}
+	if ref != "" && strings.TrimSpace(trailingSubpath) != "" && isAmbiguousInlineGitHubRefSubpath(ref, trailingSubpath) {
+		return nil, fmt.Errorf("ambiguous GitHub shorthand %q: inline @ref/subpath forms cannot safely represent refs containing '/'; use explicit flags instead (e.g., gh:%s/%s --ref <ref> --subpath <path>)", "gh:"+input, owner, repo)
+	}
 	if ref == "" && strings.Contains(subpath, "@") {
 		return nil, fmt.Errorf("invalid GitHub source format: use gh:owner/repo@ref/path (ref must come before subpath)")
 	}
@@ -168,6 +171,48 @@ func parseGitHubPrefix(input string) (*ParsedSource, error) {
 		Ref:     ref,
 		Subpath: subpath,
 	}, nil
+}
+
+func isAmbiguousInlineGitHubRefSubpath(ref, trailingSubpath string) bool {
+	trimmedRef := strings.Trim(strings.TrimSpace(ref), "/")
+	trimmedSubpath := strings.Trim(strings.TrimSpace(trailingSubpath), "/")
+
+	if trimmedRef == "" || trimmedSubpath == "" {
+		return false
+	}
+
+	// Legacy inline @ref/subpath shorthand is only unambiguous when both ref and
+	// subpath are single path segments (e.g., @main/skills).
+	//
+	// Any additional slash in either side means multiple valid split points can
+	// represent slash-containing refs + subpaths, so users must use explicit
+	// --ref/--subpath flags.
+	return strings.Contains(trimmedRef, "/") || strings.Contains(trimmedSubpath, "/")
+}
+
+// NormalizeExplicitSubpath normalizes and validates explicit --subpath values.
+func NormalizeExplicitSubpath(sourceType SourceType, raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", fmt.Errorf("subpath cannot be empty")
+	}
+
+	if sourceType == GitHub {
+		return normalizeGitHubSubpath(raw)
+	}
+
+	normalizedSeparators := strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/")
+	for _, segment := range strings.Split(normalizedSeparators, "/") {
+		if segment == ".." {
+			return "", fmt.Errorf("invalid subpath %q: parent traversal (..) is not supported", raw)
+		}
+	}
+
+	normalized := normalizeParsedSubpath(raw)
+	if normalized == "" {
+		return "", fmt.Errorf("subpath cannot be empty")
+	}
+
+	return normalized, nil
 }
 
 // parseLocalPrefix parses a local source with local: prefix removed
@@ -263,7 +308,10 @@ func parseGitHubRawMarketplaceURL(parsedURL *url.URL, input string) (*ParsedSour
 	owner := pathParts[0]
 	repo := strings.TrimSuffix(pathParts[1], ".git")
 	ref := pathParts[2]
-	subpath := strings.Join(pathParts[3:], "/")
+	subpath, err := normalizeGitHubSubpath(strings.Join(pathParts[3:], "/"))
+	if err != nil {
+		return nil, err
+	}
 
 	if owner == "" || repo == "" || ref == "" || subpath == "" {
 		return nil, fmt.Errorf("unable to normalize raw GitHub marketplace URL %q: expected /<owner>/<repo>/<ref>/.../marketplace.json", input)

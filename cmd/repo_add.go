@@ -33,6 +33,8 @@ var (
 	addFormatFlag    string
 	nameFlag         string
 	discoveryFlag    string
+	refFlag          string
+	subpathFlag      string
 
 	// syncSilentMode suppresses all fmt.Printf output in importFromLocalPathWithMode
 	// and printImportResults. Set to true by runSync() to collect results silently.
@@ -57,10 +59,15 @@ Discovery modes:
 Source Formats:
   GitHub (shorthand):
     gh:owner/repo              GitHub repository
-    gh:owner/repo@v1.0.0       Specific branch or tag
-    gh:owner/repo/subpath       Subdirectory within repo
-    gh:owner/repo@ref/subpath   Ref and subdirectory combined
-    (use @ref before /subpath; gh:owner/repo/subpath@ref is rejected)
+    gh:owner/repo --ref v1.0.0                  Preferred explicit ref syntax
+    gh:owner/repo --subpath skills/core         Preferred explicit subpath syntax
+    gh:owner/repo --ref main --subpath skills/core  Preferred explicit ref+subpath syntax
+    Legacy compatibility forms still parse:
+      gh:owner/repo@v1.0.0
+      gh:owner/repo/subpath
+      gh:owner/repo@main/skills
+    Ambiguous slash-containing refs + subpaths are rejected inline:
+      gh:owner/repo@feature/x/skills/core  -> use --ref/--subpath
 
   GitHub HTTPS with subpath (clone-style):
     https://github.com/owner/repo.git/subpath
@@ -94,7 +101,11 @@ Marketplace files (marketplace.json) are automatically discovered and converted 
 Examples:
   # Add from GitHub (shorthand)
   aimgr repo add gh:owner/repo
+  aimgr repo add gh:owner/repo --ref v1.0.0
+  aimgr repo add gh:owner/repo --ref main --subpath skills/core
+  # Legacy inline forms are compatibility-only (prefer explicit flags above)
   aimgr repo add gh:owner/repo@v1.0.0
+  aimgr repo add gh:owner/repo@main/skills
   aimgr repo add gh:owner/repo --filter "skill/*"
 
   # Add from any Git host (HTTPS)
@@ -105,6 +116,7 @@ Examples:
   # HTTPS with subpath (non-GitHub hosts)
   aimgr repo add https://bitbucket.example.com/scm/TEAM/repo.git/skills
   aimgr repo add https://gitlab.internal.com/group/repo.git/packages/ai
+  aimgr repo add https://git.example.com/team/repo.git --ref release-2026 --subpath skills/core
 
   # Add from any Git host (SSH)
   aimgr repo add git@github.com:owner/repo.git
@@ -176,6 +188,10 @@ Run 'aimgr repo add --help' for full documentation`)
 		// Parse source
 		parsed, err := source.ParseSource(sourceInput)
 		if err != nil {
+			return err
+		}
+
+		if err := applyExplicitRemoteSourceFlags(parsed, sourceInput, refFlag, subpathFlag); err != nil {
 			return err
 		}
 
@@ -257,7 +273,42 @@ func init() {
 	repoAddCmd.Flags().StringVar(&addFormatFlag, "format", "table", "Output format: table, json, yaml")
 	repoAddCmd.Flags().StringVar(&nameFlag, "name", "", "Override auto-generated source name")
 	repoAddCmd.Flags().StringVar(&discoveryFlag, "discovery", repomanifest.DiscoveryModeAuto, "Discovery mode: auto, marketplace, generic")
+	repoAddCmd.Flags().StringVar(&refFlag, "ref", "", "Preferred explicit git ref (remote sources only). Do not mix with inline @ref syntax")
+	repoAddCmd.Flags().StringVar(&subpathFlag, "subpath", "", "Preferred explicit repository subpath (remote sources only). Do not mix with inline subpath syntax")
 	_ = repoAddCmd.RegisterFlagCompletionFunc("format", completeFormatFlag)
+}
+
+func applyExplicitRemoteSourceFlags(parsed *source.ParsedSource, sourceInput, explicitRef, explicitSubpath string) error {
+	hasExplicitRef := strings.TrimSpace(explicitRef) != ""
+	hasExplicitSubpath := strings.TrimSpace(explicitSubpath) != ""
+	hasExplicit := hasExplicitRef || hasExplicitSubpath
+
+	if !hasExplicit {
+		return nil
+	}
+
+	isRemote := parsed.Type == source.GitHub || parsed.Type == source.GitURL || parsed.Type == source.GitLab
+	if !isRemote {
+		return fmt.Errorf("--ref/--subpath are only supported for remote sources; remove these flags or use a remote source instead of %q", sourceInput)
+	}
+
+	if strings.TrimSpace(parsed.Ref) != "" || strings.TrimSpace(parsed.Subpath) != "" {
+		return fmt.Errorf("conflicting remote coordinates for %q: do not mix inline ref/subpath syntax with --ref/--subpath; use one form only (recommended: use --ref/--subpath with a base remote URL)", sourceInput)
+	}
+
+	if hasExplicitRef {
+		parsed.Ref = strings.TrimSpace(explicitRef)
+	}
+
+	if hasExplicitSubpath {
+		normalizedSubpath, err := source.NormalizeExplicitSubpath(parsed.Type, explicitSubpath)
+		if err != nil {
+			return fmt.Errorf("invalid --subpath value %q: %w", explicitSubpath, err)
+		}
+		parsed.Subpath = normalizedSubpath
+	}
+
+	return nil
 }
 
 // Helper functions for bulk add integration

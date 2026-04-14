@@ -908,6 +908,61 @@ func TestGetSource(t *testing.T) {
 	}
 }
 
+func TestGetSource_RemoteIdentifierUsesCanonicalURLAndSubpathNotRef(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{
+			{
+				Name:    "team-tools",
+				URL:     "https://github.com/example/tools",
+				Ref:     "main",
+				Subpath: "resources",
+			},
+		},
+	}
+
+	// Canonical identity lookup via parser-compatible identifier should match
+	// stored URL+subpath regardless of ref.
+	source, found := m.GetSource("https://github.com/example/tools/tree/release-v2/resources")
+	if !found {
+		t.Fatal("expected canonical remote lookup to find source")
+	}
+	if source.Name != "team-tools" {
+		t.Fatalf("expected source team-tools, got %q", source.Name)
+	}
+	if source.Ref != "main" {
+		t.Fatalf("expected stored ref to remain unchanged, got %q", source.Ref)
+	}
+}
+
+func TestRemoveSource_RemoteIdentifierUsesCanonicalURLAndSubpathNotRef(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Sources: []*Source{
+			{
+				Name:    "team-tools",
+				URL:     "https://github.com/example/tools",
+				Ref:     "main",
+				Subpath: "resources",
+			},
+		},
+	}
+
+	removed, err := m.RemoveSource("https://github.com/example/tools/tree/release-v2/resources")
+	if err != nil {
+		t.Fatalf("RemoveSource() canonical remote identifier error = %v", err)
+	}
+	if removed == nil {
+		t.Fatal("RemoveSource() returned nil source")
+	}
+	if removed.Name != "team-tools" {
+		t.Fatalf("expected removed source team-tools, got %q", removed.Name)
+	}
+	if len(m.Sources) != 0 {
+		t.Fatalf("expected no sources after canonical remove, got %d", len(m.Sources))
+	}
+}
+
 func TestGetSource_NilManifest(t *testing.T) {
 	var m *Manifest
 	_, found := m.GetSource("test")

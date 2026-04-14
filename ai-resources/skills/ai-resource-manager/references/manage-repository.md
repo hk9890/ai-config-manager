@@ -104,7 +104,13 @@ aimgr repo add local:./local-resources
 
 # GitHub (copied — stable, versioned)
 aimgr repo add gh:owner/repo
-aimgr repo add gh:owner/repo@v1.0.0       # Pinned version
+aimgr repo add gh:owner/repo --ref v1.0.0  # Preferred pinned version syntax
+aimgr repo add gh:owner/repo --subpath skills/core
+aimgr repo add gh:owner/repo --ref main --subpath skills/core
+
+# Legacy compatibility forms (still accepted when unambiguous)
+aimgr repo add gh:owner/repo@v1.0.0
+aimgr repo add gh:owner/repo@main/skills
 aimgr repo add https://github.com/owner/repo
 aimgr repo add git@github.com:owner/repo.git  # SSH
 
@@ -129,11 +135,21 @@ aimgr repo add local:./resources --dry-run            # Preview only
 
 | Format | Example | Import Mode |
 |--------|---------|-------------|
-| GitHub shorthand | `gh:owner/repo` (optional `@ref`, `/subpath`) | Copy |
+| GitHub shorthand (preferred) | `gh:owner/repo` + `--ref` / `--subpath` flags | Copy |
+| GitHub shorthand (legacy compatibility) | `gh:owner/repo@ref`, `gh:owner/repo/subpath`, `gh:owner/repo@ref/path` (unambiguous only) | Copy |
 | Local directory | `local:./path/to/dir` | Symlink |
 | HTTPS Git URL | `https://github.com/owner/repo.git` | Copy |
 | HTTPS monorepo | `https://host/org/repo.git/subpath` | Copy |
 | SSH Git URL | `git@github.com:owner/repo.git` | Copy |
+
+Compatibility caveat: inline `gh:owner/repo@ref/path` is compatibility-only and
+only unambiguous for single-segment `ref` + single-segment `path` (for example
+`@main/skills`). Slash-containing refs or multi-segment paths are rejected as
+ambiguous. In those cases use explicit flags, for example:
+
+```bash
+aimgr repo add gh:owner/repo --ref release/v1 --subpath skills/core
+```
 
 ⚠️ **v3.0+:** All sources require explicit prefixes. Bare paths like `owner/repo` or `./path` are rejected with actionable error messages.
 

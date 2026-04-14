@@ -22,6 +22,8 @@ type repoInfoSourceOutput struct {
 	Name       string   `json:"name" yaml:"name"`
 	Type       string   `json:"type" yaml:"type"`
 	Location   string   `json:"location" yaml:"location"`
+	Ref        string   `json:"ref,omitempty" yaml:"ref,omitempty"`
+	Subpath    string   `json:"subpath,omitempty" yaml:"subpath,omitempty"`
 	Mode       string   `json:"mode" yaml:"mode"`
 	LastSynced string   `json:"last_synced" yaml:"last_synced"`
 	Include    []string `json:"include,omitempty" yaml:"include,omitempty"`
@@ -225,6 +227,8 @@ func buildRepoInfoOutput(
 				Name:       src.Name,
 				Type:       sourceType,
 				Location:   location,
+				Ref:        src.Ref,
+				Subpath:    src.Subpath,
 				Mode:       src.GetMode(),
 				LastSynced: lastSynced,
 				Include:    src.Include,
@@ -311,7 +315,7 @@ func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata
 		location := source.Path
 		if source.URL != "" {
 			sourceType = "remote"
-			location = source.URL
+			location = sourceLocationForDisplay(source)
 		}
 
 		// Get mode from source (implicit based on path/url)
@@ -351,6 +355,30 @@ func renderSourcesTable(sources []*repomanifest.Source, metadata *sourcemetadata
 	return table.Format(output.Table)
 }
 
+// sourceLocationForDisplay keeps source-identity formatting consistent across
+// repo info human output paths that render source location details.
+func sourceLocationForDisplay(source *repomanifest.Source) string {
+	if source == nil {
+		return ""
+	}
+
+	if source.URL == "" {
+		return source.Path
+	}
+
+	identifiers := make([]string, 0, 2)
+	if source.Ref != "" {
+		identifiers = append(identifiers, fmt.Sprintf("ref %q", source.Ref))
+	}
+	if source.Subpath != "" {
+		identifiers = append(identifiers, fmt.Sprintf("subpath %q", source.Subpath))
+	} else {
+		identifiers = append(identifiers, "repo root")
+	}
+
+	return fmt.Sprintf("%s (%s)", source.URL, strings.Join(identifiers, ", "))
+}
+
 // formatSource formats a source with health indicator, type, path/URL, mode, and last synced
 func formatSource(source *repomanifest.Source, metadata *sourcemetadata.SourceMetadata) string {
 	// Health check
@@ -365,7 +393,7 @@ func formatSource(source *repomanifest.Source, metadata *sourcemetadata.SourceMe
 	location := source.Path
 	if source.URL != "" {
 		sourceType = "remote"
-		location = source.URL
+		location = sourceLocationForDisplay(source)
 	}
 
 	// Get mode from source (implicit based on path/url)
