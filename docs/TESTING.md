@@ -5,8 +5,8 @@
 | Goal | Command | What it covers |
 | --- | --- | --- |
 | Baseline contributor checks | `make test` | `make vet` + `make unit-test` + `make integration-test` |
-| Fast local regression | `make unit-test` | `go test -v -short ./cmd/...` and `./pkg/...` |
-| Integration coverage | `make integration-test` | `go test -tags=integration ./pkg/...` plus `go test ./test/...` |
+| Fast local regression | `make unit-test` | `go test -v -short ./cmd/...` and `./pkg/...` (excludes `//go:build integration` files) |
+| Integration coverage | `make integration-test` | `go test -v -tags=integration ./cmd/...` + `./pkg/...` plus `go test -v ./test/...` |
 | Full CLI end-to-end coverage | `make e2e-test` | `go test -tags=e2e ./test/e2e/` |
 | Main CI test-job parity | `go test -race ./...` | Mirrors the non-E2E `Run tests` step in `.github/workflows/build.yml` |
 
@@ -27,8 +27,8 @@
 
 ## Test locations
 
-- `cmd/*_test.go` and `pkg/**/*_test.go` — fast local coverage run by `make unit-test`
-- `pkg/**/*_test.go` with `//go:build integration` plus files under `test/` — integration coverage run by `make integration-test`
+- `cmd/*_test.go` and `pkg/**/*_test.go` without `//go:build integration` — fast local coverage run by `make unit-test`
+- `cmd/**/*_test.go` and `pkg/**/*_test.go` with `//go:build integration`, plus files under `test/` — integration coverage run by `make integration-test`
 - `test/e2e/*` with `//go:build e2e` — full binary coverage run by `make e2e-test`
 
 ## Concurrency Test Expectations

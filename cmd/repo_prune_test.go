@@ -1,3 +1,5 @@
+//go:build integration
+
 package cmd
 
 import (
@@ -508,26 +510,21 @@ func TestFormatSize(t *testing.T) {
 	}
 }
 
-func TestPluralize(t *testing.T) {
+func TestRepositoryPlural(t *testing.T) {
 	tests := []struct {
-		singular string
-		plural   string
 		count    int
 		expected string
 	}{
-		{"repository", "repositories", 0, "repositories"},
-		{"repository", "repositories", 1, "repository"},
-		{"repository", "repositories", 2, "repositories"},
-		{"repository", "repositories", 100, "repositories"},
-		{"file", "files", 1, "file"},
-		{"file", "files", 5, "files"},
+		{0, "repositories"},
+		{1, "repository"},
+		{2, "repositories"},
+		{100, "repositories"},
 	}
 
 	for _, tt := range tests {
-		result := pluralize(tt.singular, tt.plural, tt.count)
+		result := repositoryPlural(tt.count)
 		if result != tt.expected {
-			t.Errorf("pluralize(%q, %q, %d) = %q, expected %q",
-				tt.singular, tt.plural, tt.count, result, tt.expected)
+			t.Errorf("repositoryPlural(%d) = %q, expected %q", tt.count, result, tt.expected)
 		}
 	}
 }

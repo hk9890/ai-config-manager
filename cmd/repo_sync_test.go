@@ -1,11 +1,11 @@
+//go:build integration
+
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -132,50 +132,6 @@ func writeAndCommitRemotePluginDirectoryMarketplace(t *testing.T, worktreePath, 
 	runGit(t, worktreePath, "add", ".")
 	runGit(t, worktreePath, "-c", "user.name=Test User", "-c", "user.email=test@example.com", "commit", "-m", "add plugin-dir marketplace")
 	runGit(t, worktreePath, "push", "origin", "main")
-}
-
-func captureOutput(t *testing.T, fn func()) (string, string) {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-
-	stdoutR, stdoutW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to create stdout pipe: %v", err)
-	}
-	stderrR, stderrW, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to create stderr pipe: %v", err)
-	}
-
-	os.Stdout = stdoutW
-	os.Stderr = stderrW
-
-	stdoutCh := make(chan string, 1)
-	stderrCh := make(chan string, 1)
-
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, stdoutR)
-		stdoutCh <- buf.String()
-	}()
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, stderrR)
-		stderrCh <- buf.String()
-	}()
-
-	fn()
-
-	_ = stdoutW.Close()
-	_ = stderrW.Close()
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
-
-	stdout := <-stdoutCh
-	stderr := <-stderrCh
-	return stdout, stderr
 }
 
 // Test helper: create a minimal test source directory with resources

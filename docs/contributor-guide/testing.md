@@ -4,8 +4,8 @@ Start with [docs/TESTING.md](../TESTING.md) for command selection, minimum check
 
 ## Where tests live
 
-- `cmd/*_test.go` and `pkg/**/*_test.go` hold most fast unit coverage run by `make unit-test`.
-- Integration coverage is split between `pkg/**/*_test.go` files tagged with `//go:build integration` and higher-level CLI/integration coverage under `test/`.
+- `cmd/*_test.go` and `pkg/**/*_test.go` without `//go:build integration` hold fast unit coverage run by `make unit-test`.
+- Integration coverage is split between `cmd/**/*_test.go` and `pkg/**/*_test.go` files tagged with `//go:build integration` and higher-level CLI/integration coverage under `test/`.
 - End-to-end coverage lives under `test/e2e/` and uses the `e2e` build tag.
 - Reusable fixtures usually live under package-local `testdata/` directories such as `pkg/discovery/testdata/`.
 

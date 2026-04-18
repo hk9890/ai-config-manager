@@ -1,4 +1,4 @@
-.PHONY: build test integration-test test-integration e2e-test install clean help os-info
+.PHONY: build test integration-test test-integration e2e-test install clean help os-info lint
 
 # Binary name
 BINARY=aimgr
@@ -17,6 +17,7 @@ GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
 GOVET=$(GOCMD) vet
 GOMOD=$(GOCMD) mod
+GOLANGCI_LINT_VERSION=$(shell tr -d '[:space:]' < .golangci-version)
 
 # OS and Architecture Detection
 UNAME_S := $(shell uname -s)
@@ -84,6 +85,7 @@ unit-test: ## Run only unit tests (fast, no external dependencies)
 
 integration-test: ## Run only integration tests (slower, requires git/network)
 	@echo "Running integration tests..."
+	$(GOTEST) -v -tags=integration ./cmd/...
 	$(GOTEST) -v -tags=integration ./pkg/...
 	$(GOTEST) -v ./test/...
 
@@ -119,5 +121,8 @@ fmt: ## Format Go code
 
 vet: ## Run go vet
 	$(GOVET) ./...
+
+lint: ## Run the pinned golangci-lint version used in CI
+	$(GOCMD) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(GOLANGCI_LINT_VERSION) run --timeout=5m
 
 all: clean deps fmt vet test build ## Run all checks and build

@@ -44,11 +44,8 @@ jobs:
       - name: Run vet
         run: make vet
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-          args: --timeout=5m
+      - name: Run golangci-lint
+        run: make lint
 
       - name: Build binary
         run: make build

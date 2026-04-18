@@ -8,7 +8,8 @@
 | Show install target for this OS | `make os-info` | Use before `make install` if the install path matters |
 | Install the binary | `make install` | Installs to the OS-specific path reported by `make os-info` |
 | Format Go code | `make fmt` | Run before commit |
-| Run static analysis | `make vet` | Baseline local static-analysis check; CI also runs `golangci-lint` from `.github/workflows/build.yml` |
+| Run static analysis | `make vet` | Baseline local static-analysis check |
+| Run CI-equivalent lint | `make lint` | Runs the pinned `golangci-lint` version from `.golangci-version`, matching GitHub Actions |
 
 For test selection and session-close validation, use `docs/TESTING.md`.
 

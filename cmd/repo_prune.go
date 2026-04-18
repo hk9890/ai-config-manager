@@ -134,7 +134,7 @@ Examples:
 			if pruneDryRunFlag {
 				fmt.Printf("\n[DRY RUN] Would remove %d cached %s, freeing %s\n",
 					result.TotalCount,
-					pluralize("repository", "repositories", result.TotalCount),
+					repositoryPlural(result.TotalCount),
 					result.TotalSizeHuman)
 				return nil
 			}
@@ -143,7 +143,7 @@ Examples:
 			if !pruneForceFlag {
 				fmt.Printf("\nRemove %d cached %s? This will free %s. [y/N] ",
 					result.TotalCount,
-					pluralize("repository", "repositories", result.TotalCount),
+					repositoryPlural(result.TotalCount),
 					result.TotalSizeHuman)
 
 				reader := bufio.NewReader(os.Stdin)
@@ -228,7 +228,7 @@ func outputPruneResult(result *PruneResult, format output.Format) error {
 		if result.Removed > 0 {
 			fmt.Printf("\n✓ Removed %d cached %s, freed %s",
 				result.Removed,
-				pluralize("repository", "repositories", result.Removed),
+				repositoryPlural(result.Removed),
 				result.FreedHuman)
 			if result.Failed > 0 {
 				fmt.Printf(" (%d failed)", result.Failed)
@@ -375,7 +375,7 @@ func getDirSize(path string) (int64, error) {
 func displayUnreferencedCaches(unreferenced []CachedRepo) {
 	fmt.Printf("Found %d unreferenced cached %s:\n\n",
 		len(unreferenced),
-		pluralize("repository", "repositories", len(unreferenced)))
+		repositoryPlural(len(unreferenced)))
 
 	for _, cache := range unreferenced {
 		fmt.Printf("  • %s (%s)\n", cache.URL, formatSize(cache.Size))
@@ -410,10 +410,10 @@ func formatSize(bytes int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-// pluralize returns singular or plural form based on count
-func pluralize(singular, plural string, count int) string {
+// repositoryPlural returns the correct plural form for repository counts.
+func repositoryPlural(count int) string {
 	if count == 1 {
-		return singular
+		return "repository"
 	}
-	return plural
+	return "repositories"
 }
