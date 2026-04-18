@@ -181,7 +181,7 @@ func TestRepoInitWithNonExistentRepoPathDoesNotWarnAboutLogger(t *testing.T) {
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
 
 	var runErr error
-	stdoutOutput, stderrOutput := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		runErr = repoInitCmd.RunE(repoInitCmd, []string{})
 	})
 
@@ -189,12 +189,12 @@ func TestRepoInitWithNonExistentRepoPathDoesNotWarnAboutLogger(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", runErr)
 	}
 
-	if stderrOutput != "" {
-		t.Fatalf("expected no stderr output for successful repo init, got: %q", stderrOutput)
+	if output.Stderr != "" {
+		t.Fatalf("expected no stderr output for successful repo init, got: %q", output.Stderr)
 	}
 
-	if !strings.Contains(stdoutOutput, "✓ Repository initialized at:") {
-		t.Fatalf("expected stdout success message, got: %q", stdoutOutput)
+	if !strings.Contains(output.Stdout, "✓ Repository initialized at:") {
+		t.Fatalf("expected stdout success message, got: %q", output.Stdout)
 	}
 
 	if _, statErr := os.Stat(filepath.Join(repoDir, "commands")); os.IsNotExist(statErr) {

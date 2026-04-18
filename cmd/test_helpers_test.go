@@ -7,7 +7,12 @@ import (
 	"testing"
 )
 
-func captureOutput(t *testing.T, fn func()) (string, string) {
+type capturedOutput struct {
+	Stdout string
+	Stderr string
+}
+
+func captureOutput(t *testing.T, fn func()) capturedOutput {
 	t.Helper()
 
 	oldStdout := os.Stdout
@@ -52,5 +57,5 @@ func captureOutput(t *testing.T, fn func()) (string, string) {
 	_ = stdoutR.Close()
 	_ = stderrR.Close()
 
-	return stdout, stderr
+	return capturedOutput{Stdout: stdout, Stderr: stderr}
 }

@@ -105,15 +105,15 @@ func TestRenderSourcesTableIncludeColumn(t *testing.T) {
 		}
 	}
 
-	stdout, _ := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := renderSourcesTable(sources, metadata); err != nil {
 			t.Fatalf("renderSourcesTable() error = %v", err)
 		}
 	})
 
 	for _, expected := range []string{"INCLUDE", "all", "skills/*"} {
-		if !strings.Contains(stdout, expected) {
-			t.Fatalf("expected sources table output to contain %q, got:\n%s", expected, stdout)
+		if !strings.Contains(output.Stdout, expected) {
+			t.Fatalf("expected sources table output to contain %q, got:\n%s", expected, output.Stdout)
 		}
 	}
 }
@@ -471,15 +471,15 @@ func TestRenderSourcesTable_ShowsRefAndSubpathIdentity(t *testing.T) {
 	}
 	metadata := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{}}
 
-	stdout, _ := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := renderSourcesTable(sources, metadata); err != nil {
 			t.Fatalf("renderSourcesTable() failed: %v", err)
 		}
 	})
 
 	for _, expected := range []string{"repo root", "ref \"release-2026\"", "subpath \"skills/platform\""} {
-		if !strings.Contains(stdout, expected) {
-			t.Fatalf("expected table output to contain %q, got:\n%s", expected, stdout)
+		if !strings.Contains(output.Stdout, expected) {
+			t.Fatalf("expected table output to contain %q, got:\n%s", expected, output.Stdout)
 		}
 	}
 }
@@ -494,15 +494,15 @@ func TestRenderSourcesTable_ShowsOverrideRestoreTarget(t *testing.T) {
 	}}
 	metadata := &sourcemetadata.SourceMetadata{Version: 1, Sources: map[string]*sourcemetadata.SourceState{}}
 
-	stdout, _ := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := renderSourcesTable(sources, metadata); err != nil {
 			t.Fatalf("renderSourcesTable() failed: %v", err)
 		}
 	})
 
 	for _, expected := range []string{"OVERRIDE", "url \"https://github.com/example/tools\"", "ref \"main\"", "subpath \"resources\""} {
-		if !strings.Contains(stdout, expected) {
-			t.Fatalf("expected table output to contain %q, got:\n%s", expected, stdout)
+		if !strings.Contains(output.Stdout, expected) {
+			t.Fatalf("expected table output to contain %q, got:\n%s", expected, output.Stdout)
 		}
 	}
 }
@@ -529,7 +529,7 @@ func TestRepoInfo_JSON_IncludesOverrideState(t *testing.T) {
 	originalFormat := repoInfoFormatFlag
 	repoInfoFormatFlag = "json"
 	defer func() { repoInfoFormatFlag = originalFormat }()
-	stdout, _ := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := repoInfoCmd.RunE(repoInfoCmd, nil); err != nil {
 			t.Fatalf("repo info failed: %v", err)
 		}
@@ -542,8 +542,8 @@ func TestRepoInfo_JSON_IncludesOverrideState(t *testing.T) {
 			RestoreTo  string `json:"restore_to"`
 		} `json:"sources"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &parsed); err != nil {
-		t.Fatalf("failed to parse repo info json: %v\n%s", err, stdout)
+	if err := json.Unmarshal([]byte(output.Stdout), &parsed); err != nil {
+		t.Fatalf("failed to parse repo info json: %v\n%s", err, output.Stdout)
 	}
 	if len(parsed.Sources) != 1 {
 		t.Fatalf("expected one source, got %d", len(parsed.Sources))
@@ -563,14 +563,14 @@ func TestRepoInfo_MissingRepoDoesNotCreateLockState(t *testing.T) {
 		t.Fatalf("failed to remove repo dir: %v", err)
 	}
 
-	stdout, _ := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := repoInfoCmd.RunE(repoInfoCmd, nil); err != nil {
 			t.Fatalf("repo info failed: %v", err)
 		}
 	})
 
-	if !strings.Contains(stdout, "Repository not initialized") {
-		t.Fatalf("expected missing repo message, got:\n%s", stdout)
+	if !strings.Contains(output.Stdout, "Repository not initialized") {
+		t.Fatalf("expected missing repo message, got:\n%s", output.Stdout)
 	}
 	if _, statErr := os.Stat(filepath.Join(repoDir, ".workspace")); !os.IsNotExist(statErr) {
 		t.Fatalf("expected missing repo path to remain untouched, stat err: %v", statErr)

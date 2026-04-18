@@ -1871,14 +1871,14 @@ func TestRunSync_DryRunPruneShowsPlannedCleanup(t *testing.T) {
 		syncPruneFlag = false
 	}()
 
-	stdout, _ := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := runSync(syncCmd, []string{}); err != nil {
 			t.Fatalf("dry-run prune sync failed: %v", err)
 		}
 	})
 
-	if !strings.Contains(stdout, "Would prune") {
-		t.Fatalf("expected dry-run prune output to include planned prune actions, got:\n%s", stdout)
+	if !strings.Contains(output.Stdout, "Would prune") {
+		t.Fatalf("expected dry-run prune output to include planned prune actions, got:\n%s", output.Stdout)
 	}
 
 	if _, err := os.Lstat(filepath.Join(repoPath, "commands", "pdf-command.md")); err != nil {
@@ -2285,21 +2285,21 @@ func TestPrintSyncOutputTable_CompactIncludesRemovedCounts(t *testing.T) {
 		Warnings: []string{"removed resources may have active project installations; run 'aimgr repair' in affected projects if needed"},
 	}
 
-	stdout, stderr := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		printSyncOutputTable(so, false)
 	})
 
-	if !strings.Contains(stdout, "✓ anthropics (remote)") {
-		t.Fatalf("expected compact source line, got:\n%s", stdout)
+	if !strings.Contains(output.Stdout, "✓ anthropics (remote)") {
+		t.Fatalf("expected compact source line, got:\n%s", output.Stdout)
 	}
-	if !strings.Contains(stdout, "1 added, 1 updated, 2 removed") {
-		t.Fatalf("expected removed count in compact output, got:\n%s", stdout)
+	if !strings.Contains(output.Stdout, "1 added, 1 updated, 2 removed") {
+		t.Fatalf("expected removed count in compact output, got:\n%s", output.Stdout)
 	}
-	if !strings.Contains(stdout, "warnings: 1") {
-		t.Fatalf("expected compact warning summary, got:\n%s", stdout)
+	if !strings.Contains(output.Stdout, "warnings: 1") {
+		t.Fatalf("expected compact warning summary, got:\n%s", output.Stdout)
 	}
-	if stderr != "" {
-		t.Fatalf("expected no stderr output, got:\n%s", stderr)
+	if output.Stderr != "" {
+		t.Fatalf("expected no stderr output, got:\n%s", output.Stderr)
 	}
 }
 
@@ -2435,7 +2435,7 @@ func TestRemoveOrphanedResources_UsesFriendlySourceNamesInHumanOutput(t *testing
 		t.Fatalf("failed to write command file: %v", err)
 	}
 
-	stdout, stderr := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		removed, warnings := removeOrphanedResources(
 			manager,
 			map[string][]resourceInfo{"src-c7b86a375511": {{Name: "demo", Type: resource.Command}}},
@@ -2450,14 +2450,14 @@ func TestRemoveOrphanedResources_UsesFriendlySourceNamesInHumanOutput(t *testing
 		}
 	})
 
-	if !strings.Contains(stdout, "from open-coder") {
-		t.Fatalf("expected friendly source name in output, got:\n%s", stdout)
+	if !strings.Contains(output.Stdout, "from open-coder") {
+		t.Fatalf("expected friendly source name in output, got:\n%s", output.Stdout)
 	}
-	if strings.Contains(stdout, "src-c7b86a375511") {
-		t.Fatalf("expected source id to be hidden when name available, got:\n%s", stdout)
+	if strings.Contains(output.Stdout, "src-c7b86a375511") {
+		t.Fatalf("expected source id to be hidden when name available, got:\n%s", output.Stdout)
 	}
-	if stderr != "" {
-		t.Fatalf("expected no stderr output, got:\n%s", stderr)
+	if output.Stderr != "" {
+		t.Fatalf("expected no stderr output, got:\n%s", output.Stderr)
 	}
 }
 
@@ -2477,22 +2477,22 @@ func TestRunSync_JSONOutputIsSingleDocument(t *testing.T) {
 	}()
 
 	var runErr error
-	stdout, stderr := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		runErr = runSync(syncCmd, []string{})
 	})
 	if runErr != nil {
 		t.Fatalf("runSync failed: %v", runErr)
 	}
-	if stderr != "" {
-		t.Fatalf("expected no stderr output in json mode, got:\n%s", stderr)
+	if output.Stderr != "" {
+		t.Fatalf("expected no stderr output in json mode, got:\n%s", output.Stderr)
 	}
-	if strings.Contains(stdout, "Syncing from") {
-		t.Fatalf("expected no human progress output in json mode, got:\n%s", stdout)
+	if strings.Contains(output.Stdout, "Syncing from") {
+		t.Fatalf("expected no human progress output in json mode, got:\n%s", output.Stdout)
 	}
 
 	var got syncOutput
-	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
-		t.Fatalf("expected valid JSON output, got error: %v\noutput:\n%s", err, stdout)
+	if err := json.Unmarshal([]byte(output.Stdout), &got); err != nil {
+		t.Fatalf("expected valid JSON output, got error: %v\noutput:\n%s", err, output.Stdout)
 	}
 	if got.Summary.SourcesTotal != 1 {
 		t.Fatalf("expected one source in json summary, got %+v", got.Summary)
@@ -2517,17 +2517,17 @@ func TestRunSync_TableModePrintsImmediateStartupBanner(t *testing.T) {
 		syncVerboseFlag = oldVerbose
 	}()
 
-	stdout, stderr := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := runSync(syncCmd, []string{}); err != nil {
 			t.Fatalf("runSync failed: %v", err)
 		}
 	})
 
-	if !strings.HasPrefix(stdout, "Syncing from 1 configured source(s)...") {
-		t.Fatalf("expected immediate startup banner at beginning of output, got:\n%s", stdout)
+	if !strings.HasPrefix(output.Stdout, "Syncing from 1 configured source(s)...") {
+		t.Fatalf("expected immediate startup banner at beginning of output, got:\n%s", output.Stdout)
 	}
-	if stderr != "" {
-		t.Fatalf("expected no stderr output, got:\n%s", stderr)
+	if output.Stderr != "" {
+		t.Fatalf("expected no stderr output, got:\n%s", output.Stderr)
 	}
 }
 

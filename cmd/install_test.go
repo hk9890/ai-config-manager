@@ -1052,14 +1052,14 @@ func TestInstallFromManifest_EmptyManifestRepoPathExists(t *testing.T) {
 	installTargetFlag = ""
 	_ = os.Setenv("AIMGR_REPO_PATH", repoPath)
 
-	stdout, _ := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := installFromManifest(); err != nil {
 			t.Fatalf("installFromManifest() failed: %v", err)
 		}
 	})
 
-	if !strings.Contains(stdout, "No resources defined") {
-		t.Fatalf("expected no-resources output, got:\n%s", stdout)
+	if !strings.Contains(output.Stdout, "No resources defined") {
+		t.Fatalf("expected no-resources output, got:\n%s", output.Stdout)
 	}
 }
 
@@ -1329,14 +1329,14 @@ sources:
 	}
 
 	projectPathFlag = projectB
-	_, stderr := captureOutput(t, func() {
+	output := captureOutput(t, func() {
 		if err := installFromManifest(); err != nil {
 			t.Fatalf("project B install failed: %v", err)
 		}
 	})
 
-	if !strings.Contains(stderr, "requested ref 'develop' was not applied") {
-		t.Fatalf("expected ref mismatch warning, stderr:\n%s", stderr)
+	if !strings.Contains(output.Stderr, "requested ref 'develop' was not applied") {
+		t.Fatalf("expected ref mismatch warning, stderr:\n%s", output.Stderr)
 	}
 
 	repoManifest, err := repomanifest.Load(repoPath)
