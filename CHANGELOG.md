@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-04-18
+
+### Added
+- **Manifest-driven remote bootstrap during install** — `aimgr install` can now bootstrap and sync manifest-declared remote `sources:` during zero-argument install flows, so first-run setup works directly from `ai.package.yaml` without requiring a separate repo bootstrap step.
+- **Repo rebuild and explicit sync-prune workflow** — Added repository rebuild support with explicit sync pruning controls to make full repo refreshes safer and more predictable when reconciling managed sources.
+
+### Fixed
+- **Source coordinate and discovery edge cases** — Improved explicit source-coordinate handling, preserved soft-drop source definitions, hardened GitHub subpath handling, and normalized generic discovery warnings for clearer sync/import behavior.
+
+### Changed
+- **Release quality and maintenance updates** — Refined install/sync command internals and tightened CI/lint/test workflows for more reliable day-to-day usage and release gating.
+- **Dependency updates** — Merged Dependabot maintenance updates via PR #13 (`golang.org/x/term` to `v0.42.0`) and PR #14 (`github.com/olekukonko/tablewriter` to `v1.1.4`).
+
 ## [3.8.0] - 2026-04-10
 
 ### Added
@@ -959,7 +972,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform support (Linux, macOS)
 - Configuration management with XDG base directory support
 
-[Unreleased]: https://github.com/dynatrace-oss/ai-config-manager/compare/v3.8.0...HEAD
+[Unreleased]: https://github.com/dynatrace-oss/ai-config-manager/compare/v3.9.0...HEAD
+[3.9.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v3.8.0...v3.9.0
 [3.8.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v3.7.1...v3.8.0
 [3.7.1]: https://github.com/dynatrace-oss/ai-config-manager/compare/v3.7.0...v3.7.1
 [3.7.0]: https://github.com/dynatrace-oss/ai-config-manager/compare/v3.6.0...v3.7.0
