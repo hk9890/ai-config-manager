@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+if ! command -v gofmt >/dev/null 2>&1; then
+    printf 'pre-commit: gofmt not found in PATH\n' >&2
+    exit 1
+fi
+
+staged_go_files=$(git -C "$repo_root" diff --cached --name-only --diff-filter=ACMR -- '*.go')
+
+if [ -z "$staged_go_files" ]; then
+    exit 0
+fi
+
+printf 'pre-commit: formatting staged Go files\n'
+
+old_ifs=$IFS
+IFS='
+'
+set -f
+for file in $staged_go_files; do
+    [ -n "$file" ] || continue
+    gofmt -w "$repo_root/$file"
+    git -C "$repo_root" add -- "$file"
+done
+set +f
+IFS=$old_ifs

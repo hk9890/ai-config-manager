@@ -72,6 +72,22 @@ func NewManagerWithPath(repoPath string) *Manager {
 	return m
 }
 
+func repoLockAcquireTimeout() time.Duration {
+	timeout := 30 * time.Second
+
+	override := strings.TrimSpace(os.Getenv("AIMGR_TEST_REPO_LOCK_TIMEOUT"))
+	if override == "" {
+		return timeout
+	}
+
+	parsed, err := time.ParseDuration(override)
+	if err != nil || parsed <= 0 {
+		return timeout
+	}
+
+	return parsed
+}
+
 // SetLogLevel sets the log level and reinitializes the logger.
 // This should be called after creating the manager and before using it.
 func (m *Manager) SetLogLevel(level slog.Level) {
@@ -137,7 +153,7 @@ func (m *Manager) TryAcquireRepoLock() (*repolock.Lock, bool, error) {
 // AcquireRepoReadLock acquires the repository-wide shared/read lock with default
 // CLI semantics: blocking up to 30s and honoring context cancellation.
 func (m *Manager) AcquireRepoReadLock(ctx context.Context) (*repolock.Lock, error) {
-	return m.locks.AcquireRepoReadLock(ctx)
+	return repolock.AcquireShared(ctx, m.locks.RepoLockPath(), repoLockAcquireTimeout())
 }
 
 // AcquireRepoReadLockWithTimeout acquires the repository-wide shared/read lock
@@ -155,7 +171,7 @@ func (m *Manager) TryAcquireRepoReadLock() (*repolock.Lock, bool, error) {
 // AcquireRepoWriteLock acquires the repository-wide exclusive/write lock with
 // default CLI semantics: blocking up to 30s and honoring context cancellation.
 func (m *Manager) AcquireRepoWriteLock(ctx context.Context) (*repolock.Lock, error) {
-	return m.locks.AcquireRepoWriteLock(ctx)
+	return repolock.AcquireExclusive(ctx, m.locks.RepoLockPath(), repoLockAcquireTimeout())
 }
 
 // AcquireRepoWriteLockWithTimeout acquires the repository-wide exclusive/write

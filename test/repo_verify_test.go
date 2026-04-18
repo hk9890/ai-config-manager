@@ -226,6 +226,7 @@ func TestCLIRepoVerifyPackageJSON(t *testing.T) {
 func TestCLIRepoVerifyJSONOperationalFailureIncludesCategory(t *testing.T) {
 	repoDir := t.TempDir()
 	t.Setenv("AIMGR_REPO_PATH", repoDir)
+	t.Setenv("AIMGR_TEST_REPO_LOCK_TIMEOUT", "250ms")
 
 	manager := repo.NewManagerWithPath(repoDir)
 	lock, err := manager.AcquireRepoWriteLock(context.Background())

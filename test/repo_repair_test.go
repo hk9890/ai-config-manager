@@ -212,6 +212,7 @@ func TestRepoRepairIntegration_UnfixableExitCodeAndStatus(t *testing.T) {
 
 func TestRepoRepairIntegration_OperationalFailureExitCodeAndCategory(t *testing.T) {
 	p := setupRepairTestProject(t)
+	t.Setenv("AIMGR_TEST_REPO_LOCK_TIMEOUT", "250ms")
 
 	lock, err := p.manager.AcquireRepoWriteLock(context.Background())
 	if err != nil {

@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+printf 'pre-push: running unit tests\n'
+make -C "$repo_root" unit-test
+
+printf 'pre-push: running go vet\n'
+make -C "$repo_root" vet
